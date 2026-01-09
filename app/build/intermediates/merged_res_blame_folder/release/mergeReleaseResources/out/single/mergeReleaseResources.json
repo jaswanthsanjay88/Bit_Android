@@ -1,0 +1,198 @@
+[
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\xml_file_paths.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\xml\\file_paths.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable-night_bg_message_assistant.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable-night\\bg_message_assistant.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_back.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_back.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_school.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_school.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_logo_small.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_logo_small.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_chat.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_chat.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_news.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_news.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable-night_bg_send_button.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable-night\\bg_send_button.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_attach_file.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_attach_file.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\mipmap-anydpi-v26\\ic_launcher.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout_activity_settings.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout\\activity_settings.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_copy.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_copy.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_launcher_foreground.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_stop.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_stop.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_info.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_info.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_play.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_play.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_add.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_add.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout-night_item_message_user.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout-night\\item_message_user.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_bg_message_assistant.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\bg_message_assistant.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_volume_up.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_volume_up.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_bg_send_button.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\bg_send_button.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout_item_conversation.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout\\item_conversation.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout\\activity_main.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_bg_message_user.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\bg_message_user.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_send.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_send.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout_item_message_loading.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout\\item_message_loading.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout_item_message_assistant.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout\\item_message_assistant.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_menu.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_menu.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_globe.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_globe.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_bg_typing_dot.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\bg_typing_dot.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_code_box.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_code_box.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_fingerprint.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_fingerprint.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-release-41:/layout_activity_settings.xml.flat",
+        "source": "com.atharva.ollama.app-main-42:/layout/activity_settings.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_bg_input_field.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\bg_input_field.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_dark_mode.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_dark_mode.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_check.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_check.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_bg_settings_input.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\bg_settings_input.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout_item_image_preview.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout\\item_image_preview.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_mic.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_mic.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_fire.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_fire.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable-night_bg_message_user.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable-night\\bg_message_user.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable-night_bg_settings_input.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable-night\\bg_settings_input.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable-night_bg_input_field.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable-night\\bg_input_field.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_bg_stop_button.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\bg_stop_button.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_settings.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_settings.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout_item_message_user.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout\\item_message_user.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\drawable_ic_delete.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\drawable\\ic_delete.xml"
+    },
+    {
+        "merged": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-release-41:\\layout_activity_lock.xml.flat",
+        "source": "C:\\Users\\MY PC\\.gradle\\daemon\\9.0-milestone-1\\com.atharva.ollama.app-main-42:\\layout\\activity_lock.xml"
+    }
+]

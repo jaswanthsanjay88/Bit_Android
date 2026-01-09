@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Semantic Colors for Dark Mode -->
+    <color name="chat_bubble_user_background">@color/dark_bubble_user</color>
+    <color name="chat_bubble_assistant_background">@color/dark_bubble_assistant</color>
+    <color name="input_field_background">@color/dark_divider</color>
+    <color name="send_button_background">@color/white_primary</color>
+    <color name="send_button_icon_tint">@color/black_primary</color>
+</resources>

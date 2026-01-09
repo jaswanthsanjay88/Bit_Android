@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- True Black & White Monochrome Palette - Light Mode -->
+    <color name="black_primary">#FF000000</color>
+    <color name="white_primary">#FFFFFFFF</color>
+    
+    <!-- Grayscale Shades -->
+    <color name="gray_darkest">#FF0A0A0A</color>
+    <color name="gray_dark">#FF1A1A1A</color>
+    <color name="gray_medium">#FF808080</color>
+    <color name="gray_light">#FFE5E5E5</color>
+    <color name="gray_lightest">#FFF5F5F5</color>
+    
+    <!-- Light Mode Colors -->
+    <color name="background_primary">#FFFFFFFF</color>
+    <color name="background_secondary">#FFF5F5F5</color>
+    <color name="text_primary">#FF000000</color>
+    <color name="text_secondary">#FF808080</color>
+    <color name="divider">#FFE5E5E5</color>
+    
+    <!-- Light Mode Message Bubbles -->
+    <color name="bubble_user">#FF000000</color>
+    <color name="bubble_user_text">#FFFFFFFF</color>
+    <color name="bubble_assistant">#FFFFFFFF</color>
+    <color name="bubble_assistant_text">#FF000000</color>
+    <color name="bubble_assistant_border">#FF000000</color>
+    
+    <!-- Dark Mode Colors -->
+    <color name="dark_background_primary">#FF000000</color>
+    <color name="dark_background_secondary">#FF0A0A0A</color>
+    <color name="dark_text_primary">#FFFFFFFF</color>
+    <color name="dark_text_secondary">#FF808080</color>
+    <color name="dark_divider">#FF1A1A1A</color>
+    
+    <!-- Dark Mode Message Bubbles -->
+    <color name="dark_bubble_user">#FFFFFFFF</color>
+    <color name="dark_bubble_user_text">#FF000000</color>
+    <color name="dark_bubble_assistant">#FF1A1A1A</color>
+    <color name="dark_bubble_assistant_text">#FFFFFFFF</color>
+    <color name="dark_bubble_assistant_border">#FF808080</color>
+    
+    <!-- Accent Colors -->
+    <color name="success">#FF2E7D32</color>
+    <color name="error">#FFC62828</color>
+    <color name="warning">#FFF9A825</color>
+    <color name="accent_mic_active">#FF6200EE</color>
+    
+    <!-- Code Block Colors -->
+    <color name="code_background">#FFF5F5F5</color>
+    <color name="code_text">#FF212121</color>
+    <color name="dark_code_background">#FF1A1A1A</color>
+    <color name="dark_code_text">#FFE0E0E0</color>
+
+    <!-- Semantic Colors -->
+    <color name="chat_bubble_user_background">@color/bubble_user</color>
+    <color name="chat_bubble_assistant_background">@color/bubble_assistant</color>
+    <color name="input_field_background">@color/gray_lightest</color>
+    <color name="send_button_background">@color/black_primary</color>
+    <color name="send_button_icon_tint">@color/white_primary</color>
+</resources>

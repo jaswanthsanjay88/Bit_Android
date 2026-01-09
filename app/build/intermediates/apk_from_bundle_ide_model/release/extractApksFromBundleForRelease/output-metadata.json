@@ -1,0 +1,36 @@
+{
+  "version": 3,
+  "artifactType": {
+    "type": "EXTRACTED_APKS",
+    "kind": "Directory"
+  },
+  "applicationId": "com.atharva.ollama",
+  "variantName": "release",
+  "elements": [
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "outputFile": "../../../extracted_apks/release/extractApksFromBundleForRelease/base-arm64_v8a.apk"
+    },
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "outputFile": "../../../extracted_apks/release/extractApksFromBundleForRelease/base-en.apk"
+    },
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "outputFile": "../../../extracted_apks/release/extractApksFromBundleForRelease/base-master_2.apk"
+    },
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "outputFile": "../../../extracted_apks/release/extractApksFromBundleForRelease/base-xxhdpi.apk"
+    }
+  ],
+  "elementType": "File"
+}

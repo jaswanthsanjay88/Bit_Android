@@ -1,0 +1,198 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.atharva.ollama"
+4    android:versionCode="2"
+5    android:versionName="2.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="30"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->D:\android_atharva\app\src\main\AndroidManifest.xml:5:5-67
+11-->D:\android_atharva\app\src\main\AndroidManifest.xml:5:22-64
+12    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+12-->D:\android_atharva\app\src\main\AndroidManifest.xml:6:5-76
+12-->D:\android_atharva\app\src\main\AndroidManifest.xml:6:22-73
+13    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+13-->D:\android_atharva\app\src\main\AndroidManifest.xml:7:5-79
+13-->D:\android_atharva\app\src\main\AndroidManifest.xml:7:22-76
+14    <uses-permission android:name="android.permission.VIBRATE" />
+14-->D:\android_atharva\app\src\main\AndroidManifest.xml:8:5-66
+14-->D:\android_atharva\app\src\main\AndroidManifest.xml:8:22-63
+15    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+15-->D:\android_atharva\app\src\main\AndroidManifest.xml:9:5-71
+15-->D:\android_atharva\app\src\main\AndroidManifest.xml:9:22-68
+16    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+16-->D:\android_atharva\app\src\main\AndroidManifest.xml:10:5-72
+16-->D:\android_atharva\app\src\main\AndroidManifest.xml:10:22-69
+17
+18    <!-- suppress DeprecatedClassUsageInspection -->
+19    <uses-permission android:name="android.permission.USE_FINGERPRINT" />
+19-->[androidx.biometric:biometric:1.1.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\bd531d81a10b1fe2eb0df25f7c60bef6\transformed\biometric-1.1.0\AndroidManifest.xml:27:5-74
+19-->[androidx.biometric:biometric:1.1.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\bd531d81a10b1fe2eb0df25f7c60bef6\transformed\biometric-1.1.0\AndroidManifest.xml:27:22-71
+20
+21    <permission
+21-->[androidx.core:core:1.12.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\d04971ec83f43ab28c7172efa079e292\transformed\core-1.12.0\AndroidManifest.xml:22:5-24:47
+22        android:name="com.atharva.ollama.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+22-->[androidx.core:core:1.12.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\d04971ec83f43ab28c7172efa079e292\transformed\core-1.12.0\AndroidManifest.xml:23:9-81
+23        android:protectionLevel="signature" />
+23-->[androidx.core:core:1.12.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\d04971ec83f43ab28c7172efa079e292\transformed\core-1.12.0\AndroidManifest.xml:24:9-44
+24
+25    <uses-permission android:name="com.atharva.ollama.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+25-->[androidx.core:core:1.12.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\d04971ec83f43ab28c7172efa079e292\transformed\core-1.12.0\AndroidManifest.xml:26:5-97
+25-->[androidx.core:core:1.12.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\d04971ec83f43ab28c7172efa079e292\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
+26
+27    <application
+27-->D:\android_atharva\app\src\main\AndroidManifest.xml:12:5-54:19
+28        android:allowBackup="true"
+28-->D:\android_atharva\app\src\main\AndroidManifest.xml:13:9-35
+29        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+29-->[androidx.core:core:1.12.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\d04971ec83f43ab28c7172efa079e292\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
+30        android:debuggable="true"
+31        android:enableOnBackInvokedCallback="true"
+31-->D:\android_atharva\app\src\main\AndroidManifest.xml:14:9-51
+32        android:extractNativeLibs="false"
+33        android:icon="@mipmap/ic_launcher"
+33-->D:\android_atharva\app\src\main\AndroidManifest.xml:15:9-43
+34        android:label="@string/app_name"
+34-->D:\android_atharva\app\src\main\AndroidManifest.xml:16:9-41
+35        android:roundIcon="@mipmap/ic_launcher_round"
+35-->D:\android_atharva\app\src\main\AndroidManifest.xml:17:9-54
+36        android:supportsRtl="true"
+36-->D:\android_atharva\app\src\main\AndroidManifest.xml:18:9-35
+37        android:theme="@style/Theme.OllamaChat"
+37-->D:\android_atharva\app\src\main\AndroidManifest.xml:19:9-48
+38        android:usesCleartextTraffic="true" >
+38-->D:\android_atharva\app\src\main\AndroidManifest.xml:20:9-44
+39
+40        <!-- Lock Activity - Entry point for biometric auth -->
+41        <activity
+41-->D:\android_atharva\app\src\main\AndroidManifest.xml:24:9-32:20
+42            android:name="com.atharva.ollama.LockActivity"
+42-->D:\android_atharva\app\src\main\AndroidManifest.xml:25:13-41
+43            android:exported="true"
+43-->D:\android_atharva\app\src\main\AndroidManifest.xml:26:13-36
+44            android:theme="@style/Theme.OllamaChat" >
+44-->D:\android_atharva\app\src\main\AndroidManifest.xml:27:13-52
+45            <intent-filter>
+45-->D:\android_atharva\app\src\main\AndroidManifest.xml:28:13-31:29
+46                <action android:name="android.intent.action.MAIN" />
+46-->D:\android_atharva\app\src\main\AndroidManifest.xml:29:17-69
+46-->D:\android_atharva\app\src\main\AndroidManifest.xml:29:25-66
+47
+48                <category android:name="android.intent.category.LAUNCHER" />
+48-->D:\android_atharva\app\src\main\AndroidManifest.xml:30:17-77
+48-->D:\android_atharva\app\src\main\AndroidManifest.xml:30:27-74
+49            </intent-filter>
+50        </activity>
+51        <activity
+51-->D:\android_atharva\app\src\main\AndroidManifest.xml:34:9-37:58
+52            android:name="com.atharva.ollama.MainActivity"
+52-->D:\android_atharva\app\src\main\AndroidManifest.xml:35:13-41
+53            android:exported="false"
+53-->D:\android_atharva\app\src\main\AndroidManifest.xml:36:13-37
+54            android:windowSoftInputMode="adjustResize" />
+54-->D:\android_atharva\app\src\main\AndroidManifest.xml:37:13-55
+55        <activity
+55-->D:\android_atharva\app\src\main\AndroidManifest.xml:39:9-42:58
+56            android:name="com.atharva.ollama.SettingsActivity"
+56-->D:\android_atharva\app\src\main\AndroidManifest.xml:40:13-45
+57            android:exported="false"
+57-->D:\android_atharva\app\src\main\AndroidManifest.xml:41:13-37
+58            android:parentActivityName="com.atharva.ollama.MainActivity" />
+58-->D:\android_atharva\app\src\main\AndroidManifest.xml:42:13-55
+59
+60        <provider
+61            android:name="androidx.core.content.FileProvider"
+61-->D:\android_atharva\app\src\main\AndroidManifest.xml:45:13-62
+62            android:authorities="com.atharva.ollama.provider"
+62-->D:\android_atharva\app\src\main\AndroidManifest.xml:46:13-60
+63            android:exported="false"
+63-->D:\android_atharva\app\src\main\AndroidManifest.xml:47:13-37
+64            android:grantUriPermissions="true" >
+64-->D:\android_atharva\app\src\main\AndroidManifest.xml:48:13-47
+65            <meta-data
+65-->D:\android_atharva\app\src\main\AndroidManifest.xml:49:13-51:54
+66                android:name="android.support.FILE_PROVIDER_PATHS"
+66-->D:\android_atharva\app\src\main\AndroidManifest.xml:50:17-67
+67                android:resource="@xml/file_paths" />
+67-->D:\android_atharva\app\src\main\AndroidManifest.xml:51:17-51
+68        </provider>
+69        <provider
+69-->[androidx.emoji2:emoji2:1.2.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\cc648c4741525a919d97fd06316efdbb\transformed\emoji2-1.2.0\AndroidManifest.xml:24:9-32:20
+70            android:name="androidx.startup.InitializationProvider"
+70-->[androidx.emoji2:emoji2:1.2.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\cc648c4741525a919d97fd06316efdbb\transformed\emoji2-1.2.0\AndroidManifest.xml:25:13-67
+71            android:authorities="com.atharva.ollama.androidx-startup"
+71-->[androidx.emoji2:emoji2:1.2.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\cc648c4741525a919d97fd06316efdbb\transformed\emoji2-1.2.0\AndroidManifest.xml:26:13-68
+72            android:exported="false" >
+72-->[androidx.emoji2:emoji2:1.2.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\cc648c4741525a919d97fd06316efdbb\transformed\emoji2-1.2.0\AndroidManifest.xml:27:13-37
+73            <meta-data
+73-->[androidx.emoji2:emoji2:1.2.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\cc648c4741525a919d97fd06316efdbb\transformed\emoji2-1.2.0\AndroidManifest.xml:29:13-31:52
+74                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+74-->[androidx.emoji2:emoji2:1.2.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\cc648c4741525a919d97fd06316efdbb\transformed\emoji2-1.2.0\AndroidManifest.xml:30:17-75
+75                android:value="androidx.startup" />
+75-->[androidx.emoji2:emoji2:1.2.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\cc648c4741525a919d97fd06316efdbb\transformed\emoji2-1.2.0\AndroidManifest.xml:31:17-49
+76            <meta-data
+76-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e5abc38a9203a083b01a298225d1b62e\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:29:13-31:52
+77                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+77-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e5abc38a9203a083b01a298225d1b62e\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:30:17-78
+78                android:value="androidx.startup" />
+78-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e5abc38a9203a083b01a298225d1b62e\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:31:17-49
+79            <meta-data
+79-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:29:13-31:52
+80                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+80-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:30:17-85
+81                android:value="androidx.startup" />
+81-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:31:17-49
+82        </provider>
+83
+84        <service
+84-->[androidx.room:room-runtime:2.6.1] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\ff4cf4f9581c804f7eedcc3a94eba191\transformed\room-runtime-2.6.1\AndroidManifest.xml:24:9-28:63
+85            android:name="androidx.room.MultiInstanceInvalidationService"
+85-->[androidx.room:room-runtime:2.6.1] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\ff4cf4f9581c804f7eedcc3a94eba191\transformed\room-runtime-2.6.1\AndroidManifest.xml:25:13-74
+86            android:directBootAware="true"
+86-->[androidx.room:room-runtime:2.6.1] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\ff4cf4f9581c804f7eedcc3a94eba191\transformed\room-runtime-2.6.1\AndroidManifest.xml:26:13-43
+87            android:exported="false" />
+87-->[androidx.room:room-runtime:2.6.1] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\ff4cf4f9581c804f7eedcc3a94eba191\transformed\room-runtime-2.6.1\AndroidManifest.xml:27:13-37
+88
+89        <receiver
+89-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:34:9-52:20
+90            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+90-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:35:13-76
+91            android:directBootAware="false"
+91-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:36:13-44
+92            android:enabled="true"
+92-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:37:13-35
+93            android:exported="true"
+93-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:38:13-36
+94            android:permission="android.permission.DUMP" >
+94-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:39:13-57
+95            <intent-filter>
+95-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:40:13-42:29
+96                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+96-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:17-91
+96-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:25-88
+97            </intent-filter>
+98            <intent-filter>
+98-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:43:13-45:29
+99                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+99-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:17-85
+99-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:25-82
+100            </intent-filter>
+101            <intent-filter>
+101-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:46:13-48:29
+102                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+102-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:17-88
+102-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:25-85
+103            </intent-filter>
+104            <intent-filter>
+104-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:49:13-51:29
+105                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+105-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:17-95
+105-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\MY PC\.gradle\caches\9.0-milestone-1\transforms\e973d005fd38447ac79bb2c124aedea3\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:25-92
+106            </intent-filter>
+107        </receiver>
+108    </application>
+109
+110</manifest>

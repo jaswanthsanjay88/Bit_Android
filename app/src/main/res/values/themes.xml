@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Light Theme (Default) -->
+    <style name="Theme.OllamaChat" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/black_primary</item>
+        <item name="colorPrimaryVariant">@color/gray_dark</item>
+        <item name="colorOnPrimary">@color/white_primary</item>
+        
+        <item name="colorSecondary">@color/gray_dark</item>
+        <item name="colorSecondaryVariant">@color/gray_darkest</item>
+        <item name="colorOnSecondary">@color/white_primary</item>
+        
+        <item name="android:colorBackground">@color/white_primary</item>
+        <item name="colorSurface">@color/white_primary</item>
+        <item name="colorOnSurface">@color/black_primary</item>
+        <item name="colorOnSurfaceVariant">@color/gray_medium</item>
+        
+        <item name="android:statusBarColor">@color/white_primary</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">@color/white_primary</item>
+    </style>
+
+    <!-- Dark Theme -->
+    <style name="Theme.OllamaChat.Dark" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/white_primary</item>
+        <item name="colorPrimaryVariant">@color/gray_light</item>
+        <item name="colorOnPrimary">@color/black_primary</item>
+        
+        <item name="colorSecondary">@color/gray_light</item>
+        <item name="colorSecondaryVariant">@color/gray_medium</item>
+        <item name="colorOnSecondary">@color/black_primary</item>
+        
+        <item name="android:colorBackground">@color/black_primary</item>
+        <item name="colorSurface">@color/black_primary</item>
+        <item name="colorOnSurface">@color/white_primary</item>
+        <item name="colorOnSurfaceVariant">@color/gray_medium</item>
+        
+        <item name="android:statusBarColor">@color/black_primary</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">@color/black_primary</item>
+    </style>
+
+</resources>

@@ -1,0 +1,1039 @@
+[Skip to content](https://github.com/Siddhesh2377/Ai-Core#start-of-content)
+
+## Navigation Menu
+
+[Sign in](https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2FSiddhesh2377%2FAi-Core)
+- PlatformAI CODE CREATION[GitHub CopilotWrite better code with AI](https://github.com/features/copilot)[GitHub SparkBuild and deploy intelligent apps](https://github.com/features/spark)[GitHub ModelsManage and compare prompts](https://github.com/features/models)[MCP RegistryNewIntegrate external tools](https://github.com/mcp)DEVELOPER WORKFLOWS[ActionsAutomate any workflow](https://github.com/features/actions)[CodespacesInstant dev environments](https://github.com/features/codespaces)[IssuesPlan and track work](https://github.com/features/issues)[Code ReviewManage code changes](https://github.com/features/code-review)APPLICATION SECURITY[GitHub Advanced SecurityFind and fix vulnerabilities](https://github.com/security/advanced-security)[Code securitySecure your code as you build](https://github.com/security/advanced-security/code-security)[Secret protectionStop leaks before they start](https://github.com/security/advanced-security/secret-protection)EXPLORE[Why GitHub](https://github.com/why-github)[Documentation](https://docs.github.com)[Blog](https://github.blog)[Changelog](https://github.blog/changelog)[Marketplace](https://github.com/marketplace)[View all features](https://github.com/features)
+- AI CODE CREATION[GitHub CopilotWrite better code with AI](https://github.com/features/copilot)[GitHub SparkBuild and deploy intelligent apps](https://github.com/features/spark)[GitHub ModelsManage and compare prompts](https://github.com/features/models)[MCP RegistryNewIntegrate external tools](https://github.com/mcp)
+- [GitHub CopilotWrite better code with AI](https://github.com/features/copilot)
+- [GitHub SparkBuild and deploy intelligent apps](https://github.com/features/spark)
+- [GitHub ModelsManage and compare prompts](https://github.com/features/models)
+- [MCP RegistryNewIntegrate external tools](https://github.com/mcp)
+- DEVELOPER WORKFLOWS[ActionsAutomate any workflow](https://github.com/features/actions)[CodespacesInstant dev environments](https://github.com/features/codespaces)[IssuesPlan and track work](https://github.com/features/issues)[Code ReviewManage code changes](https://github.com/features/code-review)
+- [ActionsAutomate any workflow](https://github.com/features/actions)
+- [CodespacesInstant dev environments](https://github.com/features/codespaces)
+- [IssuesPlan and track work](https://github.com/features/issues)
+- [Code ReviewManage code changes](https://github.com/features/code-review)
+- APPLICATION SECURITY[GitHub Advanced SecurityFind and fix vulnerabilities](https://github.com/security/advanced-security)[Code securitySecure your code as you build](https://github.com/security/advanced-security/code-security)[Secret protectionStop leaks before they start](https://github.com/security/advanced-security/secret-protection)
+- [GitHub Advanced SecurityFind and fix vulnerabilities](https://github.com/security/advanced-security)
+- [Code securitySecure your code as you build](https://github.com/security/advanced-security/code-security)
+- [Secret protectionStop leaks before they start](https://github.com/security/advanced-security/secret-protection)
+- EXPLORE[Why GitHub](https://github.com/why-github)[Documentation](https://docs.github.com)[Blog](https://github.blog)[Changelog](https://github.blog/changelog)[Marketplace](https://github.com/marketplace)
+- [Why GitHub](https://github.com/why-github)
+- [Documentation](https://docs.github.com)
+- [Blog](https://github.blog)
+- [Changelog](https://github.blog/changelog)
+- [Marketplace](https://github.com/marketplace)
+
+## Navigation Menu
+
+- SolutionsBY COMPANY SIZE[Enterprises](https://github.com/enterprise)[Small and medium teams](https://github.com/team)[Startups](https://github.com/enterprise/startups)[Nonprofits](https://github.com/solutions/industry/nonprofits)BY USE CASE[App Modernization](https://github.com/solutions/use-case/app-modernization)[DevSecOps](https://github.com/solutions/use-case/devsecops)[DevOps](https://github.com/solutions/use-case/devops)[CI/CD](https://github.com/solutions/use-case/ci-cd)[View all use cases](https://github.com/solutions/use-case)BY INDUSTRY[Healthcare](https://github.com/solutions/industry/healthcare)[Financial services](https://github.com/solutions/industry/financial-services)[Manufacturing](https://github.com/solutions/industry/manufacturing)[Government](https://github.com/solutions/industry/government)[View all industries](https://github.com/solutions/industry)[View all solutions](https://github.com/solutions)
+- BY COMPANY SIZE[Enterprises](https://github.com/enterprise)[Small and medium teams](https://github.com/team)[Startups](https://github.com/enterprise/startups)[Nonprofits](https://github.com/solutions/industry/nonprofits)
+- [Enterprises](https://github.com/enterprise)
+- [Small and medium teams](https://github.com/team)
+- [Startups](https://github.com/enterprise/startups)
+- [Nonprofits](https://github.com/solutions/industry/nonprofits)
+- BY USE CASE[App Modernization](https://github.com/solutions/use-case/app-modernization)[DevSecOps](https://github.com/solutions/use-case/devsecops)[DevOps](https://github.com/solutions/use-case/devops)[CI/CD](https://github.com/solutions/use-case/ci-cd)[View all use cases](https://github.com/solutions/use-case)
+- [App Modernization](https://github.com/solutions/use-case/app-modernization)
+- [DevSecOps](https://github.com/solutions/use-case/devsecops)
+- [DevOps](https://github.com/solutions/use-case/devops)
+- [CI/CD](https://github.com/solutions/use-case/ci-cd)
+- [View all use cases](https://github.com/solutions/use-case)
+- BY INDUSTRY[Healthcare](https://github.com/solutions/industry/healthcare)[Financial services](https://github.com/solutions/industry/financial-services)[Manufacturing](https://github.com/solutions/industry/manufacturing)[Government](https://github.com/solutions/industry/government)[View all industries](https://github.com/solutions/industry)
+- [Healthcare](https://github.com/solutions/industry/healthcare)
+- [Financial services](https://github.com/solutions/industry/financial-services)
+- [Manufacturing](https://github.com/solutions/industry/manufacturing)
+- [Government](https://github.com/solutions/industry/government)
+- [View all industries](https://github.com/solutions/industry)
+- ResourcesEXPLORE BY TOPIC[AI](https://github.com/resources/articles?topic=ai)[Software Development](https://github.com/resources/articles?topic=software-development)[DevOps](https://github.com/resources/articles?topic=devops)[Security](https://github.com/resources/articles?topic=security)[View all topics](https://github.com/resources/articles)EXPLORE BY TYPE[Customer stories](https://github.com/customer-stories)[Events & webinars](https://github.com/resources/events)[Ebooks & reports](https://github.com/resources/whitepapers)[Business insights](https://github.com/solutions/executive-insights)[GitHub Skills](https://skills.github.com)SUPPORT & SERVICES[Documentation](https://docs.github.com)[Customer support](https://support.github.com)[Community forum](https://github.com/orgs/community/discussions)[Trust center](https://github.com/trust-center)[Partners](https://github.com/partners)
+- EXPLORE BY TOPIC[AI](https://github.com/resources/articles?topic=ai)[Software Development](https://github.com/resources/articles?topic=software-development)[DevOps](https://github.com/resources/articles?topic=devops)[Security](https://github.com/resources/articles?topic=security)[View all topics](https://github.com/resources/articles)
+- [AI](https://github.com/resources/articles?topic=ai)
+- [Software Development](https://github.com/resources/articles?topic=software-development)
+- [DevOps](https://github.com/resources/articles?topic=devops)
+- [Security](https://github.com/resources/articles?topic=security)
+- [View all topics](https://github.com/resources/articles)
+
+## Navigation Menu
+
+- EXPLORE BY TYPE[Customer stories](https://github.com/customer-stories)[Events & webinars](https://github.com/resources/events)[Ebooks & reports](https://github.com/resources/whitepapers)[Business insights](https://github.com/solutions/executive-insights)[GitHub Skills](https://skills.github.com)
+- [Customer stories](https://github.com/customer-stories)
+- [Events & webinars](https://github.com/resources/events)
+- [Ebooks & reports](https://github.com/resources/whitepapers)
+- [Business insights](https://github.com/solutions/executive-insights)
+- [GitHub Skills](https://skills.github.com)
+- SUPPORT & SERVICES[Documentation](https://docs.github.com)[Customer support](https://support.github.com)[Community forum](https://github.com/orgs/community/discussions)[Trust center](https://github.com/trust-center)[Partners](https://github.com/partners)
+- [Documentation](https://docs.github.com)
+- [Customer support](https://support.github.com)
+- [Community forum](https://github.com/orgs/community/discussions)
+- [Trust center](https://github.com/trust-center)
+- [Partners](https://github.com/partners)
+- Open SourceCOMMUNITY[GitHub SponsorsFund open source developers](https://github.com/sponsors)PROGRAMS[Security Lab](https://securitylab.github.com)[Maintainer Community](https://maintainers.github.com)[Accelerator](https://github.com/accelerator)[Archive Program](https://archiveprogram.github.com)REPOSITORIES[Topics](https://github.com/topics)[Trending](https://github.com/trending)[Collections](https://github.com/collections)
+- COMMUNITY[GitHub SponsorsFund open source developers](https://github.com/sponsors)
+- [GitHub SponsorsFund open source developers](https://github.com/sponsors)
+- PROGRAMS[Security Lab](https://securitylab.github.com)[Maintainer Community](https://maintainers.github.com)[Accelerator](https://github.com/accelerator)[Archive Program](https://archiveprogram.github.com)
+- [Security Lab](https://securitylab.github.com)
+- [Maintainer Community](https://maintainers.github.com)
+- [Accelerator](https://github.com/accelerator)
+- [Archive Program](https://archiveprogram.github.com)
+- REPOSITORIES[Topics](https://github.com/topics)[Trending](https://github.com/trending)[Collections](https://github.com/collections)
+- [Topics](https://github.com/topics)
+- [Trending](https://github.com/trending)
+- [Collections](https://github.com/collections)
+- EnterpriseENTERPRISE SOLUTIONS[Enterprise platformAI-powered developer platform](https://github.com/enterprise)AVAILABLE ADD-ONS[GitHub Advanced SecurityEnterprise-grade security features](https://github.com/security/advanced-security)[Copilot for BusinessEnterprise-grade AI features](https://github.com/features/copilot/copilot-business)[Premium SupportEnterprise-grade 24/7 support](https://github.com/premium-support)
+- ENTERPRISE SOLUTIONS[Enterprise platformAI-powered developer platform](https://github.com/enterprise)
+- [Enterprise platformAI-powered developer platform](https://github.com/enterprise)
+- AVAILABLE ADD-ONS[GitHub Advanced SecurityEnterprise-grade security features](https://github.com/security/advanced-security)[Copilot for BusinessEnterprise-grade AI features](https://github.com/features/copilot/copilot-business)[Premium SupportEnterprise-grade 24/7 support](https://github.com/premium-support)
+- [GitHub Advanced SecurityEnterprise-grade security features](https://github.com/security/advanced-security)
+- [Copilot for BusinessEnterprise-grade AI features](https://github.com/features/copilot/copilot-business)
+- [Premium SupportEnterprise-grade 24/7 support](https://github.com/premium-support)
+- [Pricing](https://github.com/pricing)
+- AI CODE CREATION[GitHub CopilotWrite better code with AI](https://github.com/features/copilot)[GitHub SparkBuild and deploy intelligent apps](https://github.com/features/spark)[GitHub ModelsManage and compare prompts](https://github.com/features/models)[MCP RegistryNewIntegrate external tools](https://github.com/mcp)
+- [GitHub CopilotWrite better code with AI](https://github.com/features/copilot)
+- [GitHub SparkBuild and deploy intelligent apps](https://github.com/features/spark)
+- [GitHub ModelsManage and compare prompts](https://github.com/features/models)
+- [MCP RegistryNewIntegrate external tools](https://github.com/mcp)
+
+## Navigation Menu
+
+- DEVELOPER WORKFLOWS[ActionsAutomate any workflow](https://github.com/features/actions)[CodespacesInstant dev environments](https://github.com/features/codespaces)[IssuesPlan and track work](https://github.com/features/issues)[Code ReviewManage code changes](https://github.com/features/code-review)
+- [ActionsAutomate any workflow](https://github.com/features/actions)
+- [CodespacesInstant dev environments](https://github.com/features/codespaces)
+- [IssuesPlan and track work](https://github.com/features/issues)
+- [Code ReviewManage code changes](https://github.com/features/code-review)
+- APPLICATION SECURITY[GitHub Advanced SecurityFind and fix vulnerabilities](https://github.com/security/advanced-security)[Code securitySecure your code as you build](https://github.com/security/advanced-security/code-security)[Secret protectionStop leaks before they start](https://github.com/security/advanced-security/secret-protection)
+- [GitHub Advanced SecurityFind and fix vulnerabilities](https://github.com/security/advanced-security)
+- [Code securitySecure your code as you build](https://github.com/security/advanced-security/code-security)
+- [Secret protectionStop leaks before they start](https://github.com/security/advanced-security/secret-protection)
+- EXPLORE[Why GitHub](https://github.com/why-github)[Documentation](https://docs.github.com)[Blog](https://github.blog)[Changelog](https://github.blog/changelog)[Marketplace](https://github.com/marketplace)
+- [Why GitHub](https://github.com/why-github)
+- [Documentation](https://docs.github.com)
+- [Blog](https://github.blog)
+- [Changelog](https://github.blog/changelog)
+- [Marketplace](https://github.com/marketplace)
+- [GitHub CopilotWrite better code with AI](https://github.com/features/copilot)
+- [GitHub SparkBuild and deploy intelligent apps](https://github.com/features/spark)
+- [GitHub ModelsManage and compare prompts](https://github.com/features/models)
+- [MCP RegistryNewIntegrate external tools](https://github.com/mcp)
+[GitHub CopilotWrite better code with AI](https://github.com/features/copilot)
+[GitHub SparkBuild and deploy intelligent apps](https://github.com/features/spark)
+[GitHub ModelsManage and compare prompts](https://github.com/features/models)
+[MCP RegistryNewIntegrate external tools](https://github.com/mcp)
+- [ActionsAutomate any workflow](https://github.com/features/actions)
+- [CodespacesInstant dev environments](https://github.com/features/codespaces)
+- [IssuesPlan and track work](https://github.com/features/issues)
+- [Code ReviewManage code changes](https://github.com/features/code-review)
+[ActionsAutomate any workflow](https://github.com/features/actions)
+[CodespacesInstant dev environments](https://github.com/features/codespaces)
+[IssuesPlan and track work](https://github.com/features/issues)
+[Code ReviewManage code changes](https://github.com/features/code-review)
+- [GitHub Advanced SecurityFind and fix vulnerabilities](https://github.com/security/advanced-security)
+- [Code securitySecure your code as you build](https://github.com/security/advanced-security/code-security)
+- [Secret protectionStop leaks before they start](https://github.com/security/advanced-security/secret-protection)
+[GitHub Advanced SecurityFind and fix vulnerabilities](https://github.com/security/advanced-security)
+[Code securitySecure your code as you build](https://github.com/security/advanced-security/code-security)
+[Secret protectionStop leaks before they start](https://github.com/security/advanced-security/secret-protection)
+- [Why GitHub](https://github.com/why-github)
+- [Documentation](https://docs.github.com)
+- [Blog](https://github.blog)
+- [Changelog](https://github.blog/changelog)
+- [Marketplace](https://github.com/marketplace)
+[Why GitHub](https://github.com/why-github)
+[Documentation](https://docs.github.com)
+[Blog](https://github.blog)
+[Changelog](https://github.blog/changelog)
+[Marketplace](https://github.com/marketplace)
+[View all features](https://github.com/features)
+- BY COMPANY SIZE[Enterprises](https://github.com/enterprise)[Small and medium teams](https://github.com/team)[Startups](https://github.com/enterprise/startups)[Nonprofits](https://github.com/solutions/industry/nonprofits)
+- [Enterprises](https://github.com/enterprise)
+- [Small and medium teams](https://github.com/team)
+- [Startups](https://github.com/enterprise/startups)
+- [Nonprofits](https://github.com/solutions/industry/nonprofits)
+
+## Navigation Menu
+
+- BY USE CASE[App Modernization](https://github.com/solutions/use-case/app-modernization)[DevSecOps](https://github.com/solutions/use-case/devsecops)[DevOps](https://github.com/solutions/use-case/devops)[CI/CD](https://github.com/solutions/use-case/ci-cd)[View all use cases](https://github.com/solutions/use-case)
+- [App Modernization](https://github.com/solutions/use-case/app-modernization)
+- [DevSecOps](https://github.com/solutions/use-case/devsecops)
+- [DevOps](https://github.com/solutions/use-case/devops)
+- [CI/CD](https://github.com/solutions/use-case/ci-cd)
+- [View all use cases](https://github.com/solutions/use-case)
+- BY INDUSTRY[Healthcare](https://github.com/solutions/industry/healthcare)[Financial services](https://github.com/solutions/industry/financial-services)[Manufacturing](https://github.com/solutions/industry/manufacturing)[Government](https://github.com/solutions/industry/government)[View all industries](https://github.com/solutions/industry)
+- [Healthcare](https://github.com/solutions/industry/healthcare)
+- [Financial services](https://github.com/solutions/industry/financial-services)
+- [Manufacturing](https://github.com/solutions/industry/manufacturing)
+- [Government](https://github.com/solutions/industry/government)
+- [View all industries](https://github.com/solutions/industry)
+- [Enterprises](https://github.com/enterprise)
+- [Small and medium teams](https://github.com/team)
+- [Startups](https://github.com/enterprise/startups)
+- [Nonprofits](https://github.com/solutions/industry/nonprofits)
+[Enterprises](https://github.com/enterprise)
+[Small and medium teams](https://github.com/team)
+[Startups](https://github.com/enterprise/startups)
+[Nonprofits](https://github.com/solutions/industry/nonprofits)
+- [App Modernization](https://github.com/solutions/use-case/app-modernization)
+- [DevSecOps](https://github.com/solutions/use-case/devsecops)
+- [DevOps](https://github.com/solutions/use-case/devops)
+- [CI/CD](https://github.com/solutions/use-case/ci-cd)
+- [View all use cases](https://github.com/solutions/use-case)
+[App Modernization](https://github.com/solutions/use-case/app-modernization)
+[DevSecOps](https://github.com/solutions/use-case/devsecops)
+[DevOps](https://github.com/solutions/use-case/devops)
+[CI/CD](https://github.com/solutions/use-case/ci-cd)
+[View all use cases](https://github.com/solutions/use-case)
+- [Healthcare](https://github.com/solutions/industry/healthcare)
+- [Financial services](https://github.com/solutions/industry/financial-services)
+- [Manufacturing](https://github.com/solutions/industry/manufacturing)
+- [Government](https://github.com/solutions/industry/government)
+- [View all industries](https://github.com/solutions/industry)
+[Healthcare](https://github.com/solutions/industry/healthcare)
+[Financial services](https://github.com/solutions/industry/financial-services)
+[Manufacturing](https://github.com/solutions/industry/manufacturing)
+[Government](https://github.com/solutions/industry/government)
+[View all industries](https://github.com/solutions/industry)
+[View all solutions](https://github.com/solutions)
+- EXPLORE BY TOPIC[AI](https://github.com/resources/articles?topic=ai)[Software Development](https://github.com/resources/articles?topic=software-development)[DevOps](https://github.com/resources/articles?topic=devops)[Security](https://github.com/resources/articles?topic=security)[View all topics](https://github.com/resources/articles)
+- [AI](https://github.com/resources/articles?topic=ai)
+- [Software Development](https://github.com/resources/articles?topic=software-development)
+- [DevOps](https://github.com/resources/articles?topic=devops)
+- [Security](https://github.com/resources/articles?topic=security)
+- [View all topics](https://github.com/resources/articles)
+- EXPLORE BY TYPE[Customer stories](https://github.com/customer-stories)[Events & webinars](https://github.com/resources/events)[Ebooks & reports](https://github.com/resources/whitepapers)[Business insights](https://github.com/solutions/executive-insights)[GitHub Skills](https://skills.github.com)
+- [Customer stories](https://github.com/customer-stories)
+- [Events & webinars](https://github.com/resources/events)
+- [Ebooks & reports](https://github.com/resources/whitepapers)
+- [Business insights](https://github.com/solutions/executive-insights)
+- [GitHub Skills](https://skills.github.com)
+
+## Navigation Menu
+
+- SUPPORT & SERVICES[Documentation](https://docs.github.com)[Customer support](https://support.github.com)[Community forum](https://github.com/orgs/community/discussions)[Trust center](https://github.com/trust-center)[Partners](https://github.com/partners)
+- [Documentation](https://docs.github.com)
+- [Customer support](https://support.github.com)
+- [Community forum](https://github.com/orgs/community/discussions)
+- [Trust center](https://github.com/trust-center)
+- [Partners](https://github.com/partners)
+- [AI](https://github.com/resources/articles?topic=ai)
+- [Software Development](https://github.com/resources/articles?topic=software-development)
+- [DevOps](https://github.com/resources/articles?topic=devops)
+- [Security](https://github.com/resources/articles?topic=security)
+- [View all topics](https://github.com/resources/articles)
+[AI](https://github.com/resources/articles?topic=ai)
+[Software Development](https://github.com/resources/articles?topic=software-development)
+[DevOps](https://github.com/resources/articles?topic=devops)
+[Security](https://github.com/resources/articles?topic=security)
+[View all topics](https://github.com/resources/articles)
+- [Customer stories](https://github.com/customer-stories)
+- [Events & webinars](https://github.com/resources/events)
+- [Ebooks & reports](https://github.com/resources/whitepapers)
+- [Business insights](https://github.com/solutions/executive-insights)
+- [GitHub Skills](https://skills.github.com)
+[Customer stories](https://github.com/customer-stories)
+[Events & webinars](https://github.com/resources/events)
+[Ebooks & reports](https://github.com/resources/whitepapers)
+[Business insights](https://github.com/solutions/executive-insights)
+[GitHub Skills](https://skills.github.com)
+- [Documentation](https://docs.github.com)
+- [Customer support](https://support.github.com)
+- [Community forum](https://github.com/orgs/community/discussions)
+- [Trust center](https://github.com/trust-center)
+- [Partners](https://github.com/partners)
+[Documentation](https://docs.github.com)
+[Customer support](https://support.github.com)
+[Community forum](https://github.com/orgs/community/discussions)
+[Trust center](https://github.com/trust-center)
+[Partners](https://github.com/partners)
+- COMMUNITY[GitHub SponsorsFund open source developers](https://github.com/sponsors)
+- [GitHub SponsorsFund open source developers](https://github.com/sponsors)
+- PROGRAMS[Security Lab](https://securitylab.github.com)[Maintainer Community](https://maintainers.github.com)[Accelerator](https://github.com/accelerator)[Archive Program](https://archiveprogram.github.com)
+- [Security Lab](https://securitylab.github.com)
+- [Maintainer Community](https://maintainers.github.com)
+- [Accelerator](https://github.com/accelerator)
+- [Archive Program](https://archiveprogram.github.com)
+- REPOSITORIES[Topics](https://github.com/topics)[Trending](https://github.com/trending)[Collections](https://github.com/collections)
+- [Topics](https://github.com/topics)
+- [Trending](https://github.com/trending)
+- [Collections](https://github.com/collections)
+- [GitHub SponsorsFund open source developers](https://github.com/sponsors)
+[GitHub SponsorsFund open source developers](https://github.com/sponsors)
+- [Security Lab](https://securitylab.github.com)
+- [Maintainer Community](https://maintainers.github.com)
+- [Accelerator](https://github.com/accelerator)
+- [Archive Program](https://archiveprogram.github.com)
+[Security Lab](https://securitylab.github.com)
+[Maintainer Community](https://maintainers.github.com)
+[Accelerator](https://github.com/accelerator)
+[Archive Program](https://archiveprogram.github.com)
+- [Topics](https://github.com/topics)
+- [Trending](https://github.com/trending)
+- [Collections](https://github.com/collections)
+[Topics](https://github.com/topics)
+[Trending](https://github.com/trending)
+[Collections](https://github.com/collections)
+- ENTERPRISE SOLUTIONS[Enterprise platformAI-powered developer platform](https://github.com/enterprise)
+- [Enterprise platformAI-powered developer platform](https://github.com/enterprise)
+- AVAILABLE ADD-ONS[GitHub Advanced SecurityEnterprise-grade security features](https://github.com/security/advanced-security)[Copilot for BusinessEnterprise-grade AI features](https://github.com/features/copilot/copilot-business)[Premium SupportEnterprise-grade 24/7 support](https://github.com/premium-support)
+
+## Navigation Menu
+
+- [GitHub Advanced SecurityEnterprise-grade security features](https://github.com/security/advanced-security)
+- [Copilot for BusinessEnterprise-grade AI features](https://github.com/features/copilot/copilot-business)
+- [Premium SupportEnterprise-grade 24/7 support](https://github.com/premium-support)
+- [Enterprise platformAI-powered developer platform](https://github.com/enterprise)
+[Enterprise platformAI-powered developer platform](https://github.com/enterprise)
+- [GitHub Advanced SecurityEnterprise-grade security features](https://github.com/security/advanced-security)
+- [Copilot for BusinessEnterprise-grade AI features](https://github.com/features/copilot/copilot-business)
+- [Premium SupportEnterprise-grade 24/7 support](https://github.com/premium-support)
+[GitHub Advanced SecurityEnterprise-grade security features](https://github.com/security/advanced-security)
+[Copilot for BusinessEnterprise-grade AI features](https://github.com/features/copilot/copilot-business)
+[Premium SupportEnterprise-grade 24/7 support](https://github.com/premium-support)
+[Pricing](https://github.com/pricing)
+
+# Search code, repositories, users, issues, pull requests...
+[Search syntax tips](https://docs.github.com/search-github/github-code-search/understanding-github-code-search-syntax)
+
+# Provide feedback
+We read every piece of feedback, and take your input very seriously.
+
+## Use saved searches to filter your results more quickly
+
+To see all available qualifiers, see our [documentation](https://docs.github.com/search-github/github-code-search/understanding-github-code-search-syntax).
+[Sign in](https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2FSiddhesh2377%2FAi-Core)
+[Sign up](https://github.com/signup?ref_cta=Sign+up&ref_loc=header+logged+out&ref_page=%2F%3Cuser-name%3E%2F%3Crepo-name%3E&source=header-repo&source_repo=Siddhesh2377%2FAi-Core)
+[Reload](https://github.com/Siddhesh2377/Ai-Core)
+[Reload](https://github.com/Siddhesh2377/Ai-Core)
+[Reload](https://github.com/Siddhesh2377/Ai-Core)
+[Siddhesh2377](https://github.com/Siddhesh2377)
+[Ai-Core](https://github.com/Siddhesh2377/Ai-Core)
+- 
+
+
+
+
+
+
+
+
+              Uh oh!
+
+              There was an error while loading. [Please reload this page](https://github.com/Siddhesh2377/Ai-Core).
+
+
+
+
+
+
+- 
+            [Notifications](https://github.com/login?return_to=%2FSiddhesh2377%2FAi-Core)    You must be signed in to change notification settings
+
+
+- 
+          [Fork
+    2](https://github.com/login?return_to=%2FSiddhesh2377%2FAi-Core)
+
+- 
+
+        [Star
+          23](https://github.com/login?return_to=%2FSiddhesh2377%2FAi-Core)
+
+### Uh oh!
+There was an error while loading. [Please reload this page](https://github.com/Siddhesh2377/Ai-Core).
+[Notifications](https://github.com/login?return_to=%2FSiddhesh2377%2FAi-Core)
+[Fork
+    2](https://github.com/login?return_to=%2FSiddhesh2377%2FAi-Core)
+[Star
+          23](https://github.com/login?return_to=%2FSiddhesh2377%2FAi-Core)
+Native C/C++ core for ToolNeuron — JNI + llama.cpp bindings for fast, private, on‑device LLM inference on Android.
+[github.com/Siddhesh2377/ToolNeuron](https://github.com/Siddhesh2377/ToolNeuron)
+
+### License
+[Apache-2.0 license](https://github.com/Siddhesh2377/Ai-Core/blob/master/LICENSE)
+[23
+          stars](https://github.com/Siddhesh2377/Ai-Core/stargazers)
+[2
+          forks](https://github.com/Siddhesh2377/Ai-Core/forks)
+[Branches](https://github.com/Siddhesh2377/Ai-Core/branches)
+[Tags](https://github.com/Siddhesh2377/Ai-Core/tags)
+[Activity](https://github.com/Siddhesh2377/Ai-Core/activity)
+[Star](https://github.com/login?return_to=%2FSiddhesh2377%2FAi-Core)
+[Notifications](https://github.com/login?return_to=%2FSiddhesh2377%2FAi-Core)
+- 
+  [Code](https://github.com/Siddhesh2377/Ai-Core)
+- 
+  [Issues
+          0](https://github.com/Siddhesh2377/Ai-Core/issues)
+- 
+  [Pull requests
+          0](https://github.com/Siddhesh2377/Ai-Core/pulls)
+- 
+  [Discussions](https://github.com/Siddhesh2377/Ai-Core/discussions)
+- 
+  [Actions](https://github.com/Siddhesh2377/Ai-Core/actions)
+- 
+  [Projects
+          0](https://github.com/Siddhesh2377/Ai-Core/projects)
+- https://github.com/Siddhesh2377/Ai-Core/security[Security](https://github.com/Siddhesh2377/Ai-Core/security)https://github.com/Siddhesh2377/Ai-Core/security
+  https://github.com/Siddhesh2377/Ai-Core/security[Uh oh!](https://github.com/Siddhesh2377/Ai-Core/security)[There was an error while loading.](https://github.com/Siddhesh2377/Ai-Core/security)[Please reload this page](https://github.com/Siddhesh2377/Ai-Core).
+
+
+
+
+
+
+
+
+- 
+  [Insights](https://github.com/Siddhesh2377/Ai-Core/pulse)
+[Code](https://github.com/Siddhesh2377/Ai-Core)
+[Issues
+          0](https://github.com/Siddhesh2377/Ai-Core/issues)
+[Pull requests
+          0](https://github.com/Siddhesh2377/Ai-Core/pulls)
+[Discussions](https://github.com/Siddhesh2377/Ai-Core/discussions)
+[Actions](https://github.com/Siddhesh2377/Ai-Core/actions)
+[Projects
+          0](https://github.com/Siddhesh2377/Ai-Core/projects)
+[Security](https://github.com/Siddhesh2377/Ai-Core/security)
+[Uh oh!](https://github.com/Siddhesh2377/Ai-Core/security)
+
+### Uh oh!
+[There was an error while loading.](https://github.com/Siddhesh2377/Ai-Core/security)[Please reload this page](https://github.com/Siddhesh2377/Ai-Core).
+[Insights](https://github.com/Siddhesh2377/Ai-Core/pulse)
+- 
+
+
+    [Code](https://github.com/Siddhesh2377/Ai-Core)
+
+
+- 
+
+
+    [Issues](https://github.com/Siddhesh2377/Ai-Core/issues)
+
+
+- 
+
+
+    [Pull requests](https://github.com/Siddhesh2377/Ai-Core/pulls)
+
+
+- 
+
+
+    [Discussions](https://github.com/Siddhesh2377/Ai-Core/discussions)
+
+
+- 
+
+
+    [Actions](https://github.com/Siddhesh2377/Ai-Core/actions)
+
+
+- 
+
+
+    [Projects](https://github.com/Siddhesh2377/Ai-Core/projects)
+
+
+- 
+
+
+    [Security](https://github.com/Siddhesh2377/Ai-Core/security)
+
+
+- 
+
+
+    [Insights](https://github.com/Siddhesh2377/Ai-Core/pulse)
+
+
+[Code](https://github.com/Siddhesh2377/Ai-Core)
+[Issues](https://github.com/Siddhesh2377/Ai-Core/issues)
+[Pull requests](https://github.com/Siddhesh2377/Ai-Core/pulls)
+[Discussions](https://github.com/Siddhesh2377/Ai-Core/discussions)
+[Actions](https://github.com/Siddhesh2377/Ai-Core/actions)
+[Projects](https://github.com/Siddhesh2377/Ai-Core/projects)
+[Security](https://github.com/Siddhesh2377/Ai-Core/security)
+[Insights](https://github.com/Siddhesh2377/Ai-Core/pulse)
+
+# Siddhesh2377/Ai-Core
+
+[Branches](https://github.com/Siddhesh2377/Ai-Core/branches)
+[Tags](https://github.com/Siddhesh2377/Ai-Core/tags)
+
+## History
+[63 Commits](https://github.com/Siddhesh2377/Ai-Core/commits/master/)
+[.github](https://github.com/Siddhesh2377/Ai-Core/tree/master/.github)
+[.github](https://github.com/Siddhesh2377/Ai-Core/tree/master/.github)
+[.idea](https://github.com/Siddhesh2377/Ai-Core/tree/master/.idea)
+[.idea](https://github.com/Siddhesh2377/Ai-Core/tree/master/.idea)
+[ai-core](https://github.com/Siddhesh2377/Ai-Core/tree/master/ai-core)
+[ai-core](https://github.com/Siddhesh2377/Ai-Core/tree/master/ai-core)
+[app](https://github.com/Siddhesh2377/Ai-Core/tree/master/app)
+[app](https://github.com/Siddhesh2377/Ai-Core/tree/master/app)
+[gradle](https://github.com/Siddhesh2377/Ai-Core/tree/master/gradle)
+[gradle](https://github.com/Siddhesh2377/Ai-Core/tree/master/gradle)
+[res](https://github.com/Siddhesh2377/Ai-Core/tree/master/res)
+[res](https://github.com/Siddhesh2377/Ai-Core/tree/master/res)
+[scripts](https://github.com/Siddhesh2377/Ai-Core/tree/master/scripts)
+[scripts](https://github.com/Siddhesh2377/Ai-Core/tree/master/scripts)
+[.gitignore](https://github.com/Siddhesh2377/Ai-Core/blob/master/.gitignore)
+[.gitignore](https://github.com/Siddhesh2377/Ai-Core/blob/master/.gitignore)
+[LICENSE](https://github.com/Siddhesh2377/Ai-Core/blob/master/LICENSE)
+[LICENSE](https://github.com/Siddhesh2377/Ai-Core/blob/master/LICENSE)
+[README.MD](https://github.com/Siddhesh2377/Ai-Core/blob/master/README.MD)
+[README.MD](https://github.com/Siddhesh2377/Ai-Core/blob/master/README.MD)
+[build.gradle.kts](https://github.com/Siddhesh2377/Ai-Core/blob/master/build.gradle.kts)
+[build.gradle.kts](https://github.com/Siddhesh2377/Ai-Core/blob/master/build.gradle.kts)
+[gradle.properties](https://github.com/Siddhesh2377/Ai-Core/blob/master/gradle.properties)
+[gradle.properties](https://github.com/Siddhesh2377/Ai-Core/blob/master/gradle.properties)
+[gradlew](https://github.com/Siddhesh2377/Ai-Core/blob/master/gradlew)
+[gradlew](https://github.com/Siddhesh2377/Ai-Core/blob/master/gradlew)
+[gradlew.bat](https://github.com/Siddhesh2377/Ai-Core/blob/master/gradlew.bat)
+[gradlew.bat](https://github.com/Siddhesh2377/Ai-Core/blob/master/gradlew.bat)
+[settings.gradle.kts](https://github.com/Siddhesh2377/Ai-Core/blob/master/settings.gradle.kts)
+[settings.gradle.kts](https://github.com/Siddhesh2377/Ai-Core/blob/master/settings.gradle.kts)
+
+## Repository files navigation
+- [README](https://github.com/Siddhesh2377/Ai-Core)
+- [Apache-2.0 license](https://github.com/Siddhesh2377/Ai-Core)
+[README](https://github.com/Siddhesh2377/Ai-Core)
+[Apache-2.0 license](https://github.com/Siddhesh2377/Ai-Core)
+
+## 📦 ai-core – Android AI Core Library (AAR)
+```
+ai-core
+```
+
+# ai-core (Android Java/Kotlin AAR)
+
+ai-core exposes a powerful, lightweight LLM stack (text‑generation, embeddings, multimodal vision) via a single self‑contained AAR. The binary contains the JNI glue + a native ai_core.so built with llama.cpp and mtmd (multimodal) back‑end.
+
+```
+ai_core.so
+```
+
+## ✅ Features
+
+```
+EmbedLib
+```
+
+
+```
+FloatArray
+```
+
+
+```
+MtmdLib
+```
+
+
+```
+IGenerationCallback
+```
+
+
+```
+ModelSwapper
+```
+
+
+```
+llamaPrintTimings
+```
+
+
+```
+modelInfo
+```
+
+
+```
+Dispatcher.IO/Default
+```
+
+⚠️ Currently GPU support is disabled (CPU‑only). Feel free to enable MIGraphX or Metal in ai_core.cpp if needed.
+
+```
+MIGraphX
+```
+
+
+```
+Metal
+```
+
+
+```
+ai_core.cpp
+```
+
+### 1️⃣ Add the AAR to your project
+```
+app/ ├─ libs/ │ ├─ ai_core-1.0.0.aar # provided in `build-output/` └─ build.gradle
+```
+
+
+```
+app/ ├─ libs/ │ ├─ ai_core-1.0.0.aar # provided in `build-output/` └─ build.gradle
+```
+
+
+```
+// app/build.gradle dependencies { implementation(fileTree(dir: 'libs', include: ['*.aar'])) }
+```
+
+Important: Add the NDK path in local.properties ndk.dir=/path/to/ndk
+
+```
+local.properties
+```
+
+
+```
+ndk.dir=/path/to/ndk
+```
+
+### 2️⃣ Declare PROPER permissions
+```
+<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" /> <uses-permission android:name="android.permission.FOREGROUND_SERVICE" /> <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+```
+
+### 3️⃣ Generic Usage
+```
+val lib = NativeLib.getInstance() val ok = lib.init( path = "/sdcard/models/llama-2-7B.gguf", threads = 4, ctxSize = 4096, temp = 0.7f, topK = 20, topP = 0.9f, minP = 0.0f ) if (ok) { lib.generateStreaming( prompt = "Hello AI!", maxTokens = 128, callback = object : IGenerationCallback { ... } ) }
+```
+
+Embedding:
+
+```
+val embed = EmbedLib.getInstance() val vec: FloatArray? = embed.encode("some text")
+```
+
+Multimodal:
+
+```
+MtmdLib.getInstance().init("mmproj.bin", threads = 4) val imgBytes = /* load PNG/JPEG */ MtmdLib.getInstance().nativeGenerateStreamWithImage( prompt = "Describe image", imageData = imgBytes, imageWidth = 640, imageHeight = 480, maxTokens = 256, callback = object : StreamCallback { ... } )
+```
+
+### 4️⃣ Clean‑up
+```
+NativeLib.releaseAll() EmbedLib.release() MtmdLib.releaseInstance()
+```
+
+## 🔧 Build Script (scripts/build_llama.sh)
+
+```
+scripts/build_llama.sh
+```
+
+
+```
+sh scripts/build_llama.sh /path/to/llama.cpp
+```
+
+
+```
+sh scripts/build_llama.sh /path/to/llama.cpp
+```
+
+- Builds libllama.so, libggml.so, libggml-cpu.so, libggml-base.so, and libmtmd.so for arm64-v8a and x86_64.
+- Output goes to build-output/<abi>/bin/.
+- Requires ANDROID_NDK env‑var to be set.
+
+```
+arm64-v8a
+```
+
+
+```
+x86_64
+```
+
+
+```
+build-output/<abi>/bin/
+```
+
+
+```
+ANDROID_NDK
+```
+
+### Helper Sub‑packages
+
+```
+chat/...
+```
+
+
+```
+chat_template.cpp
+```
+
+
+```
+cpu/...
+```
+
+
+```
+cpu_helper.cpp
+```
+
+
+```
+global_state/...
+```
+
+
+```
+g_state
+```
+
+
+```
+state/...
+```
+
+
+```
+ModelState
+```
+
+
+```
+tool_calling/...
+```
+
+
+```
+tool_call_state.cpp
+```
+
+
+```
+utils/...
+```
+
+
+```
+jni_utils.cpp
+```
+
+
+```
+logger.h
+```
+
+
+```
+utf8_utils.cpp
+```
+
+## 🔄 Project Overview (App Module)
+```
+app/ ├─ src/main/AndroidManifest.xml ├─ src/main/java/com/mp/ai_core/MainActivity.kt ├─ src/main/java/com/mp/ai_core/text/GenerationService.kt ├─ src/main/java/com/mp/ai_core/ModelSwapper.kt ├─ src/main/java/com/mp/ai_core/stt/ (Sherpa STT) ├─ src/main/java/com/mp/ai_core/tts/ (Sherpa TTS) └─ build.gradle
+```
+
+
+```
+app/ ├─ src/main/AndroidManifest.xml ├─ src/main/java/com/mp/ai_core/MainActivity.kt ├─ src/main/java/com/mp/ai_core/text/GenerationService.kt ├─ src/main/java/com/mp/ai_core/ModelSwapper.kt ├─ src/main/java/com/mp/ai_core/stt/ (Sherpa STT) ├─ src/main/java/com/mp/ai_core/tts/ (Sherpa TTS) └─ build.gradle
+```
+
+Functionality
+- Demonstrates how to bind the GenerationService (foreground service) and call LLM APIs from UI.
+- Shows embedding, GET CHUNK generation, multi‑modal, STT / TTS usage.
+- Uses ViewModel + Compose for UI; all heavy work is on Dispatchers.IO.
+
+```
+GenerationService
+```
+
+
+```
+ViewModel + Compose
+```
+
+
+```
+Dispatchers.IO
+```
+
+Build
+
+```
+implementation(fileTree(dir: 'libs', include: ['*.aar']))
+```
+
+## 🗣️ Speech‑to‑Text (STT)
+```
+app/src/main/java/com/mp/ai_core/stt/ ├─ SherpaSTTManager.kt (Singleton manager) ├─ SherpaSTTService.kt (AIDL service, runs in :stt process) └─ SherpaSTTClient.kt (Client wrapper)
+```
+
+
+```
+app/src/main/java/com/mp/ai_core/stt/ ├─ SherpaSTTManager.kt (Singleton manager) ├─ SherpaSTTService.kt (AIDL service, runs in :stt process) └─ SherpaSTTClient.kt (Client wrapper)
+```
+
+### Key Points
+
+- Uses Sherpa‑ONNX (offline) for fast voice recognition.
+- Exposes a remote AIDL service (ISherpaSTTService) – preferable for memory‑heavy models.
+- Clients bind to the service via SherpaSTTClient.
+- Thread‑safe init, transcribe file/samples, release.
+
+```
+ISherpaSTTService
+```
+
+
+```
+SherpaSTTClient
+```
+
+## 🔊 Text‑to‑Speech (TTS)
+
+```
+app/src/main/java/com/mp/ai_core/tts/ ├─ ITtsService.kt ├─ TtsEngine.kt (Sherpa‑ONNX implementation) ├─ TtsServiceFactory.kt └─ (AIDL service optional)
+```
+
+
+```
+app/src/main/java/com/mp/ai_core/tts/ ├─ ITtsService.kt ├─ TtsEngine.kt (Sherpa‑ONNX implementation) ├─ TtsServiceFactory.kt └─ (AIDL service optional)
+```
+
+### Features
+
+- ITtsService contract: initialize, generateAudioStream, stop, release.
+- TTS samples streamed as Flow<AudioChunk>.
+- Thread‑safe hot‑reinitialization.
+
+```
+ITtsService
+```
+
+
+```
+initialize
+```
+
+
+```
+generateAudioStream
+```
+
+
+```
+stop
+```
+
+
+```
+release
+```
+
+
+```
+Flow<AudioChunk>
+```
+
+## 📦 How to Release / Distribute
+1. Compile via gradlew assembleRelease.
+2. Take ai_core-1.0.0.aar from build/libs.
+3. Include libs/ folder in your Android project or host on JCenter/GitHub Packages.
+4. Add implementation(fileTree(dir: 'libs', include: ['*.aar'])).
+
+```
+gradlew assembleRelease
+```
+
+
+```
+ai_core-1.0.0.aar
+```
+
+
+```
+build/libs
+```
+
+
+```
+libs/
+```
+
+
+```
+implementation(fileTree(dir: 'libs', include: ['*.aar']))
+```
+
+## 📄 Full List of Public APIs (ai-core AAR)
+```
+ai-core
+```
+
+
+```
+// Text generation NativeLib.init(...) NativeLib.generateStreaming(...) // Embedding EmbedLib.getInstance().encode(...) // Multimodal MtmdLib.getInstance().init(...) MtmdLib.getInstance().nativeGenerateStreamWithImage(...) // STT (via AIDL) SherpaSTTClient(...) // TTS (via ITtsService) TtsServiceFactory.createTtsService()
+```
+
+All public methods are suspend where necessary or return Callback interfaces.
+
+```
+suspend
+```
+
+
+```
+Callback
+```
+
+## 📂 Folder Tree Recap
+```
+ai-core/ ├─ src/main/cpp/src/ │ ├─ chat/ │ ├─ cpu/ │ ├─ global_state/ │ ├─ state/ │ ├─ tool_calling/ │ └─ utils/ ├─ src/main/java/com/mp/ai_core/ │ ├─ text/ │ ├─ stt/ │ ├─ tts/ │ └─ helpers/ ├─ CMakeLists.txt ├─ build_llama.sh └─ README.md
+```
+
+
+```
+ai-core/ ├─ src/main/cpp/src/ │ ├─ chat/ │ ├─ cpu/ │ ├─ global_state/ │ ├─ state/ │ ├─ tool_calling/ │ └─ utils/ ├─ src/main/java/com/mp/ai_core/ │ ├─ text/ │ ├─ stt/ │ ├─ tts/ │ └─ helpers/ ├─ CMakeLists.txt ├─ build_llama.sh └─ README.md
+```
+
+⭐️ Happy coding – the library is designed to be plug‑and‑play. Use the README as your “starter kit”.
+
+## About
+Native C/C++ core for ToolNeuron — JNI + llama.cpp bindings for fast, private, on‑device LLM inference on Android.
+[github.com/Siddhesh2377/ToolNeuron](https://github.com/Siddhesh2377/ToolNeuron)
+
+### Resources
+[Readme](https://github.com/Siddhesh2377/Ai-Core#readme-ov-file)
+
+### License
+[Apache-2.0 license](https://github.com/Siddhesh2377/Ai-Core#Apache-2.0-1-ov-file)
+
+### Uh oh!
+There was an error while loading. [Please reload this page](https://github.com/Siddhesh2377/Ai-Core).
+[Activity](https://github.com/Siddhesh2377/Ai-Core/activity)
+
+### Stars
+[23
+        stars](https://github.com/Siddhesh2377/Ai-Core/stargazers)
+
+### Watchers
+[3
+        watching](https://github.com/Siddhesh2377/Ai-Core/watchers)
+
+### Forks
+[2
+        forks](https://github.com/Siddhesh2377/Ai-Core/forks)
+[Report repository](https://github.com/contact/report-content?content_url=https%3A%2F%2Fgithub.com%2FSiddhesh2377%2FAi-Core&report=Siddhesh2377+%28user%29)
+
+## [Releases 1](https://github.com/Siddhesh2377/Ai-Core/releases)
+
+[Releases
+      1](https://github.com/Siddhesh2377/Ai-Core/releases)
+[😸 Ai‑core – Version 0.1 Stable
+
+          Latest
+
+      Oct 24, 2025](https://github.com/Siddhesh2377/Ai-Core/releases/tag/V-0.1-Stable)
+
+### Uh oh!
+
+There was an error while loading. [Please reload this page](https://github.com/Siddhesh2377/Ai-Core).
+- 
+
+
+
+
+            [patreon.com/Siddhesh2377](https://patreon.com/Siddhesh2377)
+
+
+[patreon.com/Siddhesh2377](https://patreon.com/Siddhesh2377)
+[Learn more about GitHub Sponsors](https://github.com/sponsors)
+
+## [Packages 0](https://github.com/users/Siddhesh2377/packages?repo_name=Ai-Core)
+[Packages
+      0](https://github.com/users/Siddhesh2377/packages?repo_name=Ai-Core)
+
+## Languages
+- 
+        [Kotlin
+          51.5%](https://github.com/Siddhesh2377/Ai-Core/search?l=kotlin)
+
+- 
+        [C++
+          44.1%](https://github.com/Siddhesh2377/Ai-Core/search?l=c%2B%2B)
+
+- 
+        [CMake
+          1.6%](https://github.com/Siddhesh2377/Ai-Core/search?l=cmake)
+
+- 
+        [AIDL
+          1.5%](https://github.com/Siddhesh2377/Ai-Core/search?l=aidl)
+
+- 
+
+
+
+
+        Other
+        1.3%
+
+
+[Kotlin
+          51.5%](https://github.com/Siddhesh2377/Ai-Core/search?l=kotlin)
+[C++
+          44.1%](https://github.com/Siddhesh2377/Ai-Core/search?l=c%2B%2B)
+[CMake
+          1.6%](https://github.com/Siddhesh2377/Ai-Core/search?l=cmake)
+[AIDL
+          1.5%](https://github.com/Siddhesh2377/Ai-Core/search?l=aidl)
+
+### Footer navigation
+
+- 
+            [Terms](https://docs.github.com/site-policy/github-terms/github-terms-of-service)
+
+- 
+            [Privacy](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement)
+
+- 
+            [Security](https://github.com/security)
+
+- 
+            [Status](https://www.githubstatus.com/)
+
+- 
+            [Community](https://github.community/)
+
+- 
+            [Docs](https://docs.github.com/)
+
+- 
+            [Contact](https://support.github.com?tags=dotcom-footer)
+
+- 
+
+
+       Manage cookies
+
+
+
+- 
+
+
+      Do not share my personal information
+
+
+
+[Terms](https://docs.github.com/site-policy/github-terms/github-terms-of-service)
+[Privacy](https://docs.github.com/site-policy/privacy-policies/github-privacy-statement)
+[Security](https://github.com/security)
+[Status](https://www.githubstatus.com/)
+[Community](https://github.community/)
+[Docs](https://docs.github.com/)
+[Contact](https://support.github.com?tags=dotcom-footer)

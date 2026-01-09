@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="start"
+    android:paddingVertical="6dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginEnd="48dp"
+        android:background="@drawable/bg_message_assistant"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- Thinking Process Section -->
+        <LinearLayout
+            android:id="@+id/layoutThinking"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:layout_marginBottom="8dp">
+
+            <LinearLayout
+                android:id="@+id/headerThinking"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="?attr/selectableItemBackground"
+                android:paddingVertical="4dp">
+
+                <ImageView
+                    android:id="@+id/iconThinking"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_info" 
+                    app:tint="?attr/colorPrimary" />
+                
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="Thinking Process"
+                    android:textSize="12sp"
+                    android:textStyle="italic"
+                    android:textColor="?attr/colorPrimary" />
+                
+                <ImageView
+                    android:id="@+id/iconExpand"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_menu"
+                    android:rotation="90"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/txtThinking"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="24dp"
+                android:paddingEnd="4dp"
+                android:paddingVertical="4dp"
+                android:textSize="12sp"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:fontFamily="monospace"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Main Message Text -->
+        <TextView
+            android:id="@+id/txtMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/colorOnSurface"
+            android:textSize="15sp"
+            android:lineSpacingMultiplier="1.4"
+            android:textIsSelectable="true" />
+
+        <!-- Bottom Row: Time and Speak Button -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+            
+            <TextView
+                android:id="@+id/txtTime"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="10sp" />
+
+            <ImageButton
+                android:id="@+id/btnSpeak"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_volume_up"
+                app:tint="?attr/colorPrimary"
+                android:visibility="visible"
+                android:contentDescription="Read Aloud" />
+        </LinearLayout>
+            
+        <!-- Source Chips -->
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/chipGroupSources"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:singleLine="false" />
+
+    </LinearLayout>
+
+</LinearLayout>

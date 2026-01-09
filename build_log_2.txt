@@ -1,0 +1,52 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:parseDebugLocalResources
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:mergeDebugResources
+> Task :app:processDebugResources FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:processDebugResources'.
+> A failure occurred while executing com.android.build.gradle.internal.res.LinkApplicationAndroidResourcesTask$TaskAction
+   > Android resource linking failed
+     ERROR: D:\android_atharva\app\src\main\res\layout\activity_main.xml:265: AAPT: error: resource string/content_description_attach (aka com.atharva.ollama:string/content_description_attach) not found.
+         
+     ERROR: D:\android_atharva\app\src\main\res\layout\activity_main.xml:265: AAPT: error: resource drawable/ic_attach_file (aka com.atharva.ollama:drawable/ic_attach_file) not found.
+         
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3s
+25 actionable tasks: 6 executed, 19 up-to-date

@@ -1,0 +1,194 @@
+[
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_bg_settings_input.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/bg_settings_input.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable-night_bg_settings_input.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable-night/bg_settings_input.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_menu.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_menu.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable-night_bg_message_user.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable-night/bg_message_user.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_bg_stop_button.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/bg_stop_button.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_send.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_send.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable-night_bg_input_field.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable-night/bg_input_field.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout_item_message_user.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout/item_message_user.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_mic.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_mic.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout_item_image_preview.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout/item_image_preview.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_school.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_school.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_globe.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_globe.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable-night_bg_message_assistant.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable-night/bg_message_assistant.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_stop.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_stop.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout-night_item_message_user.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout-night/item_message_user.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_bg_message_assistant.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/bg_message_assistant.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_logo_small.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_logo_small.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_fire.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_fire.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout_item_message_loading.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout/item_message_loading.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_copy.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_copy.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/xml_file_paths.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/xml/file_paths.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_back.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_back.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_attach_file.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_attach_file.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_check.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_check.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_bg_input_field.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/bg_input_field.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_chat.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_chat.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_dark_mode.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_dark_mode.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_volume_up.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_volume_up.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_fingerprint.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_fingerprint.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout_item_conversation.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout/item_conversation.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_info.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_info.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_bg_message_user.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/bg_message_user.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_delete.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_delete.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout_activity_lock.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout/activity_lock.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_bg_send_button.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/bg_send_button.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable-night_bg_send_button.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable-night/bg_send_button.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_settings.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_settings.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_bg_typing_dot.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/bg_typing_dot.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_add.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_add.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout_item_message_assistant.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout/item_message_assistant.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_news.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_news.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_code_box.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_code_box.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout_activity_settings.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout/activity_settings.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/layout_activity_main.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.atharva.ollama.app-debug-42:/drawable_ic_play.xml.flat",
+        "source": "com.atharva.ollama.app-main-44:/drawable/ic_play.xml"
+    }
+]

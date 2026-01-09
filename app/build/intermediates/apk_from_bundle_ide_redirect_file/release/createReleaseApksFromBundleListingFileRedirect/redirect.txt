@@ -1,0 +1,2 @@
+#- File Locator -
+listingFile=../../../apk_from_bundle_ide_model/release/extractApksFromBundleForRelease/output-metadata.json

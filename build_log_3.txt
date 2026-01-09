@@ -1,0 +1,1045 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:parseDebugLocalResources
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:mergeDebugResources
+> Task :app:processDebugResources
+
+> Task :app:compileDebugJavaWithJavac
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:248: error: method setupListeners() is already defined in class MainActivity
+    private void setupListeners() {
+                 ^
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:181: error: cannot find symbol
+        public ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
+                                              ^
+  symbol:   class NonNull
+  location: class MainActivity.ImagePreviewAdapter
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:179: error: cannot find symbol
+        @NonNull
+         ^
+  symbol:   class NonNull
+  location: class MainActivity.ImagePreviewAdapter
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:187: error: cannot find symbol
+        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+                                      ^
+  symbol:   class NonNull
+  location: class MainActivity.ImagePreviewAdapter
+D:\android_atharva\app\src\main\java\com\atharva\ollama\api\UnifiedApiClient.java:363: error: cannot find symbol
+                        sources.add(new com.atharva.ollama.model.ChatMessage.Source(res.title, res.url, res.body));
+                                                                                                           ^
+  symbol:   variable body
+  location: variable res of type SearchResult
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:93: error: cannot find symbol
+                        executor.execute(() -> {
+                        ^
+  symbol:   variable executor
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:96: error: cannot find symbol
+                                mainHandler.post(() -> viewModel.addPendingImage(path));
+                                ^
+  symbol:   variable mainHandler
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:96: error: cannot find symbol
+                                mainHandler.post(() -> viewModel.addPendingImage(path));
+                                                       ^
+  symbol:   variable viewModel
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:117: error: cannot find symbol
+        btnSearchFocus = findViewById(R.id.btnSearchFocus);
+        ^
+  symbol:   variable btnSearchFocus
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:119: error: cannot find symbol
+        suggestionChips = findViewById(R.id.suggestionChips);
+        ^
+  symbol:   variable suggestionChips
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:123: error: cannot find symbol
+        switchDarkMode.setChecked(prefs.isDarkMode());
+        ^
+  symbol:   variable switchDarkMode
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:123: error: cannot find symbol
+        switchDarkMode.setChecked(prefs.isDarkMode());
+                                  ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:157: error: cannot find symbol
+        viewModel.getPendingImages().observe(this, images -> {
+        ^
+  symbol:   variable viewModel
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:199: error: cannot find symbol
+            holder.btnRemove.setOnClickListener(v -> viewModel.removePendingImage(holder.getBindingAdapterPosition()));
+                                                     ^
+  symbol:   variable viewModel
+  location: class MainActivity.ImagePreviewAdapter
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:220: error: cannot find symbol
+        ApiProvider provider = prefs.getApiProvider();
+                               ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:221: error: cannot find symbol
+        String model = prefs.getModel();
+                       ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:224: error: cannot find symbol
+            txtModel.setText(model);
+            ^
+  symbol:   variable txtModel
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:226: error: cannot find symbol
+            txtModel.setText(provider.getDisplayName() + " • " + model);
+            ^
+  symbol:   variable txtModel
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:232: error: cannot find symbol
+        chatAdapter = new ChatAdapter(this, markwon);
+        ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:232: error: cannot find symbol
+        chatAdapter = new ChatAdapter(this, markwon);
+                                            ^
+  symbol:   variable markwon
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:233: error: cannot find symbol
+        chatAdapter.setDarkMode(prefs.isDarkMode());
+        ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:233: error: cannot find symbol
+        chatAdapter.setDarkMode(prefs.isDarkMode());
+                                ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:234: error: cannot find symbol
+        layoutManager = new LinearLayoutManager(this);
+        ^
+  symbol:   variable layoutManager
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:235: error: cannot find symbol
+        layoutManager.setStackFromEnd(true);
+        ^
+  symbol:   variable layoutManager
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:236: error: cannot find symbol
+        recyclerMessages.setLayoutManager(layoutManager);
+                                          ^
+  symbol:   variable layoutManager
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:237: error: cannot find symbol
+        recyclerMessages.setAdapter(chatAdapter);
+                                    ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:243: error: cannot find symbol
+        conversationAdapter = new ConversationAdapter(this);
+        ^
+  symbol:   variable conversationAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:245: error: cannot find symbol
+        recyclerConversations.setAdapter(conversationAdapter);
+                                         ^
+  symbol:   variable conversationAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:261: error: cannot find symbol
+        chatAdapter.setOnMessageClickListener(text -> {
+        ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:265: error: cannot find symbol
+        btnSettings.setOnClickListener(v -> {
+        ^
+  symbol:   variable btnSettings
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:269: error: cannot find symbol
+        btnMenu.setOnClickListener(v -> {
+        ^
+  symbol:   variable btnMenu
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:273: error: cannot find symbol
+        btnNewChat.setOnClickListener(v -> createNewConversation());
+        ^
+  symbol:   variable btnNewChat
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:275: error: cannot find symbol
+        btnNewChatDrawer.setOnClickListener(v -> {
+        ^
+  symbol:   variable btnNewChatDrawer
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:280: error: cannot find symbol
+        btnSearchFocus.setOnClickListener(this::showSearchFocusMenu);
+        ^
+  symbol:   variable btnSearchFocus
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:282: error: cannot find symbol
+        switchDarkMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
+        ^
+  symbol:   variable switchDarkMode
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:283: error: cannot find symbol
+            if (isChecked != prefs.isDarkMode()) {
+                             ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:284: error: cannot find symbol
+                prefs.setDarkMode(isChecked);
+                ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:343: error: cannot find symbol
+        viewModel.cancelGeneration();
+        ^
+  symbol:   variable viewModel
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:368: error: cannot find symbol
+        executor.execute(() -> {
+        ^
+  symbol:   variable executor
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:369: error: cannot find symbol
+            List<Conversation> conversations = conversationDao.getAllConversations();
+                                               ^
+  symbol:   variable conversationDao
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:370: error: cannot find symbol
+            mainHandler.post(() -> {
+            ^
+  symbol:   variable mainHandler
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:371: error: cannot find symbol
+                conversationAdapter.setConversations(conversations);
+                ^
+  symbol:   variable conversationAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:372: error: cannot find symbol
+                conversationAdapter.setSelectedConversationId(currentConversationId);
+                                                              ^
+  symbol:   variable currentConversationId
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:372: error: cannot find symbol
+                conversationAdapter.setSelectedConversationId(currentConversationId);
+                ^
+  symbol:   variable conversationAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:378: error: cannot find symbol
+        long savedId = prefs.getCurrentConversationId();
+                       ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:387: error: cannot find symbol
+        executor.execute(() -> {
+        ^
+  symbol:   variable executor
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:388: error: cannot find symbol
+            Conversation conversation = conversationDao.getConversationById(conversationId);
+                                        ^
+  symbol:   variable conversationDao
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:390: error: cannot find symbol
+                List<Message> messages = messageDao.getMessagesForConversation(conversationId);
+                                         ^
+  symbol:   variable messageDao
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:397: error: cannot find symbol
+                mainHandler.post(() -> {
+                ^
+  symbol:   variable mainHandler
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:398: error: cannot find symbol
+                    currentConversationId = conversationId;
+                    ^
+  symbol:   variable currentConversationId
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:399: error: cannot find symbol
+                    prefs.setCurrentConversationId(conversationId);
+                    ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:400: error: cannot find symbol
+                    chatAdapter.setMessages(chatMessages);
+                    ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:401: error: cannot find symbol
+                    conversationAdapter.setSelectedConversationId(conversationId);
+                    ^
+  symbol:   variable conversationAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:406: error: cannot find symbol
+                mainHandler.post(this::createNewConversation);
+                ^
+  symbol:   variable mainHandler
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:412: error: cannot find symbol
+        executor.execute(() -> {
+        ^
+  symbol:   variable executor
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:414: error: cannot find symbol
+            long id = conversationDao.insert(conversation);
+                      ^
+  symbol:   variable conversationDao
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:416: error: cannot find symbol
+            mainHandler.post(() -> {
+            ^
+  symbol:   variable mainHandler
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:417: error: cannot find symbol
+                currentConversationId = id;
+                ^
+  symbol:   variable currentConversationId
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:418: error: cannot find symbol
+                prefs.setCurrentConversationId(id);
+                ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:419: error: cannot find symbol
+                chatAdapter.clearMessages();
+                ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:427: error: cannot find symbol
+        emptyState.setVisibility(chatAdapter.isEmpty() ? View.VISIBLE : View.GONE);
+        ^
+  symbol:   variable emptyState
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:427: error: cannot find symbol
+        emptyState.setVisibility(chatAdapter.isEmpty() ? View.VISIBLE : View.GONE);
+                                 ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:431: error: cannot find symbol
+        if (chatAdapter.getItemCount() > 0) {
+            ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:433: error: cannot find symbol
+                recyclerMessages.scrollToPosition(chatAdapter.getItemCount() - 1);
+                                                  ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:439: error: cannot find symbol
+        if (isStreaming) return;
+            ^
+  symbol:   variable isStreaming
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:455: error: cannot find symbol
+        emptyState.setVisibility(View.GONE);
+        ^
+  symbol:   variable emptyState
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:459: error: cannot find symbol
+        chatAdapter.addMessage(userMessage);
+        ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:466: error: cannot find symbol
+        chatAdapter.addMessage(loadingMessage);
+        ^
+  symbol:   variable chatAdapter
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:469: error: cannot find symbol
+        isStreaming = true;
+        ^
+  symbol:   variable isStreaming
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:470: error: cannot find symbol
+        updateButtonState(true);
+        ^
+  symbol:   method updateButtonState(boolean)
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:473: error: cannot find symbol
+        viewModel.sendMessage(currentConversationId, messageText);
+                              ^
+  symbol:   variable currentConversationId
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:473: error: cannot find symbol
+        viewModel.sendMessage(currentConversationId, messageText);
+        ^
+  symbol:   variable viewModel
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:476: error: cannot find symbol
+        mainHandler.postDelayed(this::loadConversations, 500);
+        ^
+  symbol:   variable mainHandler
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:480: error: cannot find symbol
+        ApiProvider provider = prefs.getApiProvider();
+                               ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:481: error: cannot find symbol
+        String baseUrl = prefs.getBaseUrl();
+                         ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:482: error: cannot find symbol
+        String model = prefs.getModel();
+                       ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:490: error: cannot find symbol
+            String apiKey = prefs.getApiKey();
+                            ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:511: error: cannot find symbol
+        if (conversation.id != currentConversationId) {
+                               ^
+  symbol:   variable currentConversationId
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:518: error: cannot find symbol
+        executor.execute(() -> {
+        ^
+  symbol:   variable executor
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:519: error: cannot find symbol
+            conversationDao.delete(conversation);
+            ^
+  symbol:   variable conversationDao
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:520: error: cannot find symbol
+            mainHandler.post(() -> {
+            ^
+  symbol:   variable mainHandler
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:522: error: cannot find symbol
+                if (conversation.id == currentConversationId) {
+                                       ^
+  symbol:   variable currentConversationId
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:562: error: cannot find symbol
+            prefs.setSearchFocus(focus);
+            ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:570: error: cannot find symbol
+        if (btnSearchFocus == null) return;
+            ^
+  symbol:   variable btnSearchFocus
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:572: error: cannot find symbol
+        String focus = prefs.getSearchFocus();
+                       ^
+  symbol:   variable prefs
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:585: error: cannot find symbol
+        btnSearchFocus.setImageTintList(android.content.res.ColorStateList.valueOf(color));
+        ^
+  symbol:   variable btnSearchFocus
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:593: error: cannot find symbol
+            requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+            ^
+  symbol:   variable requestPermissionLauncher
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:598: error: cannot find symbol
+        if (isListening) return;
+            ^
+  symbol:   variable isListening
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:600: error: cannot find symbol
+        if (speechRecognizer == null) {
+            ^
+  symbol:   variable speechRecognizer
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:601: error: cannot find symbol
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+            ^
+  symbol:   variable speechRecognizer
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:605: error: cannot find symbol
+                    isListening = true;
+                    ^
+  symbol: variable isListening
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:612: error: cannot find symbol
+                    isListening = false;
+                    ^
+  symbol: variable isListening
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:619: error: cannot find symbol
+                    isListening = false;
+                    ^
+  symbol: variable isListening
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:630: error: cannot find symbol
+                    isListening = false;
+                    ^
+  symbol: variable isListening
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:602: error: cannot find symbol
+            speechRecognizer.setRecognitionListener(new RecognitionListener() {
+            ^
+  symbol:   variable speechRecognizer
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:650: error: cannot find symbol
+        speechRecognizer.startListening(intent);
+        ^
+  symbol:   variable speechRecognizer
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:655: error: cannot find symbol
+        if (textToSpeech == null) {
+            ^
+  symbol:   variable textToSpeech
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:656: error: cannot find symbol
+            textToSpeech = new TextToSpeech(this, status -> {
+            ^
+  symbol:   variable textToSpeech
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:658: error: cannot find symbol
+                    textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, null);
+                    ^
+  symbol:   variable textToSpeech
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:664: error: cannot find symbol
+             textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, null);
+             ^
+  symbol:   variable textToSpeech
+  location: class MainActivity
+Note: D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+100 errors
+
+> Task :app:compileDebugJavaWithJavac FAILED
+
+[Incubating] Problems report is available at: file:///D:/android_atharva/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  Note: D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java uses or overrides a deprecated API.
+  Note: Recompile with -Xlint:deprecation for details.
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:181: error: cannot find symbol
+          public ViewHolder onCreateViewHolder(@NonNull android.view.ViewGroup parent, int viewType) {
+                                                ^
+    symbol:   class NonNull
+    location: class MainActivity.ImagePreviewAdapter
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:179: error: cannot find symbol
+          @NonNull
+           ^
+    symbol:   class NonNull
+    location: class MainActivity.ImagePreviewAdapter
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:187: error: cannot find symbol
+          public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+                                        ^
+    symbol:   class NonNull
+    location: class MainActivity.ImagePreviewAdapter
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\api\UnifiedApiClient.java:363: error: cannot find symbol
+                          sources.add(new com.atharva.ollama.model.ChatMessage.Source(res.title, res.url, res.body));
+                                                                                                             ^
+    symbol:   variable body
+    location: variable res of type SearchResult
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:93: error: cannot find symbol
+                          executor.execute(() -> {
+                          ^
+    symbol:   variable executor
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:96: error: cannot find symbol
+                                  mainHandler.post(() -> viewModel.addPendingImage(path));
+                                  ^
+    symbol:   variable mainHandler
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:96: error: cannot find symbol
+                                  mainHandler.post(() -> viewModel.addPendingImage(path));
+                                                         ^
+    symbol:   variable viewModel
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:117: error: cannot find symbol
+          btnSearchFocus = findViewById(R.id.btnSearchFocus);
+          ^
+    symbol:   variable btnSearchFocus
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:119: error: cannot find symbol
+          suggestionChips = findViewById(R.id.suggestionChips);
+          ^
+    symbol:   variable suggestionChips
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:123: error: cannot find symbol
+          switchDarkMode.setChecked(prefs.isDarkMode());
+          ^
+    symbol:   variable switchDarkMode
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:123: error: cannot find symbol
+          switchDarkMode.setChecked(prefs.isDarkMode());
+                                    ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:157: error: cannot find symbol
+          viewModel.getPendingImages().observe(this, images -> {
+          ^
+    symbol:   variable viewModel
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:199: error: cannot find symbol
+              holder.btnRemove.setOnClickListener(v -> viewModel.removePendingImage(holder.getBindingAdapterPosition()));
+                                                       ^
+    symbol:   variable viewModel
+    location: class MainActivity.ImagePreviewAdapter
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:220: error: cannot find symbol
+          ApiProvider provider = prefs.getApiProvider();
+                                 ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:221: error: cannot find symbol
+          String model = prefs.getModel();
+                         ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:224: error: cannot find symbol
+              txtModel.setText(model);
+              ^
+    symbol:   variable txtModel
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:226: error: cannot find symbol
+              txtModel.setText(provider.getDisplayName() + " • " + model);
+              ^
+    symbol:   variable txtModel
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:232: error: cannot find symbol
+          chatAdapter = new ChatAdapter(this, markwon);
+          ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:232: error: cannot find symbol
+          chatAdapter = new ChatAdapter(this, markwon);
+                                              ^
+    symbol:   variable markwon
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:233: error: cannot find symbol
+          chatAdapter.setDarkMode(prefs.isDarkMode());
+          ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:233: error: cannot find symbol
+          chatAdapter.setDarkMode(prefs.isDarkMode());
+                                  ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:234: error: cannot find symbol
+          layoutManager = new LinearLayoutManager(this);
+          ^
+    symbol:   variable layoutManager
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:235: error: cannot find symbol
+          layoutManager.setStackFromEnd(true);
+          ^
+    symbol:   variable layoutManager
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:236: error: cannot find symbol
+          recyclerMessages.setLayoutManager(layoutManager);
+                                            ^
+    symbol:   variable layoutManager
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:237: error: cannot find symbol
+          recyclerMessages.setAdapter(chatAdapter);
+                                      ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:243: error: cannot find symbol
+          conversationAdapter = new ConversationAdapter(this);
+          ^
+    symbol:   variable conversationAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:245: error: cannot find symbol
+          recyclerConversations.setAdapter(conversationAdapter);
+                                           ^
+    symbol:   variable conversationAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:261: error: cannot find symbol
+          chatAdapter.setOnMessageClickListener(text -> {
+          ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:265: error: cannot find symbol
+          btnSettings.setOnClickListener(v -> {
+          ^
+    symbol:   variable btnSettings
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:269: error: cannot find symbol
+          btnMenu.setOnClickListener(v -> {
+          ^
+    symbol:   variable btnMenu
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:273: error: cannot find symbol
+          btnNewChat.setOnClickListener(v -> createNewConversation());
+          ^
+    symbol:   variable btnNewChat
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:275: error: cannot find symbol
+          btnNewChatDrawer.setOnClickListener(v -> {
+          ^
+    symbol:   variable btnNewChatDrawer
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:280: error: cannot find symbol
+          btnSearchFocus.setOnClickListener(this::showSearchFocusMenu);
+          ^
+    symbol:   variable btnSearchFocus
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:282: error: cannot find symbol
+          switchDarkMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
+          ^
+    symbol:   variable switchDarkMode
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:283: error: cannot find symbol
+              if (isChecked != prefs.isDarkMode()) {
+                               ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:284: error: cannot find symbol
+                  prefs.setDarkMode(isChecked);
+                  ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:343: error: cannot find symbol
+          viewModel.cancelGeneration();
+          ^
+    symbol:   variable viewModel
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:368: error: cannot find symbol
+          executor.execute(() -> {
+          ^
+    symbol:   variable executor
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:369: error: cannot find symbol
+              List<Conversation> conversations = conversationDao.getAllConversations();
+                                                 ^
+    symbol:   variable conversationDao
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:370: error: cannot find symbol
+              mainHandler.post(() -> {
+              ^
+    symbol:   variable mainHandler
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:371: error: cannot find symbol
+                  conversationAdapter.setConversations(conversations);
+                  ^
+    symbol:   variable conversationAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:372: error: cannot find symbol
+                  conversationAdapter.setSelectedConversationId(currentConversationId);
+                                                                ^
+    symbol:   variable currentConversationId
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:372: error: cannot find symbol
+                  conversationAdapter.setSelectedConversationId(currentConversationId);
+                  ^
+    symbol:   variable conversationAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:378: error: cannot find symbol
+          long savedId = prefs.getCurrentConversationId();
+                         ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:387: error: cannot find symbol
+          executor.execute(() -> {
+          ^
+    symbol:   variable executor
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:388: error: cannot find symbol
+              Conversation conversation = conversationDao.getConversationById(conversationId);
+                                          ^
+    symbol:   variable conversationDao
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:390: error: cannot find symbol
+                  List<Message> messages = messageDao.getMessagesForConversation(conversationId);
+                                           ^
+    symbol:   variable messageDao
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:397: error: cannot find symbol
+                  mainHandler.post(() -> {
+                  ^
+    symbol:   variable mainHandler
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:398: error: cannot find symbol
+                      currentConversationId = conversationId;
+                      ^
+    symbol:   variable currentConversationId
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:399: error: cannot find symbol
+                      prefs.setCurrentConversationId(conversationId);
+                      ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:400: error: cannot find symbol
+                      chatAdapter.setMessages(chatMessages);
+                      ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:401: error: cannot find symbol
+                      conversationAdapter.setSelectedConversationId(conversationId);
+                      ^
+    symbol:   variable conversationAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:406: error: cannot find symbol
+                  mainHandler.post(this::createNewConversation);
+                  ^
+    symbol:   variable mainHandler
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:412: error: cannot find symbol
+          executor.execute(() -> {
+          ^
+    symbol:   variable executor
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:414: error: cannot find symbol
+              long id = conversationDao.insert(conversation);
+                        ^
+    symbol:   variable conversationDao
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:416: error: cannot find symbol
+              mainHandler.post(() -> {
+              ^
+    symbol:   variable mainHandler
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:417: error: cannot find symbol
+                  currentConversationId = id;
+                  ^
+    symbol:   variable currentConversationId
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:418: error: cannot find symbol
+                  prefs.setCurrentConversationId(id);
+                  ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:419: error: cannot find symbol
+                  chatAdapter.clearMessages();
+                  ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:427: error: cannot find symbol
+          emptyState.setVisibility(chatAdapter.isEmpty() ? View.VISIBLE : View.GONE);
+          ^
+    symbol:   variable emptyState
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:427: error: cannot find symbol
+          emptyState.setVisibility(chatAdapter.isEmpty() ? View.VISIBLE : View.GONE);
+                                   ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:431: error: cannot find symbol
+          if (chatAdapter.getItemCount() > 0) {
+              ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:433: error: cannot find symbol
+                  recyclerMessages.scrollToPosition(chatAdapter.getItemCount() - 1);
+                                                    ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:439: error: cannot find symbol
+          if (isStreaming) return;
+              ^
+    symbol:   variable isStreaming
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:455: error: cannot find symbol
+          emptyState.setVisibility(View.GONE);
+          ^
+    symbol:   variable emptyState
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:459: error: cannot find symbol
+          chatAdapter.addMessage(userMessage);
+          ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:466: error: cannot find symbol
+          chatAdapter.addMessage(loadingMessage);
+          ^
+    symbol:   variable chatAdapter
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:469: error: cannot find symbol
+          isStreaming = true;
+          ^
+    symbol:   variable isStreaming
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:473: error: cannot find symbol
+          viewModel.sendMessage(currentConversationId, messageText);
+                                ^
+    symbol:   variable currentConversationId
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:473: error: cannot find symbol
+          viewModel.sendMessage(currentConversationId, messageText);
+          ^
+    symbol:   variable viewModel
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:476: error: cannot find symbol
+          mainHandler.postDelayed(this::loadConversations, 500);
+          ^
+    symbol:   variable mainHandler
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:480: error: cannot find symbol
+          ApiProvider provider = prefs.getApiProvider();
+                                 ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:481: error: cannot find symbol
+          String baseUrl = prefs.getBaseUrl();
+                           ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:482: error: cannot find symbol
+          String model = prefs.getModel();
+                         ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:490: error: cannot find symbol
+              String apiKey = prefs.getApiKey();
+                              ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:511: error: cannot find symbol
+          if (conversation.id != currentConversationId) {
+                                 ^
+    symbol:   variable currentConversationId
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:518: error: cannot find symbol
+          executor.execute(() -> {
+          ^
+    symbol:   variable executor
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:519: error: cannot find symbol
+              conversationDao.delete(conversation);
+              ^
+    symbol:   variable conversationDao
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:520: error: cannot find symbol
+              mainHandler.post(() -> {
+              ^
+    symbol:   variable mainHandler
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:522: error: cannot find symbol
+                  if (conversation.id == currentConversationId) {
+                                         ^
+    symbol:   variable currentConversationId
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:562: error: cannot find symbol
+              prefs.setSearchFocus(focus);
+              ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:570: error: cannot find symbol
+          if (btnSearchFocus == null) return;
+              ^
+    symbol:   variable btnSearchFocus
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:572: error: cannot find symbol
+          String focus = prefs.getSearchFocus();
+                         ^
+    symbol:   variable prefs
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:585: error: cannot find symbol
+          btnSearchFocus.setImageTintList(android.content.res.ColorStateList.valueOf(color));
+          ^
+    symbol:   variable btnSearchFocus
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:593: error: cannot find symbol
+              requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO);
+              ^
+    symbol:   variable requestPermissionLauncher
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:598: error: cannot find symbol
+          if (isListening) return;
+              ^
+    symbol:   variable isListening
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:600: error: cannot find symbol
+          if (speechRecognizer == null) {
+              ^
+    symbol:   variable speechRecognizer
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:601: error: cannot find symbol
+              speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+              ^
+    symbol:   variable speechRecognizer
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:602: error: cannot find symbol
+              speechRecognizer.setRecognitionListener(new RecognitionListener() {
+              ^
+    symbol:   variable speechRecognizer
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:650: error: cannot find symbol
+          speechRecognizer.startListening(intent);
+          ^
+    symbol:   variable speechRecognizer
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:655: error: cannot find symbol
+          if (textToSpeech == null) {
+              ^
+    symbol:   variable textToSpeech
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:656: error: cannot find symbol
+              textToSpeech = new TextToSpeech(this, status -> {
+              ^
+    symbol:   variable textToSpeech
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:658: error: cannot find symbol
+                      textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, null);
+                      ^
+    symbol:   variable textToSpeech
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:664: error: cannot find symbol
+               textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, null);
+               ^
+    symbol:   variable textToSpeech
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:605: error: cannot find symbol
+                      isListening = true;
+                      ^
+    symbol: variable isListening
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:612: error: cannot find symbol
+                      isListening = false;
+                      ^
+    symbol: variable isListening
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:619: error: cannot find symbol
+                      isListening = false;
+                      ^
+    symbol: variable isListening
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:630: error: cannot find symbol
+                      isListening = false;
+                      ^
+    symbol: variable isListening
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:470: error: cannot find symbol
+          updateButtonState(true);
+          ^
+    symbol:   method updateButtonState(boolean)
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:248: error: method setupListeners() is already defined in class MainActivity
+      private void setupListeners() {
+                   ^
+  100 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+BUILD FAILED in 5s
+26 actionable tasks: 7 executed, 19 up-to-date

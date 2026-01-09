@@ -1,0 +1,137 @@
+<resources>
+    <string name="app_name">Atharva AI</string>
+    <string name="app_tagline">Made by Jaswanth Sanjay Nekkanti</string>
+    
+    <!-- Chat -->
+    <string name="hint_type_message">Ask Atharva anything…</string>
+    <string name="content_description_send">Send message</string>
+    <string name="content_description_settings">Settings</string>
+    <string name="content_description_new_chat">New conversation</string>
+    <string name="content_description_menu">Menu</string>
+    <string name="content_description_attach">Attach Image</string>
+    <string name="content_description_copy">Copy message</string>
+    <string name="empty_state_title">Start a conversation</string>
+    <string name="empty_state_subtitle">Ask me anything!</string>
+    
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="api_provider">API Provider</string>
+    <string name="ollama_server_ip">Ollama Server IP</string>
+    <string name="hint_ip_address">e.g., 192.168.1.10</string>
+    <string name="ollama_port">Port</string>
+    <string name="hint_port">11434</string>
+    <string name="custom_base_url">Custom Base URL</string>
+    <string name="hint_base_url">https://your-api.com/v1/</string>
+    <string name="api_key">API Key</string>
+    <string name="hint_api_key">sk-...</string>
+    <string name="model_name">Model</string>
+    <string name="hint_model">Select a model</string>
+    <string name="system_prompt">System Prompt</string>
+    <string name="hint_system_prompt">You are a helpful AI assistant…</string>
+    <string name="save">Save</string>
+    <string name="test_connection">Test Connection</string>
+    <string name="auto_detect">Auto-Detect Server</string>
+    <string name="dark_mode">Dark Mode</string>
+    <string name="appearance">Appearance</string>
+    <string name="connection">Connection</string>
+    <string name="model_settings">Model Settings</string>
+    <string name="provider_settings">Provider Settings</string>
+    <string name="web_search">Web Search (RAG)</string>
+    <string name="web_search_desc">Enable to search the web for answers</string>
+    <string name="searx_host">SearXNG Host (Optional)</string>
+    <string name="hint_searx_host">https://searxng.site/</string>
+    
+    <!-- Provider descriptions -->
+    <string name="provider_ollama_desc">Connect to local Ollama instance</string>
+    <string name="provider_openai_desc">Use OpenAI GPT models</string>
+    <string name="provider_openrouter_desc">Access multiple AI models via OpenRouter</string>
+    <string name="provider_groq_desc">Fast inference with Groq</string>
+    <string name="provider_together_desc">Together AI inference</string>
+    <string name="provider_anthropic_desc">Use Claude models</string>
+    <string name="provider_custom_desc">Any OpenAI-compatible API</string>
+    
+    <!-- Messages -->
+    <string name="loading">Thinking…</string>
+    <string name="error_empty_message">Please enter a message</string>
+    <string name="error_connection">Connection failed</string>
+    <string name="settings_saved">Settings saved</string>
+    <string name="connection_success">Connected successfully!</string>
+    <string name="connection_failed">Connection failed</string>
+    <string name="scanning_network">Scanning network…</string>
+    <string name="server_found">Server found!</string>
+    <string name="no_server_found">No Ollama server found</string>
+    <string name="message_copied">Message copied</string>
+    <string name="chat_cleared">Chat cleared</string>
+    <string name="api_key_required">API key is required for this provider</string>
+    <string name="base_url_required">Base URL is required for custom provider</string>
+    
+    <!-- Drawer -->
+    <string name="conversations">Conversations</string>
+    <string name="new_chat">New Chat</string>
+    <string name="clear_chat">Clear Chat</string>
+    <string name="about">About</string>
+    
+    <!-- About -->
+    <string name="about_title">About Atharva AI</string>
+    <string name="about_version">Version 2.0</string>
+    <string name="about_creator">Created by Jaswanth Sanjay Nekkanti</string>
+    <string name="about_description">A powerful AI assistant that connects to multiple AI providers including Ollama, OpenAI, OpenRouter, Groq, Together AI, Anthropic, and custom APIs.</string>
+    
+    <!-- Suggestion Chips -->
+    <string name="suggestion_explain">Explain this concept</string>
+    <string name="suggestion_code">Help me write code</string>
+    <string name="suggestion_creative">Write something creative</string>
+    <string name="suggestion_summarize">Summarize this text</string>
+    <string name="suggestion_translate">Translate for me</string>
+    <string name="suggestion_brainstorm">Brainstorm ideas</string>
+    
+    <!-- Stop Generation -->
+    <string name="content_description_stop">Stop generation</string>
+    <string name="generation_stopped">Generation stopped</string>
+    
+    <!-- Typing Indicator Stages -->
+    <string name="status_searching">Searching web…</string>
+    <string name="status_thinking">Thinking…</string>
+    <string name="status_generating">Generating…</string>
+    <string name="status_rephrasing">Understanding query…</string>
+    
+    <!-- Search Focus -->
+    <string name="search_focus_title">Search Focus</string>
+    <string name="search_focus_all">All</string>
+    <string name="search_focus_reddit">Reddit</string>
+    <string name="search_focus_stackoverflow">Stack Overflow</string>
+    <string name="search_focus_academic">Academic</string>
+    <string name="search_focus_youtube">YouTube</string>
+    <string name="search_focus_news">News</string>
+    <string name="code_copied">Code copied to clipboard</string>
+    
+    <!-- Biometric Lock -->
+    <string name="biometric_title">Unlock Atharva AI</string>
+    <string name="biometric_subtitle">Use fingerprint or face to unlock</string>
+    <string name="biometric_cancel">Cancel</string>
+    <string name="biometric_lock">Biometric Lock</string>
+    <string name="biometric_lock_desc">Require fingerprint or face to open app</string>
+    <string name="biometric_not_available">Biometric authentication not available on this device</string>
+    <string name="security">Security</string>
+    <string name="tap_to_unlock">Tap to unlock</string>
+    
+    <!-- MediaPipe On-Device LLM -->
+    <string name="mediapipe_model_path">Model File Path (Advanced)</string>
+    <string name="hint_mediapipe_path">/data/local/tmp/llm/gemma3.task</string>
+    <string name="mediapipe_info">Place the Gemma .task model file on your device. Download from LiteRT HuggingFace.</string>
+    <string name="mediapipe_supported_models">Gemma 3 (1B), Gemma 2 (2B, 9B)</string>
+    <string name="provider_mediapipe_desc">Run Gemma models on-device using GPU/CPU</string>
+    <string name="manual_path_hint">Or enter a custom path if you transferred the model manually</string>
+    
+    <!-- Model Download -->
+    <string name="hf_token_label">HuggingFace Token</string>
+    <string name="hint_hf_token">hf_...</string>
+    <string name="hf_token_info">Required for download. Get token at huggingface.co/settings/tokens</string>
+    <string name="select_model">Select Model</string>
+    <string name="download_model">Download Model</string>
+    <string name="downloading">Downloading…</string>
+    <string name="download_complete">Download complete!</string>
+    <string name="download_failed">Download failed</string>
+    <string name="cancel_download">Cancel</string>
+</resources>
+

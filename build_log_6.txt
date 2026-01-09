@@ -1,0 +1,100 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+
+> Task :app:compileDebugJavaWithJavac FAILED
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:144: error: cannot find symbol
+            setTheme(R.style.Theme_AtharvaOllama_Dark);
+                            ^
+  symbol:   variable Theme_AtharvaOllama_Dark
+  location: class style
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:146: error: cannot find symbol
+            setTheme(R.style.Theme_AtharvaOllama);
+                            ^
+  symbol:   variable Theme_AtharvaOllama
+  location: class style
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:157: error: cannot find symbol
+        com.atharva.ollama.viewmodel.ChatViewModelFactory factory = 
+                                    ^
+  symbol:   class ChatViewModelFactory
+  location: package com.atharva.ollama.viewmodel
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:158: error: cannot find symbol
+            new com.atharva.ollama.viewmodel.ChatViewModelFactory(getApplication(), new com.atharva.ollama.repository.ChatRepository(db, new UnifiedApiClient(), prefs));
+                                            ^
+  symbol:   class ChatViewModelFactory
+  location: package com.atharva.ollama.viewmodel
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:159: error: cannot find symbol
+        viewModel = new ViewModelProvider(this, factory).get(ChatViewModel.class);
+                        ^
+  symbol:   class ViewModelProvider
+  location: class MainActivity
+D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:162: error: cannot find symbol
+        markwon = MarkdownHelper.createMarkwon(this, text -> {
+                  ^
+  symbol:   variable MarkdownHelper
+  location: class MainActivity
+Note: D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+6 errors
+
+[Incubating] Problems report is available at: file:///D:/android_atharva/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugJavaWithJavac'.
+> Compilation failed; see the compiler output below.
+  Note: D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java uses or overrides a deprecated API.
+  Note: Recompile with -Xlint:deprecation for details.
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:144: error: cannot find symbol
+              setTheme(R.style.Theme_AtharvaOllama_Dark);
+                              ^
+    symbol:   variable Theme_AtharvaOllama_Dark
+    location: class style
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:146: error: cannot find symbol
+              setTheme(R.style.Theme_AtharvaOllama);
+                              ^
+    symbol:   variable Theme_AtharvaOllama
+    location: class style
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:157: error: cannot find symbol
+          com.atharva.ollama.viewmodel.ChatViewModelFactory factory = 
+                                      ^
+    symbol:   class ChatViewModelFactory
+    location: package com.atharva.ollama.viewmodel
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:158: error: cannot find symbol
+              new com.atharva.ollama.viewmodel.ChatViewModelFactory(getApplication(), new com.atharva.ollama.repository.ChatRepository(db, new UnifiedApiClient(), prefs));
+                                              ^
+    symbol:   class ChatViewModelFactory
+    location: package com.atharva.ollama.viewmodel
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:159: error: cannot find symbol
+          viewModel = new ViewModelProvider(this, factory).get(ChatViewModel.class);
+                          ^
+    symbol:   class ViewModelProvider
+    location: class MainActivity
+  D:\android_atharva\app\src\main\java\com\atharva\ollama\MainActivity.java:162: error: cannot find symbol
+          markwon = MarkdownHelper.createMarkwon(this, text -> {
+                    ^
+    symbol:   variable MarkdownHelper
+    location: class MainActivity
+  6 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+BUILD FAILED in 3s
+15 actionable tasks: 1 executed, 14 up-to-date

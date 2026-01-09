@@ -1,0 +1,633 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    tools:context=".SettingsActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Toolbar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:elevation="2dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="8dp">
+
+            <ImageButton
+                android:id="@+id/btnBack"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Back"
+                android:src="@drawable/ic_back" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:text="@string/settings_title"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium" />
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?attr/colorOnSurface"
+            android:alpha="0.1" />
+
+        <!-- Content -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <!-- Provider Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/provider_settings"
+                android:textSize="12sp"
+                android:textAllCaps="true"
+                android:alpha="0.5"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Provider Selection -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/api_provider"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <Spinner
+                android:id="@+id/spinnerProvider"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_settings_input"
+                android:paddingHorizontal="16dp" />
+
+            <!-- Ollama Settings Container -->
+            <LinearLayout
+                android:id="@+id/ollamaSettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp">
+
+                <!-- Server IP -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/ollama_server_ip"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/editServerIp"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_settings_input"
+                    android:hint="@string/hint_ip_address"
+                    android:inputType="text"
+                    android:paddingHorizontal="16dp"
+                    android:textSize="16sp" />
+
+                <!-- Port -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/ollama_port"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/editPort"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_settings_input"
+                    android:hint="@string/hint_port"
+                    android:inputType="number"
+                    android:paddingHorizontal="16dp"
+                    android:textSize="16sp" />
+
+                <!-- Ollama Buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/btnTestConnection"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="8dp"
+                        android:text="@string/test_connection"
+                        android:textSize="14sp"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                    <Button
+                        android:id="@+id/btnAutoDetect"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/auto_detect"
+                        android:textSize="14sp"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Custom URL Settings Container -->
+            <LinearLayout
+                android:id="@+id/customUrlSettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/custom_base_url"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/editCustomUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_settings_input"
+                    android:hint="@string/hint_base_url"
+                    android:inputType="textUri"
+                    android:paddingHorizontal="16dp"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!-- API Key Settings Container -->
+            <LinearLayout
+                android:id="@+id/apiKeySettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/api_key"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/editApiKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_settings_input"
+                    android:hint="@string/hint_api_key"
+                    android:inputType="textPassword"
+                    android:paddingHorizontal="16dp"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!-- MediaPipe Settings Container -->
+            <LinearLayout
+                android:id="@+id/mediaPipeSettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"
+                android:visibility="gone">
+
+                <!-- HuggingFace Token -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hf_token_label"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/editHfToken"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_settings_input"
+                    android:hint="@string/hint_hf_token"
+                    android:inputType="textPassword"
+                    android:paddingHorizontal="16dp"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/hf_token_info"
+                    android:textSize="11sp"
+                    android:alpha="0.5" />
+
+                <!-- Model Selection -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/select_model"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <Spinner
+                    android:id="@+id/spinnerGemmaModel"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_settings_input"
+                    android:paddingHorizontal="16dp" />
+
+                <!-- Download Button and Progress -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical">
+
+                    <Button
+                        android:id="@+id/btnDownloadModel"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:text="@string/download_model"
+                        android:textSize="14sp"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                    <LinearLayout
+                        android:id="@+id/downloadProgressContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <ProgressBar
+                            android:id="@+id/downloadProgress"
+                            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="8dp"
+                            android:max="100" />
+
+                        <TextView
+                            android:id="@+id/txtDownloadStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:textSize="12sp"
+                            android:alpha="0.7" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Divider -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="16dp"
+                    android:background="?attr/colorOnSurface"
+                    android:alpha="0.1" />
+
+                <!-- Manual Path (Advanced) -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/mediapipe_model_path"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/manual_path_hint"
+                    android:textSize="11sp"
+                    android:alpha="0.5" />
+
+                <EditText
+                    android:id="@+id/editMediaPipeModelPath"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_settings_input"
+                    android:hint="@string/hint_mediapipe_path"
+                    android:inputType="text"
+                    android:paddingHorizontal="16dp"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+
+            <!-- Connection Status -->
+            <TextView
+                android:id="@+id/txtConnectionStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="24dp"
+                android:background="?attr/colorOnSurface"
+                android:alpha="0.1" />
+
+            <!-- Web Search Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Knowledge &amp; RAG"
+                android:textSize="12sp"
+                android:textAllCaps="true"
+                android:alpha="0.5"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Enable Search Toggle -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/web_search"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/web_search_desc"
+                        android:textSize="12sp"
+                        android:alpha="0.6" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchWebSearch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- SearXNG Host (Visible only if enabled) -->
+            <LinearLayout
+                android:id="@+id/searxSettings"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/searx_host"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <EditText
+                    android:id="@+id/editSearxHost"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_settings_input"
+                    android:hint="@string/hint_searx_host"
+                    android:inputType="textUri"
+                    android:paddingHorizontal="16dp"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="24dp"
+                android:background="?attr/colorOnSurface"
+                android:alpha="0.1" />
+
+            <!-- Security Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/security"
+                android:textSize="12sp"
+                android:textAllCaps="true"
+                android:alpha="0.5"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Biometric Lock Toggle -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/biometric_lock"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/biometric_lock_desc"
+                        android:textSize="12sp"
+                        android:alpha="0.6" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/switchBiometric"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="24dp"
+                android:background="?attr/colorOnSurface"
+                android:alpha="0.1" />
+
+            <!-- Model Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/model_settings"
+                android:textSize="12sp"
+                android:textAllCaps="true"
+                android:alpha="0.5"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Model Input (editable for flexibility) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/model_name"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/editModel"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_settings_input"
+                android:hint="@string/hint_model"
+                android:inputType="text"
+                android:paddingHorizontal="16dp"
+                android:textSize="16sp" />
+
+            <!-- Popular Models (for cloud providers) -->
+            <LinearLayout
+                android:id="@+id/popularModels"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Popular: "
+                    android:textSize="12sp"
+                    android:alpha="0.5" />
+
+                <TextView
+                    android:id="@+id/txtPopularModels"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textSize="12sp"
+                    android:alpha="0.7" />
+            </LinearLayout>
+
+            <!-- System Prompt -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/system_prompt"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/editSystemPrompt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minHeight="120dp"
+                android:background="@drawable/bg_settings_input"
+                android:hint="@string/hint_system_prompt"
+                android:inputType="textMultiLine"
+                android:gravity="top"
+                android:padding="16dp"
+                android:textSize="14sp" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="24dp"
+                android:background="?attr/colorOnSurface"
+                android:alpha="0.1" />
+
+            <!-- Save Button -->
+            <Button
+                android:id="@+id/btnSave"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="@string/save"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+
+            <!-- About Card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:background="@drawable/bg_message_assistant"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/about_title"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/about_version"
+                    android:textSize="12sp"
+                    android:alpha="0.6" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/about_creator"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/about_description"
+                    android:textSize="13sp"
+                    android:alpha="0.7"
+                    android:lineSpacingMultiplier="1.3" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</ScrollView>
