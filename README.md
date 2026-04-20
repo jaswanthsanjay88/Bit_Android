@@ -132,8 +132,8 @@ Export everything to an encrypted `.tnbackup` file (PBKDF2 + AES-256-GCM):
 
 ### Build
 ```bash
-git clone https://github.com/Siddhesh2377/ToolNeuron.git
-cd ToolNeuron
+git clone https://github.com/jaswanthsanjay88/Bit_android
+cd Bit_android
 
 # Debug
 ./gradlew assembleDebug
