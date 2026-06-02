@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "mobile-design": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "856ea34ed7f67bed22055b2f6a638b03e7cb10bd796da1b0973358da19e2e96b"
+    }
+  }
+}

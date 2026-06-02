@@ -1,0 +1,45 @@
+/home/home/AndroidStudioProjects/BIT/app/src/main/assets/embedding-model/model_fp16.onnx
+*.iml
+.gradle
+/local.properties
+local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/app/build
+/app/google-services.json
+/captures
+.externalNativeBuild
+.cxx
+/app/release/app-release.apk
+/app/release/baselineProfiles/0/app-release.dm
+/app/release/baselineProfiles/1/app-release.dm
+/.idea/codeStyles/codeStyleConfig.xml
+/.idea/jsonSchemas.xml
+/app/release/output-metadata.json
+/.idea/codeStyles/Project.xml
+/web/*.html
+/smollm/src/main/jniLibs/
+/repo/*.apk
+*.apk
+
+/app/release/
+ISSUES_TRACKER.txt
+
+# Build logs and temp files
+build_*.txt
+build_*.log
+fixed*.log
+logcat*.txt
+hs_err_*.log
+
+# Scratch and temp directories
+/scratch/
+
+# Kotlin build cache
+.kotlin/
