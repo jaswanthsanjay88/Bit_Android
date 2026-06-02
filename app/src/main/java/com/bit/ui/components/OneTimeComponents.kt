@@ -12,8 +12,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -235,6 +241,60 @@ fun ModelListItem(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun ModelList(
+    installedModels: List<Model>,
+    currentModelID: String,
+    onClickListener: (Model) -> Unit,
+    modifier: Modifier = Modifier,
+    onDeleteListener: ((Model) -> Unit)? = null,
+    maxHeight: Dp = 200.dp
+) {
+    if (installedModels.isEmpty()) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(Standards.SpacingLg),
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.foundation.layout.Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
+            ) {
+                Icon(
+                    imageVector = TnIcons.Photo,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
+                Text(
+                    text = "No models installed",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(max = maxHeight),
+            contentPadding = PaddingValues(Standards.SpacingSm),
+            verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
+        ) {
+            items(installedModels, key = { it.id }) { model ->
+                ModelListItem(
+                    modifier = Modifier.fillMaxWidth(),
+                    model = model,
+                    isLoaded = currentModelID == model.id,
+                    onClickListener = onClickListener,
+                    onDeleteListener = onDeleteListener
+                )
             }
         }
     }

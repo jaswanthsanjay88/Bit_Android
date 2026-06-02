@@ -52,7 +52,6 @@ import com.bit.ui.components.ActionButton
 import com.bit.ui.components.GlassCard
 import com.bit.ui.components.GlassDivider
 import com.bit.ui.components.GlassSectionCard
-import com.bit.ui.components.SectionHeader
 import com.bit.ui.components.SettingsClickableRow
 import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.Glass
@@ -199,8 +198,8 @@ fun SettingsScreen(
                                 .background(
                                     brush = Brush.radialGradient(
                                         colors = listOf(
-                                            Color(0xFF3388EE),
-                                            Color(0xFF1F5FBF)
+                                            Glass.AccentPrimary,
+                                            Glass.AccentSecondary
                                          )
                                     ),
                                     shape = CircleShape
@@ -212,7 +211,7 @@ fun SettingsScreen(
                                 text = initials,
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = Glass.TextOnAccent
                             )
                         }
 
@@ -440,131 +439,83 @@ fun SettingsScreen(
 
     // ── Dialogs to Edit Profile dynamically ──
     if (showEditNameDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditNameDialog = false },
-            title = { Text("Edit Full Name", fontWeight = FontWeight.SemiBold) },
-            text = {
-                OutlinedTextField(
-                    value = editNameInput,
-                    onValueChange = { editNameInput = it },
-                    label = { Text("Full Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Glass.TextPrimary,
-                        unfocusedTextColor = Glass.TextPrimary,
-                        focusedBorderColor = Glass.BorderActive,
-                        unfocusedBorderColor = Glass.Border
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (editNameInput.isNotBlank()) {
-                            viewModel.updateProfileName(editNameInput.trim())
-                        }
-                        showEditNameDialog = false
-                    }
-                ) {
-                    Text("Save", color = Glass.AccentPrimary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditNameDialog = false }) {
-                    Text("Cancel", color = Glass.TextSecondary)
-                }
-            },
-            containerColor = Color(0xFF121212),
-            textContentColor = Glass.TextPrimary,
-            titleContentColor = Glass.TextPrimary,
-            shape = RoundedCornerShape(Standards.RadiusLg)
+        ProfileEditDialog(
+            title = "Edit Full Name",
+            label = "Full Name",
+            initialValue = editNameInput,
+            onDismiss = { showEditNameDialog = false },
+            onSave = { viewModel.updateProfileName(it) }
         )
     }
 
     if (showEditEmailDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditEmailDialog = false },
-            title = { Text("Edit Email Address", fontWeight = FontWeight.SemiBold) },
-            text = {
-                OutlinedTextField(
-                    value = editEmailInput,
-                    onValueChange = { editEmailInput = it },
-                    label = { Text("Email Address") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Glass.TextPrimary,
-                        unfocusedTextColor = Glass.TextPrimary,
-                        focusedBorderColor = Glass.BorderActive,
-                        unfocusedBorderColor = Glass.Border
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (editEmailInput.isNotBlank()) {
-                            viewModel.updateProfileEmail(editEmailInput.trim())
-                        }
-                        showEditEmailDialog = false
-                    }
-                ) {
-                    Text("Save", color = Glass.AccentPrimary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditEmailDialog = false }) {
-                    Text("Cancel", color = Glass.TextSecondary)
-                }
-            },
-            containerColor = Color(0xFF121212),
-            textContentColor = Glass.TextPrimary,
-            titleContentColor = Glass.TextPrimary,
-            shape = RoundedCornerShape(Standards.RadiusLg)
+        ProfileEditDialog(
+            title = "Edit Email Address",
+            label = "Email Address",
+            initialValue = editEmailInput,
+            onDismiss = { showEditEmailDialog = false },
+            onSave = { viewModel.updateProfileEmail(it) }
         )
     }
 
     if (showEditPhoneDialog) {
-        AlertDialog(
-            onDismissRequest = { showEditPhoneDialog = false },
-            title = { Text("Edit Phone Number", fontWeight = FontWeight.SemiBold) },
-            text = {
-                OutlinedTextField(
-                    value = editPhoneInput,
-                    onValueChange = { editPhoneInput = it },
-                    label = { Text("Phone Number") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Glass.TextPrimary,
-                        unfocusedTextColor = Glass.TextPrimary,
-                        focusedBorderColor = Glass.BorderActive,
-                        unfocusedBorderColor = Glass.Border
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (editPhoneInput.isNotBlank()) {
-                            viewModel.updateProfilePhone(editPhoneInput.trim())
-                        }
-                        showEditPhoneDialog = false
-                    }
-                ) {
-                    Text("Save", color = Glass.AccentPrimary)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditPhoneDialog = false }) {
-                    Text("Cancel", color = Glass.TextSecondary)
-                }
-            },
-            containerColor = Color(0xFF121212),
-            textContentColor = Glass.TextPrimary,
-            titleContentColor = Glass.TextPrimary,
-            shape = RoundedCornerShape(Standards.RadiusLg)
+        ProfileEditDialog(
+            title = "Edit Phone Number",
+            label = "Phone Number",
+            initialValue = editPhoneInput,
+            onDismiss = { showEditPhoneDialog = false },
+            onSave = { viewModel.updateProfilePhone(it) }
         )
     }
+}
+
+@Composable
+private fun ProfileEditDialog(
+    title: String,
+    label: String,
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var textInput by remember { mutableStateOf(initialValue) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title, fontWeight = FontWeight.SemiBold) },
+        text = {
+            OutlinedTextField(
+                value = textInput,
+                onValueChange = { textInput = it },
+                label = { Text(label) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Glass.TextPrimary,
+                    unfocusedTextColor = Glass.TextPrimary,
+                    focusedBorderColor = Glass.BorderActive,
+                    unfocusedBorderColor = Glass.Border
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (textInput.isNotBlank()) {
+                        onSave(textInput.trim())
+                    }
+                    onDismiss()
+                }
+            ) {
+                Text("Save", color = Glass.AccentPrimary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Glass.TextSecondary)
+            }
+        },
+        containerColor = Glass.SurfaceElevated,
+        textContentColor = Glass.TextPrimary,
+        titleContentColor = Glass.TextPrimary,
+        shape = RoundedCornerShape(Standards.RadiusLg)
+    )
 }

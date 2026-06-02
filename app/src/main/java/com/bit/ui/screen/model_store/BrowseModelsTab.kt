@@ -43,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.models.data.HuggingFaceModel
 import com.bit.service.ModelDownloadService
 import com.bit.global.Standards
+import com.bit.global.HardwareScanner
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.CaptionText
 import com.bit.ui.components.GlassCard
@@ -205,7 +206,7 @@ internal fun RepoCardListView(
             if (searchQuery.isBlank()) {
                 item {
                     val context = androidx.compose.ui.platform.LocalContext.current
-                    val ramGb = remember { getTotalSystemRamGb(context) }
+                    val ramGb = remember { HardwareScanner.getTotalSystemRamGb(context) }
                     RecommendedModelCard(systemRamGb = ramGb, onClick = {
                         val query = when {
                             ramGb < 4.0 -> "Qwen2.5-0.5B"
@@ -289,73 +290,56 @@ internal fun RepoCardListView(
                     items = explorerResults,
                     key = { it.id }
                 ) { explorerRepo ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                viewModel.addExplorerRepository(explorerRepo)
-                                viewModel.selectRepository(explorerRepo.id)
-                            }
-                            .padding(vertical = Standards.SpacingSm)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingXs),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-                        ) {
-                            ModelTypeBadge(com.bit.models.data.ModelType.GGUF)
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = explorerRepo.id.substringAfter("/"),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Glass.TextPrimary,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                    RepoListItem(
+                        title = explorerRepo.id.substringAfter("/"),
+                        modelType = com.bit.models.data.ModelType.GGUF,
+                        onClick = {
+                            viewModel.addExplorerRepository(explorerRepo)
+                            viewModel.selectRepository(explorerRepo.id)
+                        },
+                        subtitle = {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CaptionText(text = explorerRepo.author, color = Glass.TextSecondary)
+                                CaptionText(text = "·", color = Glass.TextMuted)
+                                CaptionText(
+                                    text = "${if (explorerRepo.downloads >= 1000000) "${explorerRepo.downloads / 1000000}M" else if (explorerRepo.downloads >= 1000) "${explorerRepo.downloads / 1000}k" else explorerRepo.downloads} DLs",
+                                    color = Glass.TextSecondary
                                 )
+                                CaptionText(text = "·", color = Glass.TextMuted)
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    CaptionText(text = explorerRepo.author, color = Glass.TextSecondary)
-                                    CaptionText(text = "·", color = Glass.TextMuted)
-                                    CaptionText(
-                                        text = "${if (explorerRepo.downloads >= 1000000) "${explorerRepo.downloads / 1000000}M" else if (explorerRepo.downloads >= 1000) "${explorerRepo.downloads / 1000}k" else explorerRepo.downloads} DLs",
-                                        color = Glass.TextSecondary
+                                    Icon(
+                                        imageVector = TnIcons.Heart,
+                                        contentDescription = "Likes",
+                                        tint = Glass.TextSecondary,
+                                        modifier = Modifier.size(10.dp)
                                     )
+                                    CaptionText(text = explorerRepo.likes.toString(), color = Glass.TextSecondary)
+                                }
+
+                                if (explorerRepo.gated) {
                                     CaptionText(text = "·", color = Glass.TextMuted)
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Icon(
-                                            imageVector = TnIcons.Heart,
-                                            contentDescription = "Likes",
-                                            tint = Glass.TextSecondary,
+                                            imageVector = TnIcons.Lock,
+                                            contentDescription = "Gated",
+                                            tint = Glass.StatusWarning,
                                             modifier = Modifier.size(10.dp)
                                         )
-                                        CaptionText(text = explorerRepo.likes.toString(), color = Glass.TextSecondary)
-                                    }
-
-                                    if (explorerRepo.gated) {
-                                        CaptionText(text = "·", color = Glass.TextMuted)
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = TnIcons.Lock,
-                                                contentDescription = "Gated",
-                                                tint = Glass.StatusWarning,
-                                                modifier = Modifier.size(10.dp)
-                                            )
-                                            CaptionText(text = "Gated", color = Glass.StatusWarning)
-                                        }
+                                        CaptionText(text = "Gated", color = Glass.StatusWarning)
                                     }
                                 }
                             }
-
+                        },
+                        rightContent = {
                             Icon(
                                 imageVector = TnIcons.Plus,
                                 contentDescription = "Add and View",
@@ -363,12 +347,7 @@ internal fun RepoCardListView(
                                 tint = Glass.AccentPrimary
                             )
                         }
-                        Spacer(modifier = Modifier.height(Standards.SpacingSm))
-                        HorizontalDivider(
-                            color = Glass.BorderSubtle.copy(alpha = 0.5f),
-                            thickness = 0.8.dp
-                        )
-                    }
+                    )
                 }
             }
         }
@@ -382,17 +361,19 @@ internal fun RepoCardListView(
     }
 }
 
-// ── StoreRepoCard ──
+// ── Shared RepoListItem ──
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun StoreRepoCard(
-    info: RepoGroupInfo,
-    hasActiveDownload: Boolean,
-    onClick: () -> Unit
+internal fun RepoListItem(
+    title: String,
+    modelType: com.bit.models.data.ModelType,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: @Composable () -> Unit,
+    rightContent: @Composable () -> Unit
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(vertical = Standards.SpacingSm)
@@ -402,45 +383,21 @@ internal fun StoreRepoCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
-            ModelTypeBadge(info.modelType)
+            ModelTypeBadge(modelType)
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = info.displayName,
+                    text = title,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Glass.TextPrimary,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (info.author.isNotEmpty()) {
-                        CaptionText(text = info.author, color = Glass.TextSecondary)
-                        CaptionText(text = "·", color = Glass.TextMuted)
-                    }
-                    CaptionText(
-                        text = "${info.modelCount} ${if (info.modelCount == 1) "model" else "models"}",
-                        color = Glass.TextSecondary
-                    )
-                    if (hasActiveDownload) {
-                        CaptionText(text = "·", color = Glass.TextMuted)
-                        LoadingIndicator(
-                            modifier = Modifier.size(10.dp),
-                            color = Glass.AccentPrimary
-                        )
-                    }
-                }
+                subtitle()
             }
 
-            Icon(
-                imageVector = TnIcons.ChevronRight,
-                contentDescription = "View models",
-                modifier = Modifier.size(16.dp),
-                tint = Glass.TextMuted
-            )
+            rightContent()
         }
         Spacer(modifier = Modifier.height(Standards.SpacingSm))
         HorizontalDivider(
@@ -448,6 +405,52 @@ internal fun StoreRepoCard(
             thickness = 0.8.dp
         )
     }
+}
+
+// ── StoreRepoCard ──
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun StoreRepoCard(
+    info: RepoGroupInfo,
+    hasActiveDownload: Boolean,
+    onClick: () -> Unit
+) {
+    RepoListItem(
+        title = info.displayName,
+        modelType = info.modelType,
+        onClick = onClick,
+        subtitle = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (info.author.isNotEmpty()) {
+                    CaptionText(text = info.author, color = Glass.TextSecondary)
+                    CaptionText(text = "·", color = Glass.TextMuted)
+                }
+                CaptionText(
+                    text = "${info.modelCount} ${if (info.modelCount == 1) "model" else "models"}",
+                    color = Glass.TextSecondary
+                )
+                if (hasActiveDownload) {
+                    CaptionText(text = "·", color = Glass.TextMuted)
+                    LoadingIndicator(
+                        modifier = Modifier.size(10.dp),
+                        color = Glass.AccentPrimary
+                    )
+                }
+            }
+        },
+        rightContent = {
+            Icon(
+                imageVector = TnIcons.ChevronRight,
+                contentDescription = "View models",
+                modifier = Modifier.size(16.dp),
+                tint = Glass.TextMuted
+            )
+        }
+    )
 }
 
 // ── RepoDetailView ──
@@ -541,16 +544,6 @@ internal fun RepoDetailView(
     }
 }
 
-private fun getTotalSystemRamGb(context: android.content.Context): Double {
-    return try {
-        val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        val memoryInfo = android.app.ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        memoryInfo.totalMem / (1024.0 * 1024.0 * 1024.0)
-    } catch (e: Exception) {
-        8.0
-    }
-}
 
 @Composable
 internal fun RecommendedModelCard(systemRamGb: Double, onClick: () -> Unit) {

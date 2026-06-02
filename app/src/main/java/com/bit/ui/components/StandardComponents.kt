@@ -38,25 +38,6 @@ import com.bit.ui.icons.TnIcons
 
 // ==================== Text Components ====================
 
-/**
- * Body label text - used for descriptions, labels alongside controls
- */
-@Composable
-fun BodyLabel(
-    text: String,
-    modifier: Modifier = Modifier,
-    color: Color = Glass.TextPrimary,
-    maxLines: Int = Int.MAX_VALUE
-) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = color,
-        maxLines = maxLines,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-    )
-}
 
 /**
  * Caption text - small secondary info text
@@ -78,7 +59,7 @@ fun CaptionText(
 // ==================== Switch Components ====================
 
 /**
- * Standard row with label and CuteSwitch on the right.
+ * Standard row with label and ActionSwitch on the right.
  * Optional icon on the left, optional description below the title.
  */
 @SuppressLint("ModifierParameter")
@@ -92,19 +73,17 @@ fun SwitchRow(
     icon: ImageVector? = null,
     iconRes: Int? = null,
     enabled: Boolean = true,
-    titleColor: androidx.compose.ui.graphics.Color? = null
+    titleColor: Color? = null,
+    hasBorder: Boolean = true
 ) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(1.dp, Glass.BorderSubtle, RoundedCornerShape(Standards.CardSmallCornerRadius)),
-        color = Glass.Surface,
-        shape = RoundedCornerShape(Standards.CardSmallCornerRadius)
-    ) {
+    val rowContent = @Composable {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Standards.CardPadding, vertical = Standards.SpacingSm),
+                .padding(
+                    horizontal = if (hasBorder) Standards.CardPadding else 0.dp,
+                    vertical = Standards.SpacingSm
+                ),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
@@ -150,6 +129,22 @@ fun SwitchRow(
             )
         }
     }
+
+    if (hasBorder) {
+        Surface(
+            modifier = modifier
+                .fillMaxWidth()
+                .border(1.dp, Glass.BorderSubtle, RoundedCornerShape(Standards.CardSmallCornerRadius)),
+            color = Glass.Surface,
+            shape = RoundedCornerShape(Standards.CardSmallCornerRadius)
+        ) {
+            rowContent()
+        }
+    } else {
+        Box(modifier = modifier) {
+            rowContent()
+        }
+    }
 }
 
 /**
@@ -167,54 +162,18 @@ fun SettingsSwitchRow(
     enabled: Boolean = true,
     titleColor: Color? = null
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = Standards.SpacingSm),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-    ) {
-        // Optional icon
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(Standards.IconMd),
-                tint = if (enabled) Glass.AccentPrimary else Glass.TextMuted
-            )
-        } else if (iconRes != null) {
-            Icon(
-                painter = painterResource(iconRes),
-                contentDescription = null,
-                modifier = Modifier.size(Standards.IconMd),
-                tint = if (enabled) Glass.AccentPrimary else Glass.TextMuted
-            )
-        }
-
-        // Title + description
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = titleColor ?: if (enabled) Glass.TextPrimary else Glass.TextMuted
-            )
-            if (description != null) {
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (enabled) Glass.TextSecondary else Glass.TextMuted
-                )
-            }
-        }
-
-        // Switch
-        ActionSwitch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled
-        )
-    }
+    SwitchRow(
+        title = title,
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        description = description,
+        icon = icon,
+        iconRes = iconRes,
+        enabled = enabled,
+        titleColor = titleColor,
+        hasBorder = false
+    )
 }
 
 /**
@@ -565,56 +524,17 @@ fun SectionDivider(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(1.dp)
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Glass.Divider,
-                                Glass.Divider
-                            )
-                        )
-                    )
-            )
+            GlassDivider(modifier = Modifier.weight(1f))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 color = Glass.TextMuted
             )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(1.dp)
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Glass.Divider,
-                                Glass.Divider,
-                                Color.Transparent
-                            )
-                        )
-                    )
-            )
+            GlassDivider(modifier = Modifier.weight(1f))
         }
     } else {
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(vertical = Standards.SpacingSm)
-                .height(1.dp)
-                .background(
-                    brush = Brush.horizontalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Glass.Divider,
-                            Glass.Divider,
-                            Color.Transparent
-                        )
-                    )
-                )
+        GlassDivider(
+            modifier = modifier.padding(vertical = Standards.SpacingSm)
         )
     }
 }

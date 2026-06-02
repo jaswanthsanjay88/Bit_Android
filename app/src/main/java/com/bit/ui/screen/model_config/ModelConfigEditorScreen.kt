@@ -28,7 +28,7 @@ import com.bit.models.enums.ProviderType
 import com.bit.models.table_schema.Model
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.ActionTextButton
-import com.bit.ui.components.CuteSwitch
+import com.bit.ui.components.ActionSwitch
 import com.bit.viewmodel.ModelConfigEditorViewModel
 import com.bit.ui.icons.TnIcons
 
@@ -791,9 +791,10 @@ private fun SwitchField(
             }
         }
 
-        CuteSwitch(
+        ActionSwitch(
             checked = checked,
-            onCheckedChange = { if (enabled) onCheckedChange(it) }
+            onCheckedChange = { if (enabled) onCheckedChange(it) },
+            enabled = enabled
         )
     }
 }

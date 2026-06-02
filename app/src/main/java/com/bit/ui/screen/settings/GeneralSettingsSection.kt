@@ -29,7 +29,6 @@ import com.bit.models.table_schema.Model
 import com.bit.service.ModelDownloadService
 import com.bit.ui.components.ActionTextButton
 import com.bit.ui.components.ActionToggleGroup
-import com.bit.ui.components.BodyLabel
 import com.bit.ui.components.StandardCard
 import com.bit.ui.components.SettingsSwitchRow
 import com.bit.ui.components.SettingsClickableRow
@@ -47,7 +46,6 @@ internal fun LazyListScope.generalSettingsSection(
     toolCallingDownloadState: ModelDownloadService.DownloadState?,
     viewModel: SettingsViewModel
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         val canEnableToolCalling = hasToolCallingModel || toolCallingBypassEnabled
         GlassSectionCard(
@@ -126,7 +124,6 @@ internal fun LazyListScope.llmSettingsSection(
     speedModeEnabled: Boolean,
     viewModel: SettingsViewModel
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "LLM Engine",
@@ -165,7 +162,6 @@ internal fun LazyListScope.chatSettingsSection(
     codeHighlightEnabled: Boolean,
     viewModel: SettingsViewModel
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "Chat Experience",
@@ -190,7 +186,6 @@ internal fun LazyListScope.hardwareTuningSection(
     hardwareProfile: HardwareProfile?,
     viewModel: SettingsViewModel
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "Hardware Tuning",
@@ -295,7 +290,6 @@ internal fun LazyListScope.modelConfigurationSection(
     onModelEditor: () -> Unit,
     onEmbeddingSetup: () -> Unit
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "Model Configurations",
@@ -360,7 +354,6 @@ internal fun LazyListScope.aiMemorySection(
     onAiMemoryClick: () -> Unit,
     viewModel: SettingsViewModel
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "AI Memory",
@@ -391,7 +384,6 @@ internal fun LazyListScope.imageGenerationSection(
     imageBlurEnabled: Boolean,
     viewModel: SettingsViewModel
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "Image Generation",
@@ -411,7 +403,6 @@ internal fun LazyListScope.imageGenerationSection(
 // ── About Section ──
 
 internal fun LazyListScope.aboutSection(appVersion: String) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "About",

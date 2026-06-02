@@ -34,8 +34,10 @@ import com.bit.ui.components.ActionProgressButton
 import com.bit.ui.components.GlassCard
 import com.bit.ui.theme.Glass
 import com.bit.ui.theme.Motion
+import com.bit.ui.theme.MonoWarning
 import com.bit.ui.icons.TnIcons
 import com.bit.global.Standards
+import com.bit.global.HardwareScanner
 
 // ── ModelTypeBadge ──
 
@@ -61,19 +63,6 @@ internal fun ModelTypeBadge(modelType: ModelType) {
 
 // ── ModelCard ──
 
-private fun getTotalSystemRamGb(context: android.content.Context): Double {
-    return try {
-        val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-        val memoryInfo = android.app.ActivityManager.MemoryInfo()
-        activityManager.getMemoryInfo(memoryInfo)
-        memoryInfo.totalMem / (1024.0 * 1024.0 * 1024.0)
-    } catch (e: Exception) {
-        8.0
-    }
-}
-
-// ── ModelCard ──
-
 @Composable
 fun ModelCard(
     model: HuggingFaceModel,
@@ -83,7 +72,7 @@ fun ModelCard(
     onCancelDownload: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val systemRamGb = remember { getTotalSystemRamGb(context) }
+    val systemRamGb = remember { HardwareScanner.getTotalSystemRamGb(context) }
     
     // Auto-detect if this model requires high RAM (>3GB size or SD generation models)
     val isHeavyModel = remember(model.approximateSize, model.modelType) {
@@ -190,7 +179,7 @@ fun ModelCard(
 
                 if (isHeavyModel && systemRamGb < 6.0) {
                     val warningShape = RoundedCornerShape(Standards.SpacingXs)
-                    val warningColor = androidx.compose.ui.graphics.Color(0xFFFFCA6B) // Functional Warm Orange Warning
+                    val warningColor = MonoWarning
                     Row(
                         modifier = Modifier
                             .background(warningColor.copy(alpha = 0.12f), warningShape)
@@ -300,29 +289,17 @@ fun ModelCard(
 
                     Spacer(modifier = Modifier.height(Standards.SpacingXs))
 
-                    if (isExtracting) {
-                        val es = downloadState as ModelDownloadService.DownloadState.Extracting
-                        if (es.totalFiles > 0) {
-                            LinearProgressIndicator(
-                                progress = { es.extractedCount.toFloat() / es.totalFiles },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp)),
-                                color = Glass.AccentPrimary,
-                                trackColor = Glass.SurfaceSubtle
-                            )
-                        } else {
-                            LinearProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(4.dp)
-                                    .clip(RoundedCornerShape(2.dp)),
-                                color = Glass.AccentPrimary,
-                                trackColor = Glass.SurfaceSubtle
-                            )
+                    val isIndeterminate = isProcessing || (isExtracting && (downloadState as ModelDownloadService.DownloadState.Extracting).totalFiles <= 0)
+                    val progressVal = when {
+                        isDownloading -> progress
+                        isExtracting -> {
+                            val es = downloadState as ModelDownloadService.DownloadState.Extracting
+                            if (es.totalFiles > 0) es.extractedCount.toFloat() / es.totalFiles else 0f
                         }
-                    } else if (isProcessing) {
+                        else -> 0f
+                    }
+
+                    if (isIndeterminate) {
                         LinearProgressIndicator(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -333,7 +310,7 @@ fun ModelCard(
                         )
                     } else {
                         LinearProgressIndicator(
-                            progress = { progress },
+                            progress = { progressVal },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(4.dp)

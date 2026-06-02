@@ -47,6 +47,17 @@ data class HardwareProfile(
 
 object HardwareScanner {
 
+    fun getTotalSystemRamGb(context: Context): Double {
+        return try {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val memInfo = ActivityManager.MemoryInfo()
+            am.getMemoryInfo(memInfo)
+            memInfo.totalMem / (1024.0 * 1024.0 * 1024.0)
+        } catch (_: Exception) {
+            8.0
+        }
+    }
+
     fun scan(context: Context): HardwareProfile {
         val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         val memInfo = ActivityManager.MemoryInfo()

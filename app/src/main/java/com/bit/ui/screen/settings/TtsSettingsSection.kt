@@ -84,7 +84,6 @@ internal fun LazyListScope.ttsSettingsSection(
     voices: List<String>,
     viewModel: SettingsViewModel
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "Text-to-Speech",
@@ -251,7 +250,6 @@ internal fun LazyListScope.sttSettingsSection(
     sttLanguage: String,
     viewModel: SettingsViewModel
 ) {
-    item { Spacer(Modifier.height(Standards.SpacingSm)) }
     item {
         GlassSectionCard(
             title = "Speech-to-Text",

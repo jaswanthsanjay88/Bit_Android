@@ -63,6 +63,7 @@ import com.bit.ui.components.GlassDivider
 import com.bit.ui.components.MemoryOverlayBottomSheet
 import com.bit.ui.components.ModeToggleSwitch
 import com.bit.ui.components.ModelListItem
+import com.bit.ui.components.ModelList
 import com.bit.ui.components.PluginOverlayBottomSheet
 import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.Glass
@@ -173,7 +174,6 @@ internal fun BottomBar(
     Column(
         modifier = Modifier.then(if (liquidState != null) Modifier.liquid(liquidState) else Modifier)
     ) {
-        // ── Model list panel (AnimatedVisibility) ──
         AnimatedVisibility(config.showModelList) {
             if (installedModels.isEmpty()) {
                 Row(
@@ -199,35 +199,26 @@ internal fun BottomBar(
                     )
                 }
             } else {
-                LazyColumn(
-                    Modifier
+                ModelList(
+                    installedModels = installedModels,
+                    currentModelID = currentModelID,
+                    onClickListener = { selectedModel ->
+                        if (currentModelID == selectedModel.id) {
+                            llmModelViewModel.unloadModel()
+                            chatViewModel.hideModelList()
+                        } else {
+                            llmModelViewModel.loadModel(selectedModel)
+                            onModelSelectedNavigate(selectedModel)
+                            chatViewModel.hideModelList()
+                        }
+                    },
+                    modifier = Modifier
                         .fillMaxWidth()
                         .padding(Standards.SpacingSm)
-                        .heightIn(max = 200.dp)
                         .background(Glass.Surface, shape = RoundedCornerShape(Standards.RadiusMd))
                         .border(1.dp, Glass.BorderSubtle, RoundedCornerShape(Standards.RadiusMd)),
-                    contentPadding = PaddingValues(bottom = Standards.SpacingSm)
-                ) {
-                    items(installedModels) { modelConfig ->
-                        ModelListItem(
-                            modifier = Modifier
-                                .padding(top = Standards.SpacingSm)
-                                .padding(horizontal = Standards.SpacingSm),
-                            model = modelConfig,
-                            isLoaded = currentModelID == modelConfig.id,
-                            onClickListener = { selectedModel ->
-                                if (currentModelID == modelConfig.id) {
-                                    llmModelViewModel.unloadModel()
-                                    chatViewModel.hideModelList()
-                                } else {
-                                    llmModelViewModel.loadModel(selectedModel)
-                                    onModelSelectedNavigate(selectedModel)
-                                    chatViewModel.hideModelList()
-                                }
-                            }
-                        )
-                    }
-                }
+                    maxHeight = 200.dp
+                )
             }
         }
 
