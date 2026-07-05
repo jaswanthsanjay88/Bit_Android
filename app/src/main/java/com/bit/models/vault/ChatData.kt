@@ -13,7 +13,8 @@ data class ChatInfo(
     val chatId: String,
     val createdAt: Long,
     val messageCount: Int,
-    val lastMessageTime: Long?
+    val lastMessageTime: Long?,
+    val title: String? = null
 )
 
 data class MessageSearchResult(

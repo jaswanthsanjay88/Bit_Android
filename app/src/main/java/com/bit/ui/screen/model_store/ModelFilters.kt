@@ -182,16 +182,22 @@ fun ModelFiltersSection(
                 label = { Text("LLM (GGUF)") }
             )
 
-            FilterChip(
-                selected = selectedModelType == ModelType.SD,
-                onClick = { viewModel.filterByModelType(ModelType.SD) },
-                label = { Text("Image (SD)") }
-            )
+            // FilterChip(
+            //     selected = selectedModelType == ModelType.SD,
+            //     onClick = { viewModel.filterByModelType(ModelType.SD) },
+            //     label = { Text("Image (SD)") }
+            // )
 
             FilterChip(
                 selected = selectedModelType == ModelType.TTS,
                 onClick = { viewModel.filterByModelType(ModelType.TTS) },
                 label = { Text("Speech (TTS)") }
+            )
+
+            FilterChip(
+                selected = selectedModelType == ModelType.STT,
+                onClick = { viewModel.filterByModelType(ModelType.STT) },
+                label = { Text("Speech (STT)") }
             )
         }
 

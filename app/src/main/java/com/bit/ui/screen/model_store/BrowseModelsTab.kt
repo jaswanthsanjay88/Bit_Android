@@ -22,10 +22,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,8 +48,6 @@ import com.bit.global.Standards
 import com.bit.global.HardwareScanner
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.CaptionText
-import com.bit.ui.components.GlassCard
-import com.bit.ui.theme.Glass
 import com.bit.ui.theme.Motion
 import com.bit.viewmodel.ModelStoreViewModel
 import com.bit.viewmodel.RepoGroupInfo
@@ -66,6 +66,8 @@ internal fun ModelsTab(
     viewModel: ModelStoreViewModel,
     onDownload: (HuggingFaceModel) -> Unit,
     onCancelDownload: (String) -> Unit,
+    onPauseDownload: (String) -> Unit = {},
+    onResumeDownload: (String, String) -> Unit = { _, _ -> },
     onRetry: () -> Unit
 ) {
     val selectedRepo by viewModel.selectedRepository.collectAsStateWithLifecycle()
@@ -78,7 +80,7 @@ internal fun ModelsTab(
                 Box(
                     modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
                 ) {
-                    LoadingIndicator(color = Glass.AccentPrimary)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             }
 
@@ -94,17 +96,17 @@ internal fun ModelsTab(
                             imageVector = TnIcons.AlertTriangle,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
-                            tint = Glass.StatusError
+                            tint = MaterialTheme.colorScheme.error
                         )
                         Text(
                             text = "Error loading models",
                             style = MaterialTheme.typography.titleMedium,
-                            color = Glass.StatusError
+                            color = MaterialTheme.colorScheme.error
                         )
                         Text(
                             text = error,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Glass.TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Button(onClick = onRetry) {
                             Text("Retry")
@@ -125,12 +127,12 @@ internal fun ModelsTab(
                             imageVector = TnIcons.SearchOff,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
-                            tint = Glass.TextMuted
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
                         Text(
                             text = "No models found",
                             style = MaterialTheme.typography.bodyLarge,
-                            color = Glass.TextSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -161,7 +163,9 @@ internal fun ModelsTab(
                             downloadStates = downloadStates,
                             installedModelIds = installedModelIds,
                             onDownload = onDownload,
-                            onCancelDownload = onCancelDownload
+                            onCancelDownload = onCancelDownload,
+                            onPauseDownload = onPauseDownload,
+                            onResumeDownload = onResumeDownload
                         )
                     }
                 }
@@ -226,7 +230,7 @@ internal fun RepoCardListView(
                     Text(
                         text = "Local Repositories",
                         style = MaterialTheme.typography.titleSmall,
-                        color = Glass.AccentPrimary,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(vertical = Standards.SpacingSm, horizontal = Standards.SpacingXs)
                     )
@@ -237,7 +241,7 @@ internal fun RepoCardListView(
                         Text(
                             text = "No matching local repositories found",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Glass.TextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = Standards.SpacingMd, horizontal = Standards.SpacingXs)
                         )
                     }
@@ -269,7 +273,7 @@ internal fun RepoCardListView(
                     Text(
                         text = "Explore Hugging Face",
                         style = MaterialTheme.typography.titleSmall,
-                        color = Glass.AccentPrimary,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(vertical = Standards.SpacingSm, horizontal = Standards.SpacingXs)
                     )
@@ -280,7 +284,7 @@ internal fun RepoCardListView(
                         Text(
                             text = explorerError ?: "No online Hugging Face repositories found for \"$searchQuery\"",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Glass.TextMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = Standards.SpacingMd, horizontal = Standards.SpacingXs)
                         )
                     }
@@ -295,20 +299,12 @@ internal fun RepoCardListView(
                         modelType = com.bit.models.data.ModelType.GGUF,
                         onClick = {
                             viewModel.addExplorerRepository(explorerRepo)
-                            viewModel.selectRepository(explorerRepo.id)
                         },
                         subtitle = {
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                CaptionText(text = explorerRepo.author, color = Glass.TextSecondary)
-                                CaptionText(text = "·", color = Glass.TextMuted)
-                                CaptionText(
-                                    text = "${if (explorerRepo.downloads >= 1000000) "${explorerRepo.downloads / 1000000}M" else if (explorerRepo.downloads >= 1000) "${explorerRepo.downloads / 1000}k" else explorerRepo.downloads} DLs",
-                                    color = Glass.TextSecondary
-                                )
-                                CaptionText(text = "·", color = Glass.TextMuted)
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                                     verticalAlignment = Alignment.CenterVertically
@@ -316,14 +312,14 @@ internal fun RepoCardListView(
                                     Icon(
                                         imageVector = TnIcons.Heart,
                                         contentDescription = "Likes",
-                                        tint = Glass.TextSecondary,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(10.dp)
                                     )
-                                    CaptionText(text = explorerRepo.likes.toString(), color = Glass.TextSecondary)
+                                    CaptionText(text = explorerRepo.likes.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
 
                                 if (explorerRepo.gated) {
-                                    CaptionText(text = "·", color = Glass.TextMuted)
+                                    CaptionText(text = "·", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                                         verticalAlignment = Alignment.CenterVertically
@@ -331,10 +327,10 @@ internal fun RepoCardListView(
                                         Icon(
                                             imageVector = TnIcons.Lock,
                                             contentDescription = "Gated",
-                                            tint = Glass.StatusWarning,
+                                            tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(10.dp)
                                         )
-                                        CaptionText(text = "Gated", color = Glass.StatusWarning)
+                                        CaptionText(text = "Gated", color = MaterialTheme.colorScheme.error)
                                     }
                                 }
                             }
@@ -344,7 +340,7 @@ internal fun RepoCardListView(
                                 imageVector = TnIcons.Plus,
                                 contentDescription = "Add and View",
                                 modifier = Modifier.size(16.dp),
-                                tint = Glass.AccentPrimary
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     )
@@ -353,9 +349,9 @@ internal fun RepoCardListView(
         }
 
         if (isLoading || isExplorerLoading) {
-            LoadingIndicator(
+            CircularProgressIndicator(
                 modifier = Modifier.align(Alignment.Center),
-                color = Glass.AccentPrimary
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
@@ -389,7 +385,7 @@ internal fun RepoListItem(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Glass.TextPrimary,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -401,7 +397,7 @@ internal fun RepoListItem(
         }
         Spacer(modifier = Modifier.height(Standards.SpacingSm))
         HorizontalDivider(
-            color = Glass.BorderSubtle.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.outlineVariant,
             thickness = 0.8.dp
         )
     }
@@ -426,18 +422,19 @@ internal fun StoreRepoCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (info.author.isNotEmpty()) {
-                    CaptionText(text = info.author, color = Glass.TextSecondary)
-                    CaptionText(text = "·", color = Glass.TextMuted)
+                    CaptionText(text = info.author, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    CaptionText(text = "·", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                 }
                 CaptionText(
                     text = "${info.modelCount} ${if (info.modelCount == 1) "model" else "models"}",
-                    color = Glass.TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (hasActiveDownload) {
-                    CaptionText(text = "·", color = Glass.TextMuted)
-                    LoadingIndicator(
+                    CaptionText(text = "·", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    CircularProgressIndicator(
                         modifier = Modifier.size(10.dp),
-                        color = Glass.AccentPrimary
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -447,7 +444,7 @@ internal fun StoreRepoCard(
                 imageVector = TnIcons.ChevronRight,
                 contentDescription = "View models",
                 modifier = Modifier.size(16.dp),
-                tint = Glass.TextMuted
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     )
@@ -464,7 +461,9 @@ internal fun RepoDetailView(
     downloadStates: Map<String, ModelDownloadService.DownloadState>,
     installedModelIds: Set<String>,
     onDownload: (HuggingFaceModel) -> Unit,
-    onCancelDownload: (String) -> Unit
+    onCancelDownload: (String) -> Unit,
+    onPauseDownload: (String) -> Unit = {},
+    onResumeDownload: (String, String) -> Unit = { _, _ -> }
 ) {
     val repoModels = remember(viewModel.filteredModels.collectAsStateWithLifecycle().value, repoKey) {
         viewModel.getModelsForRepo(repoKey)
@@ -494,21 +493,21 @@ internal fun RepoDetailView(
                     Text(
                         text = info.displayName,
                         style = MaterialTheme.typography.titleSmall,
-                        color = Glass.TextPrimary,
+                        color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (info.author.isNotEmpty()) {
-                        CaptionText(text = info.author, color = Glass.TextSecondary)
+                        CaptionText(text = info.author, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                CaptionText(text = "${info.modelCount} models", color = Glass.TextSecondary)
+                CaptionText(text = "${info.modelCount} models", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
         HorizontalDivider(
-            color = Glass.BorderSubtle
+            color = MaterialTheme.colorScheme.outlineVariant
         )
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -529,15 +528,17 @@ internal fun RepoDetailView(
                         isInstalled = installedModelIds.contains(model.id),
                         downloadState = downloadStates[model.id],
                         onDownload = { onDownload(model) },
-                        onCancelDownload = { onCancelDownload(model.id) }
+                        onCancelDownload = { onCancelDownload(model.id) },
+                        onPauseDownload = { onPauseDownload(model.id) },
+                        onResumeDownload = { onResumeDownload(model.id, model.name) }
                     )
                 }
             }
 
             if (isLoading) {
-                LoadingIndicator(
+                CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
-                    color = Glass.AccentPrimary
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -554,12 +555,14 @@ internal fun RecommendedModelCard(systemRamGb: Double, onClick: () -> Unit) {
         else -> Triple("Qwen 2.5 14B (Q4_K_M)", "~9.05 GB", "Best for 12GB+ premium RAM")
     }
 
-    GlassCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = Standards.SpacingXs, vertical = Standards.SpacingSm),
-        cornerRadius = Standards.RadiusLg,
-        onClick = onClick
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
@@ -576,13 +579,13 @@ internal fun RecommendedModelCard(systemRamGb: Double, onClick: () -> Unit) {
                     Icon(
                         imageVector = TnIcons.Bolt,
                         contentDescription = null,
-                        tint = Glass.AccentWarm,
+                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(12.dp)
                     )
                     Text(
                         text = "RECOMMENDED FOR YOUR DEVICE",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Glass.AccentWarm,
+                        color = MaterialTheme.colorScheme.secondary,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -591,22 +594,22 @@ internal fun RecommendedModelCard(systemRamGb: Double, onClick: () -> Unit) {
                     text = modelName,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
-                    color = Glass.TextPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CaptionText(text = sizeStr, color = Glass.TextSecondary)
-                    CaptionText(text = "·", color = Glass.TextMuted)
-                    CaptionText(text = ramStr, color = Glass.TextMuted)
+                    CaptionText(text = sizeStr, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    CaptionText(text = "·", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    CaptionText(text = ramStr, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                 }
             }
             Icon(
                 imageVector = TnIcons.ChevronRight,
                 contentDescription = null,
-                tint = Glass.TextMuted,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.size(16.dp)
             )
         }

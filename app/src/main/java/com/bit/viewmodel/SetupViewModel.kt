@@ -15,6 +15,8 @@ import com.bit.models.data.HuggingFaceModel
 import com.bit.models.data.ModelType
 import com.bit.models.enums.ProviderType
 import com.bit.global.PerformanceMode
+import com.bit.global.HardwareProfile
+import com.bit.global.CpuTopology
 import com.bit.repo.ModelStoreRepository
 import com.bit.service.ModelDownloadService
 import com.bit.worker.SystemBackupManager
@@ -28,6 +30,7 @@ import kotlinx.serialization.json.Json
 
 enum class SetupOption {
     TEXT,
+    TEXT_RECOMMENDED,
     TEXT_TTS,
     IMAGE_GEN,
     POWER_MODE
@@ -64,32 +67,45 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
 
     // ==================== Setup Model Definitions ====================
 
-    private val textModel = HuggingFaceModel(
-        id = "lfm2-350m",
-        name = "LFM2 350M",
-        description = "Compact text generation model by LiquidAI",
-        fileUri = "LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M-hip-optimized.gguf",
-        approximateSize = "200 MB",
+    private val llama1bModel = HuggingFaceModel(
+        id = "unsloth-llama-3_2-1b-instruct-q4_k_m",
+        name = "Llama-3.2 1B Instruct",
+        description = "Highly optimized, state-of-the-art Llama-3.2 1B text model",
+        fileUri = "unsloth/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+        approximateSize = "640 MB",
         modelType = ModelType.GGUF,
         isZip = false,
-        tags = listOf("GGUF", "Q4_K_M"),
+        tags = listOf("GGUF", "Q4_K_M", "Llama-3.2 (1B)", "Tool Calling"),
         requiresNPU = false,
-        repositoryUrl = "LiquidAI/LFM2-350M-GGUF"
+        repositoryUrl = "unsloth/Llama-3.2-1B-Instruct-GGUF"
+    )
+
+    private val llama3bModel = HuggingFaceModel(
+        id = "unsloth-llama-3_2-3b-instruct-q4_k_m",
+        name = "Llama-3.2 3B Instruct",
+        description = "Powerful, state-of-the-art Llama-3.2 3B text model",
+        fileUri = "unsloth/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        approximateSize = "2.0 GB",
+        modelType = ModelType.GGUF,
+        isZip = false,
+        tags = listOf("GGUF", "Q4_K_M", "Llama-3.2 (3B)", "Tool Calling"),
+        requiresNPU = false,
+        repositoryUrl = "unsloth/Llama-3.2-3B-Instruct-GGUF"
     )
 
     private val ttsModel = HuggingFaceModel(
-        id = "supertonic-v2-tts",
-        name = "Supertonic v2 TTS",
-        description = "Multilingual text-to-speech engine",
-        fileUri = "Supertone/supertonic-2/resolve/main",
-        approximateSize = "263 MB",
+        id = "kokoro-multi-lang-v1_0",
+        name = "Kokoro v1.0 (TTS)",
+        description = "Frontier-class Kokoro speech synthesis model (24kHz, 53 voices)",
+        fileUri = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2",
+        approximateSize = "340 MB",
         modelType = ModelType.TTS,
         isZip = false,
         runOnCpu = true,
         textEmbeddingSize = 0,
-        tags = listOf("TTS"),
+        tags = listOf("TTS", "Kokoro", "sherpa-onnx"),
         requiresNPU = false,
-        repositoryUrl = "Supertone/supertonic-2"
+        repositoryUrl = "csukuangfj/kokoro-multi-lang-v1_0"
     )
 
     private fun getImageModel(): HuggingFaceModel {
@@ -109,6 +125,9 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
             repositoryUrl = "xororz/sd-qnn"
         )
     }
+
+    private val _recommendedTextModel = MutableStateFlow<HuggingFaceModel>(llama1bModel)
+    val recommendedTextModel: StateFlow<HuggingFaceModel> = _recommendedTextModel
 
     companion object {
         private const val TAG = "SetupVM"
@@ -133,6 +152,7 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         // Scan hardware if no profile exists or profile is stale (>30 days)
         viewModelScope.launch(Dispatchers.IO) {
             scanHardwareIfNeeded()
+            determineRecommendedModel()
         }
 
         // Resume active setup downloads if any
@@ -168,12 +188,14 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
     private fun watchModelInstallations() {
         viewModelScope.launch {
             modelRepository.getAllModels().collect { models ->
-                if (_selectedOption.value != null && _selectedOption.value != SetupOption.POWER_MODE && !_showPerformancePicker.value && !_setupComplete.value) {
+                if (_selectedOption.value != null && _selectedOption.value != SetupOption.POWER_MODE && !_setupComplete.value) {
                     val hasTextOrImage = models.any {
                         it.providerType == ProviderType.GGUF || it.providerType == ProviderType.DIFFUSION
                     }
                     if (hasTextOrImage) {
-                        _showPerformancePicker.value = true
+                        appSettingsDataStore.savePerformanceMode(PerformanceMode.BALANCED)
+                        setupDataStore.completeSetup()
+                        _setupComplete.value = true
                     }
                 }
             }
@@ -183,15 +205,24 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
     private fun resumeActiveDownloads() {
         val currentStates = downloadStates.value
         val imageModelId = getImageModel().id
+        val recommendedModel = recommendedTextModel.value
 
         when {
-            currentStates.containsKey(textModel.id) && currentStates.containsKey(ttsModel.id) -> {
+            currentStates.containsKey(recommendedModel.id) && currentStates.containsKey(ttsModel.id) -> {
                 _selectedOption.value = SetupOption.TEXT_TTS
-                _primaryModelId.value = textModel.id
+                _primaryModelId.value = recommendedModel.id
             }
-            currentStates.containsKey(textModel.id) -> {
+            currentStates.containsKey(llama1bModel.id) && currentStates.containsKey(ttsModel.id) -> {
+                _selectedOption.value = SetupOption.TEXT_TTS
+                _primaryModelId.value = llama1bModel.id
+            }
+            currentStates.containsKey(llama1bModel.id) -> {
                 _selectedOption.value = SetupOption.TEXT
-                _primaryModelId.value = textModel.id
+                _primaryModelId.value = llama1bModel.id
+            }
+            currentStates.containsKey(llama3bModel.id) -> {
+                _selectedOption.value = SetupOption.TEXT_RECOMMENDED
+                _primaryModelId.value = llama3bModel.id
             }
             currentStates.containsKey(imageModelId) -> {
                 _selectedOption.value = SetupOption.IMAGE_GEN
@@ -210,12 +241,17 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
 
         when (option) {
             SetupOption.TEXT -> {
-                _primaryModelId.value = textModel.id
-                downloadModel(textModel)
+                _primaryModelId.value = llama1bModel.id
+                downloadModel(llama1bModel)
+            }
+            SetupOption.TEXT_RECOMMENDED -> {
+                val model = recommendedTextModel.value
+                _primaryModelId.value = model.id
+                downloadModel(model)
             }
             SetupOption.TEXT_TTS -> {
-                _primaryModelId.value = textModel.id
-                downloadModel(textModel)
+                _primaryModelId.value = llama1bModel.id
+                downloadModel(llama1bModel)
                 downloadModel(ttsModel)
             }
             SetupOption.IMAGE_GEN -> {
@@ -225,6 +261,7 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
             }
             SetupOption.POWER_MODE -> {
                 viewModelScope.launch {
+                    appSettingsDataStore.savePerformanceMode(PerformanceMode.BALANCED)
                     setupDataStore.skipSetup()
                     _setupComplete.value = true
                 }
@@ -254,9 +291,26 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun cancelDownload() {
+        val primaryId = _primaryModelId.value ?: return
+        val context = getApplication<Application>()
+        val intent = Intent(context, ModelDownloadService::class.java).apply {
+            action = ModelDownloadService.ACTION_CANCEL_DOWNLOAD
+            putExtra(ModelDownloadService.EXTRA_MODEL_ID, primaryId)
+        }
+        context.startService(intent)
+        _selectedOption.value = null
+        _primaryModelId.value = null
+        _downloadError.value = null
+    }
+
     private fun downloadModel(model: HuggingFaceModel) {
         val context = getApplication<Application>()
-        val fileUrl = "https://huggingface.co/${model.fileUri}"
+        val fileUrl = if (model.fileUri.startsWith("http://") || model.fileUri.startsWith("https://")) {
+            model.fileUri
+        } else {
+            "https://huggingface.co/${model.fileUri}"
+        }
 
         val intent = Intent(context, ModelDownloadService::class.java).apply {
             action = ModelDownloadService.ACTION_START_DOWNLOAD
@@ -316,4 +370,82 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private suspend fun determineRecommendedModel() {
+        try {
+            val existingJson = appSettingsDataStore.hardwareProfileJson.firstOrNull()
+            val profile = if (!existingJson.isNullOrBlank()) {
+                lenientJson.decodeFromString<HardwareProfile>(existingJson)
+            } else {
+                val p = HardwareScanner.scan(getApplication())
+                val json = lenientJson.encodeToString(p)
+                appSettingsDataStore.saveHardwareProfile(json)
+                p
+            }
+            val ramGb = profile.totalRamMB / 1024.0
+            val topo = profile.cpuTopology
+            val primeCores = if (topo.scanSucceeded) topo.primeCoreCount else 0
+
+            val recommended = when {
+                ramGb < 10.0 -> llama1bModel
+                ramGb >= 10.0 -> {
+                    if (primeCores > 0) {
+                        llama3bModel
+                    } else {
+                        llama1bModel
+                    }
+                }
+                else -> llama1bModel
+            }
+
+            _recommendedTextModel.value = recommended
+            Log.d(TAG, "Recommended text model determined: ${recommended.name} (RAM: ${profile.totalRamMB}MB, Prime cores: $primeCores)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error determining recommended model", e)
+            _recommendedTextModel.value = llama1bModel
+        }
+    }
+
+    fun configureRemoteApi(provider: String, baseUrl: String, modelName: String, apiKey: String) {
+        viewModelScope.launch {
+            val providerClean = provider.lowercase(java.util.Locale.US)
+            val modelClean = modelName.lowercase(java.util.Locale.US).replace(" ", "-")
+            val modelId = "api-$providerClean-$modelClean"
+
+            // 1. Create and insert Model record
+            val model = com.bit.models.table_schema.Model(
+                id = modelId,
+                modelName = "$modelName ($provider)",
+                modelPath = baseUrl.trim(),
+                pathType = com.bit.models.enums.PathType.FILE,
+                providerType = com.bit.models.enums.ProviderType.API,
+                fileSize = null,
+                isActive = true
+            )
+            modelRepository.insertModel(model)
+
+            // 2. Create and insert ModelConfig record
+            val loadingJson = org.json.JSONObject().apply {
+                put("endpoint", baseUrl.trim())
+                put("model", modelName.trim())
+                put("stream", true)
+                put("authHeader", apiKey.trim())
+            }.toString()
+
+            val config = com.bit.models.table_schema.ModelConfig(
+                modelId = modelId,
+                modelLoadingParams = loadingJson,
+                modelInferenceParams = "{}"
+            )
+            modelRepository.insertConfig(config)
+
+            // 3. Mark as the last/active text model
+            appSettingsDataStore.saveLastModelId(modelId)
+
+            // 4. Complete setup
+            appSettingsDataStore.savePerformanceMode(PerformanceMode.BALANCED)
+            setupDataStore.completeSetup()
+            _setupComplete.value = true
+        }
+    }
 }
+

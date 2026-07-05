@@ -8,6 +8,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import com.bit.ui.theme.Motion
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.style.TextOverflow
+import com.bit.repo.RepositoryValidator
+import com.bit.repo.ValidationResult
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +52,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.global.Standards
@@ -58,7 +62,6 @@ import com.bit.models.data.RepositorySource
 import com.bit.models.ui.ActionIcon
 import com.bit.models.ui.ActionItem
 import com.bit.repo.HuggingFaceExplorerRepo
-import com.bit.repo.ValidationResult
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.ActionSwitch
 import com.bit.ui.components.CaptionText
@@ -70,11 +73,12 @@ import com.bit.ui.theme.maple
 import com.bit.viewmodel.ModelStoreViewModel
 import com.bit.ui.icons.TnIcons
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-// ── SettingsTab ──
+// ── AdvancedTab ──
 
 @Composable
-internal fun SettingsTab(
+internal fun AdvancedTab(
     deviceInfo: Map<String, String>, viewModel: ModelStoreViewModel
 ) {
     val repositories by viewModel.repositories.collectAsStateWithLifecycle(emptyList())
@@ -475,6 +479,11 @@ internal fun AddRepositoryDialog(
     var apiAuthToken by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(ModelType.GGUF) }
 
+    val scope = rememberCoroutineScope()
+    var preset by remember { mutableStateOf("Custom") }
+    var testStatus by remember { mutableStateOf<String?>(null) }
+    var isTesting by remember { mutableStateOf(false) }
+
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Add Repository") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)) {
             OutlinedTextField(
@@ -516,9 +525,56 @@ internal fun AddRepositoryDialog(
             }
 
             if (source == RepositorySource.CUSTOM_API) {
+                Text(
+                    text = "API Presets",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                ) {
+                    listOf("Custom", "OpenRouter", "OpenAI", "Gemini", "Groq", "NVIDIA NIM").forEach { name ->
+                        FilterChip(
+                            selected = preset == name,
+                            onClick = {
+                                preset = name
+                                when (name) {
+                                    "OpenRouter" -> {
+                                        apiBaseUrl = "https://openrouter.ai/api/v1/"
+                                        apiEndpoint = "models"
+                                    }
+                                    "OpenAI" -> {
+                                        apiBaseUrl = "https://api.openai.com/v1/"
+                                        apiEndpoint = "models"
+                                    }
+                                    "Gemini" -> {
+                                        apiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/"
+                                        apiEndpoint = "models"
+                                    }
+                                    "Groq" -> {
+                                        apiBaseUrl = "https://api.groq.com/openai/v1/"
+                                        apiEndpoint = "models"
+                                    }
+                                    "NVIDIA NIM" -> {
+                                        apiBaseUrl = "https://integrate.api.nvidia.com/v1/"
+                                        apiEndpoint = "models"
+                                    }
+                                }
+                                testStatus = null
+                            },
+                            label = { Text(name) }
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = apiBaseUrl,
-                    onValueChange = { apiBaseUrl = it },
+                    onValueChange = { 
+                        apiBaseUrl = it 
+                        preset = "Custom"
+                        testStatus = null
+                    },
                     label = { Text("API Base URL") },
                     placeholder = { Text("https://api.example.com/") },
                     singleLine = true,
@@ -527,7 +583,11 @@ internal fun AddRepositoryDialog(
 
                 OutlinedTextField(
                     value = apiEndpoint,
-                    onValueChange = { apiEndpoint = it },
+                    onValueChange = { 
+                        apiEndpoint = it 
+                        preset = "Custom"
+                        testStatus = null
+                    },
                     label = { Text("Catalog Endpoint") },
                     placeholder = { Text("/api/v1/models") },
                     singleLine = true,
@@ -536,12 +596,68 @@ internal fun AddRepositoryDialog(
 
                 OutlinedTextField(
                     value = apiAuthToken,
-                    onValueChange = { apiAuthToken = it },
+                    onValueChange = { 
+                        apiAuthToken = it 
+                        testStatus = null
+                    },
                     label = { Text("Authorization Header (optional)") },
                     placeholder = { Text("Bearer <token>") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(
+                        onClick = {
+                            isTesting = true
+                            testStatus = "Connecting..."
+                            scope.launch {
+                                try {
+                                    val tempRepo = HFModelRepository(
+                                        id = "test-repo",
+                                        name = repoName.ifBlank { "test" },
+                                        repoPath = "test",
+                                        modelType = selectedType,
+                                        source = source,
+                                        apiBaseUrl = apiBaseUrl.trim(),
+                                        apiEndpoint = apiEndpoint.trim(),
+                                        apiAuthToken = apiAuthToken.trim()
+                                    )
+                                    val validator = RepositoryValidator()
+                                    val res = validator.validateRepository(tempRepo)
+                                    testStatus = when (res) {
+                                        is ValidationResult.Valid -> "Success! Found ${res.ggufFileCount} models."
+                                        is ValidationResult.Invalid -> "Error: ${res.reason}"
+                                        else -> "Failed"
+                                    }
+                                } catch (e: Exception) {
+                                    testStatus = "Error: ${e.message}"
+                                } finally {
+                                    isTesting = false
+                                }
+                            }
+                        },
+                        enabled = apiBaseUrl.isNotBlank() && !isTesting
+                    ) {
+                        Text(if (isTesting) "Testing..." else "Test Connection")
+                    }
+
+                    testStatus?.let { status ->
+                        Text(
+                            text = status,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (status.startsWith("Success")) MaterialTheme.colorScheme.primary 
+                                    else MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f).padding(start = 8.dp)
+                        )
+                    }
+                }
             }
 
             Row(
@@ -552,10 +668,6 @@ internal fun AddRepositoryDialog(
                     selected = selectedType == ModelType.GGUF,
                     onClick = { selectedType = ModelType.GGUF },
                     label = { Text("GGUF") })
-                FilterChip(
-                    selected = selectedType == ModelType.SD,
-                    onClick = { selectedType = ModelType.SD },
-                    label = { Text("Stable Diffusion") })
                 FilterChip(
                     selected = selectedType == ModelType.TTS,
                     onClick = { selectedType = ModelType.TTS },
@@ -614,6 +726,21 @@ internal fun EditRepositoryDialog(
     var selectedCategory by remember { mutableStateOf(repository.category) }
     var showCategoryDropdown by remember { mutableStateOf(false) }
 
+    val scope = rememberCoroutineScope()
+    val initialPreset = remember(repository) {
+        when {
+            repository.apiBaseUrl == "https://openrouter.ai/api/v1/" && repository.apiEndpoint == "models" -> "OpenRouter"
+            repository.apiBaseUrl == "https://api.openai.com/v1/" && repository.apiEndpoint == "models" -> "OpenAI"
+            repository.apiBaseUrl == "https://generativelanguage.googleapis.com/v1beta/openai/" && repository.apiEndpoint == "models" -> "Gemini"
+            repository.apiBaseUrl == "https://api.groq.com/openai/v1/" && repository.apiEndpoint == "models" -> "Groq"
+            repository.apiBaseUrl == "https://integrate.api.nvidia.com/v1/" && repository.apiEndpoint == "models" -> "NVIDIA NIM"
+            else -> "Custom"
+        }
+    }
+    var preset by remember { mutableStateOf(initialPreset) }
+    var testStatus by remember { mutableStateOf<String?>(null) }
+    var isTesting by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Edit Repository") },
@@ -658,9 +785,56 @@ internal fun EditRepositoryDialog(
                 }
 
                 if (source == RepositorySource.CUSTOM_API) {
+                    Text(
+                        text = "API Presets",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                    ) {
+                        listOf("Custom", "OpenRouter", "OpenAI", "Gemini", "Groq", "NVIDIA NIM").forEach { name ->
+                            FilterChip(
+                                selected = preset == name,
+                                onClick = {
+                                    preset = name
+                                    when (name) {
+                                        "OpenRouter" -> {
+                                            apiBaseUrl = "https://openrouter.ai/api/v1/"
+                                            apiEndpoint = "models"
+                                        }
+                                        "OpenAI" -> {
+                                            apiBaseUrl = "https://api.openai.com/v1/"
+                                            apiEndpoint = "models"
+                                        }
+                                        "Gemini" -> {
+                                            apiBaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/"
+                                            apiEndpoint = "models"
+                                        }
+                                        "Groq" -> {
+                                            apiBaseUrl = "https://api.groq.com/openai/v1/"
+                                            apiEndpoint = "models"
+                                        }
+                                        "NVIDIA NIM" -> {
+                                            apiBaseUrl = "https://integrate.api.nvidia.com/v1/"
+                                            apiEndpoint = "models"
+                                        }
+                                    }
+                                    testStatus = null
+                                },
+                                label = { Text(name) }
+                            )
+                        }
+                    }
+
                     OutlinedTextField(
                         value = apiBaseUrl,
-                        onValueChange = { apiBaseUrl = it },
+                        onValueChange = { 
+                            apiBaseUrl = it 
+                            preset = "Custom"
+                            testStatus = null
+                        },
                         label = { Text("API Base URL") },
                         placeholder = { Text("https://api.example.com/") },
                         singleLine = true,
@@ -669,7 +843,11 @@ internal fun EditRepositoryDialog(
 
                     OutlinedTextField(
                         value = apiEndpoint,
-                        onValueChange = { apiEndpoint = it },
+                        onValueChange = { 
+                            apiEndpoint = it 
+                            preset = "Custom"
+                            testStatus = null
+                        },
                         label = { Text("Catalog Endpoint") },
                         placeholder = { Text("/api/v1/models") },
                         singleLine = true,
@@ -678,12 +856,68 @@ internal fun EditRepositoryDialog(
 
                     OutlinedTextField(
                         value = apiAuthToken,
-                        onValueChange = { apiAuthToken = it },
+                        onValueChange = { 
+                            apiAuthToken = it 
+                            testStatus = null
+                        },
                         label = { Text("Authorization Header (optional)") },
                         placeholder = { Text("Bearer <token>") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(
+                            onClick = {
+                                isTesting = true
+                                testStatus = "Connecting..."
+                                scope.launch {
+                                    try {
+                                        val tempRepo = HFModelRepository(
+                                            id = repository.id.ifBlank { "test-repo" },
+                                            name = repoName.ifBlank { "test" },
+                                            repoPath = repoPath.ifBlank { "test" },
+                                            modelType = selectedType,
+                                            source = source,
+                                            apiBaseUrl = apiBaseUrl.trim(),
+                                            apiEndpoint = apiEndpoint.trim(),
+                                            apiAuthToken = apiAuthToken.trim()
+                                        )
+                                        val validator = RepositoryValidator()
+                                        val res = validator.validateRepository(tempRepo)
+                                        testStatus = when (res) {
+                                            is ValidationResult.Valid -> "Success! Found ${res.ggufFileCount} models."
+                                            is ValidationResult.Invalid -> "Error: ${res.reason}"
+                                            else -> "Failed"
+                                        }
+                                    } catch (e: Exception) {
+                                        testStatus = "Error: ${e.message}"
+                                    } finally {
+                                        isTesting = false
+                                    }
+                                }
+                            },
+                            enabled = apiBaseUrl.isNotBlank() && !isTesting
+                        ) {
+                            Text(if (isTesting) "Testing..." else "Test Connection")
+                        }
+
+                        testStatus?.let { status ->
+                            Text(
+                                text = status,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (status.startsWith("Success")) MaterialTheme.colorScheme.primary 
+                                        else MaterialTheme.colorScheme.error,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f).padding(start = 8.dp)
+                            )
+                        }
+                    }
                 }
 
                 // Model Type
@@ -701,11 +935,11 @@ internal fun EditRepositoryDialog(
                         onClick = { selectedType = ModelType.GGUF },
                         label = { Text("GGUF") }
                     )
-                    FilterChip(
-                        selected = selectedType == ModelType.SD,
-                        onClick = { selectedType = ModelType.SD },
-                        label = { Text("Stable Diffusion") }
-                    )
+                    // FilterChip(
+                    //     selected = selectedType == ModelType.SD,
+                    //     onClick = { selectedType = ModelType.SD },
+                    //     label = { Text("Stable Diffusion") }
+                    // )
                     FilterChip(
                         selected = selectedType == ModelType.TTS,
                         onClick = { selectedType = ModelType.TTS },

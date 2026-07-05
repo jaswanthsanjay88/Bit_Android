@@ -66,7 +66,7 @@ class RepositoryValidator {
                 ModelType.SD -> {
                     files.filter { it.path.endsWith(".zip", ignoreCase = true) } to "ZIP"
                 }
-                ModelType.TTS -> {
+                ModelType.TTS, ModelType.STT -> {
                     files.filter { it.path.endsWith(".onnx", ignoreCase = true) } to "ONNX"
                 }
                 else -> {

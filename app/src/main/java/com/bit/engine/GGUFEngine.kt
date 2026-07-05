@@ -41,12 +41,19 @@ class GGUFEngine {
         val loading = schema.loadingParams
         val inference = schema.inferenceParams
 
+        val backend = when {
+            loading.npuAcceleration -> com.dark.gguf_lib.InferenceBackend.NPU_QNN
+            loading.gpuAcceleration -> com.dark.gguf_lib.InferenceBackend.GPU_VULKAN
+            else -> com.dark.gguf_lib.InferenceBackend.CPU
+        }
+
         val success = try {
             engine.load(
                 path = model.modelPath,
                 contextSize = loading.ctxSize,
                 threads = loading.threads,
                 flashAttn = loading.flashAttn,
+                backend = backend,
                 cacheTypeK = cacheTypeIntToString(loading.cacheTypeK),
                 cacheTypeV = cacheTypeIntToString(loading.cacheTypeV)
             )
@@ -92,12 +99,19 @@ class GGUFEngine {
         val loading = schema.loadingParams
         val inference = schema.inferenceParams
 
+        val backend = when {
+            loading.npuAcceleration -> com.dark.gguf_lib.InferenceBackend.NPU_QNN
+            loading.gpuAcceleration -> com.dark.gguf_lib.InferenceBackend.GPU_VULKAN
+            else -> com.dark.gguf_lib.InferenceBackend.CPU
+        }
+
         val success = try {
             engine.loadFromFd(
                 fd = fd,
                 contextSize = loading.ctxSize,
                 threads = loading.threads,
                 flashAttn = loading.flashAttn,
+                backend = backend,
                 cacheTypeK = cacheTypeIntToString(loading.cacheTypeK),
                 cacheTypeV = cacheTypeIntToString(loading.cacheTypeV)
             )

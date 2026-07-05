@@ -2,46 +2,36 @@ package com.bit.ui.screen.files
 
 import android.content.Intent
 import android.net.Uri
-
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-
 import com.bit.models.enums.ProviderType
 import com.bit.ui.components.ActionTextButton
 import com.bit.ui.icons.TnIcons
-import com.bit.global.Standards
-
-// ════════════════════════════════════════════
-//  MODEL PICKER SCREEN
-// ════════════════════════════════════════════
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,8 +40,6 @@ fun ModelPickerScreen(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
-
-    // ── SAF Launcher ──
 
     val ggufPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -68,104 +56,77 @@ fun ModelPickerScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = Color.Transparent
                 ),
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(TnIcons.ArrowLeft, "Back")
+                        Icon(
+                            imageVector = TnIcons.ArrowLeft,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                 },
-                title = {
-                    Text(
-                        "Model Picker",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                title = {}
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { inner ->
-        Column(
+        Box(
             modifier = Modifier
                 .padding(inner)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = Standards.SpacingXl),
-            verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
+                .padding(horizontal = 24.dp),
+            contentAlignment = Alignment.Center
         ) {
-            PickerCard(
-                icon = TnIcons.File,
-                title = "GGUF Model",
-                description = "Pick a .gguf model file for text generation. " +
-                    "The file will be accessed via a secure file descriptor — no broad storage permission needed.",
-                buttonLabel = "Pick Model File",
-                buttonIcon = TnIcons.Upload,
-                onClick = { ggufPickerLauncher.launch(arrayOf("application/octet-stream", "*/*")) }
-            )
-        }
-    }
-}
-
-// ── Picker Card ──
-
-@Composable
-private fun PickerCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    description: String,
-    buttonLabel: String,
-    buttonIcon: androidx.compose.ui.graphics.vector.ImageVector,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Standards.RadiusXxl),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 1.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
+                // Minimal icon in a soft round container
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(Standards.RadiusLg))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                        .size(64.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(16.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = icon,
+                        imageVector = TnIcons.File,
                         contentDescription = null,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(32.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
 
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    text = "Import GGUF Model",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Text(
+                    text = "Pick a local .gguf model file to run directly on your device. The file is accessed securely with no broad storage permissions required.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                ActionTextButton(
+                    onClickListener = { ggufPickerLauncher.launch(arrayOf("application/octet-stream", "*/*")) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    icon = TnIcons.Upload,
+                    text = "Browse Files",
+                    contentDescription = "Browse Files"
                 )
             }
-
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            ActionTextButton(
-                onClickListener = onClick,
-                modifier = Modifier.fillMaxWidth(),
-                icon = buttonIcon,
-                text = buttonLabel,
-                contentDescription = buttonLabel
-            )
         }
     }
 }

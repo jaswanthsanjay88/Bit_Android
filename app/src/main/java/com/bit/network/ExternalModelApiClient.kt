@@ -33,7 +33,17 @@ object ExternalModelApiClient {
     suspend fun fetchCatalog(repo: HFModelRepository): Response<JsonElement> {
         val endpoint = repo.apiEndpoint.trim().ifBlank { "/api/v1/models" }
         val relative = endpoint.removePrefix("/")
-        val authHeader = repo.apiAuthToken.trim().takeIf { it.isNotBlank() }
+        val authHeader = formatAuthHeader(repo.apiAuthToken)
         return buildService(repo.apiBaseUrl.trim()).getCatalog(relative, authHeader)
     }
+
+    private fun formatAuthHeader(token: String?): String? {
+        val trimmed = token?.trim() ?: return null
+        if (trimmed.isBlank()) return null
+        if (trimmed.contains(Regex("^[a-zA-Z]+\\s+"))) {
+            return trimmed
+        }
+        return "Bearer $trimmed"
+    }
 }
+

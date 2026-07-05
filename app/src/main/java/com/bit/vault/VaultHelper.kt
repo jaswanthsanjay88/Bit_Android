@@ -267,7 +267,8 @@ object VaultHelper {
                             chatId = chatData.chatId,
                             createdAt = chatData.createdAt,
                             messageCount = messageCount,
-                            lastMessageTime = lastMessageTime
+                            lastMessageTime = lastMessageTime,
+                            title = null
                         )
                     } catch (e: Exception) {
                         null

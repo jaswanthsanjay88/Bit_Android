@@ -40,6 +40,36 @@ class AppSettingsDataStore(private val context: Context) {
         private val SPEED_MODE_ENABLED = booleanPreferencesKey("speed_mode_enabled")
         private val STT_THREADS = androidx.datastore.preferences.core.intPreferencesKey("stt_threads")
         private val STT_LANGUAGE = stringPreferencesKey("stt_language")
+        private val LOCAL_SERVER_ENABLED = booleanPreferencesKey("local_server_enabled")
+        private val LOCAL_SERVER_PORT = androidx.datastore.preferences.core.intPreferencesKey("local_server_port")
+        private val LOCAL_SERVER_TOKEN = stringPreferencesKey("local_server_token")
+        private val WEB_SEARCH_PROVIDER = stringPreferencesKey("web_search_provider")
+        private val WEB_SEARCH_API_KEY = stringPreferencesKey("web_search_api_key")
+        private val WEB_SEARCH_BASE_URL = stringPreferencesKey("web_search_base_url")
+    }
+
+    val localServerEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[LOCAL_SERVER_ENABLED] ?: false
+    }
+
+    suspend fun updateLocalServerEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[LOCAL_SERVER_ENABLED] = enabled }
+    }
+
+    val localServerPort: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[LOCAL_SERVER_PORT] ?: 8080
+    }
+
+    suspend fun updateLocalServerPort(port: Int) {
+        context.appSettingsDataStore.edit { it[LOCAL_SERVER_PORT] = port }
+    }
+
+    val localServerToken: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[LOCAL_SERVER_TOKEN] ?: ""
+    }
+
+    suspend fun updateLocalServerToken(token: String) {
+        context.appSettingsDataStore.edit { it[LOCAL_SERVER_TOKEN] = token }
     }
 
     val sttThreads: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
@@ -257,6 +287,30 @@ class AppSettingsDataStore(private val context: Context) {
 
     suspend fun saveProfilePhone(phone: String) {
         context.appSettingsDataStore.edit { it[PROFILE_PHONE] = phone }
+    }
+
+    val webSearchProvider: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[WEB_SEARCH_PROVIDER] ?: "duckduckgo"
+    }
+
+    suspend fun saveWebSearchProvider(provider: String) {
+        context.appSettingsDataStore.edit { it[WEB_SEARCH_PROVIDER] = provider }
+    }
+
+    val webSearchApiKey: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[WEB_SEARCH_API_KEY] ?: ""
+    }
+
+    suspend fun saveWebSearchApiKey(key: String) {
+        context.appSettingsDataStore.edit { it[WEB_SEARCH_API_KEY] = key }
+    }
+
+    val webSearchBaseUrl: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[WEB_SEARCH_BASE_URL] ?: ""
+    }
+
+    suspend fun saveWebSearchBaseUrl(url: String) {
+        context.appSettingsDataStore.edit { it[WEB_SEARCH_BASE_URL] = url }
     }
 
     suspend fun clear() {

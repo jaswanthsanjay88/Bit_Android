@@ -31,6 +31,9 @@ import com.bit.ui.components.ActionTextButton
 import com.bit.ui.components.ActionSwitch
 import com.bit.viewmodel.ModelConfigEditorViewModel
 import com.bit.ui.icons.TnIcons
+import com.bit.tts.TTSDataStore
+import com.bit.tts.TTSSettings
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -332,12 +335,10 @@ private fun ConfigEditorPanel(
                 when (model.providerType) {
                     ProviderType.GGUF -> GgufConfigEditor(viewModel)
                     ProviderType.DIFFUSION -> DiffusionConfigEditor(viewModel)
-                    else -> {
-                        Text(
-                            "Unsupported model type",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                    ProviderType.STT -> SttConfigEditor(model)
+                    ProviderType.TTS -> TtsConfigEditor(model)
+                    ProviderType.VLM -> VlmConfigEditor(model)
+                    ProviderType.API -> ApiConfigEditor(viewModel, model)
                 }
             }
         }
@@ -408,6 +409,22 @@ private fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
                 label = "Use Memory Lock (mlock)",
                 checked = ggufConfig.loadingParams.useMlock,
                 onCheckedChange = { viewModel.updateGgufUseMlock(it) },
+                enabled = !loadingLocked
+            )
+
+            SwitchField(
+                label = "GPU Acceleration (Vulkan)",
+                checked = ggufConfig.loadingParams.gpuAcceleration,
+                onCheckedChange = { viewModel.updateGgufGpuAcceleration(it) },
+                description = "Offload layers to GPU using Vulkan",
+                enabled = !loadingLocked
+            )
+
+            SwitchField(
+                label = "NPU Acceleration (QNN)",
+                checked = ggufConfig.loadingParams.npuAcceleration,
+                onCheckedChange = { viewModel.updateGgufNpuAcceleration(it) },
+                description = "Offload layers to NPU using Qualcomm Snapdragon QNN",
                 enabled = !loadingLocked
             )
         }
@@ -619,6 +636,209 @@ private fun DiffusionConfigEditor(viewModel: ModelConfigEditorViewModel) {
                     description = "Show intermediate image every N steps"
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ReadOnlyField(label: String, value: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun SttConfigEditor(model: Model) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val appSettings = remember { AppSettingsDataStore(context) }
+    
+    val threads by appSettings.sttThreads.collectAsState(initial = 2)
+    val language by appSettings.sttLanguage.collectAsState(initial = "en")
+
+    Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {
+        ConfigSection("Speech-to-Text Model Details") {
+            ReadOnlyField(label = "Model ID", value = model.id)
+            ReadOnlyField(label = "Model Path", value = model.modelPath)
+            ReadOnlyField(label = "Format/Type", value = "Whisper ONNX")
+        }
+
+        ConfigSection("STT Parameters") {
+            IntField(
+                label = "Inference Threads",
+                value = threads,
+                onValueChange = { newThreads ->
+                    coroutineScope.launch {
+                        appSettings.updateSttThreads(newThreads)
+                    }
+                },
+                range = 1..4,
+                description = "Number of CPU threads to use for Whisper transcription"
+            )
+
+            Spacer(modifier = Modifier.height(Standards.SpacingXs))
+
+            // Simple language picker (English or Auto-detect)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Model Language",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        text = "Target language for transcription",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                val options = listOf("en" to "English Only", "auto" to "Auto-Detect")
+                Row(horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)) {
+                    options.forEach { opt ->
+                        FilterChip(
+                            selected = language == opt.first,
+                            onClick = {
+                                coroutineScope.launch {
+                                    appSettings.updateSttLanguage(opt.first)
+                                }
+                            },
+                            label = { Text(opt.second) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TtsConfigEditor(model: Model) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val appSettings = remember { AppSettingsDataStore(context) }
+    val ttsDataStore = remember { TTSDataStore(context) }
+
+    val loadTTSOnStart by appSettings.loadTTSOnStart.collectAsState(initial = true)
+    val ttsSettings by ttsDataStore.settings.collectAsState(initial = TTSSettings())
+
+    Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {
+        ConfigSection("Voice Model Details") {
+            ReadOnlyField(label = "Model ID", value = model.id)
+            ReadOnlyField(label = "Model Path", value = model.modelPath)
+            ReadOnlyField(label = "Format/Type", value = "VITS / Piper ONNX")
+        }
+
+        ConfigSection("TTS Parameters") {
+            SwitchField(
+                label = "Load TTS on App Start",
+                checked = loadTTSOnStart,
+                onCheckedChange = { checked ->
+                    coroutineScope.launch {
+                        appSettings.updateLoadTTSOnStart(checked)
+                    }
+                },
+                description = "Pre-load voice weights into RAM at startup"
+            )
+
+            FloatField(
+                label = "Playback Speed",
+                value = ttsSettings.speed,
+                onValueChange = { newSpeed ->
+                    coroutineScope.launch {
+                        ttsDataStore.updateSpeed(newSpeed)
+                    }
+                },
+                range = 0.5f..2.0f,
+                step = 0.05f,
+                description = "Acoustic speech rate multiplier"
+            )
+
+            IntField(
+                label = "Speaker ID",
+                value = ttsSettings.voice.toIntOrNull() ?: 0,
+                onValueChange = { newVoice ->
+                    coroutineScope.launch {
+                        ttsDataStore.updateVoice(newVoice.toString())
+                    }
+                },
+                range = 0..9,
+                description = "Synthesizer speaker profile index"
+            )
+        }
+    }
+}
+
+@Composable
+private fun VlmConfigEditor(model: Model) {
+    Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {
+        ConfigSection("Vision-Language Model Details") {
+            ReadOnlyField(label = "Model ID", value = model.id)
+            ReadOnlyField(label = "Model Path", value = model.modelPath)
+            ReadOnlyField(label = "Format/Type", value = "Qwen2-VL GGUF")
+            ReadOnlyField(label = "Projector Weights", value = "mmproj-Qwen2-VL-2B-Instruct-f16.gguf")
+        }
+
+        ConfigSection("VLM Parameters") {
+            Text(
+                text = "Model parameters are pre-configured during installation for snapshot compatibility.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun ApiConfigEditor(viewModel: ModelConfigEditorViewModel, model: Model) {
+    val apiConfig by viewModel.apiConfig.collectAsStateWithLifecycle()
+
+    Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {
+        ConfigSection("API Model Details") {
+            ReadOnlyField(label = "Database Model ID", value = model.id)
+            ReadOnlyField(label = "Model Name", value = model.modelName)
+            ReadOnlyField(label = "Type", value = "Remote REST Endpoint")
+        }
+
+        ConfigSection("Endpoint Parameters") {
+            TextField(
+                label = "Endpoint URL",
+                value = apiConfig.endpoint,
+                onValueChange = { viewModel.updateApiEndpoint(it) }
+            )
+
+            TextField(
+                label = "API Model Name/ID (e.g. meta/llama-3.1-8b-instruct)",
+                value = apiConfig.model,
+                onValueChange = { viewModel.updateApiModel(it) }
+            )
+
+            TextField(
+                label = "Authorization Token",
+                value = apiConfig.authHeader,
+                onValueChange = { viewModel.updateApiAuthHeader(it) }
+            )
+
+            SwitchField(
+                label = "Enable Streaming",
+                checked = apiConfig.stream,
+                onCheckedChange = { viewModel.updateApiStream(it) },
+                description = "Stream response tokens as they are generated"
+            )
         }
     }
 }

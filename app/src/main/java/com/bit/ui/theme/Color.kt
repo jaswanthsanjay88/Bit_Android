@@ -92,3 +92,17 @@ object Glass {
     val Divider = Color(0x1AFFFFFF)             // ~10% white
     val DividerStrong = Color(0x33FFFFFF)       // ~20% white
 }
+
+// ── Strict Monochrome Color Palette for BIT ──
+object BitColors {
+    val Background = Color(0xFF000000)      // true black, OLED-friendly
+    val Surface     = Color(0xFF0D0D0D)      // cards, sheets
+    val SurfaceAlt  = Color(0xFF1A1A1A)      // pressed/selected state
+    val Border      = Color(0xFF262626)      // hairlines only
+    val TextPrimary = Color(0xFFF5F5F5)
+    val TextSecondary = Color(0xFF8C8C8C)
+    val TextTertiary  = Color(0xFF5C5C5C)
+    val Inverse     = Color(0xFFFFFFFF)      // primary CTA fill
+    val OnInverse   = Color(0xFF000000)      // text on white CTA
+}
+

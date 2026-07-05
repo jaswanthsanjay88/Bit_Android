@@ -79,7 +79,8 @@ class UmsChatRepository(private val ums: UnifiedMemorySystem) {
                 chatId = chatId,
                 createdAt = rec.getTimestamp(Tags.Chat.CREATED_AT) ?: 0L,
                 messageCount = rec.getInt(Tags.Chat.MESSAGE_COUNT) ?: 0,
-                lastMessageTime = rec.getTimestamp(Tags.Chat.LAST_MESSAGE_AT)
+                lastMessageTime = rec.getTimestamp(Tags.Chat.LAST_MESSAGE_AT),
+                title = rec.getString(Tags.Chat.TITLE)
             )
         }.sortedByDescending { it.lastMessageTime ?: it.createdAt }
     }
@@ -160,6 +161,23 @@ class UmsChatRepository(private val ums: UnifiedMemorySystem) {
         createChat(export.chatId)
         export.messages.forEach { addMessage(export.chatId, it) }
         export.chatId
+    }
+
+    suspend fun updateChatTitle(chatId: String, title: String) = withContext(Dispatchers.IO) {
+        val chatRecords = ums.queryString(chats, Tags.Chat.CHAT_ID, chatId)
+        val chatRec = chatRecords.firstOrNull() ?: return@withContext
+        val updated = UmsRecord.create()
+            .id(chatRec.id)
+            .putString(Tags.Chat.CHAT_ID, chatId)
+            .putTimestamp(Tags.Chat.CREATED_AT, chatRec.getTimestamp(Tags.Chat.CREATED_AT) ?: 0L)
+            .putString(Tags.Chat.TITLE, title)
+            .putTimestamp(Tags.Chat.LAST_MESSAGE_AT, chatRec.getTimestamp(Tags.Chat.LAST_MESSAGE_AT) ?: 0L)
+            .putInt(Tags.Chat.MESSAGE_COUNT, chatRec.getInt(Tags.Chat.MESSAGE_COUNT) ?: 0)
+        val modelId = chatRec.getString(Tags.Chat.PRIMARY_MODEL_ID)
+        if (modelId != null) updated.putString(Tags.Chat.PRIMARY_MODEL_ID, modelId)
+        val personaId = chatRec.getString(Tags.Chat.PRIMARY_PERSONA_ID)
+        if (personaId != null) updated.putString(Tags.Chat.PRIMARY_PERSONA_ID, personaId)
+        ums.put(chats, updated.build())
     }
 
     // ── Helpers ──

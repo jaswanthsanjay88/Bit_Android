@@ -23,6 +23,8 @@ import com.bit.service.ILLMService
 import com.bit.service.IModelLoadCallback
 import com.bit.service.LLMService
 import com.bit.models.engine_schema.DecodingMetrics
+import com.bit.global.AppPaths
+import com.bit.data.AppSettingsDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ProducerScope
@@ -37,6 +39,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
@@ -51,6 +56,10 @@ object LlmModelWorker {
     private val _serviceFlow = MutableStateFlow<ILLMService?>(null)
     private var boundContext: Context? = null
     @Volatile private var isBinding = false
+
+    // Session recovery tracking
+    @Volatile private var lastLoadedModel: Model? = null
+    @Volatile private var lastLoadedConfig: ModelConfig? = null
 
     // GGUF state
     private val _isGgufModelLoaded = MutableStateFlow(false)
@@ -77,19 +86,28 @@ object LlmModelWorker {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             _serviceFlow.value = ILLMService.Stub.asInterface(binder)
             isBinding = false
-            Log.i(TAG, "Service connected")
+            Log.i(TAG, "Service connected to inference process")
+            restoreSessionAfterCrash()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             _serviceFlow.value = null
             isBinding = false
-            Log.w(TAG, "Service disconnected unexpectedly")
+            Log.w(TAG, "Inference process disconnected unexpectedly (crashed or killed)")
+            
+            _isGgufModelLoaded.value = false
+            com.bit.state.AppStateManager.setError("AI engine process crashed. Recovering session...")
+            triggerAutoRecovery()
         }
 
         override fun onBindingDied(name: ComponentName?) {
             _serviceFlow.value = null
             isBinding = false
             Log.e(TAG, "Service binding died")
+            
+            _isGgufModelLoaded.value = false
+            com.bit.state.AppStateManager.setError("AI engine process crashed. Recovering session...")
+            triggerAutoRecovery()
         }
 
         override fun onNullBinding(name: ComponentName?) {
@@ -158,6 +176,64 @@ object LlmModelWorker {
         withTimeout(10_000) { _serviceFlow.first { it != null } }
     }
 
+    private fun triggerAutoRecovery() {
+        val context = boundContext ?: return
+        Log.i(TAG, "Triggering auto-recovery Service bind...")
+        kotlinx.coroutines.CoroutineScope(Dispatchers.Main).launch {
+            kotlinx.coroutines.delay(1000)
+            bindService(context)
+        }
+    }
+
+    private fun restoreSessionAfterCrash() {
+        val model = lastLoadedModel
+        val config = lastLoadedConfig
+        if (model != null && config != null) {
+            Log.i(TAG, "Attempting to auto-restore crashed model session: ${model.modelName}")
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                val context = boundContext ?: return@launch
+                try {
+                    com.bit.state.AppStateManager.setLoadingModel(model.modelName)
+                    val success = loadGgufModel(model, config)
+                    if (success) {
+                        // Restore performance optimizations on restart
+                        try {
+                            val cacheDir = AppPaths.promptCache(context).also { it.mkdirs() }
+                            setPromptCacheDirGguf(cacheDir.absolutePath)
+                            val speedMode = AppSettingsDataStore(context).speedModeEnabled.first()
+                            setSpeculativeDecodingGguf(speedMode)
+                            warmUpGguf()
+                            Log.d(TAG, "Optimizations re-applied after crash recovery")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Failed to re-apply optimizations on recovery: ${e.message}")
+                        }
+
+                        com.bit.state.AppStateManager.setModelLoaded(model.modelName)
+                        Log.i(TAG, "Auto-recovery successful for model: ${model.modelName}")
+                    } else {
+                        com.bit.state.AppStateManager.setError("Failed to auto-restore model after crash")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Auto-recovery failed", e)
+                    com.bit.state.AppStateManager.setError("Auto-recovery failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Diagnostic simulation of a native engine crash.
+     * Tells the service to exit its process immediately.
+     */
+    fun simulateEngineCrash() {
+        val svc = _serviceFlow.value ?: return
+        try {
+            svc.simulateProcessCrash()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to send crash simulation signal", e)
+        }
+    }
+
     // ── Shared GGUF Callback Factory ──
 
     private fun createGgufCallback(
@@ -218,6 +294,8 @@ object LlmModelWorker {
             val callback = object : IModelLoadCallback.Stub() {
                 override fun onSuccess() {
                     if (!resumed.compareAndSet(false, true)) return
+                    lastLoadedModel = model
+                    lastLoadedConfig = modelConfig
                     _isGgufModelLoaded.value = true
                     Log.i(TAG, "GGUF model loaded successfully")
                     continuation.resume(true)
@@ -315,7 +393,11 @@ object LlmModelWorker {
     fun unloadGgufModel() {
         val svc = _serviceFlow.value
         if (svc == null) { Log.w(TAG, "unloadGgufModel: service not bound"); return }
-        svc.unloadModelGguf()
+        try {
+            svc.unloadModelGguf()
+        } catch (_: Exception) {}
+        lastLoadedModel = null
+        lastLoadedConfig = null
         _isGgufModelLoaded.value = false
         Log.i(TAG, "GGUF model unloaded")
     }

@@ -25,11 +25,32 @@ class UmsModelRepository(private val ums: UnifiedMemorySystem) {
     }
 
     private fun refreshCache() {
-        _allModels.value = ums.getAll(collection).map { it.toModel() }
+        val allRecords = ums.getAll(collection)
+        val seenIds = mutableSetOf<String>()
+        val dedupedModels = mutableListOf<Model>()
+        
+        allRecords.forEach { record ->
+            val model = record.toModel()
+            if (model.id.isNotEmpty()) {
+                if (model.id in seenIds) {
+                    // Delete duplicate record from database
+                    ums.delete(collection, record.id)
+                } else {
+                    seenIds.add(model.id)
+                    dedupedModels.add(model)
+                }
+            }
+        }
+        _allModels.value = dedupedModels
     }
 
     suspend fun insert(model: Model) = withContext(Dispatchers.IO) {
-        ums.put(collection, model.toRecord())
+        val existing = findRecordId(model.id)
+        if (existing != null) {
+            ums.put(collection, model.toRecord(existing))
+        } else {
+            ums.put(collection, model.toRecord())
+        }
         refreshCache()
     }
 

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import org.json.JSONObject
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -47,6 +48,9 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
     private val _diffusionInferenceParams = MutableStateFlow(DiffusionInferenceParams())
     val diffusionInferenceParams: StateFlow<DiffusionInferenceParams> =
         _diffusionInferenceParams.asStateFlow()
+
+    private val _apiConfig = MutableStateFlow(ApiModelConfig())
+    val apiConfig: StateFlow<ApiModelConfig> = _apiConfig.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -103,7 +107,21 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
                     }
 
                     ProviderType.API -> {
-                        // Remote API models store endpoint metadata in loading params.
+                        _apiConfig.value = if (config != null && !config.modelLoadingParams.isNullOrBlank()) {
+                            try {
+                                val json = JSONObject(config.modelLoadingParams)
+                                ApiModelConfig(
+                                    endpoint = json.optString("endpoint", ""),
+                                    model = json.optString("model", ""),
+                                    stream = json.optBoolean("stream", false),
+                                    authHeader = json.optString("authHeader", "")
+                                )
+                            } catch (_: Exception) {
+                                ApiModelConfig()
+                            }
+                        } else {
+                            ApiModelConfig()
+                        }
                     }
                 }
             } catch (_: Exception) {
@@ -170,10 +188,16 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
                     }
 
                     ProviderType.API -> {
+                        val loadingJson = JSONObject().apply {
+                            put("endpoint", _apiConfig.value.endpoint.trim())
+                            put("model", _apiConfig.value.model.trim())
+                            put("stream", _apiConfig.value.stream)
+                            put("authHeader", _apiConfig.value.authHeader.trim())
+                        }.toString()
                         ModelConfig(
                             id = existingConfig?.id ?: "",
                             modelId = model.id,
-                            modelLoadingParams = existingConfig?.modelLoadingParams ?: "{}",
+                            modelLoadingParams = loadingJson,
                             modelInferenceParams = existingConfig?.modelInferenceParams
                         )
                     }
@@ -219,6 +243,26 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
     fun updateGgufUseMlock(value: Boolean) {
         _ggufConfig.update {
             it.copy(loadingParams = it.loadingParams.copy(useMlock = value))
+        }
+    }
+
+    fun updateGgufGpuAcceleration(value: Boolean) {
+        _ggufConfig.update {
+            val updatedLoading = it.loadingParams.copy(
+                gpuAcceleration = value,
+                npuAcceleration = if (value) false else it.loadingParams.npuAcceleration
+            )
+            it.copy(loadingParams = updatedLoading)
+        }
+    }
+
+    fun updateGgufNpuAcceleration(value: Boolean) {
+        _ggufConfig.update {
+            val updatedLoading = it.loadingParams.copy(
+                npuAcceleration = value,
+                gpuAcceleration = if (value) false else it.loadingParams.gpuAcceleration
+            )
+            it.copy(loadingParams = updatedLoading)
         }
     }
 
@@ -357,4 +401,27 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
             it.copy(showDiffusionStride = value)
         }
     }
+
+    fun updateApiEndpoint(endpoint: String) {
+        _apiConfig.update { it.copy(endpoint = endpoint) }
+    }
+
+    fun updateApiModel(model: String) {
+        _apiConfig.update { it.copy(model = model) }
+    }
+
+    fun updateApiStream(stream: Boolean) {
+        _apiConfig.update { it.copy(stream = stream) }
+    }
+
+    fun updateApiAuthHeader(authHeader: String) {
+        _apiConfig.update { it.copy(authHeader = authHeader) }
+    }
 }
+
+data class ApiModelConfig(
+    val endpoint: String = "",
+    val model: String = "",
+    val stream: Boolean = false,
+    val authHeader: String = ""
+)

@@ -70,7 +70,7 @@
             android:windowSoftInputMode="adjustResize"
             tools:targetApi="33" >
 
-            <!-- Intent filter for .neuron RAG files -->
+            <!-- Intent filter for .bit RAG files -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -79,8 +79,8 @@
                 <data android:scheme="content" />
                 <data android:host="*" />
                 <data android:mimeType="*/*" />
-                <data android:pathPattern=".*\\.rag" />
-                <data android:pathPattern=".*\\.RAG" />
+                <data android:pathPattern=".*\\.bit" />
+                <data android:pathPattern=".*\\.BIT" />
             </intent-filter>
         </activity>
 
@@ -104,6 +104,7 @@
             android:exported="true"
             android:foregroundServiceType="dataSync"
             android:permission="${applicationId}.permission.BIND_LLM_SERVICE"
+            android:process=":inference"
             android:stopWithTask="false"
             tools:targetApi="29" />
 

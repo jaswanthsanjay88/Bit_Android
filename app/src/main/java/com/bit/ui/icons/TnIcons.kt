@@ -162,6 +162,15 @@ object TnIcons {
 
     // ── Lucide ──
     val BrainCircuit by lazy { lucide("M12 5a3 3 0 1 0-5.997 .125a4 4 0 0 0-2.526 5.77a4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z", "M9 13a4.5 4.5 0 0 0 3-4", "M6.003 5.125A3 3 0 0 0 6.401 6.5", "M3.477 10.896a4 4 0 0 1 .585-.396", "M6 18a4 4 0 0 1-1.967-.516", "M12 13h4", "M12 18h6a2 2 0 0 1 2 2v1", "M12 8h8", "M16 8V5a2 2 0 0 1 2-2") }
+    val StoreFront by lazy {
+        tabler(
+            "M3 21l18 0",
+            "M3 7v1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1h-18",
+            "M5 21v-10.25",
+            "M19 21v-10.25",
+            "M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4"
+        )
+    }
 }
 
 /** Builds a Tabler-style stroke icon from SVG path strings. */
@@ -186,3 +195,21 @@ private fun tabler(vararg paths: String): ImageVector {
 
 /** Builds a Lucide-style stroke icon — same format as Tabler (24x24, stroke 2, round). */
 private fun lucide(vararg paths: String): ImageVector = tabler(*paths)
+
+/** Builds a filled monochrome vector icon. */
+private fun filled(vararg paths: String): ImageVector {
+    return ImageVector.Builder(
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        paths.forEach { svgPath ->
+            addPath(
+                pathData = PathParser().parsePathString(svgPath).toNodes(),
+                fill = SolidColor(Color.Black)
+            )
+        }
+    }.build()
+}
+

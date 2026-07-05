@@ -16,6 +16,8 @@ import com.bit.models.data.HuggingFaceModel
 import com.bit.models.data.ModelType
 import java.util.concurrent.ConcurrentHashMap
 import org.json.JSONObject
+import com.bit.worker.ActiveModelSession
+import com.bit.models.enums.ProviderType
 
 object PluginManager {
 
@@ -48,11 +50,11 @@ object PluginManager {
     @Volatile private var _cachedEnabledToolDefs: List<ToolDefinitionBuilder>? = null
 
     // Set of enabled plugin names
-    private val _enabledPluginNames = MutableStateFlow<Set<String>>(emptySet())
+    private val _enabledPluginNames = MutableStateFlow<Set<String>>(setOf(WEB_SEARCH_PLUGIN_NAME))
     val enabledPluginNames: StateFlow<Set<String>> = _enabledPluginNames.asStateFlow()
 
     // Web Search enabled state (independent toggle)
-    private val _isWebSearchEnabled = MutableStateFlow(false)
+    private val _isWebSearchEnabled = MutableStateFlow(true)
     val isWebSearchEnabled: StateFlow<Boolean> = _isWebSearchEnabled.asStateFlow()
 
     // List of registered plugins
@@ -283,6 +285,16 @@ object PluginManager {
      */
     fun syncToolsWithLLM() {
         val toolDefinitions = getEnabledToolDefinitions()
+
+        val modelType = ActiveModelSession.currentModelType.value
+        if (modelType == ProviderType.API) {
+            Log.d(TAG, "Active model is remote API; tools will be passed dynamically per request.")
+            return
+        }
+        if (modelType == null) {
+            Log.d(TAG, "No model loaded; deferring tool sync.")
+            return
+        }
 
         if (toolDefinitions.isEmpty()) {
             LlmModelWorker.clearToolsGguf()

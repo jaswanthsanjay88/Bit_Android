@@ -37,11 +37,13 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream
+import org.json.JSONObject
 
 class ModelDownloadService : Service() {
 
@@ -58,12 +60,16 @@ class ModelDownloadService : Service() {
 
     companion object {
         private const val NOTIFICATION_ID = 3001
+        private const val TAG = "DownloadService"
+        private const val PAUSE_META_FILE = "pause_meta.json"
 
         private val _downloadStates = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
         val downloadStates: StateFlow<Map<String, DownloadState>> = _downloadStates
 
         const val ACTION_START_DOWNLOAD = "action_start_download"
         const val ACTION_CANCEL_DOWNLOAD = "action_cancel_download"
+        const val ACTION_PAUSE_DOWNLOAD = "action_pause_download"
+        const val ACTION_RESUME_DOWNLOAD = "action_resume_download"
 
         const val EXTRA_MODEL_ID = "model_id"
         const val EXTRA_MODEL_NAME = "model_name"
@@ -73,6 +79,9 @@ class ModelDownloadService : Service() {
         const val EXTRA_RUN_ON_CPU = "run_on_cpu"
         const val EXTRA_TEXT_EMBEDDING_SIZE = "text_embedding_size"
     }
+
+    // Tracks which modelIds are currently paused — coroutine checks this flag
+    private val pausedModelIds = ConcurrentHashMap.newKeySet<String>()
 
     sealed class DownloadState {
         data class Downloading(
@@ -84,6 +93,13 @@ class ModelDownloadService : Service() {
             val etaSeconds: Long = -1
         ) : DownloadState()
 
+        data class Paused(
+            val modelId: String,
+            val progress: Float,
+            val downloadedBytes: Long,
+            val totalBytes: Long
+        ) : DownloadState()
+
         data class Extracting(
             val modelId: String,
             val currentFile: String = "",
@@ -91,7 +107,8 @@ class ModelDownloadService : Service() {
             val totalFiles: Int = 0
         ) : DownloadState()
         data class Processing(val modelId: String) : DownloadState()
-        data class Success(val modelId: String) : DownloadState()
+        data class Verifying(val modelId: String) : DownloadState()
+        data class Success(val modelId: String, val sha256: String? = null) : DownloadState()
         data class Error(val modelId: String, val message: String) : DownloadState()
         data class Cancelled(val modelId: String) : DownloadState()
     }
@@ -124,19 +141,15 @@ class ModelDownloadService : Service() {
                 val isMultiFile = modelType == "STT" || modelType == "VLM" || 
                         (modelType == "TTS" && fileUrl?.let { it.contains(".tar.bz2") || it.contains(".zip") } != true)
                 if (!isMultiFile && fileUrl == null) {
-                    Log.e("DownloadService", "fileUrl is required for model type $modelType")
+                    Log.e(TAG, "fileUrl is required for model type $modelType")
                     return START_NOT_STICKY
                 }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    ServiceCompat.startForeground(
-                        this@ModelDownloadService, NOTIFICATION_ID,
-                        createNotification(modelName, 0f),
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                    )
-                } else {
-                    startForeground(NOTIFICATION_ID, createNotification(modelName, 0f))
-                }
+                ensureForeground(modelName)
+
+                // Save pause metadata so download can resume after background kill
+                savePauseMetadata(modelId, modelName, fileUrl, isZip, modelType, runOnCpu, textEmbeddingSize)
+
                 startDownload(
                     modelId,
                     modelName,
@@ -154,8 +167,34 @@ class ModelDownloadService : Service() {
                     cancelDownload(modelId)
                 }
             }
+
+            ACTION_PAUSE_DOWNLOAD -> {
+                val modelId = intent.getStringExtra(EXTRA_MODEL_ID)
+                if (modelId != null) {
+                    pauseDownload(modelId)
+                }
+            }
+
+            ACTION_RESUME_DOWNLOAD -> {
+                val modelId = intent.getStringExtra(EXTRA_MODEL_ID) ?: return START_NOT_STICKY
+                val modelName = intent.getStringExtra(EXTRA_MODEL_NAME) ?: modelId
+                ensureForeground(modelName)
+                resumeDownload(modelId, modelName)
+            }
         }
         return START_NOT_STICKY
+    }
+
+    private fun ensureForeground(modelName: String) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ServiceCompat.startForeground(
+                this@ModelDownloadService, NOTIFICATION_ID,
+                createNotification(modelName, 0f),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, createNotification(modelName, 0f))
+        }
     }
 
     private fun startDownload(
@@ -169,10 +208,11 @@ class ModelDownloadService : Service() {
     ) {
         // Skip if this model is already downloading
         if (downloadJobs[modelId]?.isActive == true) {
-            Log.w("DownloadService", "Download already in progress for $modelId, skipping duplicate")
+            Log.w(TAG, "Download already in progress for $modelId, skipping duplicate")
             return
         }
         downloadJobs[modelId]?.cancel()
+        pausedModelIds.remove(modelId)
 
         val notificationId = notificationIdCounter.incrementAndGet()
         val job = serviceScope.launch {
@@ -297,6 +337,12 @@ class ModelDownloadService : Service() {
 
                         tempFile?.copyTo(targetFile, overwrite = true)
 
+                        // SHA256 checksum verification
+                        updateDownloadState(modelId, DownloadState.Verifying(modelId))
+                        updateNotification(modelName, 0f, notificationId, isVerifying = true)
+                        val sha256 = computeSha256(targetFile)
+                        Log.i(TAG, "GGUF $modelId SHA256: $sha256")
+
                         updateDownloadState(modelId, DownloadState.Processing(modelId))
                         updateNotification(modelName, 0f, notificationId, isProcessing = true)
 
@@ -374,6 +420,7 @@ class ModelDownloadService : Service() {
                 tempFile?.delete()
                 tempFile = null
                 tempDir.deleteRecursively()
+                clearPauseMetadata(modelId)
 
                 updateDownloadState(modelId, DownloadState.Success(modelId))
                 updateNotification(modelName, 100f, notificationId, isSuccess = true)
@@ -389,6 +436,24 @@ class ModelDownloadService : Service() {
                     }
                 }
 
+            } catch (e: PauseException) {
+                // Paused — keep temp file intact, don't clear metadata
+                val progress = if (e.totalBytes > 0) e.downloadedBytes.toFloat() / e.totalBytes else 0f
+                updateDownloadState(modelId, DownloadState.Paused(
+                    modelId = e.modelId,
+                    progress = progress,
+                    downloadedBytes = e.downloadedBytes,
+                    totalBytes = e.totalBytes
+                ))
+                updateNotification(modelName, progress, notificationId, isPaused = true)
+
+                withContext(Dispatchers.Main) {
+                    downloadJobs.remove(modelId)
+                    if (downloadJobs.isEmpty()) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        stopSelf()
+                    }
+                }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 extractTempDir?.deleteRecursively()
 
@@ -490,6 +555,11 @@ class ModelDownloadService : Service() {
                                 call.cancel()
                                 throw kotlinx.coroutines.CancellationException("Download cancelled")
                             }
+                            // Check for pause request
+                            if (pausedModelIds.contains(modelId)) {
+                                call.cancel()
+                                throw PauseException(modelId, downloadedBytes, totalBytes)
+                            }
 
                             val byteBuffer = java.nio.ByteBuffer.wrap(buffer, 0, bytes)
                             while (byteBuffer.hasRemaining()) {
@@ -533,6 +603,9 @@ class ModelDownloadService : Service() {
                     }
                 }
             }
+        } catch (e: PauseException) {
+            // Don't cancel call here — it's already cancelled in the read loop
+            throw e
         } catch (e: Exception) {
             call.cancel()
             throw e
@@ -692,12 +765,12 @@ class ModelDownloadService : Service() {
         sttModelDir: File, modelId: String, modelName: String, notificationId: Int
     ) = withContext(Dispatchers.IO) {
         val baseUrl = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main"
-        val files = listOf(
-            "encoder.int8.onnx",
-            "decoder.int8.onnx",
-            "tokens.txt"
+        val fileMapping = listOf(
+            "tiny.en-encoder.int8.onnx" to "encoder.int8.onnx",
+            "tiny.en-decoder.int8.onnx" to "decoder.int8.onnx",
+            "tiny.en-tokens.txt" to "tokens.txt"
         )
-        downloadMultipleFiles(files, baseUrl, sttModelDir, modelId, modelName, notificationId)
+        downloadMappedFiles(fileMapping, baseUrl, sttModelDir, modelId, modelName, notificationId)
     }
 
     private suspend fun downloadVLMModelFiles(
@@ -709,6 +782,61 @@ class ModelDownloadService : Service() {
             "mmproj-Qwen2-VL-2B-Instruct-f16.gguf"
         )
         downloadMultipleFiles(files, baseUrl, vlmModelDir, modelId, modelName, notificationId)
+    }
+
+    private suspend fun downloadMappedFiles(
+        files: List<Pair<String, String>>, baseUrl: String, targetDir: File, modelId: String, modelName: String, notificationId: Int
+    ) {
+        var filesDownloaded = 0
+
+        for ((remotePath, localPath) in files) {
+            if (!downloadJobs.containsKey(modelId) || downloadJobs[modelId]?.isCancelled == true) {
+                throw kotlinx.coroutines.CancellationException("Download cancelled")
+            }
+
+            val url = "$baseUrl/$remotePath"
+            val destFile = File(targetDir, localPath)
+            destFile.parentFile?.mkdirs()
+
+            val request = buildDownloadRequest(url)
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw Exception("Failed to download $localPath: ${response.code}")
+                }
+                
+                val body = response.body ?: throw Exception("Empty response body")
+                val totalBytes = body.contentLength()
+                var downloadedBytes = 0L
+                var lastUpdateTime = 0L
+
+                FileOutputStream(destFile).buffered().use { output ->
+                    body.byteStream().buffered().use { input ->
+                        val buffer = ByteArray(64 * 1024)
+                        var bytes: Int
+
+                        while (input.read(buffer).also { bytes = it } != -1) {
+                            if (!downloadJobs.containsKey(modelId) || downloadJobs[modelId]?.isCancelled == true) {
+                                throw kotlinx.coroutines.CancellationException("Download cancelled")
+                            }
+
+                            output.write(buffer, 0, bytes)
+                            downloadedBytes += bytes
+
+                            val currentTime = System.currentTimeMillis()
+                            if (currentTime - lastUpdateTime >= 500 || downloadedBytes == totalBytes) {
+                                lastUpdateTime = currentTime
+                                
+                                val fileProgress = if (totalBytes > 0) downloadedBytes.toFloat() / totalBytes else 0f
+                                val overallProgress = (filesDownloaded.toFloat() + fileProgress) / files.size
+                                updateDownloadState(modelId, DownloadState.Downloading(modelId, overallProgress, downloadedBytes, totalBytes))
+                                updateNotification(modelName, overallProgress, notificationId)
+                            }
+                        }
+                    }
+                }
+            }
+            filesDownloaded++
+        }
     }
 
     private suspend fun downloadMultipleFiles(
@@ -915,8 +1043,106 @@ class ModelDownloadService : Service() {
     }
 
     private fun cancelDownload(modelId: String) {
+        pausedModelIds.remove(modelId)
         downloadJobs[modelId]?.cancel()
+        clearPauseMetadata(modelId)
     }
+
+    private fun pauseDownload(modelId: String) {
+        pausedModelIds.add(modelId)
+        // The coroutine's read loop will detect the flag and throw PauseException
+    }
+
+    private fun resumeDownload(modelId: String, modelName: String) {
+        pausedModelIds.remove(modelId)
+
+        // Try to read saved metadata to get the original download parameters
+        val meta = loadPauseMetadata(modelId)
+        if (meta != null) {
+            startDownload(
+                modelId = modelId,
+                modelName = meta.optString("modelName", modelName),
+                fileUrl = meta.optString("fileUrl", null),
+                isZip = meta.optBoolean("isZip", false),
+                modelType = meta.optString("modelType", "GGUF"),
+                runOnCpu = meta.optBoolean("runOnCpu", false),
+                textEmbeddingSize = meta.optInt("textEmbeddingSize", 768)
+            )
+        } else {
+            Log.e(TAG, "No pause metadata found for $modelId — cannot resume")
+            updateDownloadState(modelId, DownloadState.Error(modelId, "Cannot resume: download metadata lost"))
+        }
+    }
+
+    // ── Pause metadata persistence (survives background kill) ──
+
+    private fun savePauseMetadata(
+        modelId: String, modelName: String, fileUrl: String?,
+        isZip: Boolean, modelType: String, runOnCpu: Boolean, textEmbeddingSize: Int
+    ) {
+        try {
+            val metaDir = AppPaths.tempDownloads(applicationContext, modelId)
+            metaDir.mkdirs()
+            val json = JSONObject().apply {
+                put("modelId", modelId)
+                put("modelName", modelName)
+                put("fileUrl", fileUrl ?: "")
+                put("isZip", isZip)
+                put("modelType", modelType)
+                put("runOnCpu", runOnCpu)
+                put("textEmbeddingSize", textEmbeddingSize)
+            }
+            File(metaDir, PAUSE_META_FILE).writeText(json.toString())
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to save pause metadata for $modelId", e)
+        }
+    }
+
+    private fun loadPauseMetadata(modelId: String): JSONObject? {
+        return try {
+            val file = File(AppPaths.tempDownloads(applicationContext, modelId), PAUSE_META_FILE)
+            if (file.exists()) JSONObject(file.readText()) else null
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to load pause metadata for $modelId", e)
+            null
+        }
+    }
+
+    private fun clearPauseMetadata(modelId: String) {
+        try {
+            File(AppPaths.tempDownloads(applicationContext, modelId), PAUSE_META_FILE).delete()
+        } catch (_: Exception) { }
+    }
+
+    /** Checks if a model has a partial temp file from a previous interrupted download. */
+    fun hasResumableDownload(modelId: String): Boolean {
+        val tempDir = AppPaths.tempDownloads(applicationContext, modelId)
+        val tempFile = File(tempDir, "${modelId}.tmp")
+        val metaFile = File(tempDir, PAUSE_META_FILE)
+        return tempFile.exists() && tempFile.length() > 0 && metaFile.exists()
+    }
+
+    // ── SHA256 checksum computation ──
+
+    private suspend fun computeSha256(file: File): String = withContext(Dispatchers.IO) {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().buffered(256 * 1024).use { input ->
+            val buffer = ByteArray(256 * 1024)
+            var bytes: Int
+            while (input.read(buffer).also { bytes = it } != -1) {
+                digest.update(buffer, 0, bytes)
+            }
+        }
+        digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    // ── PauseException — thrown when a download is paused (NOT a cancellation) ──
+
+    private class PauseException(
+        val modelId: String,
+        val downloadedBytes: Long,
+        val totalBytes: Long
+    ) : Exception("Download paused for $modelId")
 
     // Channel creation moved to NotificationChannels.createAllChannels()
     // called at app startup in NVApplication.onCreate()
@@ -926,18 +1152,22 @@ class ModelDownloadService : Service() {
         modelName: String,
         progress: Float,
         isExtracting: Boolean = false,
-        isProcessing: Boolean = false
+        isProcessing: Boolean = false,
+        isPaused: Boolean = false,
+        isVerifying: Boolean = false
     ): android.app.Notification {
         val title = when {
+            isPaused -> "Paused · $modelName"
+            isVerifying -> "Verifying $modelName"
             isProcessing -> "Processing $modelName"
             isExtracting -> "Extracting $modelName"
             else -> "Downloading $modelName"
         }
 
         return NotificationCompat.Builder(this, NotificationChannels.MODEL_DOWNLOAD).setContentTitle(title)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
-            .setProgress(100, (progress * 100).toInt(), isExtracting || isProcessing)
-            .setOngoing(true).build()
+            .setSmallIcon(if (isPaused) android.R.drawable.ic_media_pause else android.R.drawable.stat_sys_download)
+            .setProgress(100, (progress * 100).toInt(), isExtracting || isProcessing || isVerifying)
+            .setOngoing(!isPaused).build()
     }
 
     private fun updateNotification(
@@ -948,7 +1178,9 @@ class ModelDownloadService : Service() {
         error: String? = null,
         isExtracting: Boolean = false,
         isProcessing: Boolean = false,
-        isCancelled: Boolean = false
+        isCancelled: Boolean = false,
+        isPaused: Boolean = false,
+        isVerifying: Boolean = false
     ) {
         val notification = when {
             isSuccess -> {
@@ -972,7 +1204,7 @@ class ModelDownloadService : Service() {
             }
 
             else -> {
-                createNotification(modelName, progress, isExtracting, isProcessing)
+                createNotification(modelName, progress, isExtracting, isProcessing, isPaused, isVerifying)
             }
         }
 

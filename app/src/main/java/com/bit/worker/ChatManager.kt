@@ -153,6 +153,13 @@ class ChatManager {
         }
     }
 
+    suspend fun updateChatTitle(chatId: String, title: String): Result<Unit> = withContext(Dispatchers.IO) {
+        withUmsReady {
+            chatRepo.updateChatTitle(chatId, title)
+            Unit
+        }
+    }
+
     suspend fun deleteChat(chatId: String): Result<Unit> = withContext(Dispatchers.IO) {
         withUmsReady {
             chatRepo.deleteChat(chatId)

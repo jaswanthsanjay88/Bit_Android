@@ -35,7 +35,7 @@ fun AgentExecutionView(
     currentStep: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
+    var isExpanded by remember(phase) { mutableStateOf(phase != AgentPhase.Complete && phase != AgentPhase.Idle) }
     var showDetailDialog by remember { mutableStateOf(false) }
 
     if (showDetailDialog) {
@@ -136,6 +136,8 @@ fun AgentExecutionView(
                         plan = plan,
                         isActive = phase == AgentPhase.Planning
                     )
+                } else if (phase == AgentPhase.Planning) {
+                    PlanPlaceholderSection()
                 }
 
                 // Phase 2: Execution Steps
@@ -486,6 +488,28 @@ private fun AgentDetailDialog(
 
         if (summary != null) {
             DetailSection(label = "Summary", content = summary)
+        }
+    }
+}
+
+@Composable
+private fun PlanPlaceholderSection() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Standards.RadiusMd),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier.padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PhaseSpinner()
+            Text(
+                text = "Formulating execution plan...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

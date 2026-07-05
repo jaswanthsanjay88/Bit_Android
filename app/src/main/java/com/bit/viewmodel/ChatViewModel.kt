@@ -37,6 +37,7 @@ import com.bit.worker.LlmModelWorker
 import com.bit.models.engine_schema.DecodingMetrics
 import com.dark.gguf_lib.toolcalling.ToolCall
 import com.dark.gguf_lib.toolcalling.ToolCallingConfig
+import com.bit.service.AudioCaptureService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -53,6 +54,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import com.bit.api.ProviderConfig
+import com.bit.api.StreamEvent
+import com.bit.api.LlmProviderResolver
+import com.bit.api.ChatMessage
+import com.bit.api.Participant
 
 enum class AgentPhase { Idle, Planning, Executing, Summarizing, Complete }
 
@@ -102,6 +108,75 @@ class ChatViewModel @Inject constructor(
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+
+    // Speech to Text (STT) state and controllers
+    private val audioCaptureService = AudioCaptureService(context)
+    val isSttRecording: StateFlow<Boolean> = audioCaptureService.isRecordingState
+    val sttAmplitude: StateFlow<Float> = audioCaptureService.audioLevel
+    private val _isSttTranscribing = MutableStateFlow(false)
+    val isSttTranscribing: StateFlow<Boolean> = _isSttTranscribing
+
+    private var sttAudioData = java.io.ByteArrayOutputStream()
+    private var sttCollectJob: Job? = null
+
+    fun startSttRecording() {
+        if (!audioCaptureService.hasRecordPermission()) {
+            _error.value = "Microphone permission required"
+            return
+        }
+        
+        sttAudioData.reset()
+        sttCollectJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                audioCaptureService.startCapture().collect { chunk ->
+                    sttAudioData.write(chunk)
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "STT record collection error: ${e.message}")
+            }
+        }
+    }
+
+    fun cancelSttRecording() {
+        sttCollectJob?.cancel()
+        sttCollectJob = null
+        audioCaptureService.stopCapture()
+        sttAudioData.reset()
+        _isSttTranscribing.value = false
+    }
+
+    fun stopSttRecording(onTranscribed: (String) -> Unit) {
+        sttCollectJob?.cancel()
+        sttCollectJob = null
+        audioCaptureService.stopCapture()
+        
+        val audioBytes = sttAudioData.toByteArray()
+        sttAudioData.reset()
+        
+        if (audioBytes.isEmpty()) return
+        
+        viewModelScope.launch {
+            _isSttTranscribing.value = true
+            _isGenerating.value = true
+            try {
+                if (!com.bit.stt.SherpaSTTEngine.hasModelFiles(appContext)) {
+                    _error.value = "STT model not downloaded. Download CSukuangfj/sherpa-onnx-whisper-tiny.en in Settings."
+                    return@launch
+                }
+                val transcribedText = com.bit.stt.SherpaSTTEngine.transcribe(appContext, audioBytes)
+                if (transcribedText.isNotBlank()) {
+                    onTranscribed(transcribedText)
+                } else {
+                    _error.value = "No speech recognized"
+                }
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Transcription failed"
+            } finally {
+                _isGenerating.value = false
+                _isSttTranscribing.value = false
+            }
+        }
+    }
 
     private val _currentChatId = MutableStateFlow<String?>(null)
     val currentChatId: StateFlow<String?> = _currentChatId
@@ -203,7 +278,12 @@ class ChatViewModel @Inject constructor(
         ggufLoaded || providerType == ProviderType.API
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val isImageModelLoaded = LlmModelWorker.isDiffusionModelLoaded
-    val isVlmLoaded = LlmModelWorker.isVlmLoaded
+    val isVlmLoaded: StateFlow<Boolean> = combine(
+        LlmModelWorker.isVlmLoaded,
+        ActiveModelSession.currentModelType
+    ) { localVlm, providerType ->
+        localVlm || providerType == ProviderType.VLM || providerType == ProviderType.API
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // TTS state
     val ttsPlayingMsgId = TTSManager.currentPlayingMsgId
@@ -471,7 +551,7 @@ class ChatViewModel @Inject constructor(
                 val isNewChat = isNewConversation
                 val activeProviderType = ActiveModelSession.currentModelType.value
                 val hasTools = PluginManager.hasEnabledTools()
-                        && PluginManager.isToolCallingModelLoaded.value
+                        && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
                 LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value && !hasTools)
                 val ragContext = _currentRagContext.value
 
@@ -487,11 +567,6 @@ class ChatViewModel @Inject constructor(
                         reportError("Failed to save message: ${e.message}")
                         return@launch  // finally will call resetStreamingState()
                     }
-                }
-
-                if (activeProviderType == ProviderType.API) {
-                    simpleRemoteFlow(prompt, ragContext, isNewChat)
-                    return@launch
                 }
 
                 if (hasTools) {
@@ -519,12 +594,14 @@ class ChatViewModel @Inject constructor(
      * @param imageData List of raw image file bytes (JPEG/PNG)
      */
     fun sendChatWithImages(prompt: String, imageData: List<ByteArray>) {
-        if (!LlmModelWorker.isGgufModelLoaded.value) {
-            reportError("Please load a text generation model first")
+        val activeProviderType = ActiveModelSession.currentModelType.value
+
+        if (!isAnyTextModelLoaded) {
+            reportError("Please load a text model first")
             return
         }
-        if (!LlmModelWorker.isVlmLoaded.value) {
-            reportError("Please load a vision projector (mmproj) first")
+        if (activeProviderType != ProviderType.API && activeProviderType != ProviderType.VLM && !LlmModelWorker.isVlmLoaded.value) {
+            reportError("Please load a vision projector (proj) first")
             return
         }
         if (_isGenerating.value) return
@@ -536,10 +613,19 @@ class ChatViewModel @Inject constructor(
         currentMetrics = null
         _error.value = null
 
+        val base64Image = if (imageData.isNotEmpty()) {
+            android.util.Base64.encodeToString(imageData.first(), android.util.Base64.NO_WRAP)
+        } else {
+            null
+        }
         currentUserMessage = Messages(
-            msgId = "",
+            msgId = java.util.UUID.randomUUID().toString(),
             role = Role.User,
-            content = MessageContent(contentType = ContentType.Text, content = prompt),
+            content = MessageContent(
+                contentType = if (base64Image != null) ContentType.TextWithImage else ContentType.Text,
+                content = prompt,
+                imageData = base64Image
+            ),
             modelId = currentModelId,
         )
         AppStateManager.setHasMessages(true)
@@ -549,8 +635,13 @@ class ChatViewModel @Inject constructor(
                 // Let Compose render the StreamingView before native engine saturates CPU
                 kotlinx.coroutines.yield()
 
-                val maxTokens = getCurrentModelMaxTokens()
                 val isNewChat = isNewConversation
+                if (activeProviderType == ProviderType.API) {
+                    simpleRemoteFlowWithImages(prompt, base64Image, isNewChat)
+                    return@launch
+                }
+
+                val maxTokens = getCurrentModelMaxTokens()
 
                 // Insert image marker into prompt for VLM
                 val marker = LlmModelWorker.getVlmDefaultMarker()
@@ -637,7 +728,7 @@ class ChatViewModel @Inject constructor(
     private var regenerationSnapshot: Messages? = null
 
     fun regenerateLastMessage() {
-        if (!LlmModelWorker.isGgufModelLoaded.value) {
+        if (!isAnyTextModelLoaded) {
             _error.value = "Please load a text generation model first"
             return
         }
@@ -673,8 +764,9 @@ class ChatViewModel @Inject constructor(
         generationJob = viewModelScope.launch {
             try {
                 val maxTokens = getCurrentModelMaxTokens()
+                val activeProviderType = ActiveModelSession.currentModelType.value
                 val hasTools = PluginManager.hasEnabledTools()
-                        && PluginManager.isToolCallingModelLoaded.value
+                        && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
                 LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value && !hasTools)
                 val ragContext = _currentRagContext.value
 
@@ -722,11 +814,11 @@ class ChatViewModel @Inject constructor(
     ) {
         val fullPrompt = ragContext?.let { "$it\n\n$prompt" } ?: prompt
 
-        // Phase 1: Plan
+        // Phase 1: Plan (Skip model call to align with Agora's direct execution architecture and prevent hangs)
         _agentPhase.value = AgentPhase.Planning
         AppStateManager.setGeneratingText()
-        Log.d(TAG, "Agent Phase 1: Generating plan")
-        val plan = generatePlan(fullPrompt)
+        Log.d(TAG, "Agent Phase 1: Planning (Direct)")
+        val plan = "Determine if any tools are needed to answer the query."
         _agentPlan.value = plan
         Log.d(TAG, "Agent plan: $plan")
 
@@ -747,12 +839,18 @@ class ChatViewModel @Inject constructor(
             return
         }
 
-        // Phase 3: Summary
-        _agentPhase.value = AgentPhase.Summarizing
-        _streamingAssistantMessage.value = ""
-        AppStateManager.setGeneratingText()
-        Log.d(TAG, "Agent Phase 3: Generating summary")
-        val summary = generateSummary(fullPrompt, steps)
+        // Phase 3: Summary (Reuse streamed response from the execution loop to avoid redundant API request)
+        val cachedSummary = _streamingAssistantMessage.value
+        val summary = if (cachedSummary.isNotBlank()) {
+            Log.d(TAG, "Agent already generated final response during execution, skipping Phase 3 (Summary)")
+            cachedSummary
+        } else {
+            _agentPhase.value = AgentPhase.Summarizing
+            _streamingAssistantMessage.value = ""
+            AppStateManager.setGeneratingText()
+            Log.d(TAG, "Agent Phase 3: Generating summary")
+            generateSummary(fullPrompt, steps)
+        }
         _agentSummary.value = summary
         _streamingAssistantMessage.value = summary
         _agentPhase.value = AgentPhase.Complete
@@ -802,6 +900,7 @@ class ChatViewModel @Inject constructor(
         for (round in 1..maxRounds) {
             // Generate next tool call
             PluginManager.restoreGrammar()
+            _streamingAssistantMessage.value = "" // Reset streaming message for this turn's response
             // Build proper multi-turn messages: system + user + tool call/result pairs
             val messages = mutableListOf<JSONObject>()
 
@@ -809,6 +908,10 @@ class ChatViewModel @Inject constructor(
             messages.add(JSONObject().put("role", "system").put("content", buildString {
                 appendLine("Tools: $toolSignatures")
                 if (steps.isEmpty()) appendLine("Plan: $truncatedPlan")
+                if (PluginManager.isWebSearchEnabled.value) {
+                    appendLine("Web search guidelines:")
+                    appendLine("Use web_search for current, time-sensitive, or uncertain facts. Use web_fetch when a search result needs source-level detail. Prefer primary or official sources for technical, legal, medical, financial, or high-impact claims. When web search is used, cite sources and distinguish sourced facts from inference.")
+                }
                 appendLine("Call the next tool needed, or generate a text response if done.")
             }))
 
@@ -825,7 +928,22 @@ class ChatViewModel @Inject constructor(
                 ))
             }
             Log.d(TAG, "Agent loop round $round: generating tool call")
-            val toolCalls = generateAndCollectToolCalls(messages, maxTokens = 300)
+            val toolCalls = try {
+                generateAndCollectToolCalls(messages, maxTokens = 300)
+            } catch (e: Exception) {
+                Log.e(TAG, "Network or inference error during agent execution: ${e.message}", e)
+                steps.add(ToolChainStepData(
+                    round = steps.size + 1,
+                    toolName = "Error",
+                    pluginName = "System",
+                    args = "",
+                    result = "Error: ${e.message ?: "Connection aborted"}",
+                    executionTimeMs = 0,
+                    success = false
+                ))
+                _toolChainSteps.value = steps.toList()
+                break
+            }
             if (toolCalls.isEmpty()) {
                 Log.d(TAG, "Agent loop round $round: no tool call generated, stopping")
                 break
@@ -1188,8 +1306,24 @@ class ChatViewModel @Inject constructor(
             return
         }
 
+        if (!remoteCfg.endpoint.startsWith("http")) {
+            reportError("Invalid remote endpoint: ${remoteCfg.endpoint}. Please ensure it starts with http:// or https://")
+            return
+        }
+
         val remoteResult = withContext(Dispatchers.IO) {
             val messages = mutableListOf<RemoteInferenceClient.Message>()
+            
+            // Add system prompt with date/time
+            val systemPrompt = getCurrentModelSystemPrompt()
+            if (systemPrompt.isNotEmpty()) {
+                messages.add(
+                    RemoteInferenceClient.Message(
+                        role = "system",
+                        content = systemPrompt
+                    )
+                )
+            }
             
             // Build conversation history from current messages (excluding pending)
             if (!isNewChat) {
@@ -1228,6 +1362,121 @@ class ChatViewModel @Inject constructor(
                     endpoint = remoteCfg.endpoint,
                     model = remoteCfg.model,
                     prompt = fullPrompt,
+                    stream = remoteCfg.stream,
+                    authHeader = remoteCfg.authHeader
+                )
+            }
+        }
+
+        val finalResponse = remoteResult.text.trim()
+        _streamingAssistantMessage.value = finalResponse
+
+        if (isNewChat) {
+            createChatWithMessages(prompt, finalResponse, null)
+            return
+        }
+
+        val chatId = _currentChatId.value ?: return
+        val pendingUserMsg = currentUserMessage
+        if (!userMessageAdded.get() && pendingUserMsg != null) {
+            _messages.add(pendingUserMsg)
+            userMessageAdded.set(true)
+        }
+
+        if (finalResponse.isNotBlank()) {
+            val assistantMessage = Messages(
+                role = Role.Assistant,
+                content = MessageContent(contentType = ContentType.Text, content = finalResponse),
+                modelId = currentModelId
+            )
+            _messages.add(assistantMessage)
+            chatManager.addMessage(chatId, assistantMessage)
+            AppStateManager.setGenerationComplete()
+            AppStateManager.chatRefreshed()
+            val spokenMsgId = assistantMessage.msgId
+            resetStreamingState()
+            viewModelScope.launch { autoSpeakIfEnabled(finalResponse, spokenMsgId) }
+        } else {
+            AppStateManager.setGenerationComplete()
+            resetStreamingState()
+        }
+    }
+
+    private suspend fun simpleRemoteFlowWithImages(
+        prompt: String,
+        base64Image: String?,
+        isNewChat: Boolean
+    ) {
+        AppStateManager.setGeneratingText()
+        val remoteCfg = getRemoteInferenceConfig()
+        if (remoteCfg == null) {
+            reportError("Remote API model is missing endpoint configuration")
+            return
+        }
+
+        if (!remoteCfg.endpoint.startsWith("http")) {
+            reportError("Invalid remote endpoint: ${remoteCfg.endpoint}. Please ensure it starts with http:// or https://")
+            return
+        }
+
+        val remoteResult = withContext(Dispatchers.IO) {
+            val messages = mutableListOf<RemoteInferenceClient.Message>()
+            
+            // Add system prompt with date/time
+            val systemPrompt = getCurrentModelSystemPrompt()
+            if (systemPrompt.isNotEmpty()) {
+                messages.add(
+                    RemoteInferenceClient.Message(
+                        role = "system",
+                        content = systemPrompt
+                    )
+                )
+            }
+            
+            // Build conversation history from current messages (excluding pending)
+            if (!isNewChat) {
+                _messages.forEach { msg ->
+                    val role = when (msg.role) {
+                        Role.User -> "user"
+                        Role.Assistant -> "assistant"
+                    }
+                    messages.add(
+                        RemoteInferenceClient.Message(
+                            role = role,
+                            content = msg.content.content,
+                            base64Image = msg.content.imageData
+                        )
+                    )
+                }
+            }
+            
+            // Add current user message
+            messages.add(
+                RemoteInferenceClient.Message(
+                    role = "user",
+                    content = prompt,
+                    base64Image = base64Image
+                )
+            )
+            
+            // Use history-aware method for chat endpoints
+            val normalizedEndpoint = remoteCfg.endpoint.trim().lowercase()
+            val isChatEndpoint = normalizedEndpoint.contains("/api/chat") ||
+                normalizedEndpoint.contains("/v1/chat/completions")
+            
+            if (isChatEndpoint && messages.size > 1) {
+                RemoteInferenceClient.inferWithHistory(
+                    endpoint = remoteCfg.endpoint,
+                    model = remoteCfg.model,
+                    messages = messages,
+                    stream = remoteCfg.stream,
+                    authHeader = remoteCfg.authHeader
+                )
+            } else {
+                RemoteInferenceClient.inferWithHistory(
+                    endpoint = remoteCfg.endpoint,
+                    model = remoteCfg.model,
+                    messages = listOf(RemoteInferenceClient.Message("user", prompt, base64Image)),
                     stream = remoteCfg.stream,
                     authHeader = remoteCfg.authHeader
                 )
@@ -1327,6 +1576,80 @@ class ChatViewModel @Inject constructor(
         messages: List<JSONObject>,
         maxTokens: Int
     ): GenerationResult {
+        val activeProviderType = ActiveModelSession.currentModelType.value
+        if (activeProviderType == ProviderType.API) {
+            val remoteCfg = getRemoteInferenceConfig() ?: throw IllegalStateException("Remote API model is missing endpoint configuration")
+            
+            val provider = LlmProviderResolver.resolveProvider(remoteCfg.endpoint, remoteCfg.model)
+            val apiKey = LlmProviderResolver.cleanApiKey(remoteCfg.authHeader)
+            val baseUrl = LlmProviderResolver.cleanBaseUrl(remoteCfg.endpoint)
+            
+            val chatMessages = messages.map { obj ->
+                val role = obj.optString("role")
+                val content = obj.optString("content")
+                val participant = if (role.lowercase() == "user") Participant.USER else Participant.MODEL
+                ChatMessage(text = content, participant = participant)
+            }
+            
+            val config = ProviderConfig(
+                apiKey = apiKey,
+                modelId = remoteCfg.model,
+                systemPrompt = null,
+                baseUrl = baseUrl,
+                thinkingEnabled = _thinkingModeEnabled.value,
+                maxTokens = maxTokens
+            )
+            
+            val resultBuilder = java.lang.StringBuilder()
+            val nativeToolCalls = mutableListOf<Pair<String, String>>()
+            
+            try {
+                provider.generateResponse(chatMessages, config).collect { event ->
+                    when (event) {
+                        is StreamEvent.TextChunk -> {
+                            resultBuilder.append(event.text)
+                            _streamingAssistantMessage.value = resultBuilder.toString()
+                        }
+                        is StreamEvent.ToolCallRequest -> {
+                            nativeToolCalls.add(Pair(event.name, event.arguments))
+                        }
+                        is StreamEvent.ToolCallsRequest -> {
+                            event.calls.forEach { call ->
+                                nativeToolCalls.add(Pair(call.name, call.arguments))
+                            }
+                        }
+                        is StreamEvent.Error -> {
+                            throw IllegalStateException(event.message)
+                        }
+                        else -> {}
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in streaming remote inference", e)
+                throw e
+            }
+            
+            val result = resultBuilder.toString().trim()
+            _streamingAssistantMessage.value = result
+            
+            if (nativeToolCalls.isEmpty() && result.isNotBlank()) {
+                val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+                parseToolCallsFromText(result)?.let { parsed ->
+                    val valid = parsed.filter { (name, _) ->
+                        normalizeToolName(name).lowercase() in enabledNames
+                    }
+                    if (valid.size < parsed.size) {
+                        Log.w(TAG, "Filtered out ${parsed.size - valid.size} hallucinated tool calls from fallback parsing")
+                    }
+                    nativeToolCalls.addAll(valid)
+                    if (valid.isNotEmpty()) {
+                        Log.d(TAG, "Fallback parsed ${valid.size} tool calls from remote API response")
+                    }
+                }
+            }
+            return GenerationResult(text = result, toolCalls = nativeToolCalls)
+        }
+
         val jsonArray = JSONArray(messages)
         val resultBuilder = StringBuilder()
         val utf8Buffer = Utf8TokenBuffer()
@@ -1419,6 +1742,88 @@ class ChatViewModel @Inject constructor(
         messages: List<JSONObject>,
         maxTokens: Int
     ): List<Pair<String, String>> {
+        val activeProviderType = ActiveModelSession.currentModelType.value
+        if (activeProviderType == ProviderType.API) {
+            val remoteCfg = getRemoteInferenceConfig() ?: throw IllegalStateException("Remote API model is missing endpoint configuration")
+            
+            val provider = LlmProviderResolver.resolveProvider(remoteCfg.endpoint, remoteCfg.model)
+            val apiKey = LlmProviderResolver.cleanApiKey(remoteCfg.authHeader)
+            val baseUrl = LlmProviderResolver.cleanBaseUrl(remoteCfg.endpoint)
+            
+            val chatMessages = messages.map { obj ->
+                val role = obj.optString("role")
+                val content = obj.optString("content")
+                val participant = if (role.lowercase() == "user") Participant.USER else Participant.MODEL
+                ChatMessage(text = content, participant = participant)
+            }
+            
+            val jsonSerializer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            val tools = PluginManager.getEnabledToolDefinitions().map { toolDef ->
+                val toolJsonString = toolDef.build().toOpenAIFormat().toString()
+                jsonSerializer.decodeFromString<com.bit.api.ToolDefinition>(toolJsonString)
+            }
+            
+            val config = ProviderConfig(
+                apiKey = apiKey,
+                modelId = remoteCfg.model,
+                systemPrompt = null,
+                baseUrl = baseUrl,
+                tools = tools.takeIf { it.isNotEmpty() },
+                thinkingEnabled = _thinkingModeEnabled.value,
+                maxTokens = maxTokens
+            )
+            
+            val resultBuilder = java.lang.StringBuilder()
+            val nativeToolCalls = mutableListOf<Pair<String, String>>()
+            
+            try {
+                provider.generateResponse(chatMessages, config).collect { event ->
+                    when (event) {
+                        is StreamEvent.TextChunk -> {
+                            resultBuilder.append(event.text)
+                            _streamingAssistantMessage.value = resultBuilder.toString()
+                        }
+                        is StreamEvent.ToolCallRequest -> {
+                            nativeToolCalls.add(Pair(event.name, event.arguments))
+                        }
+                        is StreamEvent.ToolCallsRequest -> {
+                            event.calls.forEach { call ->
+                                nativeToolCalls.add(Pair(call.name, call.arguments))
+                            }
+                        }
+                        is StreamEvent.Error -> {
+                            throw IllegalStateException(event.message)
+                        }
+                        else -> {}
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in generateAndCollectToolCalls remote API", e)
+                throw e
+            }
+            
+            val result = resultBuilder.toString().trim()
+            val toolCalls = mutableListOf<Pair<String, String>>()
+            toolCalls.addAll(nativeToolCalls)
+            
+            if (toolCalls.isEmpty() && result.isNotBlank()) {
+                val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+                parseToolCallsFromText(result)?.let { parsed ->
+                    val valid = parsed.filter { (name, _) ->
+                        normalizeToolName(name).lowercase() in enabledNames
+                    }
+                    if (valid.size < parsed.size) {
+                        Log.w(TAG, "Filtered out ${parsed.size - valid.size} hallucinated tool calls from fallback parsing")
+                    }
+                    toolCalls.addAll(valid)
+                    if (valid.isNotEmpty()) {
+                        Log.d(TAG, "Fallback parsed ${valid.size} tool calls from remote API response")
+                    }
+                }
+            }
+            return toolCalls
+        }
+
         val toolCalls = mutableListOf<Pair<String, String>>()
         val textBuilder = StringBuilder()
         val jsonArray = JSONArray(messages)
@@ -1429,6 +1834,7 @@ class ChatViewModel @Inject constructor(
             when (event) {
                 is GenerationEvent.Token -> {
                     textBuilder.append(event.text)
+                    _streamingAssistantMessage.value = textBuilder.toString()
                 }
                 is GenerationEvent.ToolCall -> {
                     toolCalls.add(Pair(event.name, event.args))
@@ -1515,11 +1921,20 @@ class ChatViewModel @Inject constructor(
             && PluginManager.isToolCallingModelLoaded.value
         val thinkingDirective = if (_thinkingModeEnabled.value && !hasActiveTools) "/think" else "/no_think"
 
+        val currentDateTimeStr = java.text.SimpleDateFormat(
+            "EEEE, d MMMM yyyy, HH:mm",
+            java.util.Locale.US
+        ).format(java.util.Date())
+
         return buildString {
             append(thinkingDirective)
+            append("\n\nSystem Info:\n- Current Date and Time: ").append(currentDateTimeStr)
             if (basePrompt.isNotEmpty()) {
-                append("\n")
+                append("\n\n")
                 append(basePrompt)
+            }
+            if (PluginManager.isWebSearchEnabled.value) {
+                append("\n\nWeb search:\nUse web_search for current, time-sensitive, or uncertain facts. Use web_fetch when a search result needs source-level detail. Prefer primary or official sources for technical, legal, medical, financial, or high-impact claims. When web search is used, cite sources and distinguish sourced facts from inference.")
             }
         }
     }
@@ -1604,18 +2019,31 @@ class ChatViewModel @Inject constructor(
      * Returns Pair(toolName, arguments JSONObject) or null if extraction fails.
      */
     private fun extractToolCallFromArgs(toolCallName: String, toolCallArgs: String): Pair<String, JSONObject>? {
-        // Strategy 1: Parse as valid JSON with tool_calls array
+        val trimmedArgs = toolCallArgs.trim()
+
+        // Strategy 1: Parse as valid JSON (with or without envelope structure)
         try {
-            val argsObject = JSONObject(toolCallArgs)
+            val argsObject = JSONObject(trimmedArgs)
+            
+            // Case A: Standard tool_calls array (e.g. {"tool_calls": [{"name": "...", "arguments": {...}}]})
             val toolCallsArray = argsObject.optJSONArray("tool_calls")
             if (toolCallsArray != null && toolCallsArray.length() > 0) {
                 val firstCall = toolCallsArray.getJSONObject(0)
                 return Pair(firstCall.getString("name"), firstCall.getJSONObject("arguments"))
             }
-            // Maybe it's a direct {"name":"...","arguments":{...}} object
-            if (argsObject.has("name") && argsObject.has("arguments")) {
-                return Pair(argsObject.getString("name"), argsObject.getJSONObject("arguments"))
+            
+            // Case B: Nested arguments object (e.g. {"name": "...", "arguments": {...}} or {"arguments": {...}})
+            if (argsObject.has("arguments")) {
+                val nestedArgs = argsObject.optJSONObject("arguments")
+                if (nestedArgs != null) {
+                    val name = if (argsObject.has("name")) argsObject.getString("name") else toolCallName
+                    return Pair(name, nestedArgs)
+                }
             }
+            
+            // Case C: Direct flat arguments object (e.g. {"query": "latest news", "num_results": 10})
+            // Since it is a valid JSON object but lacks the envelope structure, it is already the flat arguments object itself.
+            return Pair(toolCallName, argsObject)
         } catch (e: Exception) {
             Log.d(TAG, "Strategy 1 (full JSON) failed: ${e.message}")
         }
@@ -1626,7 +2054,7 @@ class ChatViewModel @Inject constructor(
                 """\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{[^}]*\})""",
                 RegexOption.DOT_MATCHES_ALL
             )
-            val match = nameArgRegex.find(toolCallArgs)
+            val match = nameArgRegex.find(trimmedArgs)
             if (match != null) {
                 val name = match.groupValues[1]
                 val argsStr = match.groupValues[2]
@@ -1638,19 +2066,19 @@ class ChatViewModel @Inject constructor(
 
         // Strategy 3: Extract arguments with nested braces (handles deeper JSON)
         try {
-            val nameIdx = toolCallArgs.indexOf("\"name\"")
-            val argsIdx = toolCallArgs.indexOf("\"arguments\"")
+            val nameIdx = trimmedArgs.indexOf("\"name\"")
+            val argsIdx = trimmedArgs.indexOf("\"arguments\"")
             if (nameIdx >= 0 && argsIdx >= 0) {
                 val nameValRegex = Regex(""""name"\s*:\s*"([^"]+)"""")
-                val nameMatch = nameValRegex.find(toolCallArgs)
+                val nameMatch = nameValRegex.find(trimmedArgs)
                 val name = nameMatch?.groupValues?.get(1) ?: toolCallName
 
-                val argsStart = toolCallArgs.indexOf('{', argsIdx)
+                val argsStart = trimmedArgs.indexOf('{', argsIdx)
                 if (argsStart >= 0) {
                     var depth = 0
                     var argsEnd = argsStart
-                    for (i in argsStart until toolCallArgs.length) {
-                        when (toolCallArgs[i]) {
+                    for (i in argsStart until trimmedArgs.length) {
+                        when (trimmedArgs[i]) {
                             '{' -> depth++
                             '}' -> {
                                 depth--
@@ -1661,7 +2089,7 @@ class ChatViewModel @Inject constructor(
                             }
                         }
                     }
-                    val argsStr = toolCallArgs.substring(argsStart, argsEnd + 1)
+                    val argsStr = trimmedArgs.substring(argsStart, argsEnd + 1)
                     return Pair(name, JSONObject(argsStr))
                 }
             }
@@ -1669,7 +2097,40 @@ class ChatViewModel @Inject constructor(
             Log.d(TAG, "Strategy 3 (balanced braces) failed: ${e.message}")
         }
 
-        Log.e(TAG, "All JSON extraction strategies failed for: ${toolCallArgs.take(200)}")
+        // Strategy 4: Find the first balanced braces block { ... } in the text and parse as direct arguments
+        try {
+            val startIdx = trimmedArgs.indexOf('{')
+            if (startIdx >= 0) {
+                var depth = 0
+                var endIdx = startIdx
+                for (i in startIdx until trimmedArgs.length) {
+                    when (trimmedArgs[i]) {
+                        '{' -> depth++
+                        '}' -> {
+                            depth--
+                            if (depth == 0) {
+                                endIdx = i
+                                break
+                            }
+                        }
+                    }
+                }
+                if (depth == 0 && endIdx > startIdx) {
+                    val candidate = trimmedArgs.substring(startIdx, endIdx + 1)
+                    val parsedJson = JSONObject(candidate)
+                    // If it contains the envelope keys, recursively parse it
+                    if (parsedJson.has("tool_calls") || parsedJson.has("arguments")) {
+                        val nested = extractToolCallFromArgs(toolCallName, candidate)
+                        if (nested != null) return nested
+                    }
+                    return Pair(toolCallName, parsedJson)
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "Strategy 4 (fallback brace extract) failed: ${e.message}")
+        }
+
+        Log.e(TAG, "All JSON extraction strategies failed for: ${trimmedArgs.take(200)}")
         return null
     }
 
@@ -1961,11 +2422,13 @@ class ChatViewModel @Inject constructor(
 
         chatManager.createNewChat().onSuccess { newChatId ->
             _currentChatId.value = newChatId
-            val userMsg = Messages(
+            val userMsg = currentUserMessage?.let {
+                if (it.msgId.isEmpty()) it.copy(msgId = java.util.UUID.randomUUID().toString()) else it
+            } ?: Messages(
                 role = Role.User,
                 content = MessageContent(contentType = ContentType.Text, content = userPrompt),
                 modelId = currentModelId,
-                )
+            )
             chatManager.addMessage(newChatId, userMsg).onSuccess {
                 pluginResults.forEach { pluginMsg ->
                     chatManager.addMessage(newChatId, pluginMsg)
@@ -1989,6 +2452,7 @@ class ChatViewModel @Inject constructor(
                     val spokenMsgId = loadedMessages.lastOrNull { it.role == Role.Assistant }?.msgId
                     resetStreamingState()
                     viewModelScope.launch { autoSpeakIfEnabled(filteredResponse, spokenMsgId) }
+                    generateChatTitleAsync(newChatId, userPrompt, filteredResponse)
                 }.onFailure {
                     AppStateManager.setGenerationComplete()
                     resetStreamingState()
@@ -2032,12 +2496,90 @@ class ChatViewModel @Inject constructor(
                     AppStateManager.setGenerationComplete()
                     AppStateManager.chatRefreshed()
                     resetStreamingState()
+                    generateChatTitleAsync(newChatId, userPrompt, "Generated image for: $imagePrompt")
                 }
             }.onFailure { e ->
                 reportError("Failed to save chat: ${e.message}")
             }
         }.onFailure { e ->
             reportError("Failed to create chat: ${e.message}")
+        }
+    }
+
+    private fun generateChatTitleAsync(chatId: String, userPrompt: String, assistantResponse: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val providerType = ActiveModelSession.currentModelType.value ?: return@launch
+            val summaryText = "User: $userPrompt\nAssistant: ${assistantResponse.take(500)}"
+            val userMsg = "Generate a short title (5 words maximum) for this conversation:\n\n$summaryText\n\nRespond with ONLY the title text, no quotes, no punctuation, no explanation."
+            val systemMsg = "You are a title generator. Output only a short title in the same language as the conversation."
+
+            var generatedTitle = ""
+
+            try {
+                if (providerType == ProviderType.API) {
+                    val remoteCfg = getRemoteInferenceConfig() ?: return@launch
+                    val provider = LlmProviderResolver.resolveProvider(remoteCfg.endpoint, remoteCfg.model)
+                    val apiKey = LlmProviderResolver.cleanApiKey(remoteCfg.authHeader)
+                    
+                    val titlePrompt = listOf(
+                        com.bit.api.ChatMessage(
+                            text = userMsg,
+                            participant = com.bit.api.Participant.USER,
+                            status = com.bit.api.MessageStatus.SUCCESS
+                        )
+                    )
+                    
+                    val config = ProviderConfig(
+                        apiKey = apiKey,
+                        modelId = remoteCfg.model,
+                        systemPrompt = systemMsg,
+                        maxContextWindow = 1,
+                        thinkingEnabled = false,
+                        baseUrl = LlmProviderResolver.cleanBaseUrl(remoteCfg.endpoint)
+                    )
+                    
+                    val titleBuilder = StringBuilder()
+                    provider.generateResponse(titlePrompt, config).collect { event ->
+                        if (event is StreamEvent.TextChunk) {
+                            titleBuilder.append(event.text)
+                        } else if (event is StreamEvent.Error) {
+                            Log.e(TAG, "Title generation error from provider: ${event.message}")
+                        }
+                    }
+                    generatedTitle = titleBuilder.toString()
+                } else if (providerType == ProviderType.GGUF) {
+                    val messages = JSONArray().apply {
+                        put(JSONObject().put("role", "system").put("content", systemMsg))
+                        put(JSONObject().put("role", "user").put("content", userMsg))
+                    }
+                    PluginManager.clearGrammar()
+                    
+                    val textBuilder = java.lang.StringBuilder()
+                    LlmModelWorker.ggufGenerateMultiTurnStreaming(messages.toString(), maxTokens = 60).collect { event ->
+                        if (event is GenerationEvent.Token) {
+                            textBuilder.append(event.text)
+                        }
+                    }
+                    generatedTitle = textBuilder.toString()
+                    PluginManager.restoreGrammar()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to generate title: ${e.message}", e)
+                return@launch
+            }
+
+            var cleanTitle = generatedTitle.trim().replace("\n", " ").replace("\"", "")
+            if (cleanTitle.endsWith(".")) {
+                cleanTitle = cleanTitle.dropLast(1)
+            }
+            cleanTitle = cleanTitle.take(60).trim()
+
+            if (cleanTitle.isNotBlank()) {
+                chatManager.updateChatTitle(chatId, cleanTitle).onSuccess {
+                    Log.d(TAG, "Successfully generated and saved title: '$cleanTitle'")
+                    AppStateManager.chatRefreshed()
+                }
+            }
         }
     }
 
@@ -2466,7 +3008,7 @@ class ChatViewModel @Inject constructor(
 
     /**
      * Buffers incomplete UTF-8 byte sequences from streaming tokens.
-     * Some models emit tokens that split multi-byte characters (e.g. Turkish ş, emoji)
+     * Some models emit tokens that split multi byte characters (e.g. Turkish ş, emoji)
      * across multiple callbacks. This buffer holds trailing incomplete bytes until
      * the next token completes the character.
      */

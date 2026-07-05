@@ -88,6 +88,14 @@ class ModelRepositoryDataStore(private val context: Context) {
                 modelType = ModelType.TTS,
                 isEnabled = true,
                 category = ModelCategory.GENERAL
+            ),
+            HFModelRepository(
+                id = "sherpa-whisper-tiny",
+                name = "Whisper Tiny (STT)",
+                repoPath = "csukuangfj/sherpa-onnx-whisper-tiny.en",
+                modelType = ModelType.STT,
+                isEnabled = true,
+                category = ModelCategory.GENERAL
             )
         )
     }

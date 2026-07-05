@@ -202,6 +202,49 @@ private fun DiagnosticsScreen(onBack: () -> Unit) {
                 }
             }
 
+            // --- Process Isolation Test ---
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = Standards.SpacingSm, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Process Isolation Test",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    TextButton(
+                        onClick = {
+                            try {
+                                com.bit.worker.LlmModelWorker.simulateEngineCrash()
+                                Toast.makeText(context, "Crash signal sent to engine process!", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    ) {
+                        Text("Simulate Native Crash", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Standards.CardSmallCornerRadius),
+                    color = Color(0x05FFFFFF),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x0AFFFFFF))
+                ) {
+                    Text(
+                        text = "Test process isolation by simulating a native engine crash in the isolated :inference process. Tapping this kills the inference process immediately, allowing you to verify that the main application remains active and auto-recovers the loaded model.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(Standards.CardPadding)
+                    )
+                }
+            }
+
             // --- Section 3: Crash Logs ---
             item {
                 Row(

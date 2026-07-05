@@ -5,12 +5,11 @@ import android.content.Context
 import android.util.Log
 import com.bit.global.AppPaths
 import com.bit.service.AudioPlaybackManager
-import com.k2fsa.sherpa.onnx.GeneratedAudio
-import com.k2fsa.sherpa.onnx.OfflineTts
-import com.k2fsa.sherpa.onnx.OfflineTtsConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
-import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
+import com.dark.ai_sherpa.OfflineTts
+import com.dark.ai_sherpa.OfflineTtsConfig
+import com.dark.ai_sherpa.OfflineTtsModelConfig
+import com.dark.ai_sherpa.OfflineTtsVitsModelConfig
+import com.dark.ai_sherpa.GeneratedAudio
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -73,7 +72,7 @@ object TTSManager {
 
         // Clean up previous OfflineTts instance to avoid native double-destroy crash / memory leak
         try {
-            tts?.release()
+            tts?.close()
         } catch (e: Exception) {
             Log.e(TAG, "Error releasing old OfflineTts instance", e)
         }
@@ -103,57 +102,23 @@ object TTSManager {
                 return false
             }
 
-            val config = if (voicesFile != null) {
-                // Kokoro model configuration
-                Log.d(TAG, "Configuring Kokoro model with voices: ${voicesFile.name}")
-                val lexiconPaths = lexiconFiles.joinToString(",") { it.absolutePath }
-                val kokoroConfig = OfflineTtsKokoroModelConfig(
-                    model = modelFile.absolutePath,
-                    voices = voicesFile.absolutePath,
-                    tokens = tokensFile.absolutePath,
-                    dataDir = espeakDir?.absolutePath ?: "",
-                    lexicon = lexiconPaths,
-                    lang = "en",
-                    dictDir = dictDir?.absolutePath ?: "",
-                    lengthScale = 1.0f
-                )
-                val modelConfig = OfflineTtsModelConfig(
-                    vits = OfflineTtsVitsModelConfig(), // empty VITS config
-                    kokoro = kokoroConfig,
-                    numThreads = 2,
-                    debug = false
-                )
-                OfflineTtsConfig(
-                    model = modelConfig,
-                    ruleFsts = ""
-                )
-            } else {
-                // VITS / Piper model configuration
-                Log.d(TAG, "Configuring VITS/Piper model: ${modelFile.name}")
-                val vitsConfig = OfflineTtsVitsModelConfig(
-                    model = modelFile.absolutePath,
-                    lexicon = lexiconFiles.firstOrNull { it.name == "lexicon.txt" }?.absolutePath 
-                        ?: lexiconFiles.firstOrNull()?.absolutePath ?: "",
-                    tokens = tokensFile.absolutePath,
-                    dataDir = espeakDir?.absolutePath ?: "",
-                    dictDir = "",
-                    noiseScale = 0.667f,
-                    noiseScaleW = 0.8f,
-                    lengthScale = 1.0f
-                )
-                val modelConfig = OfflineTtsModelConfig(
-                    vits = vitsConfig,
-                    numThreads = 2,
-                    debug = false
-                )
-                OfflineTtsConfig(
-                    model = modelConfig,
-                    ruleFsts = ""
-                )
-            }
+            val lexiconPath = lexiconFiles.firstOrNull { it.name == "lexicon.txt" }?.absolutePath 
+                ?: lexiconFiles.firstOrNull()?.absolutePath ?: ""
 
-            tts = OfflineTts(null, config)
-            val numSpeakers = tts?.numSpeakers() ?: 1
+            val config = OfflineTtsConfig(
+                model = OfflineTtsModelConfig(
+                    vits = OfflineTtsVitsModelConfig(
+                        model = modelFile.absolutePath,
+                        lexicon = lexiconPath,
+                        tokens = tokensFile.absolutePath,
+                        dataDir = espeakDir?.absolutePath ?: ""
+                    ),
+                    numThreads = 2
+                )
+            )
+
+            tts = OfflineTts.fromFile(config)
+            val numSpeakers = tts?.numSpeakers ?: 1
             _availableVoices.value = (0 until numSpeakers).map { it.toString() }
             _isModelLoaded.value = true
             Log.d(TAG, "TTS model loaded from $modelDir with $numSpeakers speakers")
@@ -166,6 +131,22 @@ object TTSManager {
     }
 
     fun isLoaded(): Boolean = _isModelLoaded.value
+
+    private val CODE_FENCE = Regex("```[\\s\\S]*?```")
+    private val INLINE_CODE = Regex("`[^`]*`")
+    private val EMPHASIS = Regex("[*_]{1,3}")
+    private val LINK = Regex("\\[([^]]+)]\\([^)]+\\)")
+    private val HEADER = Regex("(?m)^#+\\s*")
+    private val WHITESPACE = Regex("\\s+")
+
+    private fun sanitize(text: String): String {
+        val noCode = text.replace(CODE_FENCE, " ")
+        val noInlineCode = noCode.replace(INLINE_CODE, " ")
+        val noEmphasis = noInlineCode.replace(EMPHASIS, "")
+        val noLinks = noEmphasis.replace(LINK) { it.groupValues[1] }
+        val noHeaders = noLinks.replace(HEADER, "")
+        return noHeaders.replace(WHITESPACE, " ").trim()
+    }
 
     private data class PlaybackChunk(val pcm: ByteArray, val sampleRate: Int)
 
@@ -183,9 +164,11 @@ object TTSManager {
         _isSynthesizing.value = true
         _synthProgress.value = 0f
 
+        val cleaned = sanitize(text)
+
         // Chunk text at sentence boundaries (./?!/…/;/\n)
         val regex = Regex("(?<=[.?!\\n…;])\\s*|(?<=/)\\s*")
-        val sentences = text.split(regex).map { it.trim() }.filter { it.isNotEmpty() }
+        val sentences = cleaned.split(regex).map { it.trim() }.filter { it.isNotEmpty() }
 
         if (sentences.isEmpty()) {
             _isPlaying.value = false
@@ -201,7 +184,7 @@ object TTSManager {
             // Producer: Synthesize chunks sequentially on Dispatchers.IO
             val producer = launch(Dispatchers.IO) {
                 try {
-                    val numSpeakers = currentTts.numSpeakers()
+                    val numSpeakers = currentTts.numSpeakers
                     val sid = (settings.voice.toIntOrNull() ?: 0).coerceIn(0, (numSpeakers - 1).coerceAtLeast(0))
                     val speed = settings.speed.coerceIn(0.5f, 2.0f)
                     

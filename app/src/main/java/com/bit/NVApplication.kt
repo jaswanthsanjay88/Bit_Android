@@ -5,11 +5,7 @@ import android.util.Log
 import com.bit.data.AppSettingsDataStore
 import com.bit.data.VaultManager
 import com.bit.di.AppContainer
-import com.bit.plugins.CalculatorPlugin
-import com.bit.plugins.DateTimePlugin
-import com.bit.plugins.DevUtilsPlugin
 import com.bit.plugins.FileManagerPlugin
-import com.bit.plugins.NotePadPlugin
 import com.bit.plugins.PluginManager
 import com.bit.plugins.SystemInfoPlugin
 import com.bit.plugins.WebSearchPlugin
@@ -49,18 +45,22 @@ class NVApplication : Application() {
         AppContainer.init(applicationContext, this)
 
         // Register plugins
-        PluginManager.registerPlugin(WebSearchPlugin())
-        PluginManager.registerPlugin(CalculatorPlugin())
-        PluginManager.registerPlugin(DateTimePlugin())
-        PluginManager.registerPlugin(DevUtilsPlugin())
+        PluginManager.registerPlugin(WebSearchPlugin(applicationContext))
         PluginManager.registerPlugin(FileManagerPlugin(applicationContext))
-        PluginManager.registerPlugin(NotePadPlugin())
         PluginManager.registerPlugin(SystemInfoPlugin(applicationContext))
         Log.d(TAG, "Plugins registered: ${PluginManager.registeredPlugins.value.size} plugins")
 
         // Initialize TTS Manager without auto-loading (loading controlled by settings)
         TTSManager.init(applicationContext, autoLoad = false)
         Log.d(TAG, "TTSManager initialized")
+
+        // Start Local OpenAI API Server (Main process only to prevent EADDRINUSE conflict with :inference)
+        if (isMainProcess()) {
+            com.bit.service.LocalApiServer.start()
+            Log.d(TAG, "LocalApiServer started")
+        } else {
+            Log.d(TAG, "Skipping LocalApiServer startup in background process")
+        }
 
         // Run data integrity check after UMS is ready (deferred to let UI render first)
         appScope.launch {
@@ -111,5 +111,16 @@ class NVApplication : Application() {
         }
 
         // Note: Service binding moved to MainActivity to comply with Android 14+ foreground service restrictions
+    }
+
+    private fun isMainProcess(): Boolean {
+        val processName = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            android.app.Application.getProcessName()
+        } else {
+            val pid = android.os.Process.myPid()
+            val am = getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            am?.runningAppProcesses?.firstOrNull { it.pid == pid }?.processName
+        }
+        return processName == packageName
     }
 }

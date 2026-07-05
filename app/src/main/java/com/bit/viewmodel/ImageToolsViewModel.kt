@@ -78,21 +78,21 @@ class ImageToolsViewModel @Inject constructor(
             displayName = "LaMa Inpainter",
             fileName = "lama_dilated.mnn",
             sizeMB = 93,
-            downloadUrl = "" // Requires ONNX→MNN conversion; not yet hosted
+            downloadUrl = "https://huggingface.co/jaswanthsanjay88/BIT/resolve/main/models/lama_dilated.mnn"
         ),
         ImageTool.DEPTH to ToolModelSpec(
             id = "midas_small.mnn",
             displayName = "MiDaS Depth",
             fileName = "midas_small.mnn",
             sizeMB = 66,
-            downloadUrl = "" // Requires ONNX→MNN conversion; not yet hosted
+            downloadUrl = "https://huggingface.co/jaswanthsanjay88/BIT/resolve/main/models/midas_small.mnn"
         ),
         ImageTool.STYLE_TRANSFER to ToolModelSpec(
             id = "style_transfer.mnn",
             displayName = "Style Transfer",
             fileName = "style_transfer.mnn",
             sizeMB = 7,
-            downloadUrl = "" // Requires ONNX→MNN conversion; not yet hosted
+            downloadUrl = "https://huggingface.co/jaswanthsanjay88/BIT/resolve/main/models/style_transfer.mnn"
         )
     )
 
@@ -127,6 +127,9 @@ class ImageToolsViewModel @Inject constructor(
     private val _toolModelReady = MutableStateFlow<Map<ImageTool, Boolean>>(emptyMap())
     val toolModelReady: StateFlow<Map<ImageTool, Boolean>> = _toolModelReady.asStateFlow()
 
+    private val _maskImage = MutableStateFlow<Bitmap?>(null)
+    val maskImage: StateFlow<Bitmap?> = _maskImage.asStateFlow()
+
     private var diffusionEngine: DiffusionEngine? = null
     private var loadedTools = mutableSetOf<ImageTool>()
 
@@ -139,6 +142,7 @@ class ImageToolsViewModel @Inject constructor(
     fun selectTool(tool: ImageTool) {
         _selectedTool.value = tool
         _resultImage.value = null
+        _maskImage.value = null
         _processingState.value = ProcessingState.Idle
     }
 
@@ -156,6 +160,7 @@ class ImageToolsViewModel @Inject constructor(
             }
             _inputImage.value = bitmap
             _resultImage.value = null
+            _maskImage.value = null
             _processingState.value = ProcessingState.Idle
         }
     }
@@ -184,7 +189,16 @@ class ImageToolsViewModel @Inject constructor(
         _inputImage.value = null
         _styleImage.value = null
         _resultImage.value = null
+        _maskImage.value = null
         _processingState.value = ProcessingState.Idle
+    }
+
+    fun setMaskImage(bitmap: Bitmap?) {
+        _maskImage.value = bitmap
+    }
+
+    fun clearMask() {
+        _maskImage.value = null
     }
 
     fun process() {
@@ -214,8 +228,13 @@ class ImageToolsViewModel @Inject constructor(
                             observeDepth(engine, startTime)
                         }
                         ImageTool.LAMA_INPAINT -> {
-                            // TODO: mask drawing UI — for now show error
-                            _processingState.value = ProcessingState.Error("Draw a mask on the image first")
+                            val mask = _maskImage.value
+                            if (mask == null) {
+                                _processingState.value = ProcessingState.Error("Draw a mask on the image first")
+                                return@withContext
+                            }
+                            engine.lamaInpaint(input, mask)
+                            observeLama(engine, startTime)
                         }
                         ImageTool.SEGMENTER -> {
                             engine.segmenterEncodeImage(input)
@@ -425,6 +444,24 @@ class ImageToolsViewModel @Inject constructor(
                     return@collect
                 }
                 is StyleState.Error -> {
+                    _processingState.value = ProcessingState.Error(state.message)
+                    return@collect
+                }
+                else -> {}
+            }
+        }
+    }
+
+    private suspend fun observeLama(engine: DiffusionEngine, startTime: Long) {
+        engine.lamaState.collect { state ->
+            when (state) {
+                is LamaState.Complete -> {
+                    val elapsed = (System.currentTimeMillis() - startTime).toInt()
+                    _resultImage.value = state.bitmap
+                    _processingState.value = ProcessingState.Complete(elapsed)
+                    return@collect
+                }
+                is LamaState.Error -> {
                     _processingState.value = ProcessingState.Error(state.message)
                     return@collect
                 }

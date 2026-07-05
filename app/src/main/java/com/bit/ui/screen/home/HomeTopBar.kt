@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -33,36 +34,40 @@ import com.bit.global.Standards
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.AnimatedTitle
 import com.bit.ui.icons.TnIcons
-import com.bit.ui.theme.Glass
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.layout.height
-import androidx.compose.material3.VerticalDivider
+import dev.chrisbanes.haze.HazeState
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 
 // ── TopBar ──────────────────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 internal fun TopBar(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onMenuClick: () -> Unit,
     onSettingsClick: () -> Unit,
     showDynamicWindow: () -> Unit,
-    onStoreButtonClicked: () -> Unit,
-    liquidState: LiquidState? = null
+    onStoreButtonClicked: (String?) -> Unit,
+    liquidState: LiquidState? = null,
+    hazeState: HazeState? = null
 ) {
-    val context = LocalContext.current
-
     CenterAlignedTopAppBar(
-        modifier = Modifier.then(if (liquidState != null) Modifier.liquid(liquidState) else Modifier),
+        modifier = Modifier
+            .then(if (liquidState != null) Modifier.liquid(liquidState) else Modifier),
         title = {
             AnimatedTitle(
+                sharedTransitionScope = sharedTransitionScope,
+                animatedVisibilityScope = animatedVisibilityScope,
                 modifier = Modifier,
                 onShowDynamicWindow = { showDynamicWindow() }
             )
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent,
+            containerColor = androidx.compose.ui.graphics.Color.Transparent,
             titleContentColor = MaterialTheme.colorScheme.onSurface
         ),
         navigationIcon = {
@@ -73,77 +78,11 @@ internal fun TopBar(
                 modifier = Modifier.padding(start = 6.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = Glass.Surface,
-                    contentColor = Glass.TextPrimary
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
         },
-        actions = {
-            Row(
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0x1CFFFFFF), RoundedCornerShape(16.dp)) // 11% white glass
-                    .border(0.8.dp, Color(0x15FFFFFF), RoundedCornerShape(16.dp))
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                // Action 1: Model Store (Download)
-                ActionButton(
-                    onClickListener = { onStoreButtonClicked() },
-                    icon = TnIcons.Download,
-                    contentDescription = "Open model store",
-                    modifier = Modifier.size(36.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = Glass.TextPrimary
-                    )
-                )
-
-                // Vertical Divider between actions
-                VerticalDivider(
-                    modifier = Modifier.height(16.dp),
-                    thickness = 0.8.dp,
-                    color = Color(0x22FFFFFF)
-                )
-
-                // Action 2: Model Picker (Upload)
-                ActionButton(
-                    onClickListener = {
-                        context.startActivity(Intent(context, ModelPickerActivity::class.java))
-                    },
-                    icon = TnIcons.Upload,
-                    contentDescription = "Open local model picker",
-                    modifier = Modifier.size(36.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = Glass.TextPrimary
-                    )
-                )
-
-                // Vertical Divider between actions
-                VerticalDivider(
-                    modifier = Modifier.height(16.dp),
-                    thickness = 0.8.dp,
-                    color = Color(0x22FFFFFF)
-                )
-
-                // Action 3: Settings
-                ActionButton(
-                    onClickListener = onSettingsClick,
-                    icon = TnIcons.Settings,
-                    contentDescription = "Open settings",
-                    modifier = Modifier.size(36.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = Glass.TextPrimary
-                    )
-                )
-            }
-        }
+        actions = {}
     )
 }

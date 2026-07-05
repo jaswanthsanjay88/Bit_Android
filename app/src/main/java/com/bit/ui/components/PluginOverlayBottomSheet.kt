@@ -44,6 +44,8 @@ import com.dark.gguf_lib.toolcalling.ToolCallingConfig
 import kotlin.math.roundToInt
 import com.bit.ui.icons.TnIcons
 import com.bit.global.Standards
+import com.bit.ui.theme.BitColors
+import com.bit.ui.theme.glassEdge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,7 +68,7 @@ fun PluginOverlayBottomSheet(
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = BitColors.Surface.copy(alpha = 0.92f),
             dragHandle = {
                 Box(
                     Modifier
@@ -82,6 +84,7 @@ fun PluginOverlayBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 600.dp)
+                    .glassEdge(28.dp)
                     .padding(bottom = Standards.SpacingLg)
             ) {
                 // ── Header ──

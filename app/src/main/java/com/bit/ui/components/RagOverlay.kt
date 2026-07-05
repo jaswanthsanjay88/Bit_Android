@@ -58,6 +58,8 @@ import com.bit.models.table_schema.RagSourceType
 import com.bit.models.table_schema.RagStatus
 import com.bit.ui.icons.TnIcons
 import com.bit.global.Standards
+import com.bit.ui.theme.BitColors
+import com.bit.ui.theme.glassEdge
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -83,7 +85,7 @@ fun RagOverlayBottomSheet(
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = BitColors.Surface.copy(alpha = 0.92f),
             dragHandle = {
                 Box(
                     Modifier
@@ -99,6 +101,7 @@ fun RagOverlayBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 500.dp)
+                    .glassEdge(28.dp)
                     .padding(bottom = Standards.SpacingLg)
             ) {
                 // Header

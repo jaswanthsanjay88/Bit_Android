@@ -96,4 +96,5 @@ interface ILLMService {
     void stopDiffusionBackend();
     String getDiffusionBackendState();
     String getCurrentDiffusionModel();
+    void simulateProcessCrash();
 }

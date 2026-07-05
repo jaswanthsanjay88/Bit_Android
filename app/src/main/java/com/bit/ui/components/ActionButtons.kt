@@ -52,6 +52,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -76,10 +78,16 @@ fun ActionButton(
     colors: IconButtonColors = IconButtonDefaults.filledIconButtonColors(
         containerColor = MaterialTheme.colorScheme.primary.copy(0.06f),
         contentColor = MaterialTheme.colorScheme.primary
-    )
+    ),
+    enabled: Boolean = true
 ) {
+    val haptic = LocalHapticFeedback.current
     FilledIconButton(
-        onClick = { onClickListener() },
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClickListener()
+        },
+        enabled = enabled,
         colors = colors,
         shape = shape,
         modifier = modifier.size(Standards.ActionIconSize)
@@ -106,6 +114,7 @@ fun ActionProgressButton(
         contentColor = MaterialTheme.colorScheme.primary
     )
 ) {
+    val haptic = LocalHapticFeedback.current
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -120,7 +129,10 @@ fun ActionProgressButton(
 
         // Icon button in center
         FilledIconButton(
-            onClick = { onClickListener() },
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClickListener()
+            },
             colors = colors,
             shape = shape,
             modifier = Modifier.size(Standards.ActionIconSize - 8.dp)
@@ -147,10 +159,16 @@ fun ActionButton(
     colors: IconButtonColors = IconButtonDefaults.filledIconButtonColors(
         containerColor = MaterialTheme.colorScheme.primary.copy(0.06f),
         contentColor = MaterialTheme.colorScheme.primary
-    )
+    ),
+    enabled: Boolean = true
 ) {
+    val haptic = LocalHapticFeedback.current
     FilledIconButton(
-        onClick = { onClickListener() },
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClickListener()
+        },
+        enabled = enabled,
         colors = colors,
         shape = shape,
         modifier = modifier.size(Standards.ActionIconSize)
@@ -175,6 +193,7 @@ fun MultiActionButton(
     contentColor: Color = MaterialTheme.colorScheme.primary,
     dividerColor: Color = MaterialTheme.colorScheme.outline.copy(0.3f)
 ) {
+    val haptic = LocalHapticFeedback.current
     Surface(
         shape = shape,
         color = containerColor,
@@ -190,7 +209,10 @@ fun MultiActionButton(
                     modifier = Modifier
                         .size(Standards.ActionIconSize)
                         .then(
-                            if (action.enabled) Modifier.clickable { action.onClick() }
+                            if (action.enabled) Modifier.clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                action.onClick()
+                            }
                             else Modifier
                         )
                 ) {
@@ -248,8 +270,12 @@ fun ActionTextButton(
     ),
     shape: Shape = RoundedCornerShape(Standards.RadiusSm)
 ) {
+    val haptic = LocalHapticFeedback.current
     FilledTonalButton(
-        onClick = onClickListener,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClickListener()
+        },
         shape = shape,
         colors = colors,
         modifier = modifier.height(Standards.ActionIconSize),
@@ -277,8 +303,12 @@ fun ActionTextButton(
     shape: Shape = RoundedCornerShape(Standards.RadiusSm),
     enabled: Boolean = true
 ) {
+    val haptic = LocalHapticFeedback.current
     FilledTonalButton(
-        onClick = onClickListener,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClickListener()
+        },
         shape = shape,
         colors = colors,
         modifier = modifier.height(Standards.ActionIconSize),
@@ -308,9 +338,13 @@ fun ActionToggleButton(
         checkedContentColor = MaterialTheme.colorScheme.onPrimary
     )
 ) {
+    val haptic = LocalHapticFeedback.current
     FilledIconToggleButton(
         checked = checked,
-        onCheckedChange = onCheckedChange,
+        onCheckedChange = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onCheckedChange(it)
+        },
         enabled = enabled,
         colors = colors,
         shape = shape,
@@ -340,9 +374,13 @@ fun ActionToggleButton(
         checkedContentColor = MaterialTheme.colorScheme.onPrimary
     )
 ) {
+    val haptic = LocalHapticFeedback.current
     FilledIconToggleButton(
         checked = checked,
-        onCheckedChange = onCheckedChange,
+        onCheckedChange = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onCheckedChange(it)
+        },
         enabled = enabled,
         colors = colors,
         shape = shape,
@@ -375,6 +413,7 @@ fun ActionSwitch(
     thumbSize: Dp = 22.dp,
     shape: Shape = RoundedCornerShape(Standards.RadiusMd)
 ) {
+    val haptic = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
 
     val trackColor by animateColorAsState(
@@ -420,7 +459,10 @@ fun ActionSwitch(
                 indication = null,
                 enabled = enabled,
                 role = Role.Switch,
-                onClick = { onCheckedChange(!checked) }
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onCheckedChange(!checked)
+                }
             ),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -454,6 +496,7 @@ fun <T> ActionToggleGroup(
 ) {
     if (items.isEmpty()) return
 
+    val haptic = LocalHapticFeedback.current
     val selectedIndex = items.indexOf(selectedItem).coerceAtLeast(0)
     val density = LocalDensity.current
     val containerWidth = remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -522,7 +565,10 @@ fun <T> ActionToggleGroup(
                                 enabled = enabled,
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                                onClick = { onItemSelected(item) }
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onItemSelected(item)
+                                }
                             ),
                         contentAlignment = Alignment.Center
                     ) {

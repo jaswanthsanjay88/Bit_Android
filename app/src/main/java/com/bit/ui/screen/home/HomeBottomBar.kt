@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -49,8 +52,29 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.net.Uri
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import com.bit.activity.RagActivity
 import com.bit.global.Standards
 import com.bit.models.ModelType
@@ -77,7 +101,9 @@ import com.bit.viewmodel.PluginViewModel
 import com.bit.viewmodel.RagViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 // ── BottomBar ───────────────────────────────────────────────────────────────────
 
@@ -91,10 +117,22 @@ internal fun BottomBar(
     memoryViewModel: MemoryViewModel = hiltViewModel(),
     toolCallingEnabled: Boolean = true,
     onModelSelectedNavigate: (Model) -> Unit = {},
-    liquidState: LiquidState? = null
+    liquidState: LiquidState? = null,
+    hazeState: HazeState? = null
 ) {
     val context = LocalContext.current
     var value by remember { mutableStateOf("") }
+    val isSttRecording by chatViewModel.isSttRecording.collectAsStateWithLifecycle()
+    val isSttTranscribing by chatViewModel.isSttTranscribing.collectAsStateWithLifecycle()
+    val sttAmplitude by chatViewModel.sttAmplitude.collectAsStateWithLifecycle()
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            chatViewModel.startSttRecording()
+        }
+    }
     val installedModels by llmModelViewModel.installedModels.collectAsStateWithLifecycle(emptyList())
     val currentModelID by llmModelViewModel.currentModelID.collectAsStateWithLifecycle()
     val chatState by chatViewModel.chatUiState.collectAsStateWithLifecycle()
@@ -102,7 +140,30 @@ internal fun BottomBar(
     val promptEditState by chatViewModel.promptEditState.collectAsStateWithLifecycle()
     val isTextModelLoaded by chatViewModel.isTextModelLoaded.collectAsStateWithLifecycle()
     val isImageModelLoaded by chatViewModel.isImageModelLoaded.collectAsStateWithLifecycle()
+    val isVlmLoaded by chatViewModel.isVlmLoaded.collectAsStateWithLifecycle()
     val huggingFaceToken by chatViewModel.huggingFaceToken.collectAsStateWithLifecycle()
+
+    var isPlusExpanded by remember { mutableStateOf(false) }
+    var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var attachedFiles by remember { mutableStateOf<List<Uri>>(emptyList()) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            attachedImages = attachedImages + it
+            isPlusExpanded = false
+        }
+    }
+
+    val fileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            attachedFiles = attachedFiles + it
+            isPlusExpanded = false
+        }
+    }
 
     // RAG State
     val loadedRags by ragViewModel.loadedRags.collectAsStateWithLifecycle()
@@ -244,18 +305,18 @@ internal fun BottomBar(
                     .padding(top = Standards.SpacingSm, bottom = Standards.SpacingMd)
             ) {
 
-                // ── Feature Toggle Chips — always visible, horizontally scrollable ──
+                // ── Centered Feature Toggle Chips (Icon Only, No Scroll) ──
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
                         .padding(bottom = Standards.SpacingSm),
-                    horizontalArrangement = Arrangement.spacedBy(Standards.ChipSpacing)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Web Search chip
                     if (toolCallingEnabled) {
                         GlassChip(
-                            text = "Web",
+                            text = "",
                             icon = TnIcons.World,
                             isActive = isWebSearchEnabled,
                             activeColor = Glass.AccentSecondary,
@@ -265,7 +326,7 @@ internal fun BottomBar(
 
                     // RAG chip
                     GlassChip(
-                        text = if (loadedRags.isNotEmpty()) "${loadedRags.size} RAG" else "RAG",
+                        text = "",
                         icon = TnIcons.Database,
                         isActive = isRagEnabledForChat && loadedRags.isNotEmpty(),
                         activeColor = Glass.AccentTertiary,
@@ -282,7 +343,7 @@ internal fun BottomBar(
                     if (toolCallingEnabled && nonWebSearchPlugins.isNotEmpty()) {
                         val activePluginCount = enabledPluginNames.count { it != "Web Search" }
                         GlassChip(
-                            text = if (activePluginCount > 0) "$activePluginCount Plugins" else "Plugins",
+                            text = "",
                             icon = TnIcons.Wrench,
                             isActive = activePluginCount > 0,
                             activeColor = Glass.AccentPrimary,
@@ -292,7 +353,7 @@ internal fun BottomBar(
 
                     // Memory chip
                     GlassChip(
-                        text = "Memory",
+                        text = "",
                         icon = TnIcons.Brain,
                         isActive = isMemoryEnabled,
                         activeColor = Glass.AccentWarm,
@@ -302,7 +363,7 @@ internal fun BottomBar(
                     // Thinking mode chip
                     if (isTextModelLoaded) {
                         GlassChip(
-                            text = "Thinking",
+                            text = "",
                             icon = TnIcons.BulbFilled,
                             isActive = chatState.thinkingEnabled,
                             activeColor = Glass.AccentWarm,
@@ -363,23 +424,89 @@ internal fun BottomBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
                 ) {
-                    // Left circular '+' button (for model selector toggle)
-                    ActionButton(
-                        onClickListener = {
-                            if (config.showModelList) {
-                                chatViewModel.hideModelList()
-                            } else {
-                                chatViewModel.showModelList()
-                            }
-                        },
-                        icon = TnIcons.Plus,
-                        contentDescription = "Select Models",
-                        modifier = Modifier.size(44.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = Color(0x22FFFFFF), // 13% transparent white circle
-                            contentColor = Glass.AccentPrimary
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                    ) {
+                        ActionButton(
+                            onClickListener = {
+                                if (isVlmLoaded) {
+                                    isPlusExpanded = !isPlusExpanded
+                                } else {
+                                    if (config.showModelList) {
+                                        chatViewModel.hideModelList()
+                                    } else {
+                                        chatViewModel.showModelList()
+                                    }
+                                }
+                            },
+                            icon = if (isVlmLoaded && isPlusExpanded) TnIcons.X else TnIcons.Plus,
+                            contentDescription = "Expand Options",
+                            modifier = Modifier.size(44.dp),
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = Color(0x22FFFFFF), // 13% transparent white circle
+                                contentColor = Glass.AccentPrimary
+                            )
                         )
-                    )
+
+                        AnimatedVisibility(
+                            visible = isVlmLoaded && isPlusExpanded,
+                            enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
+                            exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut()
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // 1. Models
+                                ActionButton(
+                                    onClickListener = {
+                                        isPlusExpanded = false
+                                        if (config.showModelList) {
+                                            chatViewModel.hideModelList()
+                                        } else {
+                                            chatViewModel.showModelList()
+                                        }
+                                    },
+                                    icon = TnIcons.BrainCircuit,
+                                    contentDescription = "Select Models",
+                                    modifier = Modifier.size(40.dp),
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = Color(0x1AFFFFFF),
+                                        contentColor = Glass.TextPrimary
+                                    )
+                                )
+
+                                // 2. Gallery
+                                ActionButton(
+                                    onClickListener = {
+                                        galleryLauncher.launch("image/*")
+                                    },
+                                    icon = TnIcons.Photo,
+                                    contentDescription = "Gallery",
+                                    modifier = Modifier.size(40.dp),
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = Color(0x1AFFFFFF),
+                                        contentColor = Glass.TextPrimary
+                                    )
+                                )
+
+                                // 3. Files
+                                ActionButton(
+                                    onClickListener = {
+                                        fileLauncher.launch("*/*")
+                                    },
+                                    icon = TnIcons.Folder,
+                                    contentDescription = "Files",
+                                    modifier = Modifier.size(40.dp),
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = Color(0x1AFFFFFF),
+                                        contentColor = Glass.TextPrimary
+                                    )
+                                )
+                            }
+                        }
+                    }
 
                     // Capsule Input Bar
                     Row(
@@ -393,57 +520,241 @@ internal fun BottomBar(
                             .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        OutlinedTextField(
-                            value = value,
-                            onValueChange = { value = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 38.dp, max = 150.dp)
-                                .padding(horizontal = 4.dp),
-                            placeholder = {
-                                Text(
-                                    text = if (promptEditState != null) {
-                                        "Edit your prompt…"
-                                    } else {
-                                        "Ask me anything" // Sleek minimal placeholder
-                                    },
-                                    color = Glass.TextMuted
+                        if (isSttRecording || isSttTranscribing) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // 1. Cancel button (monochrome white-on-transparent)
+                                ActionButton(
+                                    onClickListener = { chatViewModel.cancelSttRecording() },
+                                    icon = TnIcons.X,
+                                    contentDescription = "Cancel recording",
+                                    modifier = Modifier.size(32.dp),
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = Color(0x1AFFFFFF),
+                                        contentColor = Color.White
+                                    )
                                 )
-                            },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent,
-                                cursorColor = Glass.AccentPrimary,
-                                focusedTextColor = Glass.TextPrimary,
-                                unfocusedTextColor = Glass.TextPrimary
-                            ),
-                            singleLine = false,
-                            maxLines = 5
-                        )
 
-                        // Waveform Mode or Send circular button
-                        if (chatState.isGenerating) {
-                            // Generating stop button - White circle with Black stop square
-                            ActionButton(
-                                onClickListener = { chatViewModel.stop() },
-                                icon = TnIcons.PlayerStop,
-                                contentDescription = "Stop generation",
-                                modifier = Modifier.size(36.dp),
-                                colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color.Black
-                                )
-                            )
-                        } else {
-                            val hasText = value.isNotBlank()
-                            if (hasText) {
-                                // Has text: White circle with Black Up Arrow (matches ChatGPT screenshot!)
+                                // 2. Waveform & Text or Transcribing...
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+                                ) {
+                                    if (isSttTranscribing) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "Transcribing…",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                            color = Color.White,
+                                            maxLines = 1
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "Listening",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                            color = Color.White,
+                                            maxLines = 1
+                                        )
+                                        
+                                        EqualizerBars(
+                                            amplitude = sttAmplitude,
+                                            modifier = Modifier.weight(1f).height(24.dp),
+                                            activeColor = Color.White
+                                        )
+                                    }
+                                }
+
+                                // 3. Done/Stop button (monochrome black-on-white)
                                 ActionButton(
                                     onClickListener = {
-                                        if (value.isNotBlank()) {
+                                        chatViewModel.stopSttRecording { transcribedText ->
+                                            value = (value + " " + transcribedText).trim()
+                                        }
+                                    },
+                                    icon = TnIcons.Check,
+                                    contentDescription = "Stop and transcribe",
+                                    modifier = Modifier.size(32.dp),
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color.Black
+                                    ),
+                                    enabled = !isSttTranscribing
+                                )
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                if (attachedImages.isNotEmpty() || attachedFiles.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState())
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        attachedImages.forEach { uri ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(60.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(Color(0x33FFFFFF))
+                                            ) {
+                                                val resolver = context.contentResolver
+                                                val bitmap = remember(uri) {
+                                                    try {
+                                                        resolver.openInputStream(uri)?.use { stream ->
+                                                            android.graphics.BitmapFactory.decodeStream(stream)
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        null
+                                                    }
+                                                }
+                                                bitmap?.let {
+                                                    Image(
+                                                        bitmap = it.asImageBitmap(),
+                                                        contentDescription = "Image preview",
+                                                        modifier = Modifier.fillMaxSize(),
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(2.dp)
+                                                        .size(16.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0x99000000))
+                                                        .clickable {
+                                                            attachedImages = attachedImages - uri
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Icon(
+                                                        imageVector = TnIcons.X,
+                                                        contentDescription = "Remove",
+                                                        modifier = Modifier.size(10.dp),
+                                                        tint = Color.White
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        attachedFiles.forEach { uri ->
+                                            val fileName = remember(uri) {
+                                                var name: String? = null
+                                                if (uri.scheme == "content") {
+                                                    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                                                        if (cursor.moveToFirst()) {
+                                                            val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                                            if (index != -1) name = cursor.getString(index)
+                                                        }
+                                                    }
+                                                }
+                                                name ?: uri.lastPathSegment ?: "File"
+                                            }
+
+                                            Row(
+                                                modifier = Modifier
+                                                    .height(40.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .background(Color(0x22FFFFFF))
+                                                    .border(0.5.dp, Color(0x44FFFFFF), RoundedCornerShape(8.dp))
+                                                    .padding(horizontal = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = TnIcons.FileText,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = Glass.AccentSecondary
+                                                )
+                                                Text(
+                                                    text = fileName,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = Glass.TextPrimary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.widthIn(max = 100.dp)
+                                                )
+                                                Icon(
+                                                    imageVector = TnIcons.X,
+                                                    contentDescription = "Remove",
+                                                    modifier = Modifier
+                                                        .size(14.dp)
+                                                        .clickable {
+                                                            attachedFiles = attachedFiles - uri
+                                                        },
+                                                    tint = Glass.TextSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                OutlinedTextField(
+                                    value = value,
+                                    onValueChange = { value = it },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 38.dp, max = 150.dp)
+                                        .padding(horizontal = 4.dp),
+                                    placeholder = {
+                                        Text(
+                                            text = if (promptEditState != null) {
+                                                "Edit your prompt…"
+                                            } else {
+                                                "Ask me anything" // Sleek minimal placeholder
+                                            },
+                                            color = Glass.TextMuted
+                                        )
+                                    },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                        disabledContainerColor = Color.Transparent,
+                                        focusedBorderColor = Color.Transparent,
+                                        unfocusedBorderColor = Color.Transparent,
+                                        cursorColor = Glass.AccentPrimary,
+                                        focusedTextColor = Glass.TextPrimary,
+                                        unfocusedTextColor = Glass.TextPrimary
+                                    ),
+                                    singleLine = false,
+                                    maxLines = 5
+                                )
+                            }
+
+                            // Waveform Mode or Send circular button
+                            if (chatState.isGenerating) {
+                                // Generating stop button - White circle with Black stop square
+                                ActionButton(
+                                    onClickListener = { chatViewModel.stop() },
+                                    icon = TnIcons.PlayerStop,
+                                    contentDescription = "Stop generation",
+                                    modifier = Modifier.size(36.dp),
+                                    colors = IconButtonDefaults.filledIconButtonColors(
+                                        containerColor = Color.White,
+                                        contentColor = Color.Black
+                                    )
+                                )
+                            } else {
+                                val canSend = value.isNotBlank() || attachedImages.isNotEmpty() || attachedFiles.isNotEmpty()
+                                if (canSend) {
+                                    // Has text or attachments: White circle with Black Up Arrow (matches ChatGPT screenshot!)
+                                    ActionButton(
+                                        onClickListener = {
                                             val trimmedValue = value.trim()
                                             // Auto-detect image requests
                                             val isImageTrigger = trimmedValue.startsWith("/image", ignoreCase = true) ||
@@ -465,46 +776,162 @@ internal fun BottomBar(
                                                 chatViewModel.sendImageRequest(cleanPrompt)
                                                 value = ""
                                             } else {
-                                                if (promptEditState != null) {
-                                                    chatViewModel.applyPromptEdit(value)
-                                                    value = ""
-                                                    return@ActionButton
-                                                }
+                                                // Process file attachments (text)
+                                                val fileTextContent = attachedFiles.mapNotNull { uri ->
+                                                    try {
+                                                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                                                            stream.bufferedReader().use { it.readText() }
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        null
+                                                    }
+                                                }.joinToString("\n\n")
 
-                                                val hasRags = loadedRags.isNotEmpty() && isRagEnabledForChat
-
-                                                if (hasRags) {
-                                                    val userQuery = value
-                                                    value = ""
-                                                    scope.launch {
-                                                        val ragContext = ragViewModel.queryAndStoreResults(userQuery)
-                                                        chatViewModel.setRagContext(
-                                                            ragContext.ifBlank { null },
-                                                            ragViewModel.lastRagResults.value
-                                                        )
-                                                        chatViewModel.sendTextMessage(userQuery)
+                                                val finalPrompt = if (fileTextContent.isNotEmpty()) {
+                                                    if (trimmedValue.isNotEmpty()) {
+                                                        "$trimmedValue\n\n[Attached File Content]:\n$fileTextContent"
+                                                    } else {
+                                                        "[Attached File Content]:\n$fileTextContent"
                                                     }
                                                 } else {
+                                                    trimmedValue
+                                                }
+
+                                                // Process image attachments
+                                                val imageBytesList = attachedImages.mapNotNull { uri ->
+                                                    try {
+                                                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                                                            stream.readBytes()
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        null
+                                                    }
+                                                }
+
+                                                if (imageBytesList.isNotEmpty()) {
                                                     chatViewModel.clearRagContext()
-                                                    chatViewModel.sendTextMessage(value)
+                                                    chatViewModel.sendChatWithImages(finalPrompt, imageBytesList)
                                                     value = ""
+                                                    attachedImages = emptyList()
+                                                    attachedFiles = emptyList()
+                                                } else {
+                                                    if (promptEditState != null) {
+                                                        chatViewModel.applyPromptEdit(finalPrompt)
+                                                        value = ""
+                                                        attachedImages = emptyList()
+                                                        attachedFiles = emptyList()
+                                                        return@ActionButton
+                                                    }
+
+                                                    val hasRags = loadedRags.isNotEmpty() && isRagEnabledForChat
+
+                                                    if (hasRags) {
+                                                        value = ""
+                                                        attachedImages = emptyList()
+                                                        attachedFiles = emptyList()
+                                                        scope.launch {
+                                                            val ragContext = ragViewModel.queryAndStoreResults(finalPrompt)
+                                                            chatViewModel.setRagContext(
+                                                                ragContext.ifBlank { null },
+                                                                ragViewModel.lastRagResults.value
+                                                            )
+                                                            chatViewModel.sendTextMessage(finalPrompt)
+                                                        }
+                                                    } else {
+                                                        chatViewModel.clearRagContext()
+                                                        chatViewModel.sendTextMessage(finalPrompt)
+                                                        value = ""
+                                                        attachedImages = emptyList()
+                                                        attachedFiles = emptyList()
+                                                    }
                                                 }
                                             }
-                                        }
-                                    },
-                                    icon = TnIcons.ArrowUp, // Matches ChatGPT Up Arrow send button
-                                    contentDescription = "Send message",
-                                    modifier = Modifier.size(36.dp),
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = Color.White,
-                                        contentColor = Color.Black
+                                        },
+                                        icon = TnIcons.ArrowUp, // Matches ChatGPT Up Arrow send button
+                                        contentDescription = "Send message",
+                                        modifier = Modifier.size(36.dp),
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = Color.White,
+                                            contentColor = Color.Black
+                                        )
                                     )
-                                )
+                                } else {
+                                    // White/Transparent Mic Button in Black & White
+                                    ActionButton(
+                                        onClickListener = {
+                                            val hasPermission = ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.RECORD_AUDIO
+                                            ) == PackageManager.PERMISSION_GRANTED
+                                            if (hasPermission) {
+                                                chatViewModel.startSttRecording()
+                                            } else {
+                                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                            }
+                                        },
+                                        icon = TnIcons.Microphone,
+                                        contentDescription = "Voice typing",
+                                        modifier = Modifier.size(36.dp),
+                                        colors = IconButtonDefaults.filledIconButtonColors(
+                                            containerColor = Color(0x22FFFFFF),
+                                            contentColor = Color.White
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EqualizerBars(
+    amplitude: Float,
+    modifier: Modifier = Modifier,
+    activeColor: Color = Color.White,
+    barCount: Int = 20,
+    barWindowMs: Long = 80L
+) {
+    val bars = remember { mutableStateOf(FloatArray(barCount)) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val current = bars.value
+            val next = FloatArray(barCount)
+            for (i in 0 until barCount - 1) {
+                next[i] = current[i + 1]
+            }
+            next[barCount - 1] = amplitude.coerceIn(0f, 1f)
+            bars.value = next
+            delay(barWindowMs)
+        }
+    }
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterHorizontally),
+    ) {
+        val currentBars = bars.value
+        for (i in currentBars.indices) {
+            val raw = currentBars[i]
+            val target = (0.1f + raw * 0.9f).coerceIn(0.1f, 1f)
+            val animated by animateFloatAsState(
+                targetValue = target,
+                animationSpec = tween(durationMillis = 100),
+                label = "bar_$i",
+            )
+            Spacer(
+                modifier = Modifier
+                    .width(3.dp)
+                    .fillMaxHeight(animated)
+                    .background(
+                        color = activeColor.copy(alpha = 0.3f + animated * 0.7f),
+                        shape = RoundedCornerShape(1.5.dp),
+                    ),
+            )
         }
     }
 }

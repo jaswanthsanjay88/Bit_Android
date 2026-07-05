@@ -43,6 +43,13 @@ import com.bit.tts.TTSSettings
 import kotlin.math.roundToInt
 import com.bit.ui.icons.TnIcons
 import com.bit.global.Standards
+import com.bit.ui.components.GlassSlider
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.Backdrop
+import com.bit.ui.theme.BitColors
+import com.bit.ui.theme.glassEdge
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +72,7 @@ fun TTSSettingsBottomSheet(
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = BitColors.Surface.copy(alpha = 0.92f),
             dragHandle = {
                 Box(
                     Modifier
@@ -77,10 +84,17 @@ fun TTSSettingsBottomSheet(
                 )
             }
         ) {
+            val surfaceColor = MaterialTheme.colorScheme.surface
+            val backdrop = rememberLayerBackdrop {
+                drawRect(surfaceColor)
+                drawContent()
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 600.dp)
+                    .layerBackdrop(backdrop)
+                    .glassEdge(28.dp)
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = Standards.SpacingLg)
             ) {
@@ -122,7 +136,8 @@ fun TTSSettingsBottomSheet(
                     // Speed Slider
                     SpeedSection(
                         speed = settings.speed,
-                        onSpeedChange = onSpeedChange
+                        onSpeedChange = onSpeedChange,
+                        backdrop = backdrop
                     )
 
                     Spacer(modifier = Modifier.height(Standards.SpacingLg))
@@ -130,7 +145,8 @@ fun TTSSettingsBottomSheet(
                     // Steps Slider
                     StepsSection(
                         steps = settings.steps,
-                        onStepsChange = onStepsChange
+                        onStepsChange = onStepsChange,
+                        backdrop = backdrop
                     )
 
                     Spacer(modifier = Modifier.height(Standards.SpacingLg))
@@ -351,7 +367,8 @@ private fun LanguageSelectionSection(
 @Composable
 private fun SpeedSection(
     speed: Float,
-    onSpeedChange: (Float) -> Unit
+    onSpeedChange: (Float) -> Unit,
+    backdrop: Backdrop
 ) {
     Column(
         modifier = Modifier
@@ -364,18 +381,25 @@ private fun SpeedSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Speed",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
+            Column {
+                Text(
+                    text = "Speaking Speed",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Adjust speaking rate multiplier",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Surface(
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(Standards.SpacingXs)
             ) {
                 Text(
-                    text = "${"%.2f".format(speed)}x",
+                    text = "${speed}x",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
@@ -384,18 +408,16 @@ private fun SpeedSection(
             }
         }
 
-        Slider(
+        GlassSlider(
             value = speed,
-            onValueChange = { onSpeedChange((it * 20).roundToInt() / 20f) },
+            onValueChange = onSpeedChange,
+            backdrop = backdrop,
             valueRange = 0.5f..2.0f,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary
-            )
+            trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text("0.5x", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -408,7 +430,8 @@ private fun SpeedSection(
 @Composable
 private fun StepsSection(
     steps: Int,
-    onStepsChange: (Int) -> Unit
+    onStepsChange: (Int) -> Unit,
+    backdrop: Backdrop
 ) {
     Column(
         modifier = Modifier
@@ -448,15 +471,12 @@ private fun StepsSection(
             }
         }
 
-        Slider(
+        GlassSlider(
             value = steps.toFloat(),
             onValueChange = { onStepsChange(it.roundToInt()) },
+            backdrop = backdrop,
             valueRange = 1f..8f,
-            steps = 6,
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.tertiary,
-                activeTrackColor = MaterialTheme.colorScheme.tertiary
-            )
+            trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
         )
     }
 }

@@ -31,8 +31,6 @@ import com.bit.models.data.ModelType
 import com.bit.service.ModelDownloadService
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.ActionProgressButton
-import com.bit.ui.components.GlassCard
-import com.bit.ui.theme.Glass
 import com.bit.ui.theme.Motion
 import com.bit.ui.theme.MonoWarning
 import com.bit.ui.icons.TnIcons
@@ -44,9 +42,10 @@ import com.bit.global.HardwareScanner
 @Composable
 internal fun ModelTypeBadge(modelType: ModelType) {
     val (label, color) = when (modelType) {
-        ModelType.GGUF -> "LLM" to Glass.AccentPrimary
-        ModelType.SD -> "Image" to Glass.AccentWarm
-        ModelType.TTS -> "TTS" to Glass.AccentSecondary
+        ModelType.GGUF -> "LLM" to MaterialTheme.colorScheme.primary
+        ModelType.SD -> "Image" to MaterialTheme.colorScheme.secondary
+        ModelType.TTS -> "TTS" to MaterialTheme.colorScheme.tertiary
+        ModelType.STT -> "STT" to MaterialTheme.colorScheme.tertiary
     }
     val shape = RoundedCornerShape(Standards.SpacingXs)
     Text(
@@ -69,7 +68,9 @@ fun ModelCard(
     isInstalled: Boolean,
     downloadState: ModelDownloadService.DownloadState?,
     onDownload: () -> Unit,
-    onCancelDownload: () -> Unit
+    onCancelDownload: () -> Unit,
+    onPauseDownload: () -> Unit = {},
+    onResumeDownload: () -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val systemRamGb = remember { HardwareScanner.getTotalSystemRamGb(context) }
@@ -90,11 +91,17 @@ fun ModelCard(
     val isDownloading = remember(downloadState) {
         downloadState is ModelDownloadService.DownloadState.Downloading
     }
+    val isPaused = remember(downloadState) {
+        downloadState is ModelDownloadService.DownloadState.Paused
+    }
     val isExtracting = remember(downloadState) {
         downloadState is ModelDownloadService.DownloadState.Extracting
     }
     val isProcessing = remember(downloadState) {
         downloadState is ModelDownloadService.DownloadState.Processing
+    }
+    val isVerifying = remember(downloadState) {
+        downloadState is ModelDownloadService.DownloadState.Verifying
     }
 
     Column(
@@ -119,7 +126,7 @@ fun ModelCard(
                         text = model.name,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = Glass.TextPrimary,
+                        color = MaterialTheme.colorScheme.onBackground,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -130,12 +137,52 @@ fun ModelCard(
                         Icon(
                             imageVector = TnIcons.CircleCheck,
                             contentDescription = "Installed",
-                            tint = Glass.AccentPrimary,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                     }
 
-                    isDownloading || isExtracting || isProcessing -> {
+                    isDownloading -> {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Pause button
+                            ActionButton(
+                                onClickListener = onPauseDownload,
+                                icon = TnIcons.PlayerPause,
+                                contentDescription = "Pause Download"
+                            )
+                            // Cancel button
+                            ActionProgressButton(
+                                onClickListener = onCancelDownload,
+                                icon = TnIcons.PlayerStop,
+                                contentDescription = "Cancel Download"
+                            )
+                        }
+                    }
+
+                    isPaused -> {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Resume button
+                            ActionButton(
+                                onClickListener = onResumeDownload,
+                                icon = TnIcons.PlayerPlay,
+                                contentDescription = "Resume Download"
+                            )
+                            // Cancel button
+                            ActionButton(
+                                onClickListener = onCancelDownload,
+                                icon = TnIcons.PlayerStop,
+                                contentDescription = "Cancel Download"
+                            )
+                        }
+                    }
+
+                    isExtracting || isProcessing || isVerifying -> {
                         ActionProgressButton(
                             onClickListener = onCancelDownload,
                             icon = TnIcons.PlayerStop,
@@ -166,14 +213,14 @@ fun ModelCard(
                 Text(
                     text = model.approximateSize,
                     style = MaterialTheme.typography.labelSmall,
-                    color = Glass.AccentPrimary,
+                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier
                         .background(
-                            Glass.AccentPrimarySurface,
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
                             sizeChipShape
                         )
-                        .border(1.dp, Glass.AccentPrimary.copy(alpha = 0.2f), sizeChipShape)
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f), sizeChipShape)
                         .padding(horizontal = 6.dp, vertical = Standards.SpacingXxs)
                 )
 
@@ -210,13 +257,13 @@ fun ModelCard(
                     Text(
                         text = repoName,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Glass.TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .background(
-                                Glass.SurfaceSubtle,
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                                 repoChipShape
                             )
-                            .border(1.dp, Glass.BorderSubtle, repoChipShape)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, repoChipShape)
                             .padding(horizontal = 6.dp, vertical = Standards.SpacingXxs)
                     )
                 }
@@ -227,13 +274,13 @@ fun ModelCard(
                     Text(
                         text = tag,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Glass.TextMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         modifier = Modifier
                             .background(
-                                Glass.SurfaceSubtle,
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                                 tagShape
                             )
-                            .border(1.dp, Glass.BorderSubtle, tagShape)
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, tagShape)
                             .padding(horizontal = 5.dp, vertical = Standards.SpacingXxs)
                     )
                 }
@@ -241,17 +288,19 @@ fun ModelCard(
 
             // Download progress (animated)
             AnimatedVisibility(
-                visible = isDownloading || isExtracting || isProcessing,
+                visible = isDownloading || isPaused || isExtracting || isProcessing || isVerifying,
                 enter = Motion.Enter,
                 exit = Motion.Exit
             ) {
                 Column(modifier = Modifier.padding(top = Standards.SpacingSm)) {
-                    val progress =
-                        if (downloadState is ModelDownloadService.DownloadState.Downloading) {
-                            downloadState.progress
-                        } else 0f
+                    val progress = when (downloadState) {
+                        is ModelDownloadService.DownloadState.Downloading -> downloadState.progress
+                        is ModelDownloadService.DownloadState.Paused -> downloadState.progress
+                        else -> 0f
+                    }
 
                     val statusText = when {
+                        isVerifying -> "Verifying checksum..."
                         isProcessing -> "Processing..."
                         isExtracting -> {
                             val es = downloadState as ModelDownloadService.DownloadState.Extracting
@@ -260,6 +309,13 @@ fun ModelCard(
                             } else {
                                 "Extracting..."
                             }
+                        }
+                        isPaused -> {
+                            val ps = downloadState as ModelDownloadService.DownloadState.Paused
+                            val downloadedMB = ps.downloadedBytes / 1_000_000
+                            val totalMB = ps.totalBytes / 1_000_000
+                            val pct = (ps.progress * 100).toInt()
+                            "Paused · ${downloadedMB}/${totalMB}MB ($pct%)"
                         }
                         isDownloading -> {
                             val ds = downloadState as ModelDownloadService.DownloadState.Downloading
@@ -284,12 +340,12 @@ fun ModelCard(
                     Text(
                         text = statusText,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Glass.AccentPrimary
+                        color = if (isPaused) MonoWarning else MaterialTheme.colorScheme.primary
                     )
 
                     Spacer(modifier = Modifier.height(Standards.SpacingXs))
 
-                    val isIndeterminate = isProcessing || (isExtracting && (downloadState as ModelDownloadService.DownloadState.Extracting).totalFiles <= 0)
+                    val isIndeterminate = isProcessing || isVerifying || (isExtracting && (downloadState as ModelDownloadService.DownloadState.Extracting).totalFiles <= 0)
                     val progressVal = when {
                         isDownloading -> progress
                         isExtracting -> {
@@ -305,8 +361,8 @@ fun ModelCard(
                                 .fillMaxWidth()
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp)),
-                            color = Glass.AccentPrimary,
-                            trackColor = Glass.SurfaceSubtle
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     } else {
                         LinearProgressIndicator(
@@ -315,8 +371,8 @@ fun ModelCard(
                                 .fillMaxWidth()
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp)),
-                            color = Glass.AccentPrimary,
-                            trackColor = Glass.SurfaceSubtle
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
                     }
                 }
@@ -324,7 +380,7 @@ fun ModelCard(
         }
         Spacer(modifier = Modifier.height(Standards.SpacingSm))
         androidx.compose.material3.HorizontalDivider(
-            color = Glass.BorderSubtle.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.outlineVariant,
             thickness = 0.8.dp
         )
     }

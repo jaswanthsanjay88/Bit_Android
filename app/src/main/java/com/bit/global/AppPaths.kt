@@ -69,7 +69,7 @@ object AppPaths {
 
     /** Specific RAG file */
     fun ragFile(context: Context, ragId: String): File =
-        File(rags(context), "$ragId.neuron")
+        File(rags(context), "$ragId.bit")
 
     /** Persona avatar images */
     fun personaAvatars(context: Context): File =

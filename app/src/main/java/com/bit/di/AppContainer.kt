@@ -15,7 +15,6 @@ import kotlinx.coroutines.cancel
 
 object AppContainer {
 
-    // Room database kept for RAG (FTS4) and migration reads only
     private lateinit var database: AppDatabase
     private var modelRepository: ModelRepository? = null
 
@@ -32,13 +31,11 @@ object AppContainer {
         database = AppDatabase.getDatabase(context)
 
         // Initialize UMS storage (plaintext by default; VaultGateScreen can switch to encrypted)
-        // Don't auto-init here — let the onboarding flow handle vault initialization
         if (VaultManager.isReady.value) {
             initModelRepository()
         } else {
             Log.w(TAG, "VaultManager not ready at init — ModelRepository deferred")
         }
-
     }
 
     private fun initModelRepository() {

@@ -56,6 +56,17 @@ internal fun UserMessageBubble(
     onForkRequest: ((Messages) -> Unit)? = null
 ) {
     var menuExpanded by remember(message.msgId) { mutableStateOf(false) }
+    val imageBitmap = remember(message.content.imageData) {
+        message.content.imageData?.let { base64 ->
+            try {
+                val bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                bitmap?.asImageBitmap()
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -66,16 +77,20 @@ internal fun UserMessageBubble(
                 .padding(horizontal = Standards.SpacingSm, vertical = 5.dp)
         ) {
             val interactionSource = remember { MutableInteractionSource() }
-            val shape = RoundedCornerShape(Standards.RadiusLg)
+            val bubbleShape = RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp)
+            val bubbleGradient = androidx.compose.ui.graphics.Brush.verticalGradient(
+                colors = listOf(
+                    Color(0x3DFFFFFF), // 24% white glass (lighter at top)
+                    Color(0x24FFFFFF)  // 14% white glass (darker at bottom)
+                )
+            )
             
-            GlassCard(
-                backgroundColor = Color(0x2BFFFFFF), // 17% white glass -> beautiful dark gray carbon glass over black background
-                borderColor = Color(0x1AFFFFFF),
-                cornerRadius = 20.dp,
-                borderWidth = 0.8.dp,
-                contentPadding = PaddingValues(0.dp),
+            Box(
                 modifier = Modifier
                     .widthIn(max = 280.dp)
+                    .clip(bubbleShape)
+                    .background(bubbleGradient)
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), bubbleShape)
                     .combinedClickable(
                         interactionSource = interactionSource,
                         indication = null,
@@ -87,14 +102,33 @@ internal fun UserMessageBubble(
                         }
                     )
             ) {
-                SelectionContainer {
-                    MarkdownText(
-                        text = message.content.content,
-                        modifier = Modifier.padding(
-                            horizontal = 16.dp,
-                            vertical = 10.dp
+                Column {
+                    imageBitmap?.let { bmp ->
+                        Image(
+                            bitmap = bmp,
+                            contentDescription = "User attached image",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp)
+                                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
+                            contentScale = ContentScale.Crop
                         )
-                    )
+                    }
+                    SelectionContainer {
+                        androidx.compose.material3.ProvideTextStyle(
+                            MaterialTheme.typography.bodyLarge.copy(
+                                fontWeight = FontWeight.Medium
+                            )
+                        ) {
+                            MarkdownText(
+                                text = message.content.content,
+                                modifier = Modifier.padding(
+                                    horizontal = 16.dp,
+                                    vertical = 10.dp
+                                )
+                            )
+                        }
+                    }
                 }
             }
 

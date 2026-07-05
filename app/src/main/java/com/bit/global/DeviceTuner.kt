@@ -107,7 +107,9 @@ object DeviceTuner {
             useMlock = useMlock,
             flashAttn = true,
             cacheTypeK = cacheType,
-            cacheTypeV = cacheType
+            cacheTypeV = cacheType,
+            gpuAcceleration = true,
+            npuAcceleration = false
         )
     }
 

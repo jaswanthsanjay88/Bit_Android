@@ -61,6 +61,21 @@ import com.bit.viewmodel.ImageToolsViewModel
 import com.bit.viewmodel.ImageToolsViewModel.ImageTool
 import com.bit.viewmodel.ImageToolsViewModel.ProcessingState
 import com.bit.global.Standards
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntSize
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -123,13 +138,22 @@ fun ImageToolsScreen(
 
             Spacer(modifier = Modifier.height(Standards.SpacingMd))
 
-            // ── Input Image ──
-            ImagePickerCard(
-                label = "Input Image",
-                bitmap = inputImage,
-                onPick = { imagePicker.launch("image/*") },
-                modifier = Modifier.padding(horizontal = Standards.SpacingLg)
-            )
+            // ── Input Image / Drawing Canvas ──
+            if (selectedTool == ImageTool.LAMA_INPAINT && inputImage != null) {
+                MaskDrawingSection(
+                    inputImage = inputImage!!,
+                    onMaskChanged = { viewModel.setMaskImage(it) },
+                    onPickNewImage = { imagePicker.launch("image/*") },
+                    modifier = Modifier.padding(horizontal = Standards.SpacingLg)
+                )
+            } else {
+                ImagePickerCard(
+                    label = "Input Image",
+                    bitmap = inputImage,
+                    onPick = { imagePicker.launch("image/*") },
+                    modifier = Modifier.padding(horizontal = Standards.SpacingLg)
+                )
+            }
 
             // ── Style Image (only for Style Transfer) ──
             AnimatedVisibility(
@@ -606,4 +630,218 @@ private fun DownloadButton(
             )
         }
     }
+}
+
+// ════════════════════════════════════════════
+//  MASK DRAWING CANVAS
+// ════════════════════════════════════════════
+
+private data class DrawingStroke(
+    val points: List<Offset>,
+    val strokeWidth: Float
+)
+
+@Composable
+private fun MaskDrawingSection(
+    inputImage: Bitmap,
+    onMaskChanged: (Bitmap?) -> Unit,
+    onPickNewImage: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val strokes = remember { mutableStateListOf<DrawingStroke>() }
+    val currentPoints = remember { mutableStateListOf<Offset>() }
+    var brushSize by remember { mutableStateOf(30f) }
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+
+    val aspect = inputImage.width.toFloat() / inputImage.height.toFloat().coerceAtLeast(1f)
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = Standards.SpacingSm),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Draw Mask (Object to Remove)",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(Standards.SpacingMd)) {
+                Text(
+                    text = "Change Image",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        strokes.clear()
+                        currentPoints.clear()
+                        onMaskChanged(null)
+                        onPickNewImage()
+                    }
+                )
+                Text(
+                    text = "Clear Mask",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        strokes.clear()
+                        currentPoints.clear()
+                        onMaskChanged(null)
+                    }
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(aspect)
+                .clip(RoundedCornerShape(Standards.RadiusXl))
+                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                .onGloballyPositioned { coordinates ->
+                    canvasSize = coordinates.size
+                }
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            currentPoints.clear()
+                            currentPoints.add(offset)
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            currentPoints.add(change.position)
+                        },
+                        onDragEnd = {
+                            if (currentPoints.isNotEmpty()) {
+                                strokes.add(DrawingStroke(currentPoints.toList(), brushSize))
+                                currentPoints.clear()
+
+                                if (canvasSize.width > 0 && canvasSize.height > 0) {
+                                    val mask = generateMaskBitmap(
+                                        canvasWidth = canvasSize.width,
+                                        canvasHeight = canvasSize.height,
+                                        strokes = strokes,
+                                        inputWidth = inputImage.width,
+                                        inputHeight = inputImage.height
+                                    )
+                                    onMaskChanged(mask)
+                                }
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            }
+                        }
+                    )
+                }
+        ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                drawImage(
+                    image = inputImage.asImageBitmap(),
+                    srcSize = IntSize(inputImage.width, inputImage.height),
+                    dstSize = IntSize(size.width.toInt(), size.height.toInt())
+                )
+
+                strokes.forEach { stroke ->
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        if (stroke.points.isNotEmpty()) {
+                            moveTo(stroke.points[0].x, stroke.points[0].y)
+                            for (i in 1 until stroke.points.size) {
+                                lineTo(stroke.points[i].x, stroke.points[i].y)
+                            }
+                        }
+                    }
+                    drawPath(
+                        path = path,
+                        color = Color.Red.copy(alpha = 0.5f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = stroke.strokeWidth,
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round
+                        )
+                    )
+                }
+
+                if (currentPoints.isNotEmpty()) {
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(currentPoints[0].x, currentPoints[0].y)
+                        for (i in 1 until currentPoints.size) {
+                            lineTo(currentPoints[i].x, currentPoints[i].y)
+                        }
+                    }
+                    drawPath(
+                        path = path,
+                        color = Color.Red.copy(alpha = 0.5f),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                            width = brushSize,
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round
+                        )
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(Standards.SpacingSm))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingMd),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Brush Size",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Slider(
+                value = brushSize,
+                onValueChange = { brushSize = it },
+                valueRange = 10f..100f,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "${brushSize.toInt()}px",
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.width(45.dp)
+            )
+        }
+    }
+}
+
+private fun generateMaskBitmap(
+    canvasWidth: Int,
+    canvasHeight: Int,
+    strokes: List<DrawingStroke>,
+    inputWidth: Int,
+    inputHeight: Int
+): Bitmap {
+    val mask = Bitmap.createBitmap(canvasWidth, canvasHeight, Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(mask)
+    canvas.drawColor(android.graphics.Color.BLACK)
+
+    val paint = android.graphics.Paint().apply {
+        color = android.graphics.Color.WHITE
+        style = android.graphics.Paint.Style.STROKE
+        strokeCap = android.graphics.Paint.Cap.ROUND
+        strokeJoin = android.graphics.Paint.Join.ROUND
+        isAntiAlias = true
+    }
+
+    strokes.forEach { stroke ->
+        paint.strokeWidth = stroke.strokeWidth
+        val path = android.graphics.Path()
+        if (stroke.points.isNotEmpty()) {
+            path.moveTo(stroke.points[0].x, stroke.points[0].y)
+            for (i in 1 until stroke.points.size) {
+                path.lineTo(stroke.points[i].x, stroke.points[i].y)
+            }
+        }
+        canvas.drawPath(path, paint)
+    }
+
+    return Bitmap.createScaledBitmap(mask, inputWidth, inputHeight, true)
 }

@@ -54,7 +54,7 @@ class RagRepository(
     suspend fun deleteRag(id: String) {
         ragDao.deleteById(id)
         // Also delete the file
-        val ragFile = File(ragsDir, "$id.neuron")
+        val ragFile = File(ragsDir, "$id.bit")
         if (ragFile.exists()) {
             ragFile.delete()
         }
@@ -111,7 +111,7 @@ class RagRepository(
 
             // Generate unique ID
             val ragId = java.util.UUID.randomUUID().toString()
-            val destFile = File(ragsDir, "$ragId.neuron")
+            val destFile = File(ragsDir, "$ragId.bit")
 
             // Copy file to app directory
             inputStream.use { input ->
@@ -189,7 +189,7 @@ class RagRepository(
 
             val nodes = addResult.getOrThrow()
             val ragId = java.util.UUID.randomUUID().toString()
-            val destFile = File(ragsDir, "$ragId.neuron")
+            val destFile = File(ragsDir, "$ragId.bit")
 
             // Serialize and save
             val payload = graph.serialize()
@@ -240,7 +240,7 @@ class RagRepository(
 
             val nodes = addResult.getOrThrow()
             val ragId = java.util.UUID.randomUUID().toString()
-            val destFile = File(ragsDir, "$ragId.neuron")
+            val destFile = File(ragsDir, "$ragId.bit")
 
             val payload = graph.serialize()
             destFile.writeBytes(payload)
@@ -304,7 +304,7 @@ class RagRepository(
 
             val nodes = addResult.getOrThrow()
             val ragId = java.util.UUID.randomUUID().toString()
-            val destFile = File(ragsDir, "$ragId.neuron")
+            val destFile = File(ragsDir, "$ragId.bit")
 
             val payload = graph.serialize()
             destFile.writeBytes(payload)
@@ -528,7 +528,7 @@ class RagRepository(
 
             val payload = graph.serialize()
             val ragId = java.util.UUID.randomUUID().toString()
-            val destFile = File(ragsDir, "$ragId.neuron")
+            val destFile = File(ragsDir, "$ragId.bit")
 
             onProgress(0.7f, "Encrypting RAG...")
             val packetManager = NeuronPacketManager()
@@ -628,7 +628,7 @@ class RagRepository(
 
             val payload = graph.serialize()
             val ragId = java.util.UUID.randomUUID().toString()
-            val destFile = File(ragsDir, "$ragId.neuron")
+            val destFile = File(ragsDir, "$ragId.bit")
 
             onProgress(0.8f, "Encrypting RAG...")
             val packetManager = NeuronPacketManager()

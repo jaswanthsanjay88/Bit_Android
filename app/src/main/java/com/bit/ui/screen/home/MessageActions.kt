@@ -3,15 +3,20 @@ package com.bit.ui.screen.home
 import android.content.ClipData
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.bit.ui.theme.Glass
 import com.bit.models.messages.ContentType
 import com.bit.models.messages.Messages
@@ -164,9 +169,25 @@ private fun SmallActionButton(
     enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isActive = isPressed || isHovered
+
+    val backgroundColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isActive) Color(0x2EFFFFFF) else Color.Transparent,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150)
+    )
+
+    val iconColor by androidx.compose.animation.animateColorAsState(
+        targetValue = if (!enabled) Glass.TextMuted else if (isActive) Color.White else tint,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 150)
+    )
+
     Box(
         modifier = Modifier
-            .size(24.dp)
+            .size(28.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(backgroundColor)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -178,7 +199,7 @@ private fun SmallActionButton(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (enabled) tint else Glass.TextMuted,
+            tint = iconColor,
             modifier = Modifier.size(13.dp)
         )
     }
@@ -253,12 +274,12 @@ internal fun MessageActionRow(
             )
         }
 
-        // 4. DotsVertical (More Actions / Regenerate)
+        // 4. Regenerate Action (Replacing vertical dots)
         if (onRegenerate != null) {
             SmallActionButton(
-                icon = TnIcons.DotsVertical,
+                icon = TnIcons.Refresh,
                 onClick = { if (isRegenerateEnabled) onRegenerate() },
-                contentDescription = "More",
+                contentDescription = "Regenerate",
                 tint = Glass.TextMuted,
                 enabled = isRegenerateEnabled
             )

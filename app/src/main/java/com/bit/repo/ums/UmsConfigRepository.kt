@@ -19,7 +19,12 @@ class UmsConfigRepository(private val ums: UnifiedMemorySystem) {
     }
 
     suspend fun insert(config: ModelConfig) = withContext(Dispatchers.IO) {
-        ums.put(collection, config.toRecord())
+        val existing = findRecordId(config.id)
+        if (existing != null) {
+            ums.put(collection, config.toRecord(existing))
+        } else {
+            ums.put(collection, config.toRecord())
+        }
     }
 
     suspend fun update(config: ModelConfig) = withContext(Dispatchers.IO) {

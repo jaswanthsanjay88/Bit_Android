@@ -190,7 +190,7 @@ class DataIntegrityManager(
     }
 
     /**
-     * RAG DB entry -> missing .neuron file: delete DB entry.
+     * RAG DB entry -> missing .bit file: delete DB entry.
      */
     private suspend fun checkRagFiles(): Int {
         val rags = ragDao.getAllRagsOnce()

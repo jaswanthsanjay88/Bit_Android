@@ -7,9 +7,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -18,6 +23,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
@@ -85,8 +91,8 @@ class MainActivity : ComponentActivity() {
             NeuroVerseTheme {
                 val context = this@MainActivity
 
-                // Compute start destination from onboarding state + installed models
-                var startDestination by remember { mutableStateOf<String?>(null) }
+                // Compute target destination from onboarding state + installed models
+                var targetDestination by remember { mutableStateOf<String?>(null) }
                 var hasModelsInstalled by remember { mutableStateOf(false) }
                 var needsMigration by remember { mutableStateOf(false) }
 
@@ -120,22 +126,15 @@ class MainActivity : ComponentActivity() {
                                 val models = modelRepository.getAllModels().first()
                                 models.any {
                                     it.providerType == ProviderType.GGUF ||
-                                        it.providerType == ProviderType.DIFFUSION ||
                                         it.providerType == ProviderType.API
                                 }
                             } catch (_: Exception) { false }
                         } else false
                         hasModelsInstalled = hasModel
 
-                        startDestination = when {
-                            // Returning user: vault ready + terms accepted + (setup done or has model)
-                            vaultReady && termsAccepted && (setupDone || hasModel) -> Screen.Chat.route
-
-                            // Vault ready but terms not accepted
-                            vaultReady && !termsAccepted -> Screen.Terms.route
-
-                            // Vault ready but setup not done
-                            vaultReady && !setupDone && !hasModel -> Screen.OnboardingSetup.route
+                        targetDestination = when {
+                            // Returning user: terms accepted + (setup done or has model)
+                            termsAccepted && (setupDone || hasModel) -> Screen.Chat.route
 
                             // First launch: show guide
                             !guideSeen -> Screen.Guide.route
@@ -146,13 +145,13 @@ class MainActivity : ComponentActivity() {
                             // Fallback: go to setup (which handles vault init if needed)
                             else -> Screen.OnboardingSetup.route
                         }
+                        android.util.Log.d("MainActivity", "Onboarding check: termsAccepted=$termsAccepted, setupDone=$setupDone, guideSeen=$guideSeen, vaultReady=$vaultReady, hasModel=$hasModel -> targetDestination=$targetDestination")
                     }
                 }
 
-                val dest = startDestination ?: return@NeuroVerseTheme
-
                 AppNavigation(
-                    startDestination = dest,
+                    startDestination = Screen.Intro.route,
+                    targetDestination = targetDestination,
                     hasModelsInstalled = hasModelsInstalled,
                     needsMigration = needsMigration
                 )
@@ -171,6 +170,7 @@ class MainActivity : ComponentActivity() {
 
 sealed class Screen(val route: String) {
     // Onboarding (flat routes so any can be used as startDestination)
+    object Intro : Screen("intro")
     object Guide : Screen("guide")
     object Terms : Screen("terms")
     object OnboardingSetup : Screen("setup")
@@ -183,11 +183,14 @@ sealed class Screen(val route: String) {
     object AiMemory : Screen("ai_memory")
     object ImageGenSetup : Screen("image_gen_setup")
     object EmbeddingSetup : Screen("embedding_setup")
+    object HybridSettings : Screen("hybrid_settings")
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AppNavigation(
     startDestination: String,
+    targetDestination: String?,
     hasModelsInstalled: Boolean,
     needsMigration: Boolean
 ) {
@@ -199,90 +202,124 @@ fun AppNavigation(
     val chatViewModel: ChatViewModel = hiltViewModel()
     val llmModelViewModel: LLMModelViewModel = hiltViewModel()
 
-    NavHost(
-        navController = navController,
-        startDestination = startDestination,
-        enterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(300)
-            ) + fadeIn(animationSpec = tween(300))
-        },
-        exitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                animationSpec = tween(300)
-            ) + fadeOut(animationSpec = tween(300))
-        },
-        popEnterTransition = {
-            slideIntoContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300)
-            ) + fadeIn(animationSpec = tween(300))
-        },
-        popExitTransition = {
-            slideOutOfContainer(
-                towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                animationSpec = tween(300)
-            ) + fadeOut(animationSpec = tween(300))
-        }
-    ) {
+    SharedTransitionLayout {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(300)
+                ) + fadeIn(animationSpec = tween(300))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
+                    animationSpec = tween(300)
+                ) + fadeOut(animationSpec = tween(300))
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(300)
+                ) + fadeIn(animationSpec = tween(300))
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
+                    animationSpec = tween(300)
+                ) + fadeOut(animationSpec = tween(300))
+            }
+        ) {
 
-        // ============ ONBOARDING SCREENS ============
+            // ============ ONBOARDING SCREENS ============
 
-
-        composable(Screen.Guide.route) {
-            val appSettings = remember { AppSettingsDataStore(context) }
-            GuideScreen(onContinue = {
-                scope.launch { appSettings.saveGuideSeen(true) }
-                navController.navigate(Screen.Terms.route) {
-                    popUpTo(Screen.Guide.route) { inclusive = true }
-                }
-            })
-        }
-
-        composable(Screen.Terms.route) {
-            val termsDataStore = remember { TermsDataStore(context) }
-            TermsAndConditionsScreen(
-                onAccept = {
-                    scope.launch {
-                        termsDataStore.acceptTerms()
+            composable(Screen.Intro.route) {
+                com.bit.ui.screen.intro.IntroScreen(
+                    innerPadding = PaddingValues(0.dp),
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable,
+                    targetDestination = targetDestination,
+                    onFinish = { target ->
+                        navController.navigate(target) {
+                            popUpTo(Screen.Intro.route) { inclusive = true }
+                        }
                     }
-                    if (hasModelsInstalled) {
-                        // Returning user: skip setup, go to chat
+                )
+            }
+
+
+
+            composable(Screen.Guide.route) {
+                val appSettings = remember { AppSettingsDataStore(context) }
+                GuideScreen(
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable,
+                    onContinue = {
+                        scope.launch {
+                            appSettings.saveGuideSeen(true)
+                            withContext(Dispatchers.Main) {
+                                navController.navigate(Screen.Terms.route) {
+                                    popUpTo(Screen.Guide.route) { inclusive = true }
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.Terms.route) {
+                val termsDataStore = remember { TermsDataStore(context) }
+                TermsAndConditionsScreen(
+                    onAccept = {
+                        scope.launch {
+                            termsDataStore.acceptTerms()
+                            withContext(Dispatchers.Main) {
+                                if (hasModelsInstalled) {
+                                    // Returning user: skip setup, go to chat
+                                    navController.navigate(Screen.Chat.route) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                } else {
+                                    // New user: proceed to setup
+                                    navController.navigate(Screen.OnboardingSetup.route) {
+                                        popUpTo(Screen.Terms.route) { inclusive = true }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.OnboardingSetup.route) {
+                SetupScreen(
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable,
+                    onSetupComplete = {
                         navController.navigate(Screen.Chat.route) {
                             popUpTo(0) { inclusive = true }
                         }
-                    } else {
-                        // New user: proceed to setup
-                        navController.navigate(Screen.OnboardingSetup.route) {
-                            popUpTo(Screen.Terms.route) { inclusive = true }
-                        }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        composable(Screen.OnboardingSetup.route) {
-            SetupScreen(
-                onSetupComplete = {
-                    navController.navigate(Screen.Chat.route) {
-                        popUpTo(0) { inclusive = true }
-                    }
-                }
-            )
-        }
-
-        // ============ MAIN APP ROUTES ============
-        composable(Screen.Chat.route) { _ ->
-            HomeScreen(
-                onSettingsClick = {
-                    navController.navigate(Screen.Settings.route)
-                },
-                onStoreButtonClicked = {
-                    navController.navigate(Screen.Store.route)
-                },
+            // ============ MAIN APP ROUTES ============
+            composable(Screen.Chat.route) { _ ->
+                HomeScreen(
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    animatedVisibilityScope = this@composable,
+                    onSettingsClick = {
+                        navController.navigate(Screen.Settings.route)
+                    },
+                    onStoreButtonClicked = { tab ->
+                        val route = if (tab != null) "store?tab=$tab" else "store"
+                        navController.navigate(route)
+                    },
                 onVaultManagerClick = {},
+                onHybridSettingsClick = {
+                    navController.navigate(Screen.HybridSettings.route)
+                },
                 onImageGenSetupNeeded = {
                     navController.navigate(Screen.ImageGenSetup.route)
                 },
@@ -305,10 +342,20 @@ fun AppNavigation(
             })
         }
 
-        composable(Screen.Store.route) {
-            ModelStoreScreen(onNavigateBack = {
-                navController.popBackStack()
-            })
+        composable(
+            route = "store?tab={tab}",
+            arguments = listOf(
+                androidx.navigation.navArgument("tab") {
+                    type = androidx.navigation.NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) {
+            ModelStoreScreen(
+                onNavigateBack = { navController.popBackStack() },
+                llmModelViewModel = llmModelViewModel
+            )
         }
 
         composable(Screen.Settings.route) {
@@ -322,6 +369,11 @@ fun AppNavigation(
             )
         }
 
+        composable(Screen.HybridSettings.route) {
+            com.bit.ui.screen.hybrid_settings.HybridSettingsScreen(onBackClick = {
+                navController.popBackStack()
+            })
+        }
 
         composable(Screen.AiMemory.route) {
             AiMemoryScreen(
@@ -345,7 +397,6 @@ fun AppNavigation(
                 }
             )
         }
-
         composable(Screen.EmbeddingSetup.route) {
             EmbeddingSetupScreen(
                 onSetupComplete = {
@@ -353,5 +404,6 @@ fun AppNavigation(
                 }
             )
         }
+    }
     }
 }

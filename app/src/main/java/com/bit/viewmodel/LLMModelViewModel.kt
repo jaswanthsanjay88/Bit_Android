@@ -50,7 +50,7 @@ class LLMModelViewModel @Inject constructor(
             if (ready) repository.getAllModels()
             else flowOf(emptyList())
         }
-        .map { models -> models.filter { it.providerType != ProviderType.TTS } }
+        .map { models -> models.filter { it.providerType != ProviderType.TTS && it.providerType != ProviderType.DIFFUSION } }
 
     private val _currentModelID = MutableStateFlow("")
     val currentModelID: StateFlow<String> = _currentModelID.asStateFlow()

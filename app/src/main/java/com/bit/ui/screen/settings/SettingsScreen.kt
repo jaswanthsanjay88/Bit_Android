@@ -342,14 +342,15 @@ fun SettingsScreen(
                 hasSttModel = hasSttModel,
                 sttThreads = sttThreads,
                 sttLanguage = sttLanguage,
+                sttDownloadStates = ttsDownloadStates,
                 viewModel = viewModel
             )
 
             // ── Image Generation ──
-            imageGenerationSection(
-                imageBlurEnabled = imageBlurEnabled,
-                viewModel = viewModel
-            )
+            // imageGenerationSection(
+            //     imageBlurEnabled = imageBlurEnabled,
+            //     viewModel = viewModel
+            // )
 
             // ── HuggingFace Access Token ──
             huggingFaceTokenSection(

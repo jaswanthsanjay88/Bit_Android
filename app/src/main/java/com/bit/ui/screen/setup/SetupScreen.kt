@@ -2,76 +2,49 @@ package com.bit.ui.screen.setup
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import com.bit.ui.theme.Motion
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.Canvas
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.Icon
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import kotlin.math.sin
-import kotlin.random.Random
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.global.Standards
 import com.bit.service.ModelDownloadService
 import com.bit.ui.components.PasswordTextField
 import com.bit.ui.icons.TnIcons
-import com.bit.global.HardwareScanner
-import com.bit.global.PerformanceMode
 import com.bit.viewmodel.SetupOption
 import com.bit.viewmodel.SetupViewModel
 import com.bit.worker.SystemBackupManager
+import com.bit.models.data.HuggingFaceModel
+import com.bit.ui.theme.BitColors
+import com.bit.ui.theme.Motion
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun SetupScreen(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onSetupComplete: () -> Unit
 ) {
     val viewModel: SetupViewModel = viewModel()
@@ -80,9 +53,11 @@ fun SetupScreen(
     val setupComplete by viewModel.setupComplete.collectAsStateWithLifecycle()
     val downloadError by viewModel.downloadError.collectAsStateWithLifecycle()
     val primaryModelId by viewModel.primaryModelId.collectAsStateWithLifecycle()
-    val showPerformancePicker by viewModel.showPerformancePicker.collectAsStateWithLifecycle()
+    val recommendedTextModel by viewModel.recommendedTextModel.collectAsStateWithLifecycle()
 
-    // Navigate when setup completes
+    var currentSlide by remember { mutableIntStateOf(0) }
+    var selectLocalOption by remember { mutableStateOf(true) }
+
     LaunchedEffect(setupComplete) {
         if (setupComplete) {
             delay(400)
@@ -92,40 +67,720 @@ fun SetupScreen(
 
     val isDownloading = selectedOption != null && selectedOption != SetupOption.POWER_MODE
 
-    AnimatedContent(
-        targetState = showPerformancePicker,
-        transitionSpec = {
-            fadeIn(Motion.entrance()) togetherWith fadeOut(Motion.exit())
-        },
-        label = "setupPhase"
-    ) { showPerfPicker ->
-        if (showPerfPicker) {
-            PerformancePickerContent(viewModel = viewModel)
-        } else {
-            SetupOptionsContent(
-                viewModel = viewModel,
-                selectedOption = selectedOption,
-                downloadStates = downloadStates,
-                downloadError = downloadError,
-                primaryModelId = primaryModelId,
-                isDownloading = isDownloading
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BitColors.Background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp)
+            .padding(bottom = 24.dp)
+    ) {
+        AnimatedContent(
+            targetState = isDownloading,
+            transitionSpec = {
+                fadeIn(tween(280)) togetherWith fadeOut(tween(180))
+            },
+            label = "setupPhase"
+        ) { downloading ->
+            if (downloading) {
+                DownloadProgressContent(
+                    viewModel = viewModel,
+                    selectedOption = selectedOption,
+                    downloadStates = downloadStates,
+                    downloadError = downloadError,
+                    primaryModelId = primaryModelId
+                )
+            } else {
+                when (currentSlide) {
+                    0 -> WelcomeSlide(
+                        onNext = { currentSlide = 1 }
+                    )
+                    1 -> SetupChoiceSlide(
+                        selectLocal = selectLocalOption,
+                        onSelectLocal = { selectLocalOption = true },
+                        onSelectRemote = { selectLocalOption = false },
+                        onNext = { currentSlide = 2 },
+                        onBack = { currentSlide = 0 }
+                    )
+                    2 -> {
+                        if (selectLocalOption) {
+                            ModelPickerContent(
+                                viewModel = viewModel,
+                                sharedTransitionScope = sharedTransitionScope,
+                                animatedVisibilityScope = animatedVisibilityScope,
+                                recommendedTextModel = recommendedTextModel,
+                                onBack = { currentSlide = 1 }
+                            )
+                        } else {
+                            RemoteApiConfigContent(
+                                viewModel = viewModel,
+                                onBack = { currentSlide = 1 }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeSlide(
+    onNext: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(64.dp))
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            Surface(
+                color = BitColors.SurfaceAlt,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.size(96.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = TnIcons.Lock,
+                        contentDescription = null,
+                        tint = BitColors.TextPrimary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Welcome to BIT",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextPrimary,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-1).sp
+                ),
+                textAlign = TextAlign.Center
+            )
+
+            Text(
+                text = "Your private, secure on-device AI assistant.\nChoose how you want to connect to AI models.",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextSecondary,
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp
+                ),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
+        Button(
+            onClick = onNext,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = BitColors.Inverse,
+                contentColor = BitColors.OnInverse
+            )
+        ) {
+            Text(
+                text = "Set Up BIT",
+                style = androidx.compose.ui.text.TextStyle(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
             )
         }
     }
 }
 
-// ── Setup Options Phase ──
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SetupOptionsContent(
+private fun SetupChoiceSlide(
+    selectLocal: Boolean,
+    onSelectLocal: () -> Unit,
+    onSelectRemote: () -> Unit,
+    onNext: () -> Unit,
+    onBack: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.align(Alignment.Start)
+            ) {
+                Text("Back", color = BitColors.TextTertiary)
+            }
+            Text(
+                text = "Choose AI Provider Type",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.5).sp
+                )
+            )
+            Text(
+                text = "Decide whether to run local models on-device or connect to high-speed cloud APIs.",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            )
+        }
+
+        Column(
+            modifier = Modifier.weight(1f).padding(vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(if (selectLocal) BitColors.SurfaceAlt else BitColors.Surface)
+                    .border(
+                        width = if (selectLocal) 1.5.dp else 1.dp,
+                        color = if (selectLocal) BitColors.TextPrimary else BitColors.Border,
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSelectLocal()
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = TnIcons.Lock,
+                        contentDescription = null,
+                        tint = if (selectLocal) BitColors.TextPrimary else BitColors.TextSecondary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Local Offline AI (Recommended)",
+                            fontWeight = FontWeight.Bold,
+                            color = BitColors.TextPrimary,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            text = "Runs models directly on your device. 100% private, no internet required, zero data collection.",
+                            color = BitColors.TextSecondary,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(if (!selectLocal) BitColors.SurfaceAlt else BitColors.Surface)
+                    .border(
+                        width = if (!selectLocal) 1.5.dp else 1.dp,
+                        color = if (!selectLocal) BitColors.TextPrimary else BitColors.Border,
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onSelectRemote()
+                    }
+            ) {
+                Row(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = TnIcons.ArrowUp,
+                        contentDescription = null,
+                        tint = if (!selectLocal) BitColors.TextPrimary else BitColors.TextSecondary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Cloud APIs (Bring Your Own Key)",
+                            fontWeight = FontWeight.Bold,
+                            color = BitColors.TextPrimary,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            text = "Connect Google Gemini, OpenAI, Anthropic Claude, DeepSeek, or other endpoints for advanced cloud speed.",
+                            color = BitColors.TextSecondary,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        Button(
+            onClick = onNext,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = BitColors.Inverse,
+                contentColor = BitColors.OnInverse
+            )
+        ) {
+            Text(
+                text = "Continue",
+                style = androidx.compose.ui.text.TextStyle(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun ModelPickerContent(
+    viewModel: SetupViewModel,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    recommendedTextModel: HuggingFaceModel,
+    onBack: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    var localSelectedOption by remember { mutableStateOf<SetupOption?>(null) }
+    
+    val context = LocalContext.current
+    val ramGb = remember {
+        try {
+            val activityManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            val memoryInfo = android.app.ActivityManager.MemoryInfo()
+            activityManager.getMemoryInfo(memoryInfo)
+            memoryInfo.totalMem / (1024.0 * 1024.0 * 1024.0)
+        } catch (e: Exception) { 8.0 }
+    }
+    
+    val ramGuidance = when {
+        ramGb < 4.0 -> "Low memory detected (${String.format("%.1f", ramGb)}GB RAM). 1B models recommended."
+        ramGb < 8.0 -> "Standard memory detected (${String.format("%.1f", ramGb)}GB RAM). Optimized for 1B or 3B models."
+        else -> "Premium memory detected (${String.format("%.1f", ramGb)}GB RAM). Highly recommended to use 3B models."
+    }
+
+    data class PickerItem(
+        val option: SetupOption,
+        val title: String,
+        val size: String,
+        val description: String
+    )
+
+    val items = remember(recommendedTextModel) {
+        val list = mutableListOf<PickerItem>()
+        list.add(PickerItem(
+            SetupOption.TEXT,
+            "Llama-3.2 1B Instruct",
+            "640 MB",
+            "Highly responsive, optimized for low memory usage."
+        ))
+        
+        if (recommendedTextModel.id != "unsloth-llama-3_2-1b-instruct-q4_k_m") {
+            list.add(PickerItem(
+                SetupOption.TEXT_RECOMMENDED,
+                recommendedTextModel.name,
+                recommendedTextModel.approximateSize,
+                "Stronger reasoning capacity. Optimal choice for this device."
+            ))
+        }
+        
+        list.add(PickerItem(
+            SetupOption.TEXT_TTS,
+            "Llama + Kokoro Speech",
+            "980 MB",
+            "Generative chat with state-of-the-art local text-to-speech."
+        ))
+
+        list.add(PickerItem(
+            SetupOption.POWER_MODE,
+            "Skip & Go to Chat",
+            "0 MB",
+            "Minimal startup. Bring your own models or use API keys."
+        ))
+        list
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.Start
+        ) {
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.align(Alignment.Start)
+            ) {
+                Text("Back", color = BitColors.TextTertiary)
+            }
+            Text(
+                text = "Choose offline model",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = (-0.5).sp
+                )
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = ramGuidance,
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextSecondary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = 18.sp
+                )
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(vertical = 16.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items.forEach { item ->
+                val isSelected = localSelectedOption == item.option
+                
+                val strokeWidth = if (isSelected) 1.5.dp else 1.dp
+                val strokeColor = if (isSelected) BitColors.TextPrimary else BitColors.Border
+                val cardBgColor = if (isSelected) BitColors.SurfaceAlt else BitColors.Surface
+
+                val cardModifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(cardBgColor)
+                    .border(strokeWidth, strokeColor, RoundedCornerShape(20.dp))
+                    .clickable {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        localSelectedOption = item.option
+                    }
+
+                val finalModifier = if (isSelected) {
+                    with(sharedTransitionScope) {
+                        cardModifier.sharedBounds(
+                            sharedTransitionScope.rememberSharedContentState(key = "chat_header"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                    }
+                } else {
+                    cardModifier
+                }
+
+                Row(
+                    modifier = finalModifier.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = item.title,
+                                style = androidx.compose.ui.text.TextStyle(
+                                    color = BitColors.TextPrimary,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            )
+                            
+                            Box(
+                                modifier = Modifier
+                                    .border(1.dp, BitColors.TextTertiary, RoundedCornerShape(100.dp))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = item.size,
+                                    style = androidx.compose.ui.text.TextStyle(
+                                        color = BitColors.TextTertiary,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(4.dp))
+                        
+                        Text(
+                            text = item.description,
+                            style = androidx.compose.ui.text.TextStyle(
+                                color = BitColors.TextSecondary,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            RestoreFromBackupSection(viewModel = viewModel)
+
+            val isEnabled = localSelectedOption != null
+            val buttonAlpha = if (isEnabled) 1.0f else 0.3f
+            
+            Button(
+                onClick = {
+                    localSelectedOption?.let {
+                        viewModel.selectOption(it)
+                    }
+                },
+                enabled = isEnabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .alpha(buttonAlpha),
+                shape = RoundedCornerShape(28.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BitColors.Inverse,
+                    contentColor = BitColors.OnInverse,
+                    disabledContainerColor = BitColors.Inverse,
+                    disabledContentColor = BitColors.OnInverse
+                )
+            ) {
+                Text(
+                    text = if (localSelectedOption == SetupOption.POWER_MODE) "Go to Chat" else "Start Chatting",
+                    style = androidx.compose.ui.text.TextStyle(
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteApiConfigContent(
+    viewModel: SetupViewModel,
+    onBack: () -> Unit
+) {
+    val providers = listOf("Google Gemini", "OpenAI", "Anthropic Claude", "Nvidia NIM", "DeepSeek", "Custom")
+    var expanded by remember { mutableStateOf(false) }
+    var selectedProvider by remember { mutableStateOf(providers[0]) }
+
+    var endpointUrl by remember { mutableStateOf("https://generativelanguage.googleapis.com/v1beta") }
+    var modelName by remember { mutableStateOf("gemini-1.5-flash") }
+    var apiKey by remember { mutableStateOf("") }
+
+    fun onProviderChange(p: String) {
+        selectedProvider = p
+        when (p) {
+            "Google Gemini" -> {
+                endpointUrl = "https://generativelanguage.googleapis.com/v1beta"
+                modelName = "gemini-1.5-flash"
+            }
+            "OpenAI" -> {
+                endpointUrl = "https://api.openai.com/v1"
+                modelName = "gpt-4o-mini"
+            }
+            "Anthropic Claude" -> {
+                endpointUrl = "https://api.anthropic.com/v1"
+                modelName = "claude-3-5-haiku-20241022"
+            }
+            "Nvidia NIM" -> {
+                endpointUrl = "https://integrate.api.nvidia.com/v1"
+                modelName = "meta/llama-3.1-8b-instruct"
+            }
+            "DeepSeek" -> {
+                endpointUrl = "https://api.deepseek.com/v1"
+                modelName = "deepseek-chat"
+            }
+            "Custom" -> {
+                endpointUrl = ""
+                modelName = ""
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.align(Alignment.Start)
+            ) {
+                Text("Back", color = BitColors.TextTertiary)
+            }
+            Text(
+                text = "Configure API Connection",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.5).sp
+                )
+            )
+            Text(
+                text = "Register details for your preferred API endpoints. Prefilled default params are set for convenience.",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextSecondary,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            )
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { expanded = true },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = BitColors.TextPrimary),
+                    border = BorderStroke(1.dp, BitColors.Border)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(selectedProvider, style = androidx.compose.ui.text.TextStyle(fontSize = 15.sp))
+                        Text("▼", fontSize = 11.sp, color = BitColors.TextSecondary)
+                    }
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.fillMaxWidth(0.9f).background(BitColors.Surface)
+                ) {
+                    providers.forEach { provider ->
+                        DropdownMenuItem(
+                            text = { Text(provider, color = BitColors.TextPrimary) },
+                            onClick = {
+                                onProviderChange(provider)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = endpointUrl,
+                onValueChange = { endpointUrl = it },
+                label = { Text("Base Endpoint URL") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BitColors.TextPrimary,
+                    unfocusedBorderColor = BitColors.Border,
+                    focusedLabelColor = BitColors.TextPrimary,
+                    unfocusedLabelColor = BitColors.TextSecondary,
+                    focusedTextColor = BitColors.TextPrimary,
+                    unfocusedTextColor = BitColors.TextPrimary
+                )
+            )
+
+            OutlinedTextField(
+                value = modelName,
+                onValueChange = { modelName = it },
+                label = { Text("API Model ID") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = BitColors.TextPrimary,
+                    unfocusedBorderColor = BitColors.Border,
+                    focusedLabelColor = BitColors.TextPrimary,
+                    unfocusedLabelColor = BitColors.TextSecondary,
+                    focusedTextColor = BitColors.TextPrimary,
+                    unfocusedTextColor = BitColors.TextPrimary
+                )
+            )
+
+            PasswordTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                label = "API Key / Access Token",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        val isEnabled = endpointUrl.isNotBlank() && modelName.isNotBlank() && apiKey.isNotBlank()
+        val buttonAlpha = if (isEnabled) 1.0f else 0.3f
+
+        Button(
+            onClick = {
+                if (isEnabled) {
+                    viewModel.configureRemoteApi(
+                        provider = selectedProvider,
+                        baseUrl = endpointUrl,
+                        modelName = modelName,
+                        apiKey = apiKey
+                    )
+                }
+            },
+            enabled = isEnabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .alpha(buttonAlpha),
+            shape = RoundedCornerShape(28.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = BitColors.Inverse,
+                contentColor = BitColors.OnInverse,
+                disabledContainerColor = BitColors.Inverse,
+                disabledContentColor = BitColors.OnInverse
+            )
+        ) {
+            Text(
+                text = "Connect & Complete Setup",
+                style = androidx.compose.ui.text.TextStyle(
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun DownloadProgressContent(
     viewModel: SetupViewModel,
     selectedOption: SetupOption?,
     downloadStates: Map<String, ModelDownloadService.DownloadState>,
     downloadError: String?,
-    primaryModelId: String?,
-    isDownloading: Boolean
+    primaryModelId: String?
 ) {
+    val haptic = LocalHapticFeedback.current
     val downloadState = primaryModelId?.let { downloadStates[it] }
 
     val progress = when (downloadState) {
@@ -136,667 +791,292 @@ private fun SetupOptionsContent(
         else -> 0f
     }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
+    val speed = if (downloadState is ModelDownloadService.DownloadState.Downloading) {
+        val speedBytes = downloadState.speedBytesPerSec
+        val kb = speedBytes / 1024f
+        val mb = kb / 1024f
+        if (mb >= 1f) String.format("%.1f MB/s", mb) else String.format("%.1f KB/s", kb)
+    } else null
+
+    val eta = if (downloadState is ModelDownloadService.DownloadState.Downloading) {
+        val etaSecs = downloadState.etaSeconds
+        if (etaSecs < 0) "Calculating..."
+        else {
+            val mins = etaSecs / 60
+            val secs = etaSecs % 60
+            if (mins > 0) "${mins}m ${secs}s remaining" else "${secs}s remaining"
+        }
+    } else null
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = Standards.SpacingXl),
+                .fillMaxWidth()
+                .background(BitColors.Surface, RoundedCornerShape(20.dp))
+                .border(1.dp, BitColors.Border, RoundedCornerShape(20.dp))
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+            Text(
+                text = "Downloading Weights",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            )
 
-            // Header section
-            AnimatedContent(
-                targetState = isDownloading,
-                transitionSpec = {
-                    (fadeIn(Motion.entrance()) + slideInVertically(
-                        initialOffsetY = { -it / 4 },
-                        animationSpec = Motion.content()
-                    )) togetherWith fadeOut(Motion.exit())
-                },
-                label = "header"
-            ) { downloading ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (downloading) {
-                        Text(
-                            "Downloading...",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(Modifier.height(Standards.SpacingSm))
-                        Text(
-                            "You can Minimize the app, Will Notify You",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
+            Text(
+                text = "BIT runs entirely on-device. You can close or minimize the app; we will notify you when it is ready.",
+                style = androidx.compose.ui.text.TextStyle(
+                    color = BitColors.TextSecondary,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+            )
 
-                        Spacer(Modifier.height(Standards.SpacingXl))
-
-                        // Progress bar with droplets
-                        if (progress >= 0f) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                DropletProgressBar(
-                                    progress = progress,
-                                    modifier = Modifier.weight(1f).height(40.dp),
-                                    barColor = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                                )
-                                Spacer(Modifier.width(Standards.SpacingMd))
-                                Text(
-                                    "${(progress * 100).toInt()}%",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontWeight = FontWeight.SemiBold
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        } else {
-                            // Indeterminate for extracting/processing
-                            LinearProgressIndicator(
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (progress >= 0f) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(BitColors.Border)
+                        ) {
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
-                                color = MaterialTheme.colorScheme.primary,
-                                trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                                    .background(BitColors.TextPrimary)
                             )
                         }
-                    } else {
+                        
                         Text(
-                            "Welcome User",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "${(progress * 100).toInt()}%",
+                            style = androidx.compose.ui.text.TextStyle(
+                                color = BitColors.TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         )
-                        Spacer(Modifier.height(Standards.SpacingSm))
+                    }
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = BitColors.TextPrimary,
+                        trackColor = BitColors.Border
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    speed?.let {
                         Text(
-                            "Choose Your Setup!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = it,
+                            style = androidx.compose.ui.text.TextStyle(
+                                color = BitColors.TextTertiary,
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                    eta?.let {
+                        Text(
+                            text = it,
+                            style = androidx.compose.ui.text.TextStyle(
+                                color = BitColors.TextTertiary,
+                                fontSize = 12.sp
+                            )
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(Standards.SpacingXxl))
-
-            // Options list with staggered animation
-            data class SetupCard(
-                val option: SetupOption,
-                val icon: androidx.compose.ui.graphics.vector.ImageVector,
-                val title: String,
-                val subtitle: String
-            )
-
-            val options = listOf(
-                SetupCard(SetupOption.TEXT, TnIcons.Sparkles, "Text Generation", "LFM2 350M · ~200 MB"),
-                SetupCard(SetupOption.TEXT_TTS, TnIcons.Volume, "Text + Speech", "LFM2 + Supertonic TTS · ~460 MB"),
-                SetupCard(SetupOption.IMAGE_GEN, TnIcons.Photo, "Image Generation", "AbsoluteReality · ~1.1 GB"),
-                SetupCard(SetupOption.POWER_MODE, TnIcons.Bolt, "Power Mode", "Set up later in Store")
-            )
-
-            options.forEachIndexed { index, card ->
-                key(card.option) {
-                    var visible by remember { mutableStateOf(false) }
-                    LaunchedEffect(Unit) {
-                        delay(index * 80L)
-                        visible = true
-                    }
-
-                    AnimatedVisibility(
-                        visible = visible,
-                        enter = fadeIn(Motion.content())
-                    ) {
-                        SetupOptionCard(
-                            icon = card.icon,
-                            title = card.title,
-                            subtitle = card.subtitle,
-                            isSelected = selectedOption == card.option,
-                            isDownloading = isDownloading,
-                            enabled = selectedOption == null,
-                            onClick = { viewModel.selectOption(card.option) }
-                        )
-                    }
-
-                    if (index < options.lastIndex) {
-                        Spacer(Modifier.height(Standards.SpacingSm))
-                    }
+            TextButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    viewModel.cancelDownload()
                 }
+            ) {
+                Text(
+                    text = "Cancel",
+                    style = androidx.compose.ui.text.TextStyle(
+                        color = BitColors.TextTertiary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
             }
+        }
 
-            // Error message
-            AnimatedVisibility(
-                visible = downloadError != null,
-                enter = Motion.Enter,
-                exit = Motion.Exit
+        downloadError?.let { error ->
+            Spacer(modifier = Modifier.height(16.dp))
+            Surface(
+                color = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
-                    modifier = Modifier.padding(top = Standards.SpacingLg),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = downloadError ?: "",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+                        text = error,
+                        style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(Standards.SpacingSm))
-                    TextButton(onClick = { viewModel.retryDownload() }) {
+                    Button(
+                        onClick = { viewModel.retryDownload() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
                         Text("Retry")
                     }
                 }
             }
-
-            // Restore from Backup section
-            if (!isDownloading) {
-                Spacer(Modifier.height(Standards.SpacingXl))
-                RestoreFromBackupCard(viewModel = viewModel)
-            }
         }
     }
 }
 
-// ── Performance Picker Phase ──
-
 @Composable
-private fun PerformancePickerContent(viewModel: SetupViewModel) {
-    val selectedMode by viewModel.selectedPerformanceMode.collectAsStateWithLifecycle()
+private fun RestoreFromBackupSection(viewModel: SetupViewModel) {
     val context = LocalContext.current
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var backupUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var password by remember { mutableStateOf("") }
+    
+    val restoreProgress by viewModel.restoreProgress.collectAsStateWithLifecycle()
 
-    val clusterInfo = remember {
-        try {
-            val profile = HardwareScanner.scan(context)
-            val topo = profile.cpuTopology
-            if (topo.scanSucceeded) {
-                buildString {
-                    if (topo.primeCoreCount > 0) append("${topo.primeCoreCount}P")
-                    if (topo.performanceCoreCount > 0) {
-                        if (isNotEmpty()) append("+")
-                        append("${topo.performanceCoreCount}P")
-                    }
-                    if (topo.efficiencyCoreCount > 0) {
-                        if (isNotEmpty()) append("+")
-                        append("${topo.efficiencyCoreCount}E")
-                    }
-                    append(" cores")
-                }
-            } else "${topo.totalPhysicalCores} cores"
-        } catch (_: Exception) { null }
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            backupUri = uri
+            showPasswordDialog = true
+        }
     }
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = Standards.SpacingXl),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                "Optimize Performance",
-                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(Modifier.height(Standards.SpacingSm))
-            Text(
-                "Choose how your device runs AI models",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            clusterInfo?.let {
-                Spacer(Modifier.height(Standards.SpacingXs))
-                Text(
-                    "Detected: $it",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (restoreProgress != null) {
+            val progressVal = when (val progress = restoreProgress!!) {
+                is SystemBackupManager.BackupProgress.Processing -> progress.progress
+                is SystemBackupManager.BackupProgress.Complete -> 1f
+                else -> -1f
             }
-
-            Spacer(Modifier.height(Standards.SpacingXxl))
-
-            val modes = listOf(
-                Triple(PerformanceMode.PERFORMANCE, TnIcons.Gauge, "Maximum speed, higher battery usage"),
-                Triple(PerformanceMode.BALANCED, TnIcons.Adjustments, "Good speed with reasonable battery life"),
-                Triple(PerformanceMode.POWER_SAVING, TnIcons.Shield, "Slower but saves battery")
-            )
-
-            modes.forEachIndexed { index, (mode, icon, description) ->
-                var visible by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) {
-                    delay(index * 80L)
-                    visible = true
-                }
-
-                AnimatedVisibility(
-                    visible = visible,
-                    enter = fadeIn(Motion.content())
-                ) {
-                    PerformanceModeCard(
-                        mode = mode,
-                        icon = icon,
-                        description = description,
-                        isSelected = selectedMode == mode,
-                        onClick = { viewModel.selectPerformanceMode(mode) }
+            val stageVal = when (val progress = restoreProgress!!) {
+                is SystemBackupManager.BackupProgress.Starting -> "Starting"
+                is SystemBackupManager.BackupProgress.Collecting -> "Collecting ${progress.component}"
+                is SystemBackupManager.BackupProgress.Processing -> progress.stage
+                is SystemBackupManager.BackupProgress.Complete -> "Complete"
+                is SystemBackupManager.BackupProgress.Error -> "Error: ${progress.message}"
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (progressVal >= 0f) {
+                    LinearProgressIndicator(
+                        progress = { progressVal },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = BitColors.TextPrimary,
+                        trackColor = BitColors.Border
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = BitColors.TextPrimary,
+                        trackColor = BitColors.Border
                     )
                 }
-
-                if (index < modes.lastIndex) {
-                    Spacer(Modifier.height(Standards.SpacingSm))
-                }
-            }
-
-            Spacer(Modifier.height(Standards.SpacingXl))
-
-            FilledTonalButton(
-                onClick = { viewModel.confirmPerformanceMode() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Continue")
-            }
-        }
-    }
-}
-
-// ==================== Restore from Backup ====================
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun RestoreFromBackupCard(viewModel: SetupViewModel) {
-    var showRestoreDialog by remember { mutableStateOf(false) }
-    var restorePassword by remember { mutableStateOf("") }
-    val restoreProgress by viewModel.restoreProgress.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-
-    // Restart process after successful restore — Hilt singletons hold stale DB/DAO refs
-    LaunchedEffect(restoreProgress) {
-        if (restoreProgress is SystemBackupManager.BackupProgress.Complete) {
-            kotlinx.coroutines.delay(1000)
-            val activity = context as? android.app.Activity
-            activity?.let {
-                val intent = it.packageManager.getLaunchIntentForPackage(it.packageName)
-                    ?.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                it.finishAffinity()
-                if (intent != null) it.startActivity(intent)
-                Runtime.getRuntime().exit(0)
-            }
-        }
-    }
-
-    val restoreLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null && restorePassword.isNotEmpty()) {
-            viewModel.restoreFromBackup(uri, restorePassword)
-            restorePassword = ""
-            showRestoreDialog = false
-        }
-    }
-
-    // Show progress or the restore button
-    val progress = restoreProgress
-    if (progress != null && progress !is SystemBackupManager.BackupProgress.Error) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(Standards.CardCornerRadius),
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = Standards.SpacingLg, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
-            ) {
-                LoadingIndicator(modifier = Modifier.size(20.dp))
                 Text(
-                    text = when (progress) {
-                        is SystemBackupManager.BackupProgress.Starting -> "Restoring..."
-                        is SystemBackupManager.BackupProgress.Collecting -> progress.component
-                        is SystemBackupManager.BackupProgress.Processing -> "Restoring ${(progress.progress * 100).toInt()}%"
-                        is SystemBackupManager.BackupProgress.Complete -> "Restore complete!"
-                        is SystemBackupManager.BackupProgress.Error -> "Restoring..."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
+                    text = "${stageVal}...",
+                    color = BitColors.TextSecondary,
+                    fontSize = 12.sp
                 )
             }
-        }
-    } else {
-        Surface(
-            onClick = { showRestoreDialog = true },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(Standards.CardCornerRadius),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = Standards.SpacingLg, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
-            ) {
-                Icon(
-                    TnIcons.Restore, null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-                Text(
-                    "Restore from Backup",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-        }
-
-        // Error from previous attempt
-        if (progress is SystemBackupManager.BackupProgress.Error) {
-            Spacer(Modifier.height(Standards.SpacingSm))
+        } else {
             Text(
-                text = progress.message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                text = "Already have a backup?",
+                color = BitColors.TextTertiary,
+                fontSize = 13.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Restore from backup file",
+                color = BitColors.TextPrimary,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clickable {
+                        filePickerLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                    }
+                    .padding(4.dp)
             )
         }
     }
 
-    // Restore dialog
-    if (showRestoreDialog) {
+    if (showPasswordDialog && backupUri != null) {
         AlertDialog(
-            onDismissRequest = {
-                showRestoreDialog = false
-                restorePassword = ""
-            },
-            icon = { Icon(TnIcons.Restore, null, tint = MaterialTheme.colorScheme.primary) },
-            title = { Text("Restore from Backup", fontWeight = FontWeight.SemiBold) },
+            onDismissRequest = { showPasswordDialog = false },
+            title = { Text("Restore Backup", color = BitColors.TextPrimary) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        "Enter your backup password, then select the backup file.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        "Please enter the password that was used to encrypt this backup.",
+                        color = BitColors.TextSecondary,
+                        fontSize = 14.sp
                     )
                     PasswordTextField(
-                        value = restorePassword,
-                        onValueChange = { restorePassword = it },
-                        label = "Backup Password",
-                        modifier = Modifier.fillMaxWidth(),
-                        showToggle = false
+                        value = password,
+                        onValueChange = { password = it },
+                        label = "Password",
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
                 TextButton(
-                    onClick = { restoreLauncher.launch(arrayOf("application/octet-stream", "*/*")) },
-                    enabled = restorePassword.length >= 4
-                ) { Text("Select Backup File") }
+                    onClick = {
+                        showPasswordDialog = false
+                        viewModel.restoreFromBackup(backupUri!!, password)
+                    }
+                ) {
+                    Text("Restore", color = BitColors.TextPrimary, fontWeight = FontWeight.Bold)
+                }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showRestoreDialog = false
-                    restorePassword = ""
-                }) { Text("Cancel") }
+                TextButton(onClick = { showPasswordDialog = false }) {
+                    Text("Cancel", color = BitColors.TextSecondary)
+                }
             },
-            shape = RoundedCornerShape(Standards.RadiusXl)
+            containerColor = BitColors.Surface,
+            shape = RoundedCornerShape(20.dp)
         )
-    }
-}
-
-// ==================== Performance Mode Card ====================
-
-@Composable
-private fun PerformanceModeCard(
-    mode: PerformanceMode,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    description: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val backgroundColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerLow,
-        animationSpec = Motion.state(),
-        label = "perfBg"
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurface,
-        animationSpec = Motion.state(),
-        label = "perfContent"
-    )
-
-    val label = when (mode) {
-        PerformanceMode.PERFORMANCE -> "Performance"
-        PerformanceMode.BALANCED -> "Balanced"
-        PerformanceMode.POWER_SAVING -> "Power Saver"
-    }
-
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Standards.RadiusXl),
-        color = backgroundColor
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Standards.SpacingLg, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected) MaterialTheme.colorScheme.primary else contentColor.copy(alpha = 0.7f),
-                modifier = Modifier.size(28.dp)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    color = contentColor
-                )
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor.copy(alpha = 0.7f)
-                )
-            }
-            if (isSelected) {
-                Icon(
-                    imageVector = TnIcons.RadioButton,
-                    contentDescription = "Selected",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-// ==================== Option Card ====================
-
-@Composable
-private fun SetupOptionCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    isSelected: Boolean,
-    isDownloading: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    val backgroundColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isDownloading -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.surfaceContainerLow
-        },
-        animationSpec = Motion.state(),
-        label = "optionBg"
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isDownloading -> MaterialTheme.colorScheme.onPrimaryContainer
-            !enabled && !isSelected -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-            else -> MaterialTheme.colorScheme.onSurface
-        },
-        animationSpec = Motion.state(),
-        label = "optionContent"
-    )
-
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Standards.RadiusXl),
-        color = backgroundColor,
-        enabled = enabled && !isDownloading
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Standards.SpacingLg, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isSelected && isDownloading) MaterialTheme.colorScheme.primary
-                       else contentColor.copy(alpha = 0.7f),
-                modifier = Modifier.size(28.dp)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                    color = contentColor
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor.copy(alpha = 0.7f)
-                )
-            }
-            if (isSelected && isDownloading) {
-                Icon(
-                    imageVector = TnIcons.RadioButton,
-                    contentDescription = "Downloading",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
-    }
-}
-
-// ==================== Droplet Progress Bar ====================
-
-private data class Droplet(
-    val x: Float,
-    val startY: Float,
-    val speed: Float,
-    val radius: Float,
-    val alpha: Float,
-    var y: Float = startY,
-    var life: Float = 1f
-)
-
-@Composable
-private fun DropletProgressBar(
-    progress: Float,
-    modifier: Modifier = Modifier,
-    barColor: Color,
-    trackColor: Color
-) {
-    val droplets = remember { mutableListOf<Droplet>() }
-    var tick by remember { mutableFloatStateOf(0f) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(16L)
-            tick += 0.016f
-        }
-    }
-
-    Canvas(modifier = modifier) {
-        val barHeight = 6.dp.toPx()
-        val barRadius = barHeight / 2f
-        val barY = size.height / 2f - barHeight / 2f
-        val filledWidth = size.width * progress.coerceIn(0f, 1f)
-
-        // ── Track ──
-        drawRoundRect(
-            color = trackColor,
-            topLeft = Offset(0f, barY),
-            size = Size(size.width, barHeight),
-            cornerRadius = CornerRadius(barRadius)
-        )
-
-        // ── Filled bar ──
-        if (filledWidth > 0f) {
-            drawRoundRect(
-                color = barColor,
-                topLeft = Offset(0f, barY),
-                size = Size(filledWidth, barHeight),
-                cornerRadius = CornerRadius(barRadius)
-            )
-        }
-
-        // ── Spawn droplets at the right edge of the filled bar ──
-        if (progress > 0.01f && progress < 1f) {
-            val spawnX = filledWidth
-            val spawnY = barY + barHeight
-
-            // Spawn new droplets periodically
-            val spawnChance = if (sin(tick * 8f) > 0.3f) 0.25f else 0.08f
-            if (Random.nextFloat() < spawnChance && droplets.size < 6) {
-                droplets.add(
-                    Droplet(
-                        x = spawnX + Random.nextFloat() * 8f - 4f,
-                        startY = spawnY,
-                        speed = 1.2f + Random.nextFloat() * 1.5f,
-                        radius = 2f + Random.nextFloat() * 2.5f,
-                        alpha = 0.6f + Random.nextFloat() * 0.4f
-                    )
-                )
-            }
-        }
-
-        // ── Update & draw droplets ──
-        val iterator = droplets.iterator()
-        while (iterator.hasNext()) {
-            val d = iterator.next()
-            d.y += d.speed
-            d.life -= 0.025f
-
-            if (d.life <= 0f || d.y > size.height + 10f) {
-                iterator.remove()
-                continue
-            }
-
-            // Droplet shrinks as it falls
-            val currentRadius = d.radius * d.life.coerceIn(0f, 1f)
-            val currentAlpha = (d.alpha * d.life).coerceIn(0f, 1f)
-
-            drawCircle(
-                color = barColor.copy(alpha = currentAlpha),
-                radius = currentRadius,
-                center = Offset(d.x, d.y)
-            )
-
-            // Small highlight on top of droplet
-            if (currentRadius > 2f) {
-                drawCircle(
-                    color = Color.White.copy(alpha = currentAlpha * 0.4f),
-                    radius = currentRadius * 0.35f,
-                    center = Offset(d.x - currentRadius * 0.2f, d.y - currentRadius * 0.25f)
-                )
-            }
-        }
     }
 }

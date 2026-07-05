@@ -28,7 +28,7 @@ data class ModelStoreCache(
 ) {
     companion object {
         // Bump this when filtering logic changes to auto-invalidate stale caches
-        const val CURRENT_VERSION = 2
+        const val CURRENT_VERSION = 3
     }
 }
 
@@ -149,11 +149,13 @@ class ModelStoreRepository(private val context: Context) {
             val ggufModels = getGGUFModels(hfRepos.filter { it.modelType == ModelType.GGUF })
             val apiModels = getApiModels(apiRepos)
             val ttsModels = getTTSModels(hfRepos.filter { it.modelType == ModelType.TTS })
+            val sttModels = getSTTModels(hfRepos.filter { it.modelType == ModelType.STT })
 
             models.addAll(sdModels)
             models.addAll(ggufModels)
             models.addAll(apiModels)
             models.addAll(ttsModels)
+            models.addAll(sttModels)
 
             val modelList = models.toList()
             cachedModels = modelList
@@ -409,6 +411,67 @@ class ModelStoreRepository(private val context: Context) {
         return models
     }
 
+    private suspend fun getSTTModels(repositories: List<HFModelRepository>): List<HuggingFaceModel> {
+        val models = mutableListOf<HuggingFaceModel>()
+
+        // 1. Add Default Presets (Whisper Tiny English)
+        models.add(
+            HuggingFaceModel(
+                id = "sherpa-whisper-tiny",
+                name = "Whisper Tiny (English)",
+                description = "On-device Whisper Speech-to-Text recognizer model using Sherpa ONNX · ~75 MB",
+                fileUri = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main",
+                approximateSize = "75 MB",
+                modelType = ModelType.STT,
+                isZip = false,
+                runOnCpu = true,
+                textEmbeddingSize = 0,
+                tags = listOf("STT", "English", "Whisper", "sherpa-onnx"),
+                requiresNPU = false,
+                repositoryUrl = "csukuangfj/sherpa-onnx-whisper-tiny.en"
+            )
+        )
+
+        // 2. Scan enabled STT repositories
+        repositories.forEach { repo ->
+            try {
+                val response = HuggingFaceClient.api.getRepoFiles(repo.repoPath)
+                if (response.isSuccessful) {
+                    val files = response.body() ?: emptyList()
+                    val onnxFiles = files.filter { it.path.endsWith(".onnx", ignoreCase = true) }
+
+                    onnxFiles.forEach { file ->
+                        val fileName = file.path.substringAfterLast("/")
+                        val baseName = fileName.removeSuffix(".onnx").removeSuffix(".ONNX")
+                        val sizeStr = formatDecimalBytes(file.size ?: 0)
+
+                        val tags = mutableListOf("STT", repo.name, "sherpa-onnx")
+                        models.add(
+                            HuggingFaceModel(
+                                id = "${repo.id}-${baseName.lowercase()}",
+                                name = baseName.replace("-", " ").replace("_", " "),
+                                description = "${repo.name} STT model: $baseName.",
+                                fileUri = "${repo.repoPath}/resolve/main/${file.path}",
+                                approximateSize = sizeStr,
+                                modelType = ModelType.STT,
+                                isZip = false,
+                                runOnCpu = true,
+                                textEmbeddingSize = 0,
+                                tags = tags.distinct(),
+                                requiresNPU = false,
+                                repositoryUrl = repo.repoPath
+                            )
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ModelStoreRepository", "Error fetching STT models from ${repo.repoPath}", e)
+            }
+        }
+
+        return models
+    }
+
     private suspend fun getGGUFModels(repositories: List<HFModelRepository>): List<HuggingFaceModel> {
         val models = mutableListOf<HuggingFaceModel>()
 
@@ -528,8 +591,10 @@ class ModelStoreRepository(private val context: Context) {
                         // the inference endpoint directly. Prefer /api/chat for
                         // chat-first UX, while still allowing endpoint hints.
                         ?: run {
-                            val hasOllamaModelKey = item.stringValue("model") != null || item.stringValue("name") != null
-                            if (hasOllamaModelKey) {
+                            val hasModelKey = item.stringValue("model") != null || 
+                                              item.stringValue("name") != null || 
+                                              item.stringValue("id") != null
+                            if (hasModelKey) {
                                 val base = repo.apiBaseUrl.trim().removeSuffix("/")
                                 val hintedPath = item.stringValue("endpoint")
                                     ?: item.stringValue("chatEndpoint")
@@ -540,7 +605,26 @@ class ModelStoreRepository(private val context: Context) {
                                         "$base/${hintedPath.removePrefix("/")}"
                                     }
                                 } else {
-                                    "$base/api/chat"
+                                    val baseClean = base.removeSuffix("/")
+                                    val baseLower = baseClean.lowercase(java.util.Locale.US)
+                                    if (baseLower.contains("openrouter.ai") ||
+                                        baseLower.contains("openai.com") ||
+                                        baseLower.contains("googleapis.com") ||
+                                        baseLower.contains("groq.com") ||
+                                        baseLower.contains("nvidia.com") ||
+                                        baseLower.contains("deepinfra.com") ||
+                                        baseLower.contains("together.xyz") ||
+                                        baseLower.contains("mistral.ai") ||
+                                        baseLower.contains("/v1")
+                                    ) {
+                                        if (baseLower.contains("/v1")) {
+                                            "$baseClean/chat/completions"
+                                        } else {
+                                            "$baseClean/v1/chat/completions"
+                                        }
+                                    } else {
+                                        "$baseClean/api/chat"
+                                    }
                                 }
                             } else {
                                 null
@@ -597,6 +681,7 @@ class ModelStoreRepository(private val context: Context) {
             "GGUF", "LLM" -> ModelType.GGUF
             "SD", "DIFFUSION", "STABLE_DIFFUSION" -> ModelType.SD
             "TTS" -> ModelType.TTS
+            "STT" -> ModelType.STT
             else -> fallback
         }
     }

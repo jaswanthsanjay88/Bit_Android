@@ -4,10 +4,12 @@ import android.content.Context
 import android.util.Log
 import com.bit.data.AppSettingsDataStore
 import com.bit.global.AppPaths
-import com.k2fsa.sherpa.onnx.OfflineModelConfig
-import com.k2fsa.sherpa.onnx.OfflineRecognizer
-import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
-import com.k2fsa.sherpa.onnx.OfflineWhisperModelConfig
+import com.dark.ai_sherpa.OfflineModelConfig
+import com.dark.ai_sherpa.OfflineRecognizer
+import com.dark.ai_sherpa.OfflineRecognizerConfig
+import com.dark.ai_sherpa.OfflineWhisperModelConfig
+import com.dark.ai_sherpa.OfflineStream
+import com.dark.ai_sherpa.OfflineRecognizerResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -123,7 +125,7 @@ object SherpaSTTEngine {
             )
 
             // Dynamic load of Whisper model
-            recognizer = OfflineRecognizer(context.assets, config)
+            recognizer = OfflineRecognizer.fromFile(config)
 
             // Convert PCM byte array to float array (normalized to [-1, 1])
             val samples = pcmToFloat(audioData)
@@ -137,7 +139,7 @@ object SherpaSTTEngine {
             val stream = recognizer.createStream()
 
             // Accept waveform
-            stream.acceptWaveform(samples, sampleRate = 16000)
+            stream.acceptWaveform(sampleRate = 16000, samples = samples)
 
             // Decode
             recognizer.decode(stream)
@@ -147,7 +149,7 @@ object SherpaSTTEngine {
             val text = result?.text ?: ""
 
             // Release stream explicitly as memory is managed by C++
-            stream.release()
+            stream.close()
 
             Log.i(TAG, "Transcription result (threads=$numThreads, lang=$language): '${text.take(100)}'")
             text.trim()
@@ -157,7 +159,7 @@ object SherpaSTTEngine {
         } finally {
             // Unload/release recognizer immediately to reclaim ~75MB RAM
             try {
-                recognizer?.release()
+                recognizer?.close()
             } catch (e: Exception) {
                 Log.w(TAG, "Error releasing recognizer: ${e.message}")
             }

@@ -1,6 +1,7 @@
 package com.bit.ui.screen.model_store
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -19,10 +21,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bit.global.Standards
 import com.bit.global.formatBytes
 import com.bit.models.enums.ProviderType
@@ -46,10 +50,8 @@ import com.bit.models.table_schema.Model
 import com.bit.models.ui.ActionIcon
 import com.bit.models.ui.ActionItem
 import com.bit.ui.components.CaptionText
-import com.bit.ui.components.GlassCard
 import com.bit.ui.components.MultiActionButton
 import com.bit.ui.components.StatusBadge
-import com.bit.ui.theme.Glass
 import com.bit.ui.theme.maple
 import com.bit.viewmodel.ModelStoreViewModel
 import com.bit.ui.icons.TnIcons
@@ -57,52 +59,97 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-// ── InstalledModelsTab ──
-
 @Composable
 internal fun InstalledModelsTab(
     models: List<Model>,
     deleteInProgress: String?,
     onDelete: (Model) -> Unit,
-    viewModel: ModelStoreViewModel
+    viewModel: ModelStoreViewModel,
+    llmModelViewModel: com.bit.viewmodel.LLMModelViewModel
 ) {
     var selectedModel by remember { mutableStateOf<Model?>(null) }
     var showDeleteDialog by remember { mutableStateOf<Model?>(null) }
 
-    if (models.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
+        verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+    ) {
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        context.startActivity(android.content.Intent(context, com.bit.activity.ModelPickerActivity::class.java))
+                    },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(
-                    imageVector = TnIcons.Database,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = Glass.TextSecondary
-                )
-                Text(
-                    text = "No installed models",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Glass.TextPrimary
-                )
+                Row(
+                    modifier = Modifier.padding(Standards.CardPadding),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                ) {
+                    Icon(
+                        imageVector = TnIcons.Upload,
+                        contentDescription = null,
+                        modifier = Modifier.size(Standards.IconMd),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Column {
+                        Text(
+                            "Import Local Model",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            "Load local GGUF, Diffusion, or TTS model files",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         }
-    } else {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
-            verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-        ) {
-            items(models, key = { it.id }) { model ->
+
+        if (models.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
+                    ) {
+                        Icon(
+                            imageVector = TnIcons.Database,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = "No installed models",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        } else {
+            items(models) { model ->
                 InstalledModelCard(
                     model = model,
                     isDeleting = deleteInProgress == model.id,
                     onShowDetails = { selectedModel = model },
-                    onDelete = { showDeleteDialog = model }
+                    onDelete = { showDeleteDialog = model },
+                    onClick = { llmModelViewModel.loadModel(model) }
                 )
             }
         }
@@ -142,44 +189,54 @@ internal fun InstalledModelsTab(
     }
 }
 
-// ── InstalledModelCard ──
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun InstalledModelCard(
     model: Model,
     isDeleting: Boolean,
     onShowDetails: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onClick: () -> Unit
 ) {
-    GlassCard(
-        modifier = Modifier.fillMaxWidth(),
-        backgroundColor = if (model.isActive) Glass.AccentPrimarySurface else Glass.Surface,
-        borderColor = if (model.isActive) Glass.AccentPrimary else Glass.BorderSubtle,
-        cornerRadius = Standards.CardSmallCornerRadius
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = if (model.isActive) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
+        ),
+        border = if (model.isActive) {
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        },
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier.padding(Standards.CardPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
-            // Provider type icon
             Icon(
                 imageVector = when (model.providerType) {
                     ProviderType.GGUF -> TnIcons.Sparkles
+                    ProviderType.API -> TnIcons.Upload
                     else -> TnIcons.Photo
                 },
                 contentDescription = null,
                 modifier = Modifier.size(Standards.IconMd),
-                tint = if (model.isActive) Glass.AccentPrimary
-                       else Glass.TextSecondary
+                tint = if (model.isActive) MaterialTheme.colorScheme.primary
+                       else MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = model.modelName,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Glass.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -208,21 +265,20 @@ internal fun InstalledModelCard(
                 CaptionText(text = sizeText)
             }
 
-            // Status dot
             StatusBadge(
                 text = if (model.isActive) "Active" else "",
                 isActive = model.isActive
             )
 
-            // Actions
             if (isDeleting) {
                 Box(
                     modifier = Modifier.size(Standards.ActionIconSize),
                     contentAlignment = Alignment.Center
                 ) {
-                    LoadingIndicator(
-                        modifier = Modifier.size(Standards.IconMd),
-                        color = Glass.AccentPrimary
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
             } else {
@@ -245,8 +301,6 @@ internal fun InstalledModelCard(
     }
 }
 
-// ── ModelDetailsDialog ──
-
 @Composable
 internal fun ModelDetailsDialog(
     model: Model,
@@ -263,13 +317,13 @@ internal fun ModelDetailsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        modifier = Modifier.border(1.dp, Glass.BorderSubtle, RoundedCornerShape(Standards.RadiusLg)),
-        containerColor = Glass.Surface,
+        modifier = Modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(20.dp)),
+        containerColor = MaterialTheme.colorScheme.surface,
         title = {
             Text(
                 text = model.modelName,
                 style = MaterialTheme.typography.titleLarge,
-                color = Glass.TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
         },
         text = {
@@ -330,7 +384,7 @@ internal fun ModelDetailsDialog(
                 if (configLoaded && config != null) {
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = Standards.SpacingXs),
-                        color = Glass.Divider
+                        color = MaterialTheme.colorScheme.outlineVariant
                     )
 
                     when (model.providerType) {
@@ -342,7 +396,7 @@ internal fun ModelDetailsDialog(
                             Text(
                                 text = "Loading Config",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Glass.AccentPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                             DetailRow("Context Size", "${schema.loadingParams.ctxSize}")
                             DetailRow("Batch Size", "${schema.loadingParams.batchSize}")
@@ -353,7 +407,7 @@ internal fun ModelDetailsDialog(
                             Text(
                                 text = "Inference Config",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Glass.AccentPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                             DetailRow("Temperature", "${schema.inferenceParams.temperature}")
                             DetailRow("Top K", "${schema.inferenceParams.topK}")
@@ -372,7 +426,7 @@ internal fun ModelDetailsDialog(
                             Text(
                                 text = "Model Config",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Glass.AccentPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                             if (loadingObj != null) {
                                 DetailRow("Resolution", "${loadingObj.optInt("width", 512)} x ${loadingObj.optInt("height", 512)}")
@@ -386,7 +440,7 @@ internal fun ModelDetailsDialog(
                                 Text(
                                     text = "Inference Config",
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = Glass.AccentPrimary
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                                 DetailRow("Steps", "${inferenceObj.optInt("steps", 28)}")
                                 DetailRow("CFG Scale", "${inferenceObj.optDouble("cfg_scale", 7.0)}")
@@ -401,7 +455,7 @@ internal fun ModelDetailsDialog(
                             Text(
                                 text = "TTS Config",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Glass.AccentPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                             if (ttsObj != null) {
                                 DetailRow("Voice", ttsObj.optString("voice", "F1"))
@@ -417,7 +471,7 @@ internal fun ModelDetailsDialog(
                             Text(
                                 text = "API Config",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Glass.AccentPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                             if (apiObj != null) {
                                 DetailRow("Endpoint", apiObj.optString("endpoint", "--"))
@@ -433,7 +487,7 @@ internal fun ModelDetailsDialog(
                             Text(
                                 text = "STT Config",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Glass.AccentPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                             if (sttObj != null) {
                                 DetailRow("Engine", sttObj.optString("engine", "sherpa-onnx"))
@@ -451,7 +505,7 @@ internal fun ModelDetailsDialog(
                             Text(
                                 text = "VLM Config",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Glass.AccentPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                             if (vlmLoadObj != null) {
                                 DetailRow("Type", vlmLoadObj.optString("type", "vlm"))
@@ -473,20 +527,18 @@ internal fun ModelDetailsDialog(
     )
 }
 
-// ── DetailRow ──
-
 @Composable
 internal fun DetailRow(label: String, value: String) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = Glass.TextMuted
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
-            color = Glass.TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontFamily = if (label == "Path") maple else null
         )
     }

@@ -242,12 +242,11 @@ internal fun LazyListScope.ttsSettingsSection(
     }
 }
 
-// ── STT Settings Section ──
-
 internal fun LazyListScope.sttSettingsSection(
     hasSttModel: Boolean,
     sttThreads: Int,
     sttLanguage: String,
+    sttDownloadStates: Map<String, ModelDownloadService.DownloadState>,
     viewModel: SettingsViewModel
 ) {
     item {
@@ -257,6 +256,27 @@ internal fun LazyListScope.sttSettingsSection(
             description = "Configure offline Whisper recognizer"
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)) {
+                // Whisper STT Model Card
+                Text(
+                    text = "Whisper Recognizer Model",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = Glass.TextPrimary,
+                    modifier = Modifier.padding(top = Standards.SpacingXs)
+                )
+
+                val downloadState = sttDownloadStates[com.bit.stt.SherpaSTTEngine.MODEL_ID]
+                ModelDownloadCard(
+                    title = com.bit.stt.SherpaSTTEngine.MODEL_DISPLAY_NAME,
+                    description = "Fast, on-device English speech recognition · ~75 MB",
+                    downloadState = downloadState,
+                    onDownload = { viewModel.downloadSttModel() },
+                    successText = "Installed — Ready",
+                    isInstalled = hasSttModel
+                )
+
+                GlassDivider()
+
                 // Thread count config (1-4 cores)
                 Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)) {
                     Row(

@@ -52,9 +52,17 @@ import com.bit.models.table_schema.Model
 import com.bit.state.AppStateManager
 import com.bit.ui.icons.TnIcons
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun AnimatedTitle(
-    modifier: Modifier = Modifier, onShowDynamicWindow: () -> Unit = {}
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    modifier: Modifier = Modifier,
+    onShowDynamicWindow: () -> Unit = {}
 ) {
     val appState by AppStateManager.appState.collectAsStateWithLifecycle()
 
@@ -64,6 +72,8 @@ fun AnimatedTitle(
         }, label = "AppStateTitleAnim"
     ) { state ->
         TitleRow(
+            sharedTransitionScope = sharedTransitionScope,
+            animatedVisibilityScope = animatedVisibilityScope,
             text = state.getDisplayText(),
             icon = state.getIcon(),
             state = state,
@@ -73,49 +83,106 @@ fun AnimatedTitle(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+fun getShortModelLabel(fullModelName: String): String {
+    var name = fullModelName.substringAfterLast('/')
+    name = name.substringAfterLast('\\')
+    if (name.contains('(')) {
+        name = name.substringBefore('(').trim()
+    }
+    name = name.removeSuffix(".gguf")
+        .removeSuffix(".bin")
+        .removeSuffix(".onnx")
+        .trim()
+    if (name.contains(':')) {
+        name = name.substringBefore(':')
+    }
+    if (name.contains('/')) {
+        name = name.substringAfterLast('/')
+    }
+    val parts = name.split('-', '_')
+    if (parts.size >= 2) {
+        val sizeIndex = parts.indexOfFirst { it.lowercase().contains("b") || it.lowercase().contains("m") }
+        if (sizeIndex != -1 && sizeIndex < parts.size) {
+            name = parts.take(sizeIndex + 1).joinToString("-")
+        }
+    }
+    return name
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class, androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
 fun TitleRow(
-    modifier: Modifier = Modifier, text: String, icon: ImageVector, state: AppState
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
+    modifier: Modifier = Modifier,
+    text: String,
+    icon: ImageVector,
+    state: AppState
 ) {
     val iconColor = state.getColor()
-    val contentColor = Glass.TextPrimary
+    val contentColor = MaterialTheme.colorScheme.onSurface
     val isLoading = state is AppState.LoadingModel
 
-    Box(modifier = modifier) {
-        Surface(
-            color = Glass.Surface,
-            shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(1.dp, iconColor),
-            modifier = Modifier.height(Standards.ActionIconSize)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = Standards.SpacingLg)
-            ) {
-                if (isLoading) {
-                    LoadingIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = iconColor
+    val collapsedText = remember(text, state) {
+        when (state) {
+            is AppState.ModelLoaded -> "Ready: ${getShortModelLabel(state.modelName)}"
+            is AppState.LoadingModel -> "Loading: ${getShortModelLabel(state.modelName)}"
+            is AppState.GeneratingText -> "Generating: ${getShortModelLabel(state.modelName)}"
+            is AppState.GeneratingImage -> "Generating: ${getShortModelLabel(state.modelName)}"
+            is AppState.GeneratingAudio -> "Generating: ${getShortModelLabel(state.modelName)}"
+            else -> text
+        }
+    }
+
+    with(sharedTransitionScope) {
+        Box(modifier = modifier) {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                modifier = Modifier
+                    .height(Standards.ActionIconSize)
+                    .sharedBounds(
+                        sharedTransitionScope.rememberSharedContentState(key = "chat_header"),
+                        animatedVisibilityScope = animatedVisibilityScope
                     )
-                } else {
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = Standards.SpacingLg)
+                ) {
+                    if (isLoading) {
+                        LoadingIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = iconColor
+                        )
+                    } else {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = iconColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Text(
+                        text = collapsedText,
+                        color = contentColor,
+                        maxLines = 1,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Small chevron to show details overlay is tapable
                     Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(20.dp)
+                        imageVector = TnIcons.ChevronDown,
+                        contentDescription = "Show details",
+                        tint = contentColor.copy(alpha = 0.6f),
+                        modifier = Modifier.size(14.dp)
                     )
                 }
-
-                Text(
-                    text = text,
-                    color = contentColor,
-                    maxLines = 1,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
     }
@@ -287,7 +354,7 @@ fun ModelList(
             contentPadding = PaddingValues(Standards.SpacingSm),
             verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
         ) {
-            items(installedModels, key = { it.id }) { model ->
+            items(installedModels) { model ->
                 ModelListItem(
                     modifier = Modifier.fillMaxWidth(),
                     model = model,

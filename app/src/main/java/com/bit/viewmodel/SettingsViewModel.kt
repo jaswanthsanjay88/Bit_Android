@@ -423,6 +423,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         androidx.core.content.ContextCompat.startForegroundService(context, intent)
     }
 
+    fun downloadSttModel() {
+        val context = getApplication<Application>()
+        val intent = Intent(context, ModelDownloadService::class.java).apply {
+            action = ModelDownloadService.ACTION_START_DOWNLOAD
+            putExtra(ModelDownloadService.EXTRA_MODEL_ID, com.bit.stt.SherpaSTTEngine.MODEL_ID)
+            putExtra(ModelDownloadService.EXTRA_MODEL_NAME, com.bit.stt.SherpaSTTEngine.MODEL_DISPLAY_NAME)
+            putExtra(ModelDownloadService.EXTRA_FILE_URL, "")
+            putExtra(ModelDownloadService.EXTRA_IS_ZIP, false)
+            putExtra(ModelDownloadService.EXTRA_MODEL_TYPE, "STT")
+            putExtra(ModelDownloadService.EXTRA_RUN_ON_CPU, true)
+            putExtra(ModelDownloadService.EXTRA_TEXT_EMBEDDING_SIZE, 0)
+        }
+        androidx.core.content.ContextCompat.startForegroundService(context, intent)
+    }
+
     fun loadTtsAfterDownload() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {

@@ -6,7 +6,6 @@ import com.bit.models.plugins.SearchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -14,7 +13,6 @@ import org.jsoup.nodes.Element
 import java.io.IOException
 import java.net.URLDecoder
 import java.net.URLEncoder
-import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 
 class WebScrapingSearchService {
@@ -23,29 +21,11 @@ class WebScrapingSearchService {
         private const val TAG = "WebScrapingSearch"
         private const val DDG_HTML_SEARCH_URL = "https://html.duckduckgo.com/html/?q="
         private const val DDG_LITE_SEARCH_URL = "https://lite.duckduckgo.com/lite/?q="
-
         private const val MAX_RETRIES = 2
         private const val INITIAL_RETRY_DELAY_MS = 1000L
         private const val MIN_QUERY_LENGTH = 1
         private const val MAX_QUERY_LENGTH = 500
-        private const val JSOUP_TIMEOUT_MS = 15_000
     }
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .retryOnConnectionFailure(true)
-        .build()
-
-    private val userAgents = listOf(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1"
-    )
 
     suspend fun search(
         query: String,
@@ -68,52 +48,21 @@ class WebScrapingSearchService {
 
         repeat(MAX_RETRIES) { attempt ->
             try {
-                val htmlResult = scrapeDuckDuckGoFromEndpoint(
-                    query = sanitized,
-                    maxResults = capped,
-                    safeSearch = safeSearch,
-                    baseUrl = DDG_HTML_SEARCH_URL,
-                    endpointTag = "ddg_html"
-                )
+                // Try DDG HTML first
+                val htmlResult = scrapeDuckDuckGo(sanitized, capped, safeSearch, DDG_HTML_SEARCH_URL, "ddg_html")
                 if (htmlResult.results.isNotEmpty()) {
                     return@withContext Result.success(htmlResult)
                 }
-
-                val liteResult = scrapeDuckDuckGoFromEndpoint(
-                    query = sanitized,
-                    maxResults = capped,
-                    safeSearch = safeSearch,
-                    baseUrl = DDG_LITE_SEARCH_URL,
-                    endpointTag = "ddg_lite"
-                )
+                // Fallback to DDG Lite
+                val liteResult = scrapeDuckDuckGo(sanitized, capped, safeSearch, DDG_LITE_SEARCH_URL, "ddg_lite")
                 if (liteResult.results.isNotEmpty()) {
                     return@withContext Result.success(liteResult)
                 }
-
-                val encoded = URLEncoder.encode(sanitized, "UTF-8")
-                val googleNewsRss = scrapeNewsRss(
-                    query = sanitized,
-                    maxResults = capped,
-                    rssUrl = "https://news.google.com/rss/search?q=$encoded&hl=en-IN&gl=IN&ceid=IN:en",
-                    provider = "google_news_rss"
-                )
-                if (googleNewsRss.results.isNotEmpty()) {
-                    return@withContext Result.success(googleNewsRss)
-                }
-
-                val bingNewsRss = scrapeNewsRss(
-                    query = sanitized,
-                    maxResults = capped,
-                    rssUrl = "https://www.bing.com/news/search?q=$encoded&format=RSS",
-                    provider = "bing_news_rss"
-                )
-                return@withContext Result.success(bingNewsRss)
             } catch (e: Exception) {
                 lastException = e
                 Log.w(TAG, "Attempt ${attempt + 1} failed: ${e.message}")
                 if (attempt < MAX_RETRIES - 1) {
-                    val backoff = INITIAL_RETRY_DELAY_MS * (1 shl attempt) + Random.nextLong(0, 500)
-                    delay(backoff)
+                    delay(INITIAL_RETRY_DELAY_MS * (1 shl attempt) + Random.nextLong(0, 500))
                 }
             }
         }
@@ -121,7 +70,7 @@ class WebScrapingSearchService {
         Result.failure(lastException ?: IOException("DuckDuckGo search failed for: $sanitized"))
     }
 
-    private suspend fun scrapeDuckDuckGoFromEndpoint(
+    private suspend fun scrapeDuckDuckGo(
         query: String,
         maxResults: Int,
         safeSearch: Boolean,
@@ -138,82 +87,23 @@ class WebScrapingSearchService {
 
         val requestBuilder = Request.Builder().url(searchUrl)
         CurlImpersonateHelper.applyProfileHeaders(requestBuilder, searchUrl, profile)
-        val request = requestBuilder.build()
 
-        val html = impersonateClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) {
-                throw IOException("DuckDuckGo HTTP ${response.code}: ${response.message}")
-            }
+        val html = impersonateClient.newCall(requestBuilder.build()).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("DuckDuckGo HTTP ${response.code}: ${response.message}")
             response.body.string()
         }
 
         val doc = Jsoup.parse(html, searchUrl)
         val results = parseDuckDuckGoResults(doc, maxResults)
-        val elapsed = System.currentTimeMillis() - startTime
 
         DuckDuckGoSearchResponse(
             query = query,
             results = results,
             totalResults = results.size,
-            searchTime = elapsed,
+            searchTime = System.currentTimeMillis() - startTime,
             provider = endpointTag
         )
     }
-
-    private suspend fun scrapeNewsRss(
-        query: String,
-        maxResults: Int,
-        rssUrl: String,
-        provider: String
-    ): DuckDuckGoSearchResponse = withContext(Dispatchers.IO) {
-        val startTime = System.currentTimeMillis()
-
-        val profile = CurlImpersonateHelper.getRandomProfile()
-        val impersonateClient = CurlImpersonateHelper.getClient(profile.type, timeoutSeconds = 15)
-
-        val requestBuilder = Request.Builder().url(rssUrl)
-        CurlImpersonateHelper.applyProfileHeaders(requestBuilder, rssUrl, profile)
-        requestBuilder.header("Accept", "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8")
-        val request = requestBuilder.build()
-
-        impersonateClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("RSS HTTP ${response.code}: ${response.message}")
-
-            val xml = response.body.string()
-            val doc = Jsoup.parse(xml, "", org.jsoup.parser.Parser.xmlParser())
-            val items = doc.select("item")
-
-            val results = mutableListOf<SearchResult>()
-            for (item in items) {
-                if (results.size >= maxResults) break
-
-                val title = item.selectFirst("title")?.text()?.trim().orEmpty()
-                val link = item.selectFirst("link")?.text()?.trim().orEmpty()
-                val description = item.selectFirst("description")?.text()?.trim().orEmpty()
-
-                if (title.length < 3 || link.isBlank()) continue
-
-                results.add(
-                    SearchResult(
-                        title = title,
-                        snippet = description.take(260),
-                        url = link,
-                        position = results.size + 1
-                    )
-                )
-            }
-
-            val elapsed = System.currentTimeMillis() - startTime
-            DuckDuckGoSearchResponse(
-                query = query,
-                results = results,
-                totalResults = results.size,
-                searchTime = elapsed,
-                provider = provider
-            )
-        }
-    }
-
 
     private fun parseDuckDuckGoResults(doc: Document, maxResults: Int): List<SearchResult> {
         val results = mutableListOf<SearchResult>()
@@ -226,11 +116,10 @@ class WebScrapingSearchService {
 
             for (element in resultElements) {
                 if (results.size >= maxResults) break
-
                 if (element.hasClass("result--ad") || element.select(".badge--ad").isNotEmpty()) continue
 
-                val titleElement = element.selectFirst(".result__title, .result__a, a.result-link, a.result__a")
-                val title = titleElement?.text()?.trim().orEmpty()
+                val title = element.selectFirst(".result__title, .result__a, a.result-link, a.result__a")
+                    ?.text()?.trim().orEmpty()
                 if (title.length < 3) continue
 
                 val url = extractDDGUrl(element) ?: continue
@@ -238,44 +127,27 @@ class WebScrapingSearchService {
                 seenUrls.add(url)
 
                 val snippet = element.selectFirst(".result__snippet, .result__desc, .snippet, .result-snippet, td.result-snippet")
-                    ?.text()
-                    ?.trim()
-                    .orEmpty()
+                    ?.text()?.trim().orEmpty()
 
-                results.add(
-                    SearchResult(
-                        title = title,
-                        snippet = snippet,
-                        url = url,
-                        position = results.size + 1
-                    )
-                )
+                results.add(SearchResult(title = title, snippet = snippet, url = url, position = results.size + 1))
             }
 
+            // Fallback: direct link extraction
             if (results.isEmpty()) {
                 val links = doc.select("a[href*='uddg='], a[href^='/l/?'], a.result__a[href], a.result-link[href]")
                 for (link in links) {
                     if (results.size >= maxResults) break
-
                     val rawHref = link.attr("href")
                     val url = decodeDDGUrl(rawHref)
                     if (!isLikelySearchResultUrl(url) || url in seenUrls) continue
 
                     val title = link.text().trim()
                     if (title.length < 3) continue
-
                     seenUrls.add(url)
+
                     val parentText = link.parent()?.text()?.trim().orEmpty()
                     val snippet = parentText.removePrefix(title).trim().take(220)
-
-                    results.add(
-                        SearchResult(
-                            title = title,
-                            snippet = snippet,
-                            url = url,
-                            position = results.size + 1
-                        )
-                    )
+                    results.add(SearchResult(title = title, snippet = snippet, url = url, position = results.size + 1))
                 }
             }
         } catch (e: Exception) {
@@ -294,11 +166,9 @@ class WebScrapingSearchService {
                     val decoded = decodeDDGUrl(href)
                     if (decoded.isNotEmpty() && decoded.startsWith("http")) return decoded
                 }
-
                 val textUrl = linkElement.text().trim()
                 if (textUrl.startsWith("http")) return textUrl
             }
-
             null
         } catch (e: Exception) {
             Log.w(TAG, "Error extracting URL: ${e.message}")
@@ -318,10 +188,7 @@ class WebScrapingSearchService {
                 url.startsWith("http") -> url
                 else -> ""
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error decoding URL: ${e.message}")
-            url
-        }
+        } catch (_: Exception) { url }
     }
 
     private fun isLikelySearchResultUrl(url: String): Boolean {
@@ -334,9 +201,6 @@ class WebScrapingSearchService {
     }
 
     private fun sanitizeQuery(query: String): String {
-        return query
-            .trim()
-            .replace(Regex("\\s+"), " ")
-            .replace(Regex("[\\x00-\\x1F\\x7F]"), "")
+        return query.trim().replace(Regex("\\s+"), " ").replace(Regex("[\\x00-\\x1F\\x7F]"), "")
     }
 }

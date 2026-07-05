@@ -24,6 +24,8 @@ import com.bit.global.Standards
 import com.bit.worker.ScoredVaultContent
 import com.bit.worker.VaultStatsInfo
 import com.bit.ui.icons.TnIcons
+import com.bit.ui.theme.BitColors
+import com.bit.ui.theme.glassEdge
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +45,7 @@ fun MemoryOverlayBottomSheet(
         ModalBottomSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = BitColors.Surface.copy(alpha = 0.92f),
             dragHandle = {
                 Box(
                     Modifier
@@ -59,6 +61,7 @@ fun MemoryOverlayBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 300.dp)
+                    .glassEdge(28.dp)
                     .padding(horizontal = Standards.SpacingLg),
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
             ) {

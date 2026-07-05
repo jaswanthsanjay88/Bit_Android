@@ -36,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.bit.global.Standards
 import com.bit.ui.theme.Glass
 import com.bit.ui.theme.Motion
@@ -90,10 +92,14 @@ fun GlassCard(
         .border(borderWidth, borderBrush, shape)
 
     val finalModifier = if (onClick != null) {
+        val haptic = LocalHapticFeedback.current
         baseModifier.clickable(
             interactionSource = interactionSource,
             indication = null,
-            onClick = onClick
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            }
         )
     } else {
         baseModifier
@@ -219,20 +225,25 @@ fun GlassChip(
         .border(1.dp, borderColor, shape)
 
     val finalModifier = if (onClick != null) {
-        baseModifier.clickable(onClick = onClick)
+        val haptic = LocalHapticFeedback.current
+        baseModifier.clickable(onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            onClick()
+        })
     } else {
         baseModifier
     }
 
+    val horizontalPadding = if (text.isEmpty()) 10.dp else Standards.ChipHorizontalPadding
     Row(
         modifier = finalModifier.padding(
-            horizontal = Standards.ChipHorizontalPadding,
+            horizontal = horizontalPadding,
             vertical = Standards.SpacingXs
         ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
     ) {
-        if (isActive) {
+        if (isActive && text.isNotEmpty()) {
             Box(
                 modifier = Modifier
                     .size(6.dp)
@@ -249,13 +260,15 @@ fun GlassChip(
             )
         }
 
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-            color = textColor,
-            maxLines = 1
-        )
+        if (text.isNotEmpty()) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                color = textColor,
+                maxLines = 1
+            )
+        }
     }
 }
 

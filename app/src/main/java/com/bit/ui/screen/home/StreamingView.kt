@@ -119,8 +119,11 @@ internal fun StreamingView(
         // Show tool results from plugin execution (only when NOT in agent mode,
         // since AgentExecutionView already displays step results)
         if (agentPhase == AgentPhase.Idle) {
-            messages.filter { it.content.contentType == ContentType.PluginResult }.forEach { msg ->
-                PluginResultCard(message = msg)
+            val pluginMsgs = remember(messages) {
+                messages.filter { it.content.contentType == ContentType.PluginResult }
+            }
+            if (pluginMsgs.isNotEmpty()) {
+                com.bit.ui.components.PluginResultGroupCard(messages = pluginMsgs)
             }
         }
 
@@ -147,9 +150,49 @@ internal fun StreamingView(
 // ── EmptyMessagesState ──
 
 @Composable
+fun rememberGreeting(): String {
+    return remember {
+        val calendar = java.util.Calendar.getInstance()
+        val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+        val greetings = when (hour) {
+            in 5..11 -> listOf(
+                "Hey, good morning! What are we working on today?",
+                "Good morning! Ready to start something great?",
+                "Hey there, good morning. Let's make today productive.",
+                "Morning! How can I help you kick off your day?",
+                "Good morning! Hope you're having a wonderful start."
+            )
+            in 12..16 -> listOf(
+                "Hey, good afternoon! What's on your mind?",
+                "Good afternoon! How can I assist you today?",
+                "Hey there, good afternoon. Hope your day is going well.",
+                "Good afternoon! Let's get some things done.",
+                "Hey! Hope you're having a productive afternoon."
+            )
+            in 17..20 -> listOf(
+                "Hey, good evening! How was your day?",
+                "Good evening! What can I help you wrap up today?",
+                "Hey there, good evening. Hope you're having a relaxing night.",
+                "Good evening! Let's solve some problems together.",
+                "Hey! How can I support you this evening?"
+            )
+            else -> listOf(
+                "Hey, burning the midnight oil? How can I help?",
+                "Late night coding session? Let me assist you.",
+                "Hey there! Still awake? Let's get to work.",
+                "Quiet night? Let's build something awesome.",
+                "Working late? I'm here to help you out."
+            )
+        }
+        greetings.random()
+    }
+}
+
+@Composable
 internal fun EmptyMessagesState() {
     val colorScheme = MaterialTheme.colorScheme
     val typography = MaterialTheme.typography
+    val greeting = rememberGreeting()
 
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -165,20 +208,15 @@ internal fun EmptyMessagesState() {
                 modifier = Modifier.size(56.dp),
                 tint = colorScheme.primary.copy(0.45f)
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(20.dp))
             Text(
-                "What can I help with?",
+                text = greeting,
                 style = typography.headlineSmall.copy(
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    fontSize = 20.sp,
+                    lineHeight = 28.sp
                 ),
                 color = colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Select a local GGUF model and start typing. Everything runs entirely offline on your device.",
-                style = typography.bodyMedium,
-                color = colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
             )
         }

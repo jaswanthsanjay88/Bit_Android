@@ -141,6 +141,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.text)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.liquid)
+    implementation(libs.backdrop)
+    implementation(libs.haze)
 
     // Material Design
     implementation(libs.androidx.material)
@@ -162,12 +164,14 @@ dependencies {
 }
 
 fun getProperty(value: String): String {
-    return if (localPropertiesFile.exists()) {
+    val raw = if (localPropertiesFile.exists()) {
         val localProps = Properties().apply {
             load(FileInputStream(localPropertiesFile))
         }
-        localProps.getProperty(value) ?: "\"sample_val\""
+        localProps.getProperty(value) ?: "dev_alias"
     } else {
-        System.getenv(value) ?: "\"sample_val\""
+        System.getenv(value) ?: "dev_alias"
     }
+    val clean = raw.trim().removeSurrounding("\"").removeSurrounding("'")
+    return "\"$clean\""
 }

@@ -1,10 +1,12 @@
 package com.bit.ui.screen.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,9 +15,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -38,7 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,21 +52,19 @@ import com.bit.models.vault.ChatInfo
 import com.bit.global.formatRelativeTime
 import com.bit.state.AppStateManager
 import com.bit.ui.components.ActionButton
-import com.bit.ui.components.GlassCard
-import com.bit.ui.theme.Glass
 import com.bit.viewmodel.ChatListViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.bit.ui.icons.TnIcons
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import com.bit.global.Standards
-import com.bit.viewmodel.ChatUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeDrawerScreen(
     onChatSelected: (String) -> Unit,
+    onSettingsClick: () -> Unit,
     onVaultManagerClick: () -> Unit,
+    onHybridSettingsClick: () -> Unit,
+    onStoreClick: () -> Unit,
     chatViewModel: com.bit.viewmodel.ChatViewModel,
     viewModel: ChatListViewModel = hiltViewModel()
 ) {
@@ -86,85 +88,168 @@ fun HomeDrawerScreen(
             .then(
                 if (isDialogOpen) Modifier.blur(6.dp) else Modifier
             ),
-        containerColor = androidx.compose.ui.graphics.Color(0xCC050505),
+        containerColor = androidx.compose.ui.graphics.Color(0xFF08080A),
         topBar = {
             Column {
                 TopAppBar(
                     title = {
                         Text(
-                            "Chats",
+                            "BIT AI",
                             style = MaterialTheme.typography.titleLarge,
-                            color = Glass.TextPrimary
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Bold
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Glass.Surface,
-                        titleContentColor = Glass.TextPrimary
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
                     ),
                     actions = {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            ActionButton(
-                                onClickListener = {
-                                    viewModel.createNewChat { chatId ->
-                                        onChatSelected(chatId)
-                                    }
-                                },
-                                icon = TnIcons.Plus,
-                                contentDescription = "Create new chat",
-                                modifier = Modifier.padding(end = 6.dp)
-                            )
-                        }
+                        ActionButton(
+                            onClickListener = onStoreClick,
+                            icon = TnIcons.StoreFront,
+                            contentDescription = "Open model store",
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        ActionButton(
+                            onClickListener = onSettingsClick,
+                            icon = TnIcons.Settings,
+                            contentDescription = "Open settings",
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
                     }
                 )
-                HorizontalDivider(color = Glass.BorderSubtle, thickness = 1.dp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
             }
         }
     ) { paddingValues ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(horizontal = Standards.SpacingMd)
         ) {
-            when {
-                isLoading && chats.isEmpty() -> {
-                    LoadingState()
-                }
-
-                chats.isEmpty() -> {
-                    EmptyState()
-                }
-
-                else -> {
-                    ChatList(
-                        chats = chats,
-                        isRefreshing = isLoading,
-                        onRefresh = { viewModel.loadChats() },
-                        onChatClick = onChatSelected,
-                        onDeleteChat = { chatId ->
-                            viewModel.deleteChat(chatId)
-                            // If deleting the currently loaded chat, start a new conversation
-                            if (chatId == chatState.currentChatId) {
-                                chatViewModel.startNewConversation()
-                            }
-                        },
-                        chatViewModel = chatViewModel
+            // New Chat button using Material 3 Primary Container
+            Card(
+                onClick = {
+                    viewModel.createNewChat { chatId ->
+                        onChatSelected(chatId)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = Standards.SpacingSm),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                ),
+                shape = RoundedCornerShape(Standards.RadiusMd)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = TnIcons.Plus,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "New Chat",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
 
-            error?.let { errorMessage ->
-                ErrorSnackbar(
-                    message = errorMessage,
-                    onDismiss = { viewModel.clearError() }
-                )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                when {
+                    isLoading && chats.isEmpty() -> {
+                        LoadingState()
+                    }
+
+                    chats.isEmpty() -> {
+                        EmptyState()
+                    }
+
+                    else -> {
+                        ChatList(
+                            chats = chats,
+                            isRefreshing = isLoading,
+                            onRefresh = { viewModel.loadChats() },
+                            onChatClick = onChatSelected,
+                            onDeleteChat = { chatId ->
+                                viewModel.deleteChat(chatId)
+                                if (chatId == chatState.currentChatId) {
+                                    chatViewModel.startNewConversation()
+                                }
+                            },
+                            chatViewModel = chatViewModel
+                        )
+                    }
+                }
+
+                error?.let { errorMessage ->
+                    ErrorSnackbar(
+                        message = errorMessage,
+                        onDismiss = { viewModel.clearError() }
+                    )
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+            Spacer(modifier = Modifier.height(Standards.SpacingSm))
+
+            // Bottom Footer Row
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = Standards.SpacingSm)
+            ) {
+                // Hybrid Server
+                Card(
+                    onClick = onHybridSettingsClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shape = RoundedCornerShape(Standards.RadiusMd)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 10.dp, horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = TnIcons.Terminal,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Hybrid",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
             }
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -179,10 +264,9 @@ private fun ChatList(
     var isManualRefreshing by remember { mutableStateOf(false) }
     val dedupedChats = remember(chats) { chats.distinctBy { it.chatId } }
 
-    // Reset manual refresh flag when real loading completes
     LaunchedEffect(isRefreshing) {
         if (!isRefreshing && isManualRefreshing) {
-            delay(300) // Brief visual delay so spinner doesn't vanish instantly
+            delay(300)
             isManualRefreshing = false
         }
     }
@@ -206,7 +290,8 @@ private fun ChatList(
                 .then(
                     if (isManualRefreshing) Modifier.blur(24.dp) else Modifier
                 ),
-            contentPadding = PaddingValues(vertical = Standards.SpacingSm)
+            contentPadding = PaddingValues(vertical = Standards.SpacingSm),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(
                 items = dedupedChats,
@@ -239,21 +324,24 @@ private fun ChatListItem(
 
     LaunchedEffect(isDeleting) {
         if (isDeleting) {
-            kotlinx.coroutines.delay(5000)
+            delay(5000)
             isDeleting = false
         }
     }
 
-    GlassCard(
+    Card(
         onClick = onClick,
-        cornerRadius = Standards.RadiusMd,
-        borderWidth = 0.8.dp,
-        backgroundColor = Glass.Surface,
-        borderColor = Glass.BorderSubtle,
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingXs)
+        shape = RoundedCornerShape(Standards.RadiusMd),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isActive) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
+                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isActive) MaterialTheme.colorScheme.secondary
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+        ),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
@@ -269,9 +357,9 @@ private fun ChatListItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Chat ${chat.chatId.take(8)}",
+                    text = if (!chat.title.isNullOrBlank()) chat.title else "Chat ${chat.chatId.take(8)}",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Glass.TextPrimary,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -279,32 +367,32 @@ private fun ChatListItem(
                 Text(
                     text = "•",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Glass.TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Text(
                     text = "${chat.messageCount} msgs",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Glass.TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Text(
                     text = "•",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Glass.TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Text(
                     text = formatRelativeTime(chat.lastMessageTime ?: chat.createdAt),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Glass.TextSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             if (isDeleting) {
                 LoadingIndicator(
                     modifier = Modifier.size(20.dp),
-                    color = Glass.StatusError
+                    color = MaterialTheme.colorScheme.error
                 )
             } else {
                 Row(
@@ -314,12 +402,12 @@ private fun ChatListItem(
                     if (isActive && chat.messageCount >= 6) {
                         IconButton(
                             onClick = onFold,
-                            modifier = Modifier.size(48.dp)
+                            modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
                                 TnIcons.Eraser,
                                 contentDescription = "Prune chat history",
-                                tint = Glass.AccentSecondary,
+                                tint = MaterialTheme.colorScheme.secondary,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -329,12 +417,12 @@ private fun ChatListItem(
                             isDeleting = true
                             onDelete()
                         },
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
                             TnIcons.Trash,
                             contentDescription = "Delete chat",
-                            tint = Glass.StatusError,
+                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -358,19 +446,19 @@ private fun EmptyState() {
                 imageVector = TnIcons.Messages,
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
-                tint = Glass.AccentSecondary
+                tint = MaterialTheme.colorScheme.secondary
             )
 
             Text(
                 "No chats yet",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Medium),
-                color = Glass.TextPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Text(
                 "Tap + to start a new conversation",
                 style = MaterialTheme.typography.bodySmall,
-                color = Glass.TextMuted
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -391,7 +479,7 @@ private fun LoadingState() {
             Text(
                 "Loading chats...",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Glass.TextSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -411,9 +499,9 @@ private fun ErrorSnackbar(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, Glass.StatusError, RoundedCornerShape(Standards.RadiusMd)),
+                .border(1.dp, MaterialTheme.colorScheme.error, RoundedCornerShape(Standards.RadiusMd)),
             shape = RoundedCornerShape(Standards.RadiusMd),
-            color = Glass.StatusErrorSurface
+            color = MaterialTheme.colorScheme.errorContainer
         ) {
             Row(
                 modifier = Modifier
@@ -425,7 +513,7 @@ private fun ErrorSnackbar(
                 Text(
                     text = message,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Glass.StatusError,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -436,7 +524,7 @@ private fun ErrorSnackbar(
                     Icon(
                         TnIcons.X,
                         contentDescription = "Dismiss",
-                        tint = Glass.StatusError,
+                        tint = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -444,4 +532,3 @@ private fun ErrorSnackbar(
         }
     }
 }
-

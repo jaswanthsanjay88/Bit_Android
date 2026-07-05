@@ -2,9 +2,11 @@ package com.bit.viewmodel
 
 import android.app.Application
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.SavedStateHandle
 import com.bit.di.AppContainer
 import com.bit.global.AppPaths
 import com.bit.models.data.HFModelRepository
@@ -52,7 +54,8 @@ data class RepoGroupInfo(
 @HiltViewModel
 class ModelStoreViewModel @Inject constructor(
     application: Application,
-    private val explorerRepository: HuggingFaceExplorerRepository
+    private val explorerRepository: HuggingFaceExplorerRepository,
+    private val savedStateHandle: SavedStateHandle
 ) : AndroidViewModel(application) {
 
     private val repository = ModelStoreRepository(application)
@@ -150,6 +153,14 @@ class ModelStoreViewModel @Inject constructor(
         loadDeviceInfo()
         loadModels()
         loadInstalledModels()
+
+        // Read optional tab param and set initial state
+        val tabArg = savedStateHandle.get<String>("tab")
+        if (tabArg == "installed") {
+            _selectedTab.value = StoreTab.INSTALLED
+        } else if (tabArg == "models") {
+            _selectedTab.value = StoreTab.MODELS
+        }
     }
 
     private fun loadDeviceInfo() {
@@ -208,7 +219,9 @@ class ModelStoreViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 systemRepo.getAllModels().collect { installedList ->
-                    _installedModels.value = installedList
+                    _installedModels.value = installedList.filter {
+                        it.providerType != ProviderType.DIFFUSION && it.providerType != ProviderType.TTS
+                    }.distinctBy { it.id }
                 }
             } catch (e: Exception) {
                 Log.e("ModelStoreViewModel", "Error loading installed models", e)
@@ -218,11 +231,11 @@ class ModelStoreViewModel @Inject constructor(
 
     private fun applyAllFilters() {
         viewModelScope.launch {
-            var filtered = _models.value
-
-            // Model type filter (GGUF, SD, TTS)
-            _selectedModelType.value?.let { type ->
-                filtered = filtered.filter { it.modelType == type }
+            var filtered = if (_selectedModelType.value == null) {
+                // By default, only show general LLM (GGUF) models
+                _models.value.filter { it.modelType == ModelType.GGUF }
+            } else {
+                _models.value.filter { it.modelType == _selectedModelType.value }
             }
 
             // Category filter (repository level) - only applies to GGUF
@@ -404,21 +417,34 @@ class ModelStoreViewModel @Inject constructor(
         val models = _filteredModels.value
         val grouped = mutableMapOf<String, RepoGroupInfo>()
 
-        val repoNameLookup = cachedRepos.associate { it.repoPath to it.name }
+        val repoLookup = cachedRepos.associateBy { repo ->
+            if (repo.source == RepositorySource.CUSTOM_API) {
+                repo.apiBaseUrl.trim().removeSuffix("/")
+            } else {
+                repo.repoPath
+            }
+        }
 
         models.groupBy { model ->
             when (model.modelType) {
-                ModelType.GGUF -> model.repositoryUrl.ifEmpty { "Unknown" }
-                ModelType.SD -> model.repositoryUrl.ifEmpty { "SD Models" }
+                ModelType.GGUF -> model.repositoryUrl.trim().removeSuffix("/").ifEmpty { "Unknown" }
+                ModelType.SD -> model.repositoryUrl.trim().removeSuffix("/").ifEmpty { "SD Models" }
                 ModelType.TTS -> "tts-models"
+                ModelType.STT -> "stt-models"
             }
         }.forEach { (key, groupModels) ->
             val first = groupModels.first()
+            val repo = repoLookup[key]
             val displayName = when (first.modelType) {
-                ModelType.TTS -> first.name
-                else -> repoNameLookup[key] ?: key.substringAfterLast("/")
+                ModelType.TTS, ModelType.STT -> first.name
+                else -> repo?.name ?: key.substringAfterLast("/")
             }
-            val author = if (key.contains("/")) key.substringBefore("/") else ""
+            val author = when {
+                first.modelType == ModelType.TTS || first.modelType == ModelType.STT -> ""
+                repo?.source == RepositorySource.CUSTOM_API -> "API"
+                key.contains("/") -> key.substringBefore("/")
+                else -> ""
+            }
             grouped[key] = RepoGroupInfo(displayName, author, first.modelType, groupModels.size)
         }
 
@@ -426,11 +452,19 @@ class ModelStoreViewModel @Inject constructor(
     }
 
     fun getModelsForRepo(repoKey: String): List<HuggingFaceModel> {
+        val cleanRepoKey = repoKey.trim().removeSuffix("/")
         return _filteredModels.value.filter { model ->
             when (model.modelType) {
-                ModelType.GGUF -> (model.repositoryUrl.ifEmpty { "Unknown" }) == repoKey
-                ModelType.SD -> (model.repositoryUrl.ifEmpty { "SD Models" }) == repoKey
-                ModelType.TTS -> repoKey == "tts-models"
+                ModelType.GGUF -> {
+                    val cleanUrl = model.repositoryUrl.trim().removeSuffix("/")
+                    (cleanUrl.ifEmpty { "Unknown" }) == cleanRepoKey
+                }
+                ModelType.SD -> {
+                    val cleanUrl = model.repositoryUrl.trim().removeSuffix("/")
+                    (cleanUrl.ifEmpty { "SD Models" }) == cleanRepoKey
+                }
+                ModelType.TTS -> cleanRepoKey == "tts-models"
+                ModelType.STT -> cleanRepoKey == "stt-models"
             }
         }
     }
@@ -487,7 +521,7 @@ class ModelStoreViewModel @Inject constructor(
 
                 val sourceRepo = cachedRepos.firstOrNull {
                     it.source == RepositorySource.CUSTOM_API &&
-                        it.apiBaseUrl.trim().equals(model.repositoryUrl.trim(), ignoreCase = true)
+                        it.apiBaseUrl.trim().removeSuffix("/").equals(model.repositoryUrl.trim().removeSuffix("/"), ignoreCase = true)
                 }
                 val authHeader = sourceRepo?.apiAuthToken
                     ?.trim()
@@ -546,6 +580,29 @@ class ModelStoreViewModel @Inject constructor(
             putExtra(ModelDownloadService.EXTRA_MODEL_ID, modelId)
         }
         context.startService(intent)
+    }
+
+    fun pauseDownload(modelId: String) {
+        val context = getApplication<Application>()
+        val intent = Intent(context, ModelDownloadService::class.java).apply {
+            action = ModelDownloadService.ACTION_PAUSE_DOWNLOAD
+            putExtra(ModelDownloadService.EXTRA_MODEL_ID, modelId)
+        }
+        context.startService(intent)
+    }
+
+    fun resumeDownload(modelId: String, modelName: String) {
+        val context = getApplication<Application>()
+        val intent = Intent(context, ModelDownloadService::class.java).apply {
+            action = ModelDownloadService.ACTION_RESUME_DOWNLOAD
+            putExtra(ModelDownloadService.EXTRA_MODEL_ID, modelId)
+            putExtra(ModelDownloadService.EXTRA_MODEL_NAME, modelName)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
     }
 
     fun deleteModel(model: Model) {
@@ -670,6 +727,62 @@ class ModelStoreViewModel @Inject constructor(
     fun updateRepository(repo: HFModelRepository) {
         viewModelScope.launch {
             repoDataStore.updateRepository(repo)
+            
+            // Sync any already installed API models from this repo
+            try {
+                val installed = systemRepo.getAllModels().first()
+                val apiModels = installed.filter { 
+                    it.providerType == ProviderType.API && it.id.startsWith("${repo.id}-")
+                }
+                apiModels.forEach { model ->
+                    val config = systemRepo.getConfigByModelId(model.id)
+                    if (config != null && !config.modelLoadingParams.isNullOrBlank()) {
+                        val json = JSONObject(config.modelLoadingParams)
+                        
+                        val base = repo.apiBaseUrl.trim().removeSuffix("/")
+                        val baseClean = base.removeSuffix("/")
+                        val baseLower = baseClean.lowercase(java.util.Locale.US)
+                        
+                        val newEndpoint = if (baseLower.contains("openrouter.ai") ||
+                            baseLower.contains("openai.com") ||
+                            baseLower.contains("googleapis.com") ||
+                            baseLower.contains("groq.com") ||
+                            baseLower.contains("nvidia.com") ||
+                            baseLower.contains("deepinfra.com") ||
+                            baseLower.contains("together.xyz") ||
+                            baseLower.contains("mistral.ai") ||
+                            baseLower.contains("/v1")
+                        ) {
+                            if (baseLower.contains("/v1")) {
+                                "$baseClean/chat/completions"
+                            } else {
+                                "$baseClean/v1/chat/completions"
+                            }
+                        } else {
+                            "$baseClean/api/chat"
+                        }
+                        
+                        val authHeader = repo.apiAuthToken.trim().takeIf { it.isNotBlank() }
+                        
+                        json.put("endpoint", newEndpoint)
+                        json.put("authHeader", authHeader)
+                        
+                        val updatedConfig = config.copy(
+                            modelLoadingParams = json.toString()
+                        )
+                        systemRepo.updateConfig(updatedConfig)
+                        
+                        val updatedModel = model.copy(
+                            modelPath = newEndpoint
+                        )
+                        systemRepo.updateModel(updatedModel)
+                        Log.i("ModelStoreViewModel", "Synced repository config for model: ${model.id} -> $newEndpoint")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ModelStoreViewModel", "Failed to sync models after repo update", e)
+            }
+            
             loadModels()
         }
     }
