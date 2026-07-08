@@ -74,6 +74,7 @@ internal fun TopBar(
                             sharedTransitionScope.rememberSharedContentState(key = "chat_header"),
                             animatedVisibilityScope = animatedVisibilityScope
                         )
+                        .clip(RoundedCornerShape(32.dp))
                         .then(
                             if (hazeState != null) {
                                 Modifier.hazeEffect(state = hazeState) {
@@ -123,7 +124,7 @@ internal fun TopBar(
                             noiseFactor = 0.05f
                         )
                         progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-                            androidx.compose.animation.core.EaseIn, 1f, 0f
+                            androidx.compose.animation.core.EaseIn, 1f, 0f, 0f, 1f
                         )
                     }
                 } else Modifier
