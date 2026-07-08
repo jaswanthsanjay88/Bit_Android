@@ -359,7 +359,8 @@ class ModelDownloadService : Service() {
                     "TTS" -> {
                         AppPaths.models(applicationContext).mkdirs()
 
-                        val ttsModelDir = AppPaths.ttsModel(applicationContext)
+                        val ttsModelParentDir = AppPaths.ttsModel(applicationContext)
+                        val ttsModelDir = File(ttsModelParentDir, modelId)
                         if (ttsModelDir.exists()) ttsModelDir.deleteRecursively()
                         ttsModelDir.mkdirs()
 
@@ -931,11 +932,12 @@ class ModelDownloadService : Service() {
             try {
                 val existing = repository.getAllModels().firstOrNull()?.filter { it.providerType == ProviderType.TTS }
                 existing?.forEach { oldModel ->
-                    repository.deleteModel(oldModel)
-                    repository.getConfigByModelId(oldModel.id)?.let { repository.deleteConfig(it) }
+                    if (oldModel.isActive) {
+                        repository.updateModel(oldModel.copy(isActive = false))
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("DownloadService", "Failed to clean old TTS model database records", e)
+                Log.e("DownloadService", "Failed to deactivate old TTS model database records", e)
             }
         }
 

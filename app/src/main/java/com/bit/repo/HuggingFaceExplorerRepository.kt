@@ -21,6 +21,7 @@ class HuggingFaceExplorerRepository @Inject constructor(
     private val api: HuggingFaceApi
 ) : HuggingFaceExplorerContract {
 
+    // Trigger rebuild to clear KSP incremental compilation issues
     override suspend fun searchGgufRepositories(query: String, limit: Int): Result<List<HuggingFaceExplorerRepo>> = withContext(Dispatchers.IO) {
         try {
             val response = api.searchModels(

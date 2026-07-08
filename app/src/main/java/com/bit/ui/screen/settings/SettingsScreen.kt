@@ -122,6 +122,7 @@ fun SettingsScreen(
     val ttsVoices by viewModel.ttsAvailableVoices.collectAsStateWithLifecycle()
     val ttsDownloadStates by viewModel.ttsDownloadStates.collectAsStateWithLifecycle()
     val installedTtsModelId by viewModel.installedTtsModelId.collectAsStateWithLifecycle(initialValue = null)
+    val installedTtsModelIds by viewModel.installedTtsModelIds.collectAsStateWithLifecycle(initialValue = emptyList())
 
     // STT Settings State
     val sttThreads by viewModel.sttThreads.collectAsStateWithLifecycle()
@@ -274,6 +275,7 @@ fun SettingsScreen(
                         // ── Voice Settings (TTS & STT) ──
                         ttsSettingsSection(
                             installedTtsModelId = installedTtsModelId,
+                            installedTtsModelIds = installedTtsModelIds,
                             ttsDownloadStates = ttsDownloadStates,
                             ttsModelLoaded = ttsModelLoaded,
                             loadTTSOnStart = loadTTSOnStart,

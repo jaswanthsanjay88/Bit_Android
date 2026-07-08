@@ -1,5 +1,6 @@
 package com.bit.ui.screen.settings
 
+import androidx.compose.runtime.Composable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.foundation.layout.Arrangement
@@ -79,6 +80,7 @@ internal val AVAILABLE_TTS_MODELS = listOf(
 
 internal fun LazyListScope.ttsSettingsSection(
     installedTtsModelId: String?,
+    installedTtsModelIds: List<String>,
     ttsDownloadStates: Map<String, ModelDownloadService.DownloadState>,
     ttsModelLoaded: Boolean,
     loadTTSOnStart: Boolean,
@@ -104,7 +106,8 @@ internal fun LazyListScope.ttsSettingsSection(
                 )
 
                 AVAILABLE_TTS_MODELS.forEach { ttsModel ->
-                    val isInstalled = installedTtsModelId == ttsModel.id
+                    val isDownloaded = installedTtsModelIds.contains(ttsModel.id)
+                    val isActive = installedTtsModelId == ttsModel.id
                     val downloadState = ttsDownloadStates[ttsModel.id]
                     
                     ModelDownloadCard(
@@ -112,8 +115,14 @@ internal fun LazyListScope.ttsSettingsSection(
                         description = "${ttsModel.description} · ${ttsModel.size}",
                         downloadState = downloadState,
                         onDownload = { viewModel.downloadTtsModel(ttsModel.id, ttsModel.name, ttsModel.url) },
-                        successText = if (isInstalled && ttsModelLoaded) "Active — Ready" else if (isInstalled) "Installed — Ready" else "Downloaded",
-                        isInstalled = isInstalled
+                        successText = if (isActive && ttsModelLoaded) "Active — Ready" else if (isActive) "Installed — Ready" else "Downloaded",
+                        isInstalled = isDownloaded,
+                        onActivate = if (isDownloaded && !isActive) {
+                            {
+                                haptics.selection()
+                                viewModel.selectTtsModel(ttsModel.id)
+                            }
+                        } else null
                     )
                 }
 
@@ -126,55 +135,54 @@ internal fun LazyListScope.ttsSettingsSection(
                     onCheckedChange = { viewModel.setLoadTTSOnStart(it) }
                 )
 
-                GlassDivider()
-
-                // Voice Picker (Speaker ID Selection)
+                           // Voice Picker (Speaker ID Selection)
                 if (voices.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)) {
                         Text(
-                            text = "Speaker ID",
+                            text = "Speaker Voices",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = Glass.TextPrimary
                         )
-                        if (voices.size <= 5) {
-                            ActionToggleGroup(
-                                items = voices,
-                                selectedItem = ttsSettings.voice,
-                                onItemSelected = { viewModel.updateVoice(it) },
-                                itemLabel = { "Speaker $it" },
-                                enabled = ttsModelLoaded
+
+                        val voiceInfos = voices.map { getVoiceInfo(installedTtsModelId, it) }
+                        val femaleVoices = voiceInfos.filter { it.gender == "Female" }
+                        val maleVoices = voiceInfos.filter { it.gender == "Male" }
+
+                        if (femaleVoices.isNotEmpty()) {
+                            Text(
+                                text = "Female Voices",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = Glass.TextSecondary,
+                                modifier = Modifier.padding(top = Standards.SpacingXs)
                             )
-                        } else {
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                items(voices) { voice ->
-                                    val isSelected = voice == ttsSettings.voice
-                                    val itemBg = if (isSelected) MaterialTheme.colorScheme.primary else Glass.Surface
-                                    val itemBorderColor = if (isSelected) MaterialTheme.colorScheme.primary else Glass.BorderSubtle
-                                    val itemTextColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Glass.TextPrimary
+                                items(femaleVoices) { voiceInfo ->
+                                    val isSelected = voiceInfo.id == ttsSettings.voice
+                                    VoiceChip(voiceInfo, isSelected, ttsModelLoaded, viewModel)
+                                }
+                            }
+                        }
 
-                                    Surface(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(Standards.RadiusSm))
-                                            .then(
-                                                if (ttsModelLoaded) Modifier.clickable { viewModel.updateVoice(voice) }
-                                                else Modifier
-                                            ),
-                                        color = itemBg,
-                                        border = BorderStroke(1.dp, itemBorderColor),
-                                        shape = RoundedCornerShape(Standards.RadiusSm)
-                                    ) {
-                                        Text(
-                                            text = "Speaker $voice",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                                            color = itemTextColor,
-                                            modifier = Modifier.padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm)
-                                        )
-                                    }
+                        if (maleVoices.isNotEmpty()) {
+                            Text(
+                                text = "Male Voices",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = Glass.TextSecondary,
+                                modifier = Modifier.padding(top = Standards.SpacingXs)
+                            )
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(maleVoices) { voiceInfo ->
+                                    val isSelected = voiceInfo.id == ttsSettings.voice
+                                    VoiceChip(voiceInfo, isSelected, ttsModelLoaded, viewModel)
                                 }
                             }
                         }
@@ -344,6 +352,85 @@ internal fun LazyListScope.sttSettingsSection(
                 }
             }
         }
+    }
+}
+
+// ── Voice Helpers & VoiceChip ──
+
+data class VoiceInfo(
+    val id: String,
+    val name: String,
+    val gender: String, // "Female" or "Male"
+    val region: String  // "US" or "UK"
+)
+
+private fun getVoiceInfo(modelId: String?, voiceId: String): VoiceInfo {
+    return when (modelId) {
+        "kokoro-multi-lang-v1_0" -> {
+            when (voiceId) {
+                "0" -> VoiceInfo(voiceId, "Bella", "Female", "US")
+                "1" -> VoiceInfo(voiceId, "Sarah", "Female", "US")
+                "2" -> VoiceInfo(voiceId, "Nicole", "Female", "US")
+                "3" -> VoiceInfo(voiceId, "Sky", "Female", "US")
+                "4" -> VoiceInfo(voiceId, "Adam", "Male", "US")
+                "5" -> VoiceInfo(voiceId, "Michael", "Male", "US")
+                "6" -> VoiceInfo(voiceId, "Emma", "Female", "UK")
+                "7" -> VoiceInfo(voiceId, "Isabella", "Female", "UK")
+                "8" -> VoiceInfo(voiceId, "George", "Male", "UK")
+                "9" -> VoiceInfo(voiceId, "Lewis", "Male", "UK")
+                else -> VoiceInfo(voiceId, "Speaker $voiceId", "Female", "US")
+            }
+        }
+        "vits-ljs-tts" -> {
+            if (voiceId == "0") VoiceInfo(voiceId, "LJSpeech", "Female", "US")
+            else VoiceInfo(voiceId, "Speaker $voiceId", "Female", "US")
+        }
+        "vits-piper-en_us-amy-low" -> {
+            if (voiceId == "0") VoiceInfo(voiceId, "Amy", "Female", "US")
+            else VoiceInfo(voiceId, "Speaker $voiceId", "Female", "US")
+        }
+        else -> {
+            // Default heuristics: even voice IDs are female, odd are male (common standard)
+            val num = voiceId.toIntOrNull()
+            if (num != null) {
+                if (num % 2 == 0) VoiceInfo(voiceId, "Voice $voiceId", "Female", "US")
+                else VoiceInfo(voiceId, "Voice $voiceId", "Male", "US")
+            } else {
+                VoiceInfo(voiceId, "Speaker $voiceId", "Female", "US")
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceChip(
+    voiceInfo: VoiceInfo,
+    isSelected: Boolean,
+    enabled: Boolean,
+    viewModel: SettingsViewModel
+) {
+    val itemBg = if (isSelected) MaterialTheme.colorScheme.primary else Glass.Surface
+    val itemBorderColor = if (isSelected) MaterialTheme.colorScheme.primary else Glass.BorderSubtle
+    val itemTextColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else Glass.TextPrimary
+
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(Standards.RadiusSm))
+            .then(
+                if (enabled) Modifier.clickable { viewModel.updateVoice(voiceInfo.id) }
+                else Modifier
+            ),
+        color = itemBg,
+        border = BorderStroke(1.dp, itemBorderColor),
+        shape = RoundedCornerShape(Standards.RadiusSm)
+    ) {
+        Text(
+            text = "${voiceInfo.name} (${voiceInfo.region})",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            color = itemTextColor,
+            modifier = Modifier.padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm)
+        )
     }
 }
 

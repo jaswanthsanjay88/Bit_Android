@@ -9,6 +9,7 @@ import com.dark.ai_sherpa.OfflineTts
 import com.dark.ai_sherpa.OfflineTtsConfig
 import com.dark.ai_sherpa.OfflineTtsModelConfig
 import com.dark.ai_sherpa.OfflineTtsVitsModelConfig
+import com.dark.ai_sherpa.OfflineTtsKokoroModelConfig
 import com.dark.ai_sherpa.GeneratedAudio
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -28,6 +30,10 @@ object TTSManager {
 
     private const val TAG = "TTSManager"
 
+    private val nativeLock = Any()
+    private val supportedChars = HashSet<Char>()
+
+    @Volatile
     private var tts: OfflineTts? = null
     private var context: Context? = null
     private val playbackManager = AudioPlaybackManager()
@@ -70,14 +76,18 @@ object TTSManager {
     fun loadModel(modelDir: String, useNNAPI: Boolean = false): Boolean {
         val ctx = context ?: return false
 
+        stopPlayback()
+
         // Clean up previous OfflineTts instance to avoid native double-destroy crash / memory leak
-        try {
-            tts?.close()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing old OfflineTts instance", e)
+        synchronized(nativeLock) {
+            try {
+                tts?.close()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing old OfflineTts instance", e)
+            }
+            tts = null
+            _isModelLoaded.value = false
         }
-        tts = null
-        _isModelLoaded.value = false
 
         return try {
             val dir = File(modelDir)
@@ -105,20 +115,73 @@ object TTSManager {
             val lexiconPath = lexiconFiles.firstOrNull { it.name == "lexicon.txt" }?.absolutePath 
                 ?: lexiconFiles.firstOrNull()?.absolutePath ?: ""
 
+            val isKokoro = voicesFile != null
+
+            val vitsConfig = if (isKokoro) {
+                OfflineTtsVitsModelConfig()
+            } else {
+                OfflineTtsVitsModelConfig(
+                    model = modelFile.absolutePath,
+                    lexicon = lexiconPath,
+                    tokens = tokensFile.absolutePath,
+                    dataDir = espeakDir?.absolutePath ?: ""
+                )
+            }
+
+            val kokoroConfig = if (isKokoro) {
+                val dictDirPath = dictDir?.absolutePath ?: lexiconFiles.firstOrNull()?.parentFile?.absolutePath ?: ""
+                val kokoroLexiconPath = lexiconFiles.map { it.absolutePath }.joinToString(",")
+                OfflineTtsKokoroModelConfig(
+                    model = modelFile.absolutePath,
+                    voices = voicesFile.absolutePath,
+                    tokens = tokensFile.absolutePath,
+                    dataDir = espeakDir?.absolutePath ?: "",
+                    dictDir = dictDirPath,
+                    lexicon = kokoroLexiconPath,
+                    lengthScale = 1.0f
+                )
+            } else {
+                OfflineTtsKokoroModelConfig()
+            }
+
             val config = OfflineTtsConfig(
                 model = OfflineTtsModelConfig(
-                    vits = OfflineTtsVitsModelConfig(
-                        model = modelFile.absolutePath,
-                        lexicon = lexiconPath,
-                        tokens = tokensFile.absolutePath,
-                        dataDir = espeakDir?.absolutePath ?: ""
-                    ),
-                    numThreads = 2
+                    vits = vitsConfig,
+                    kokoro = kokoroConfig,
+                    numThreads = 2,
+                    debug = true,
+                    provider = "cpu"
                 )
             )
 
-            tts = OfflineTts.fromFile(config)
-            val numSpeakers = tts?.numSpeakers ?: 1
+            val newTts = synchronized(nativeLock) {
+                OfflineTts.fromFile(config)
+            }
+            tts = newTts
+            
+            // Parse tokens.txt to build supported character vocabulary
+            synchronized(nativeLock) {
+                supportedChars.clear()
+                try {
+                    tokensFile.forEachLine { line ->
+                        val index = line.lastIndexOf(' ')
+                        if (index > 0) {
+                            val token = line.substring(0, index)
+                            for (ch in token) {
+                                supportedChars.add(ch.lowercaseChar())
+                                supportedChars.add(ch.uppercaseChar())
+                            }
+                        }
+                    }
+                    Log.d(TAG, "Parsed ${supportedChars.size} supported characters from tokens.txt")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing tokens.txt", e)
+                }
+            }
+
+            val numSpeakers = synchronized(nativeLock) {
+                newTts.numSpeakers
+            }
             _availableVoices.value = (0 until numSpeakers).map { it.toString() }
             _isModelLoaded.value = true
             Log.d(TAG, "TTS model loaded from $modelDir with $numSpeakers speakers")
@@ -168,7 +231,14 @@ object TTSManager {
 
         // Chunk text at sentence boundaries (./?!/…/;/\n)
         val regex = Regex("(?<=[.?!\\n…;])\\s*|(?<=/)\\s*")
-        val sentences = cleaned.split(regex).map { it.trim() }.filter { it.isNotEmpty() }
+        val rawSentences = cleaned.split(regex)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it.any { char -> char.isLetterOrDigit() } }
+
+        val sentences = mutableListOf<String>()
+        for (s in rawSentences) {
+            sentences.addAll(chunkSentence(s, maxChars = 150))
+        }
 
         if (sentences.isEmpty()) {
             _isPlaying.value = false
@@ -184,15 +254,38 @@ object TTSManager {
             // Producer: Synthesize chunks sequentially on Dispatchers.IO
             val producer = launch(Dispatchers.IO) {
                 try {
-                    val numSpeakers = currentTts.numSpeakers
+                    val numSpeakers = synchronized(nativeLock) {
+                        if (currentTts == tts) currentTts.numSpeakers else 0
+                    }
                     val sid = (settings.voice.toIntOrNull() ?: 0).coerceIn(0, (numSpeakers - 1).coerceAtLeast(0))
                     val speed = settings.speed.coerceIn(0.5f, 2.0f)
                     
                     sentences.forEachIndexed { index, sentence ->
-                        if (speakJob?.isCancelled == true || !_isPlaying.value) return@forEachIndexed
+                        if (speakJob?.isCancelled == true || !_isPlaying.value || currentTts != tts) return@forEachIndexed
                         
+                        // Check if the sentence has any letters or digits that are supported by the model's token vocabulary
+                        val isSupported = synchronized(nativeLock) {
+                            if (supportedChars.isNotEmpty()) {
+                                sentence.any { char -> char.isLetterOrDigit() && supportedChars.contains(char) }
+                            } else {
+                                sentence.any { char -> char.isLetterOrDigit() }
+                            }
+                        }
+                        if (!isSupported) {
+                            Log.w(TAG, "Skipping sentence with no supported characters: '$sentence'")
+                            return@forEachIndexed
+                        }
+
                         Log.d(TAG, "Synthesizing chunk $index: '$sentence'")
-                        val audio = currentTts.generate(sentence, sid, speed)
+                        val audio = synchronized(nativeLock) {
+                            if (speakJob?.isCancelled == true || !_isPlaying.value || currentTts != tts) {
+                                null
+                            } else {
+                                currentTts.generate(sentence, sid, speed)
+                            }
+                        }
+                        if (audio == null) return@forEachIndexed
+                        
                         val pcm = floatToPcm(audio.samples)
                         chunkChannel.send(PlaybackChunk(pcm, audio.sampleRate))
                         
@@ -237,8 +330,30 @@ object TTSManager {
 
     fun getModelDirectory(): String? {
         val ctx = context ?: return null
-        val dir = AppPaths.ttsModel(ctx)
-        return if (dir.exists()) dir.absolutePath else null
+        
+        // 1. Try to find the active TTS model in the metadata repository
+        try {
+            val repository = com.bit.di.AppContainer.getModelRepository()
+            val activeModelPath = kotlinx.coroutines.runBlocking {
+                try {
+                    val models = repository.getAllModels().firstOrNull()
+                    val activeModel = models?.find { it.providerType == com.bit.models.enums.ProviderType.TTS && it.isActive }
+                    activeModel?.modelPath
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            if (activeModelPath != null) {
+                val dir = File(activeModelPath)
+                if (dir.exists()) return dir.absolutePath
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get active TTS model from DB, falling back", e)
+        }
+
+        // 2. Fallback to legacy path
+        val legacyDir = AppPaths.ttsModel(ctx)
+        return if (legacyDir.exists()) legacyDir.absolutePath else null
     }
 
     private fun floatToPcm(floats: FloatArray): ByteArray {
@@ -296,5 +411,39 @@ object TTSManager {
                 findFilesRecursiveHelper(f, predicate, list)
             }
         }
+    }
+
+    private fun chunkSentence(sentence: String, maxChars: Int): List<String> {
+        if (sentence.length <= maxChars) return listOf(sentence)
+        val chunks = mutableListOf<String>()
+        val words = sentence.split(" ")
+        var currentChunk = StringBuilder()
+        for (word in words) {
+            if (word.length > maxChars) {
+                if (currentChunk.isNotEmpty()) {
+                    chunks.add(currentChunk.toString())
+                    currentChunk = StringBuilder()
+                }
+                var i = 0
+                while (i < word.length) {
+                    val end = (i + maxChars).coerceAtMost(word.length)
+                    chunks.add(word.substring(i, end))
+                    i += maxChars
+                }
+                continue
+            }
+            if (currentChunk.isNotEmpty() && currentChunk.length + word.length + 1 > maxChars) {
+                chunks.add(currentChunk.toString())
+                currentChunk = StringBuilder()
+            }
+            if (currentChunk.isNotEmpty()) {
+                currentChunk.append(" ")
+            }
+            currentChunk.append(word)
+        }
+        if (currentChunk.isNotEmpty()) {
+            chunks.add(currentChunk.toString())
+        }
+        return chunks
     }
 }

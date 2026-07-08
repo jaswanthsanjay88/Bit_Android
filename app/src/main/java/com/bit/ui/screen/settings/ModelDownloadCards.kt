@@ -39,7 +39,8 @@ internal fun ModelDownloadCard(
     downloadState: ModelDownloadService.DownloadState?,
     onDownload: () -> Unit,
     successText: String = "Downloaded",
-    isInstalled: Boolean = false
+    isInstalled: Boolean = false,
+    onActivate: (() -> Unit)? = null
 ) {
     StandardCard(title = title) {
         Column(
@@ -51,7 +52,7 @@ internal fun ModelDownloadCard(
             description.split(" · ").forEach { line ->
                 CaptionText(text = line)
             }
-
+ 
             when {
                 isInstalled -> {
                     Row(
@@ -59,13 +60,26 @@ internal fun ModelDownloadCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        CaptionText(text = successText, color = Glass.StatusSuccess)
-                        Icon(
-                            imageVector = TnIcons.Check,
-                            contentDescription = "Installed",
-                            tint = Glass.StatusSuccess,
-                            modifier = Modifier.size(16.dp)
+                        CaptionText(
+                            text = successText,
+                            color = if (onActivate == null) Glass.StatusSuccess else Glass.TextSecondary
                         )
+                        if (onActivate != null) {
+                            FilledTonalButton(
+                                onClick = onActivate,
+                                modifier = Modifier.height(32.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Standards.SpacingMd)
+                            ) {
+                                Text("Activate", style = MaterialTheme.typography.labelSmall)
+                            }
+                        } else {
+                            Icon(
+                                imageVector = TnIcons.Check,
+                                contentDescription = "Active",
+                                tint = Glass.StatusSuccess,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
 

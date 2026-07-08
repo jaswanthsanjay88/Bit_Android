@@ -132,7 +132,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     val installedTtsModelId: Flow<String?> = modelRepository.getAllModels()
-        .map { models -> models.find { it.providerType == ProviderType.TTS }?.id }
+        .map { models -> models.find { it.providerType == ProviderType.TTS && it.isActive }?.id }
+
+    val installedTtsModelIds: Flow<List<String>> = modelRepository.getAllModels()
+        .map { models -> models.filter { it.providerType == ProviderType.TTS }.map { it.id } }
 
     // Tool calling model install state — any GGUF model can support tool calling
     // (actual compatibility is checked at load time via native chat-template detection)
@@ -470,6 +473,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             withContext(Dispatchers.IO) {
                 val modelDir = TTSManager.getModelDirectory() ?: return@withContext
                 TTSManager.loadModel(modelDir)
+                updateVoice("0")
             }
         }
     }
@@ -530,5 +534,30 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun clearBackupProgress() {
         _backupProgress.value = null
+    }
+
+    fun selectTtsModel(modelId: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val allModels = modelRepository.getAllModels().first()
+                    for (model in allModels) {
+                        if (model.providerType == ProviderType.TTS) {
+                            val shouldBeActive = model.id == modelId
+                            if (model.isActive != shouldBeActive) {
+                                modelRepository.updateModel(model.copy(isActive = shouldBeActive))
+                            }
+                        }
+                    }
+                    val selectedModel = modelRepository.getModelById(modelId)
+                    if (selectedModel != null) {
+                        TTSManager.loadModel(selectedModel.modelPath)
+                        updateVoice("0")
+                    }
+                } catch (e: Exception) {
+                    Log.e("SettingsViewModel", "Failed to switch TTS model", e)
+                }
+            }
+        }
     }
 }
