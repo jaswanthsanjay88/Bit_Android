@@ -118,7 +118,7 @@ dependencies {
     implementation(libs.retrofit.converter.gson)
 
     // Local Projects & AI Libraries
-    implementation(files("../libs/ai_sherpa-release-v2.aar"))
+    implementation(files("../libs/ai_sherpa-release-v3.aar"))
     implementation(project(":llama-kt"))
     implementation("com.google.code.gson:gson:2.10.1")
     implementation(files("../libs/ai_sd-release.aar"))
