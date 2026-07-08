@@ -31,9 +31,7 @@ object BitGlassStyle {
     )
 
     fun shouldUseGlass(context: Context): Boolean {
-        if (android.os.Build.VERSION.SDK_INT < 31) return false
-        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
-        return activityManager?.isLowRamDevice == false
+        return false
     }
 }
 

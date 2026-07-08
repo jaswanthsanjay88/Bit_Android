@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,8 +74,8 @@ fun ModelConfigEditorScreen(
                     )
                 },
                 navigationIcon = {
-                    ActionTextButton(
-                        onClickListener = {
+                    IconButton(
+                        onClick = {
                             if (showingEditor && selectedModel != null) {
                                 // Go back to list
                                 showingEditor = false
@@ -81,11 +83,14 @@ fun ModelConfigEditorScreen(
                                 // Exit screen
                                 onBackClick()
                             }
-                        },
-                        icon = TnIcons.ChevronLeft,
-                        text = if (showingEditor && selectedModel != null) "Models" else "Back",
-                        modifier = Modifier.padding(start = 6.dp)
-                    )
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 },
                 actions = {
                     if (showingEditor && selectedModel != null) {
@@ -296,7 +301,7 @@ private fun ModelListItem(
 }
 
 @Composable
-private fun ConfigEditorPanel(
+internal fun ConfigEditorPanel(
     model: Model,
     viewModel: ModelConfigEditorViewModel,
     modifier: Modifier = Modifier
@@ -341,12 +346,38 @@ private fun ConfigEditorPanel(
                     ProviderType.API -> ApiConfigEditor(viewModel, model)
                 }
             }
+            
+            item {
+                Spacer(modifier = Modifier.height(Standards.SpacingLg))
+                Button(
+                    onClick = { viewModel.saveConfiguration() },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(Standards.RadiusLg),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(
+                        imageVector = TnIcons.DeviceFloppy,
+                        contentDescription = "Save",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Save Configuration",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(Standards.SpacingXxl))
+            }
         }
     }
 }
 
 @Composable
-private fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
+internal fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
     val ggufConfig by viewModel.ggufConfig.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -493,20 +524,12 @@ private fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
                     step = 0.05f
                 )
             }
-
-            TextField(
-                label = "System Prompt (Optional)",
-                value = ggufConfig.inferenceParams.systemPrompt,
-                onValueChange = { viewModel.updateGgufSystemPrompt(it) },
-                multiline = true,
-                minLines = 3
-            )
         }
     }
 }
 
 @Composable
-private fun DiffusionConfigEditor(viewModel: ModelConfigEditorViewModel) {
+internal fun DiffusionConfigEditor(viewModel: ModelConfigEditorViewModel) {
     val diffusionConfig by viewModel.diffusionConfig.collectAsStateWithLifecycle()
     val inferenceParams by viewModel.diffusionInferenceParams.collectAsStateWithLifecycle()
 
@@ -658,7 +681,7 @@ private fun ReadOnlyField(label: String, value: String) {
 }
 
 @Composable
-private fun SttConfigEditor(model: Model) {
+internal fun SttConfigEditor(model: Model) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val appSettings = remember { AppSettingsDataStore(context) }
@@ -727,7 +750,7 @@ private fun SttConfigEditor(model: Model) {
 }
 
 @Composable
-private fun TtsConfigEditor(model: Model) {
+internal fun TtsConfigEditor(model: Model) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val appSettings = remember { AppSettingsDataStore(context) }
@@ -784,7 +807,7 @@ private fun TtsConfigEditor(model: Model) {
 }
 
 @Composable
-private fun VlmConfigEditor(model: Model) {
+internal fun VlmConfigEditor(model: Model) {
     Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {
         ConfigSection("Vision-Language Model Details") {
             ReadOnlyField(label = "Model ID", value = model.id)
@@ -804,7 +827,7 @@ private fun VlmConfigEditor(model: Model) {
 }
 
 @Composable
-private fun ApiConfigEditor(viewModel: ModelConfigEditorViewModel, model: Model) {
+internal fun ApiConfigEditor(viewModel: ModelConfigEditorViewModel, model: Model) {
     val apiConfig by viewModel.apiConfig.collectAsStateWithLifecycle()
 
     Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {

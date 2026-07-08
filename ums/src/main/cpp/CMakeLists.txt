@@ -32,8 +32,7 @@ FetchContent_MakeAvailable(boringssl)
 # LZ4 — fast compression for per-record storage
 FetchContent_Declare(
     lz4
-    GIT_REPOSITORY https://github.com/lz4/lz4.git
-    GIT_TAG v1.10.0
+    URL "https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.zip"
 )
 FetchContent_Populate(lz4)
 

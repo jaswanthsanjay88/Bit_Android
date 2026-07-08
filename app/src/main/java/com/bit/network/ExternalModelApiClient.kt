@@ -37,6 +37,49 @@ object ExternalModelApiClient {
         return buildService(repo.apiBaseUrl.trim()).getCatalog(relative, authHeader)
     }
 
+    suspend fun fetchModels(baseUrl: String, apiKey: String?, endpoint: String = "models"): List<String> {
+        val authHeader = formatAuthHeader(apiKey)
+        val normalizedBase = if (baseUrl.endsWith('/')) baseUrl else "$baseUrl/"
+        val service = buildService(normalizedBase)
+        val response = service.getCatalog(endpoint, authHeader)
+        if (!response.isSuccessful) {
+            throw Exception("Failed to fetch models: ${response.code()} ${response.message()}")
+        }
+        val json = response.body() ?: throw Exception("Empty response body")
+        
+        val list = mutableListOf<String>()
+        try {
+            if (json.isJsonObject) {
+                val obj = json.asJsonObject
+                if (obj.has("data") && obj.get("data").isJsonArray) {
+                    val data = obj.getAsJsonArray("data")
+                    for (elem in data) {
+                        if (elem.isJsonObject) {
+                            val modelObj = elem.asJsonObject
+                            if (modelObj.has("id")) {
+                                list.add(modelObj.get("id").asString)
+                            }
+                        }
+                    }
+                } else if (obj.has("models") && obj.get("models").isJsonArray) {
+                    val models = obj.getAsJsonArray("models")
+                    for (elem in models) {
+                        if (elem.isJsonObject) {
+                            val modelObj = elem.asJsonObject
+                            if (modelObj.has("name")) {
+                                val name = modelObj.get("name").asString
+                                list.add(name.removePrefix("models/"))
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ExternalModelApi", "Failed to parse models json", e)
+        }
+        return list
+    }
+
     private fun formatAuthHeader(token: String?): String? {
         val trimmed = token?.trim() ?: return null
         if (trimmed.isBlank()) return null

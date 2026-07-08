@@ -12,40 +12,39 @@ import androidx.compose.ui.graphics.Color
 // ── Obsidian Kernel Color Scheme ───────────────────────────
 
 private val ObsidianColorScheme = darkColorScheme(
-    primary = MonoPrimary,
-    onPrimary = CarbonTextOnPrimary,
-    primaryContainer = CarbonSurfaceHighest,
-    onPrimaryContainer = CarbonTextPrimary,
-    secondary = MonoSecondary,
-    onSecondary = CarbonTextOnPrimary,
-    secondaryContainer = CarbonSurfaceHigh,
-    onSecondaryContainer = CarbonTextPrimary,
-    tertiary = MonoSecondary,
-    onTertiary = CarbonTextOnPrimary,
-    tertiaryContainer = CarbonSurfaceHigh,
-    onTertiaryContainer = CarbonTextPrimary,
+    primary = Color(0xFFFFFFFF), // Pure White
+    onPrimary = Color(0xFF000000), // Pure Black
+    primaryContainer = Color(0xFF262626), // CarbonSurfaceHighest
+    onPrimaryContainer = Color(0xFFFFFFFF),
+    secondary = Color(0xFFE5E5E5), // Silver
+    onSecondary = Color(0xFF000000),
+    secondaryContainer = Color(0xFF1E1E1E), // CarbonSurfaceHigh
+    onSecondaryContainer = Color(0xFFE5E5E5),
+    tertiary = Color(0xFFD4D4D4), // Neutral Gray
+    onTertiary = Color(0xFF000000),
+    tertiaryContainer = Color(0xFF1E1E1E),
+    onTertiaryContainer = Color(0xFFD4D4D4),
 
-    background = CarbonBlack,
-    onBackground = CarbonTextPrimary,
+    background = Color(0xFF000000), // OLED Black
+    onBackground = Color(0xFFFFFFFF),
 
-    surface = CarbonSurface,
-    onSurface = CarbonTextPrimary,
-    surfaceVariant = CarbonSurfaceHigh,
-    onSurfaceVariant = CarbonTextSecondary,
-    surfaceTint = MonoPrimary,
-    inverseSurface = Color(0xFFD8EAF5),
-    inverseOnSurface = Color(0xFF0E161C),
+    surface = Color(0xFF121212), // Dark Surface
+    onSurface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFF1E1E1E),
+    onSurfaceVariant = Color(0xFFD0D0D0),
+    surfaceTint = Color(0xFFFFFFFF),
+    inverseSurface = Color(0xFFE5E5E5),
+    inverseOnSurface = Color(0xFF121212),
     outline = Color(0xFF666666),
     outlineVariant = Color(0xFF3D3D3D),
     scrim = Color(0xFF000000),
 
-    error = MonoError,
-    onError = CarbonTextPrimary,
+    error = Color(0xFFFF6E6E),
+    onError = Color(0xFF000000),
     errorContainer = Color(0xFF351717),
     onErrorContainer = Color(0xFFFFC8C8),
 
-    // Kept for legacy UI references that use info as tertiary-like accent
-    inversePrimary = MonoPrimaryDim
+    inversePrimary = Color(0xFFE0E0E0)
 )
 
 // ── Typography ──

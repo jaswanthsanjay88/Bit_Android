@@ -27,6 +27,10 @@ android {
         buildConfigField("String", "ALIAS", getProperty("ALIAS"))
     }
 
+    androidResources {
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:qnnlibs.tar.xz"
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -68,7 +72,8 @@ android {
                 "META-INF/NOTICE.txt",
                 "META-INF/notice.txt",
                 "META-INF/ASL2.0",
-                "META-INF/*.kotlin_module"
+                "META-INF/*.kotlin_module",
+                "assets/qnnlibs/qnnlibs.tar.xz"
             )
         }
     }
@@ -95,11 +100,9 @@ dependencies {
     implementation(libs.jsoup)
 
     // Document Parsing
-    implementation(libs.poi)
-    implementation(libs.poi.ooxml)
-    implementation(libs.poi.scratchpad)
-    implementation(libs.pdfbox.android)
-    implementation(files("../libs/epublib-core-3.1.jar"))
+    implementation(libs.pdfbox.android) {
+        exclude(group = "org.bouncycastle")
+    }
     implementation(libs.slf4j.android)
 
     // Database & Storage
@@ -147,6 +150,7 @@ dependencies {
     // Material Design
     implementation(libs.androidx.material)
     implementation(libs.androidx.material3)
+    implementation("androidx.compose.material:material-icons-extended")
 
     // Debug
     debugImplementation(libs.androidx.compose.ui.tooling)

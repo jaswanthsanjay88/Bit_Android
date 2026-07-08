@@ -59,6 +59,17 @@ class ChatListViewModel @Inject constructor(
         }
     }
 
+    fun renameChat(chatId: String, newTitle: String) {
+        viewModelScope.launch {
+            _error.value = null
+            chatManager.updateChatTitle(chatId, newTitle).onSuccess {
+                loadChats()
+            }.onFailure { e ->
+                _error.value = "Failed to rename chat: ${e.message}"
+            }
+        }
+    }
+
     fun deleteChat(chatId: String) {
         viewModelScope.launch {
             _error.value = null

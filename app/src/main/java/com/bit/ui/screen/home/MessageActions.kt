@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,15 +18,15 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import com.bit.ui.theme.Glass
 import com.bit.models.messages.ContentType
 import com.bit.models.messages.Messages
 import com.bit.models.ui.ActionIcon
 import com.bit.models.ui.ActionItem
-import com.bit.ui.components.AgentExecutionView
+import com.bit.ui.components.ReasoningTraceCard
+import com.bit.ui.components.toTraceStep
 import com.bit.ui.components.MultiActionButton
-import com.bit.ui.components.PluginResultCard
-import com.bit.ui.components.ToolChainDisplay
 import com.bit.ui.icons.TnIcons
 import com.bit.viewmodel.AgentPhase
 import kotlinx.coroutines.launch
@@ -53,23 +54,28 @@ internal fun AssistantMessageHeader(message: Messages, imageBlurEnabled: Boolean
             }
         }
 
-        if (message.agentPlan != null) {
-            AgentExecutionView(
+        val hasReasoningTrace = message.agentPlan != null || hasToolChainSteps
+        if (hasReasoningTrace) {
+            val traceSteps = (message.toolChainSteps ?: emptyList()).map { it.toTraceStep() }
+            ReasoningTraceCard(
+                steps = traceSteps,
                 plan = message.agentPlan,
-                steps = message.toolChainSteps ?: emptyList(),
                 summary = message.agentSummary,
-                phase = AgentPhase.Complete
+                isLive = false
             )
-        } else if (hasToolChainSteps) {
-            message.toolChainSteps?.let { steps ->
-                ToolChainDisplay(steps = steps, isLive = false)
-            }
         }
 
         // Non-text content types
         when (message.content.contentType) {
             ContentType.Image -> ImageMessageBubble(message, imageBlurEnabled)
-            ContentType.PluginResult -> PluginResultCard(message = message)
+            ContentType.PluginResult -> {
+                message.toTraceStep()?.let { step ->
+                    ReasoningTraceCard(
+                        steps = listOf(step),
+                        isLive = false
+                    )
+                }
+            }
             else -> {
                 // Thinking block (markdown body is handled by lazyMarkdownItems)
                 val parsed = remember(message.content.content) {
@@ -97,8 +103,7 @@ internal fun AssistantMessageFooter(
     onStopTTS: () -> Unit,
     onRegenerate: (() -> Unit)?,
     isRegenerateEnabled: Boolean,
-    onEdit: ((Messages) -> Unit)? = null,
-    onFork: ((Messages) -> Unit)? = null
+    onEdit: ((Messages) -> Unit)? = null
 ) {
     val showMetrics = remember(message.decodingMetrics) {
         message.decodingMetrics?.tokensPerSecond?.let { it > 0 } ?: false
@@ -150,8 +155,7 @@ internal fun AssistantMessageFooter(
                     onStopTTS = onStopTTS,
                     onRegenerate = onRegenerate,
                     isRegenerateEnabled = isRegenerateEnabled,
-                    onEdit = onEdit,
-                    onFork = onFork
+                    onEdit = onEdit
                 )
             }
         }
@@ -161,10 +165,11 @@ internal fun AssistantMessageFooter(
 // ── SmallActionButton ──
 
 @Composable
-private fun SmallActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+internal fun SmallActionButton(
+    icon: ImageVector,
     onClick: () -> Unit,
-    contentDescription: String,
+    contentDescription: String = "Action button",
+    modifier: Modifier = Modifier,
     tint: Color = Glass.TextMuted,
     enabled: Boolean = true
 ) {
@@ -174,23 +179,35 @@ private fun SmallActionButton(
     val isActive = isPressed || isHovered
 
     val backgroundColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (isActive) Color(0x2EFFFFFF) else Color.Transparent,
+        targetValue = if (!enabled) {
+            Color.Transparent
+        } else if (isActive) {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
+        },
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 150)
     )
 
     val iconColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (!enabled) Glass.TextMuted else if (isActive) Color.White else tint,
+        targetValue = if (!enabled) {
+            Glass.TextMuted.copy(alpha = 0.4f)
+        } else if (isActive) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            tint
+        },
         animationSpec = androidx.compose.animation.core.tween(durationMillis = 150)
     )
 
     Box(
         modifier = Modifier
-            .size(28.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .size(32.dp)
+            .clip(CircleShape)
             .background(backgroundColor)
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
+                indication = androidx.compose.material3.ripple(),
                 enabled = enabled,
                 onClick = onClick
             ),
@@ -200,7 +217,7 @@ private fun SmallActionButton(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = iconColor,
-            modifier = Modifier.size(13.dp)
+            modifier = Modifier.size(16.dp)
         )
     }
 }
@@ -218,8 +235,7 @@ internal fun MessageActionRow(
     onStopTTS: () -> Unit,
     onRegenerate: (() -> Unit)? = null,
     isRegenerateEnabled: Boolean = true,
-    onEdit: ((Messages) -> Unit)? = null,
-    onFork: ((Messages) -> Unit)? = null
+    onEdit: ((Messages) -> Unit)? = null
 ) {
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
@@ -236,7 +252,7 @@ internal fun MessageActionRow(
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 1. Copy Action
@@ -263,16 +279,6 @@ internal fun MessageActionRow(
             contentDescription = "Speak",
             tint = if (isPlaying || isSynthesizing) Color.White else Glass.TextMuted
         )
-
-        // 3. Share/Fork Action
-        if (onFork != null) {
-            SmallActionButton(
-                icon = TnIcons.Share,
-                onClick = { onFork(message) },
-                contentDescription = "Fork",
-                tint = Glass.TextMuted
-            )
-        }
 
         // 4. Regenerate Action (Replacing vertical dots)
         if (onRegenerate != null) {

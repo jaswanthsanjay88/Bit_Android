@@ -15,8 +15,8 @@ import com.bit.models.messages.ContentType
 import com.bit.models.messages.MessageContent
 import com.bit.models.messages.Messages
 import com.bit.models.messages.Role
-import com.bit.ui.components.AgentExecutionView
-import com.bit.ui.components.PluginResultCard
+import com.bit.ui.components.ReasoningTraceCard
+import com.bit.ui.components.toTraceStep
 import com.bit.ui.icons.TnIcons
 import com.bit.viewmodel.AgentPhase
 import kotlinx.coroutines.FlowPreview
@@ -105,26 +105,28 @@ internal fun StreamingView(
             RagResultsDisplay(results = ragResults)
         }
 
-        // Agent execution view (Plan → Execute → Summarize)
-        if (agentPhase != AgentPhase.Idle) {
-            AgentExecutionView(
-                plan = agentPlan,
-                steps = toolChainSteps,
-                summary = agentSummary,
-                phase = agentPhase,
-                currentStep = currentToolChainRound
-            )
+        // Show unified reasoning trace or plugin results
+        val hasReasoningTrace = agentPhase != AgentPhase.Idle || toolChainSteps.isNotEmpty() || agentPlan != null || agentSummary != null
+        val pluginMsgs = remember(messages) {
+            messages.filter { it.content.contentType == ContentType.PluginResult }
         }
 
-        // Show tool results from plugin execution (only when NOT in agent mode,
-        // since AgentExecutionView already displays step results)
-        if (agentPhase == AgentPhase.Idle) {
-            val pluginMsgs = remember(messages) {
-                messages.filter { it.content.contentType == ContentType.PluginResult }
-            }
-            if (pluginMsgs.isNotEmpty()) {
-                com.bit.ui.components.PluginResultGroupCard(messages = pluginMsgs)
-            }
+        if (hasReasoningTrace) {
+            val traceSteps = toolChainSteps.map { it.toTraceStep() }
+            ReasoningTraceCard(
+                steps = traceSteps,
+                plan = agentPlan,
+                summary = agentSummary,
+                isLive = agentPhase != AgentPhase.Complete && agentPhase != AgentPhase.Idle,
+                currentRound = currentToolChainRound,
+                maxRounds = 5
+            )
+        } else if (pluginMsgs.isNotEmpty()) {
+            val traceSteps = pluginMsgs.mapNotNull { it.toTraceStep() }
+            ReasoningTraceCard(
+                steps = traceSteps,
+                isLive = false
+            )
         }
 
         when {

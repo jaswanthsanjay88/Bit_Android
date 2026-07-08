@@ -1,6 +1,9 @@
 package com.bit.ui.screen.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,13 +15,25 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.bit.global.HardwareProfile
 import com.bit.global.PerformanceMode
@@ -34,6 +49,7 @@ import com.bit.ui.components.SettingsSwitchRow
 import com.bit.ui.components.SettingsClickableRow
 import com.bit.ui.components.GlassSectionCard
 import com.bit.ui.components.GlassDivider
+import com.bit.ui.components.providerIcon
 import com.bit.ui.icons.TnIcons
 import com.bit.viewmodel.SettingsViewModel
 
@@ -150,6 +166,87 @@ internal fun LazyListScope.llmSettingsSection(
                     description = "Accelerates generation speed up to 2x using parallel N-gram sequence prediction.",
                     checked = speedModeEnabled,
                     onCheckedChange = { viewModel.setSpeedModeEnabled(it) }
+                )
+            }
+        }
+    }
+}
+
+// ── System Prompt Section ──
+
+internal fun LazyListScope.systemPromptSection(
+    globalSystemPrompt: String,
+    globalPrependPrompt: String,
+    globalPostpendPrompt: String,
+    viewModel: SettingsViewModel
+) {
+    item {
+        var selectedTabIndex by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+
+        GlassSectionCard(
+            title = "Global Prompts",
+            icon = TnIcons.DeviceFloppy, // Just a placeholder icon, maybe something better later
+            description = "Manage prompts that are applied across all conversations"
+        ) {
+            Column {
+                androidx.compose.material3.TabRow(
+                    selectedTabIndex = selectedTabIndex,
+                    containerColor = Color.Transparent,
+                    contentColor = Color.White,
+                    indicator = { tabPositions ->
+                        androidx.compose.material3.TabRowDefaults.Indicator(
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                ) {
+                    androidx.compose.material3.Tab(
+                        selected = selectedTabIndex == 0,
+                        onClick = { selectedTabIndex = 0 },
+                        text = { Text("System") }
+                    )
+                    androidx.compose.material3.Tab(
+                        selected = selectedTabIndex == 1,
+                        onClick = { selectedTabIndex = 1 },
+                        text = { Text("Prepend") }
+                    )
+                    androidx.compose.material3.Tab(
+                        selected = selectedTabIndex == 2,
+                        onClick = { selectedTabIndex = 2 },
+                        text = { Text("Postpend") }
+                    )
+                }
+
+                val currentValue = when (selectedTabIndex) {
+                    0 -> globalSystemPrompt
+                    1 -> globalPrependPrompt
+                    2 -> globalPostpendPrompt
+                    else -> ""
+                }
+
+                val onValueChange: (String) -> Unit = {
+                    when (selectedTabIndex) {
+                        0 -> viewModel.setGlobalSystemPrompt(it)
+                        1 -> viewModel.setGlobalPrependPrompt(it)
+                        2 -> viewModel.setGlobalPostpendPrompt(it)
+                    }
+                }
+
+                androidx.compose.material3.OutlinedTextField(
+                    value = currentValue,
+                    onValueChange = onValueChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Standards.SpacingSm),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                    minLines = 3,
+                    maxLines = 10,
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent
+                    )
                 )
             }
         }
@@ -287,8 +384,9 @@ internal fun LazyListScope.hardwareTuningSection(
 internal fun LazyListScope.modelConfigurationSection(
     hardwareTuningEnabled: Boolean,
     installedModels: List<Model>,
-    onModelEditor: () -> Unit,
-    onEmbeddingSetup: () -> Unit
+    onModelSelected: (Model) -> Unit,
+    onEmbeddingSetup: () -> Unit,
+    onModelEditor: () -> Unit
 ) {
     item {
         GlassSectionCard(
@@ -296,13 +394,7 @@ internal fun LazyListScope.modelConfigurationSection(
             icon = TnIcons.Sparkles,
             description = "View active LLM formats, install new modules, and setup RAG embedding vectors",
             trailing = {
-                ActionTextButton(
-                    onClickListener = onModelEditor,
-                    icon = TnIcons.Sparkles,
-                    text = "Configure",
-                    shape = RoundedCornerShape(Standards.CardSmallCornerRadius),
-                    enabled = !hardwareTuningEnabled
-                )
+                // If there's an active model, selecting it from the gear could be a nice touch, but list is fine.
             }
         ) {
             Column {
@@ -324,15 +416,23 @@ internal fun LazyListScope.modelConfigurationSection(
                     )
                 } else {
                     installedModels.forEachIndexed { idx, model ->
+                        val iconResId = providerIcon(model.providerType.name)
                         SettingsClickableRow(
                             title = model.modelName,
                             description = model.providerType.name,
-                            onClick = if (!hardwareTuningEnabled) onModelEditor else ({})
+                            iconRes = if (iconResId != 0) iconResId else null,
+                            onClick = {
+                                onModelSelected(model)
+                            }
                         )
-                        if (idx < installedModels.size - 1) {
-                            GlassDivider()
-                        }
+                        GlassDivider()
                     }
+                    SettingsClickableRow(
+                        title = "Advanced Model Config Editor",
+                        description = "View raw model configs and edit parameters",
+                        icon = TnIcons.Settings,
+                        onClick = onModelEditor
+                    )
                 }
 
                 GlassDivider()
@@ -403,32 +503,313 @@ internal fun LazyListScope.imageGenerationSection(
 // ── About Section ──
 
 internal fun LazyListScope.aboutSection(appVersion: String) {
+    // ── Hero Block Card ──
     item {
-        GlassSectionCard(
-            title = "About",
-            icon = TnIcons.InfoCircle,
-            description = "BIT · On-device AI — LLM, Image Generation, TTS"
+        val haptics = com.bit.ui.theme.LocalBitHaptics.current
+        
+        GlassCard(
+            onClick = {},
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Glass.Surface,
+            borderColor = Glass.BorderSubtle,
+            cornerRadius = Standards.CardCornerRadius,
+            contentPadding = PaddingValues(Standards.CardPadding)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = Standards.SpacingXs),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
             ) {
-                Text(
-                    text = "Application Version",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = Glass.TextPrimary
+                // App Logo Container
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = TnIcons.Sparkles,
+                            contentDescription = "App logo",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+                
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "BIT AI",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Glass.TextPrimary
+                    )
+                    Text(
+                        text = "Offline On-Device AI Assistant",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Glass.TextSecondary
+                    )
+                }
+
+                // Divider
+                androidx.compose.material3.HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    thickness = 1.dp
                 )
-                Text(
-                    text = "Version $appVersion",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Glass.TextSecondary
+
+                // Version and Developer rows using M3 ListItem
+                androidx.compose.material3.ListItem(
+                    headlineContent = { Text("Application Version") },
+                    trailingContent = { Text("Version $appVersion", fontWeight = FontWeight.Bold) },
+                    colors = androidx.compose.material3.ListItemDefaults.colors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        headlineColor = Glass.TextPrimary,
+                        supportingColor = Glass.TextSecondary,
+                        trailingIconColor = Glass.TextSecondary
+                    )
+                )
+                
+                androidx.compose.material3.ListItem(
+                    headlineContent = { Text("Developer") },
+                    trailingContent = { Text("Jaswanth Sanjay Nekkanti") },
+                    colors = androidx.compose.material3.ListItemDefaults.colors(
+                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                        headlineColor = Glass.TextPrimary,
+                        supportingColor = Glass.TextSecondary,
+                        trailingIconColor = Glass.TextSecondary
+                    )
                 )
             }
         }
     }
+
+    // ── Bio Paragraph (Plain Surface Text) ──
+    item {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "I am Nekkanti Jaswanth Sanjay, an AI Engineer, full-stack developer, UI/UX designer, Machine Learning engineer and technology builder focused on creating intelligent digital products. I independently design, develop, and deploy complete software solutions, combining artificial intelligence, mobile development, backend engineering, and user experience design.\n\nAs a solo developer, I take ownership of the entire product lifecycle—from ideation and system architecture to interface design, implementation, testing, and deployment. My work emphasizes innovation, automation, and solving real-world problems through scalable technology.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Glass.TextSecondary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Standards.SpacingSm)
+        )
+    }
+
+    // ── Links Section Header ──
+    item {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Links",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = Standards.SpacingSm, vertical = 4.dp)
+        )
+    }
+
+    // ── Link Cards ──
+    item {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val haptics = com.bit.ui.theme.LocalBitHaptics.current
+        
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            AboutLinkRow(
+                title = "Developer Website",
+                description = "jaswanthsanjay.me",
+                icon = TnIcons.User,
+                onClick = {
+                    haptics.selection()
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://jaswanthsanjay.me")))
+                }
+            )
+
+            AboutLinkRow(
+                title = "LinkedIn Profile",
+                description = "linkedin.com/in/jaswanthsanjay",
+                icon = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = com.bit.R.drawable.ic_linkedin),
+                onClick = {
+                    haptics.selection()
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://linkedin.com/in/jaswanthsanjay")))
+                }
+            )
+
+            AboutLinkRow(
+                title = "GitHub Repository",
+                description = "Browse source code and contribute",
+                icon = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = com.bit.R.drawable.ic_github),
+                onClick = {
+                    haptics.selection()
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/jaswanthsanjay88/BIT")))
+                }
+            )
+
+            AboutLinkRow(
+                title = "Report Issues",
+                description = "Submit bugs or feature requests",
+                icon = TnIcons.AlertCircle,
+                onClick = {
+                    haptics.selection()
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/jaswanthsanjay88/BIT/issues")))
+                }
+            )
+        }
+    }
+
+    // ── Rate BIT Section Header ──
+    item {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Rate BIT",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = Standards.SpacingSm, vertical = 4.dp)
+        )
+    }
+
+    // ── Rating Block Card ──
+    item {
+        val haptics = com.bit.ui.theme.LocalBitHaptics.current
+        var localRating by remember { mutableStateOf(0) }
+        
+        GlassCard(
+            onClick = {},
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Glass.Surface,
+            borderColor = Glass.BorderSubtle,
+            cornerRadius = Standards.CardCornerRadius,
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
+            ) {
+                if (localRating == 0) {
+                    Text(
+                        text = "How is your experience?",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Glass.TextPrimary
+                    )
+                    Text(
+                        text = "Tap the stars to rate this app locally",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Glass.TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(Standards.SpacingXs))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        for (i in 1..5) {
+                            IconButton(
+                                onClick = {
+                                    haptics.selection()
+                                    localRating = i
+                                },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.Star,
+                                    contentDescription = "Star $i",
+                                    tint = if (i <= localRating) MaterialTheme.colorScheme.primary else Glass.TextSecondary.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Icon(
+                        imageVector = TnIcons.Heart,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Text(
+                        text = "Thank you for rating BIT!",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Glass.TextPrimary
+                    )
+                    Text(
+                        text = "Your feedback is highly valued. You rated: $localRating / 5 stars",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Glass.TextSecondary,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(Standards.SpacingXs))
+                    Text(
+                        text = "Reset Rating",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.clickable {
+                            haptics.selection()
+                            localRating = 0
+                        }
+                    )
+                }
+            }
+        }
+    }
 }
+
+@Composable
+private fun AboutLinkRow(
+    title: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    GlassCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = Glass.Surface,
+        borderColor = Glass.BorderSubtle,
+        cornerRadius = Standards.CardCornerRadius,
+        contentPadding = PaddingValues(Standards.SpacingMd)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Glass.TextPrimary
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Glass.TextSecondary
+                )
+            }
+            Icon(
+                imageVector = TnIcons.ChevronRight,
+                contentDescription = null,
+                tint = Glass.TextSecondary,
+                modifier = Modifier.size(Standards.IconSm)
+            )
+        }
+    }
+}
+

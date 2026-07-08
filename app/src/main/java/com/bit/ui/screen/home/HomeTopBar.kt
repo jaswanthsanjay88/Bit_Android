@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -34,9 +36,9 @@ import com.bit.global.Standards
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.AnimatedTitle
 import com.bit.ui.icons.TnIcons
-import io.github.fletchmckee.liquid.LiquidState
-import io.github.fletchmckee.liquid.liquid
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
@@ -52,37 +54,79 @@ internal fun TopBar(
     onSettingsClick: () -> Unit,
     showDynamicWindow: () -> Unit,
     onStoreButtonClicked: (String?) -> Unit,
-    liquidState: LiquidState? = null,
     hazeState: HazeState? = null
 ) {
+    val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
+    val background = MaterialTheme.colorScheme.background
+
     CenterAlignedTopAppBar(
-        modifier = Modifier
-            .then(if (liquidState != null) Modifier.liquid(liquidState) else Modifier),
-        title = {
-            AnimatedTitle(
-                sharedTransitionScope = sharedTransitionScope,
-                animatedVisibilityScope = animatedVisibilityScope,
-                modifier = Modifier,
-                onShowDynamicWindow = { showDynamicWindow() }
-            )
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-            titleContentColor = MaterialTheme.colorScheme.onSurface
+        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+            containerColor = Color.Transparent,
+            scrolledContainerColor = Color.Transparent
         ),
-        navigationIcon = {
-            ActionButton(
-                onClickListener = onMenuClick,
-                icon = TnIcons.Menu,
-                contentDescription = "Open navigation menu",
-                modifier = Modifier.padding(start = 6.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
+        title = {
+            with(sharedTransitionScope) {
+                androidx.compose.material3.Surface(
+                    color = Color.Transparent,
+                    shape = RoundedCornerShape(32.dp),
+                    modifier = Modifier
+                        .sharedBounds(
+                            sharedTransitionScope.rememberSharedContentState(key = "chat_header"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                        .then(
+                            if (hazeState != null) {
+                                Modifier.hazeEffect(state = hazeState) {
+                                    style = dev.chrisbanes.haze.HazeStyle(
+                                        backgroundColor = surfaceContainer,
+                                        tint = dev.chrisbanes.haze.HazeTint(Color.Black.copy(alpha = 0.45f)),
+                                        blurRadius = 20.dp,
+                                        noiseFactor = 0.05f
+                                    )
+                                }
+                            } else Modifier
+                        )
+                        .border(
+                            width = 0.5.dp,
+                            color = Color.White.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(32.dp)
+                        )
+                ) {
+                    Box(modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp)) {
+                        AnimatedTitle(
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            onShowDynamicWindow = { showDynamicWindow() }
+                        )
+                    }
+                }
+            }
         },
-        actions = {}
+        navigationIcon = {
+            androidx.compose.material3.IconButton(onClick = onMenuClick) {
+                Icon(
+                    imageVector = TnIcons.Menu,
+                    contentDescription = "Menu",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        },
+        modifier = Modifier
+            .statusBarsPadding()
+            .then(
+                if (hazeState != null) {
+                    Modifier.hazeEffect(state = hazeState) {
+                        style = dev.chrisbanes.haze.HazeStyle(
+                            backgroundColor = background,
+                            tint = dev.chrisbanes.haze.HazeTint(Color.Black.copy(alpha = 0.25f)),
+                            blurRadius = 24.dp,
+                            noiseFactor = 0.05f
+                        )
+                        progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
+                            androidx.compose.animation.core.EaseIn, 1f, 0f
+                        )
+                    }
+                } else Modifier
+            )
     )
 }

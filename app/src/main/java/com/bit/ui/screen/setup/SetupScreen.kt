@@ -211,7 +211,7 @@ private fun SetupChoiceSlide(
     onNext: () -> Unit,
     onBack: () -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -258,7 +258,7 @@ private fun SetupChoiceSlide(
                         shape = RoundedCornerShape(20.dp)
                     )
                     .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptics.selection()
                         onSelectLocal()
                     }
             ) {
@@ -301,7 +301,7 @@ private fun SetupChoiceSlide(
                         shape = RoundedCornerShape(20.dp)
                     )
                     .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptics.selection()
                         onSelectRemote()
                     }
             ) {
@@ -365,7 +365,7 @@ private fun ModelPickerContent(
     recommendedTextModel: HuggingFaceModel,
     onBack: () -> Unit
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     var localSelectedOption by remember { mutableStateOf<SetupOption?>(null) }
     
     val context = LocalContext.current
@@ -480,7 +480,7 @@ private fun ModelPickerContent(
                     .background(cardBgColor)
                     .border(strokeWidth, strokeColor, RoundedCornerShape(20.dp))
                     .clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptics.selection()
                         localSelectedOption = item.option
                     }
 
@@ -599,8 +599,14 @@ private fun RemoteApiConfigContent(
     var modelName by remember { mutableStateOf("gemini-1.5-flash") }
     var apiKey by remember { mutableStateOf("") }
 
+    val availableModels by viewModel.availableRemoteModels.collectAsStateWithLifecycle()
+    val isFetchingModels by viewModel.isFetchingRemoteModels.collectAsStateWithLifecycle()
+    val fetchError by viewModel.remoteFetchError.collectAsStateWithLifecycle()
+    var modelDropdownExpanded by remember { mutableStateOf(false) }
+
     fun onProviderChange(p: String) {
         selectedProvider = p
+        viewModel.clearRemoteModels()
         when (p) {
             "Google Gemini" -> {
                 endpointUrl = "https://generativelanguage.googleapis.com/v1beta"
@@ -708,28 +714,77 @@ private fun RemoteApiConfigContent(
                 )
             )
 
-            OutlinedTextField(
-                value = modelName,
-                onValueChange = { modelName = it },
-                label = { Text("API Model ID") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = BitColors.TextPrimary,
-                    unfocusedBorderColor = BitColors.Border,
-                    focusedLabelColor = BitColors.TextPrimary,
-                    unfocusedLabelColor = BitColors.TextSecondary,
-                    focusedTextColor = BitColors.TextPrimary,
-                    unfocusedTextColor = BitColors.TextPrimary
-                )
-            )
-
             PasswordTextField(
                 value = apiKey,
                 onValueChange = { apiKey = it },
                 label = "API Key / Access Token",
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Button(
+                onClick = {
+                    viewModel.fetchAvailableRemoteModels(selectedProvider, endpointUrl, apiKey)
+                },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                enabled = !isFetchingModels && endpointUrl.isNotBlank() && apiKey.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = BitColors.SurfaceAlt,
+                    contentColor = BitColors.TextPrimary
+                )
+            ) {
+                if (isFetchingModels) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = BitColors.TextPrimary)
+                } else {
+                    Text("Fetch Available Models", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+
+            fetchError?.let { err ->
+                Text(err, color = Color.Red, style = androidx.compose.ui.text.TextStyle(fontSize = 12.sp))
+            }
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = modelName,
+                    onValueChange = { modelName = it },
+                    label = { Text("API Model ID") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    trailingIcon = {
+                        if (availableModels.isNotEmpty()) {
+                            IconButton(onClick = { modelDropdownExpanded = true }) {
+                                Text("▼", fontSize = 11.sp, color = BitColors.TextSecondary)
+                            }
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = BitColors.TextPrimary,
+                        unfocusedBorderColor = BitColors.Border,
+                        focusedLabelColor = BitColors.TextPrimary,
+                        unfocusedLabelColor = BitColors.TextSecondary,
+                        focusedTextColor = BitColors.TextPrimary,
+                        unfocusedTextColor = BitColors.TextPrimary
+                    )
+                )
+                if (availableModels.isNotEmpty()) {
+                    DropdownMenu(
+                        expanded = modelDropdownExpanded,
+                        onDismissRequest = { modelDropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.9f).background(BitColors.Surface)
+                    ) {
+                        availableModels.forEach { model ->
+                            DropdownMenuItem(
+                                text = { Text(model, color = BitColors.TextPrimary) },
+                                onClick = {
+                                    modelName = model
+                                    modelDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -780,7 +835,7 @@ private fun DownloadProgressContent(
     downloadError: String?,
     primaryModelId: String?
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     val downloadState = primaryModelId?.let { downloadStates[it] }
 
     val progress = when (downloadState) {
@@ -913,7 +968,7 @@ private fun DownloadProgressContent(
 
             TextButton(
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    haptics.selection()
                     viewModel.cancelDownload()
                 }
             ) {
@@ -1080,3 +1135,4 @@ private fun RestoreFromBackupSection(viewModel: SetupViewModel) {
         )
     }
 }
+

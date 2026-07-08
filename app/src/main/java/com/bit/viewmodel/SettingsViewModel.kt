@@ -247,6 +247,33 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch { appSettingsDataStore.updateChatMemoryEnabled(enabled) }
     }
 
+    val globalSystemPrompt = appSettingsDataStore.globalSystemPrompt
+        .stateIn(viewModelScope, SharingStarted.Lazily, "")
+
+    val globalPrependPrompt = appSettingsDataStore.globalPrependPrompt
+        .stateIn(viewModelScope, SharingStarted.Lazily, "")
+
+    val globalPostpendPrompt = appSettingsDataStore.globalPostpendPrompt
+        .stateIn(viewModelScope, SharingStarted.Lazily, "")
+
+    fun setGlobalSystemPrompt(prompt: String) {
+        viewModelScope.launch {
+            appSettingsDataStore.updateGlobalSystemPrompt(prompt)
+        }
+    }
+
+    fun setGlobalPrependPrompt(prompt: String) {
+        viewModelScope.launch {
+            appSettingsDataStore.updateGlobalPrependPrompt(prompt)
+        }
+    }
+
+    fun setGlobalPostpendPrompt(prompt: String) {
+        viewModelScope.launch {
+            appSettingsDataStore.updateGlobalPostpendPrompt(prompt)
+        }
+    }
+
     fun setToolCallingEnabled(enabled: Boolean) {
         viewModelScope.launch { appSettingsDataStore.updateToolCallingEnabled(enabled) }
     }

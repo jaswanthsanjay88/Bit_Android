@@ -52,8 +52,7 @@ import com.bit.ui.components.buildInlineFormatted
 internal fun UserMessageBubble(
     message: Messages,
     editable: Boolean = false,
-    onEditRequest: ((Messages) -> Unit)? = null,
-    onForkRequest: ((Messages) -> Unit)? = null
+    onEditRequest: ((Messages) -> Unit)? = null
 ) {
     var menuExpanded by remember(message.msgId) { mutableStateOf(false) }
     val imageBitmap = remember(message.content.imageData) {
@@ -96,7 +95,7 @@ internal fun UserMessageBubble(
                         indication = null,
                         onClick = {},
                         onLongClick = {
-                            if ((editable && onEditRequest != null) || onForkRequest != null) {
+                            if (editable && onEditRequest != null) {
                                 menuExpanded = true
                             }
                         }
@@ -148,21 +147,6 @@ internal fun UserMessageBubble(
                         onClick = {
                             menuExpanded = false
                             onEditRequest.invoke(message)
-                        }
-                    )
-                }
-                if (onForkRequest != null) {
-                    DropdownMenuItem(
-                        text = { Text("Fork conversation") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = TnIcons.Share,
-                                contentDescription = null
-                            )
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onForkRequest.invoke(message)
                         }
                     )
                 }

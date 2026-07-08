@@ -52,6 +52,11 @@ import com.bit.ui.theme.Motion
 import com.bit.viewmodel.ModelStoreViewModel
 import com.bit.viewmodel.RepoGroupInfo
 import com.bit.ui.icons.TnIcons
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.CircleShape
+import com.bit.ui.components.GlassCard
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
 
 // ── ModelsTab ──
 
@@ -368,38 +373,58 @@ internal fun RepoListItem(
     subtitle: @Composable () -> Unit,
     rightContent: @Composable () -> Unit
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = Standards.SpacingSm)
+    GlassCard(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingXs),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
-            ModelTypeBadge(modelType)
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                modifier = Modifier.size(40.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = when (modelType) {
+                            com.bit.models.data.ModelType.GGUF -> TnIcons.Sparkles
+                            com.bit.models.data.ModelType.SD -> TnIcons.Photo
+                            com.bit.models.data.ModelType.TTS -> TnIcons.Volume
+                            com.bit.models.data.ModelType.STT -> TnIcons.Microphone
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ModelTypeBadge(modelType)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
                 subtitle()
             }
 
             rightContent()
         }
-        Spacer(modifier = Modifier.height(Standards.SpacingSm))
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant,
-            thickness = 0.8.dp
-        )
     }
 }
 
@@ -482,11 +507,18 @@ internal fun RepoDetailView(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
         ) {
-            ActionButton(
-                onClickListener = { viewModel.selectRepository(null) },
-                icon = TnIcons.ArrowLeft,
-                contentDescription = "Back to repos"
-            )
+            FilledTonalIconButton(
+                onClick = { viewModel.selectRepository(null) },
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                )
+            ) {
+                Icon(
+                    imageVector = TnIcons.ArrowLeft,
+                    contentDescription = "Back to repos",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
             repoInfo?.let { info ->
                 ModelTypeBadge(info.modelType)
                 Column(modifier = Modifier.weight(1f)) {
@@ -562,7 +594,7 @@ internal fun RecommendedModelCard(systemRamGb: Double, onClick: () -> Unit) {
             .padding(horizontal = Standards.SpacingXs, vertical = Standards.SpacingSm),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(20.dp)
     ) {
         Row(
             modifier = Modifier
@@ -571,24 +603,29 @@ internal fun RecommendedModelCard(systemRamGb: Double, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = TnIcons.Bolt,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Text(
-                        text = "RECOMMENDED FOR YOUR DEVICE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontWeight = FontWeight.Bold
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "RECOMMENDED FOR YOUR DEVICE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.1.sp
+                )
                 Spacer(modifier = Modifier.height(Standards.SpacingXs))
                 Text(
                     text = modelName,

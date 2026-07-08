@@ -46,6 +46,9 @@ class AppSettingsDataStore(private val context: Context) {
         private val WEB_SEARCH_PROVIDER = stringPreferencesKey("web_search_provider")
         private val WEB_SEARCH_API_KEY = stringPreferencesKey("web_search_api_key")
         private val WEB_SEARCH_BASE_URL = stringPreferencesKey("web_search_base_url")
+        private val GLOBAL_SYSTEM_PROMPT = stringPreferencesKey("global_system_prompt")
+        private val GLOBAL_PREPEND_PROMPT = stringPreferencesKey("global_prepend_prompt")
+        private val GLOBAL_POSTPEND_PROMPT = stringPreferencesKey("global_postpend_prompt")
     }
 
     val localServerEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
@@ -200,6 +203,44 @@ class AppSettingsDataStore(private val context: Context) {
 
     suspend fun updateAiMemoryEnabled(enabled: Boolean) {
         context.appSettingsDataStore.edit { it[AI_MEMORY_ENABLED] = enabled }
+    }
+
+    val globalSystemPrompt: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        val raw = prefs[GLOBAL_SYSTEM_PROMPT] ?: PredefinedVariables.compile(
+            DefaultSystemPrompt.create().systemItems,
+            emptyMap(),
+            emptyMap() // Keep {variables} as literal strings for the editor
+        )
+        raw.replace("2026-05-10", "{date}")
+           .replace("14:30:00", "{time}")
+    }
+
+    suspend fun updateGlobalSystemPrompt(prompt: String) {
+        context.appSettingsDataStore.edit { it[GLOBAL_SYSTEM_PROMPT] = prompt }
+    }
+
+    val globalPrependPrompt: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[GLOBAL_PREPEND_PROMPT] ?: PredefinedVariables.compile(
+            DefaultSystemPrompt.create().userPrependItems,
+            emptyMap(),
+            emptyMap()
+        )
+    }
+
+    suspend fun updateGlobalPrependPrompt(prompt: String) {
+        context.appSettingsDataStore.edit { it[GLOBAL_PREPEND_PROMPT] = prompt }
+    }
+
+    val globalPostpendPrompt: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[GLOBAL_POSTPEND_PROMPT] ?: PredefinedVariables.compile(
+            DefaultSystemPrompt.create().userPostpendItems,
+            emptyMap(),
+            emptyMap()
+        )
+    }
+
+    suspend fun updateGlobalPostpendPrompt(prompt: String) {
+        context.appSettingsDataStore.edit { it[GLOBAL_POSTPEND_PROMPT] = prompt }
     }
 
     val securityMode: Flow<String> = context.appSettingsDataStore.data.map { prefs ->

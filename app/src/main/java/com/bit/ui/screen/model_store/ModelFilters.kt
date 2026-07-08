@@ -23,6 +23,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,19 +71,29 @@ private fun FilterChip(
         onClick = onClick,
         label = label,
         modifier = modifier,
+        leadingIcon = if (selected) {
+            {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        } else null,
         colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
             containerColor = Glass.SurfaceSubtle,
-            selectedContainerColor = Glass.AccentPrimarySurface,
+            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
             labelColor = Glass.TextSecondary,
-            selectedLabelColor = Glass.AccentPrimary,
+            selectedLabelColor = MaterialTheme.colorScheme.primary,
             iconColor = Glass.TextSecondary,
-            selectedLeadingIconColor = Glass.AccentPrimary
+            selectedLeadingIconColor = MaterialTheme.colorScheme.primary
         ),
         border = androidx.compose.material3.FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
             borderColor = Glass.BorderSubtle,
-            selectedBorderColor = Glass.AccentPrimary,
+            selectedBorderColor = MaterialTheme.colorScheme.primary,
             borderWidth = 1.dp,
             selectedBorderWidth = 1.dp
         ),
@@ -123,12 +137,19 @@ fun SearchAppBar(
             }
         },
         navigationIcon = {
-            com.bit.ui.components.ActionButton(
-                onClickListener = onCloseSearch,
-                icon = TnIcons.ArrowLeft,
-                contentDescription = "Close search",
+            FilledTonalIconButton(
+                onClick = onCloseSearch,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                ),
                 modifier = Modifier.padding(start = Standards.SpacingXs)
-            )
+            ) {
+                Icon(
+                    imageVector = TnIcons.ArrowLeft,
+                    contentDescription = "Close search",
+                    tint = MaterialTheme.colorScheme.onSurface
+                )
+            }
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background,

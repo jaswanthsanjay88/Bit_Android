@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +23,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
@@ -585,14 +588,14 @@ private fun BulletPointView(text: String, level: Int, colors: InlineColors) {
 @Composable
 private fun NumberedPointView(text: String, number: String, colors: InlineColors) {
     Row(
-        modifier = Modifier.padding(start = Standards.SpacingXs),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        modifier = Modifier.padding(start = 12.dp, top = 2.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             text = "$number.",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f),
             modifier = Modifier.padding(top = 1.dp)
         )
         Text(
@@ -752,84 +755,110 @@ private fun TableView(
     alignments: List<MarkdownElement.Table.Alignment>,
     colors: InlineColors
 ) {
-    val outlineColor = MaterialTheme.colorScheme.outlineVariant
-    val headerBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-    val altRowBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.10f)
-    val textColor = LocalContentColor.current
-    val dimTextColor = textColor.copy(alpha = 0.87f)
-    val colCount = headers.size.coerceAtLeast(1)
-    val density = LocalDensity.current
-    val cellPadH = with(density) { 8.dp.toPx() }
-    val cellPadV = with(density) { 6.dp.toPx() }
-    val dividerWidth = with(density) { 1.dp.toPx() }
-    val cornerRadius = with(density) { 8.dp.toPx() }
-    val textMeasurer = rememberTextMeasurer()
-
-    val baseTypo = MaterialTheme.typography.bodySmall
-    val headerStyle = baseTypo.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textColor, lineHeight = 17.sp)
-    val cellStyle = baseTypo.copy(fontSize = 12.sp, color = dimTextColor, lineHeight = 17.sp)
-
     androidx.compose.foundation.layout.BoxWithConstraints(
-        modifier = Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = Standards.SpacingSm)
     ) {
-        val totalWidth = with(density) { maxWidth.toPx() }
-        val colWidth = (totalWidth - dividerWidth * (colCount - 1)) / colCount
-        val cellTextWidth = (colWidth - cellPadH * 2).coerceAtLeast(1f).toInt()
-
-        val headerMeasured = remember(headers, cellTextWidth, colors) {
-            headers.map { h ->
-                textMeasurer.measure(
-                    text = buildInlineFormatted(h, colors),
-                    style = headerStyle,
-                    maxLines = 3,
-                    constraints = Constraints(maxWidth = cellTextWidth)
-                )
-            }
-        }
-        val rowsMeasured = remember(rows, cellTextWidth, colors) {
-            rows.map { row ->
-                (0 until colCount).map { ci ->
-                    textMeasurer.measure(
-                        text = buildInlineFormatted(row.getOrElse(ci) { "" }, colors),
-                        style = cellStyle,
-                        maxLines = 5,
-                        constraints = Constraints(maxWidth = cellTextWidth)
-                    )
+        val colCount = headers.size.coerceAtLeast(1)
+        
+        // Mobile optimization for 2-column tables
+        if (colCount == 2 && maxWidth < 400.dp) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                rows.forEach { rowCells ->
+                    val topic = rowCells.getOrNull(0) ?: ""
+                    val keyPoint = rowCells.getOrNull(1) ?: ""
+                    
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        ),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = cachedInlineFormatting(topic, colors),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = cachedInlineFormatting(keyPoint, colors),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 }
             }
-        }
+        } else {
+            // Standard Canvas Table Drawing
+            val outlineColor = MaterialTheme.colorScheme.outlineVariant
+            val headerBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            val altRowBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.10f)
+            val textColor = LocalContentColor.current
+            val dimTextColor = textColor.copy(alpha = 0.87f)
+            val density = LocalDensity.current
+            val cellPadH = with(density) { 8.dp.toPx() }
+            val cellPadV = with(density) { 6.dp.toPx() }
+            val dividerWidth = with(density) { 1.dp.toPx() }
+            val cornerRadius = with(density) { 8.dp.toPx() }
+            val textMeasurer = rememberTextMeasurer()
 
-        val headerRowHeight = remember(headerMeasured) { (headerMeasured.maxOfOrNull { it.size.height } ?: 0) + (cellPadV * 2) }
-        val rowHeights = remember(rowsMeasured) { rowsMeasured.map { cells -> (cells.maxOfOrNull { it.size.height } ?: 0) + (cellPadV * 2) } }
-        val totalHeight = headerRowHeight + rowHeights.sum() + dividerWidth * rows.size
+            val baseTypo = MaterialTheme.typography.bodySmall
+            val headerStyle = baseTypo.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textColor, lineHeight = 17.sp)
+            val cellStyle = baseTypo.copy(fontSize = 12.sp, color = dimTextColor, lineHeight = 17.sp)
 
-        androidx.compose.foundation.Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(with(density) { totalHeight.toDp() })
-                .drawBehind {
-                    drawRoundRect(
-                        color = outlineColor,
-                        size = Size(totalWidth, totalHeight),
-                        cornerRadius = CornerRadius(cornerRadius),
-                        style = Stroke(width = dividerWidth)
-                    )
-                }
-        ) {
-            var y = 0f
+            val totalWidth = constraints.maxWidth.toFloat()
+            val colWidth = (totalWidth - dividerWidth * (colCount - 1)) / colCount
 
-            drawRect(color = headerBg, topLeft = Offset(0f, 0f), size = Size(totalWidth, headerRowHeight))
-            drawTableRow(headerMeasured, colCount, colWidth, cellPadH, cellPadV, dividerWidth, y, headerRowHeight, alignments, outlineColor)
-            y += headerRowHeight
-
-            rowsMeasured.forEachIndexed { rowIndex, cells ->
-                drawRect(color = outlineColor.copy(alpha = 0.4f), topLeft = Offset(0f, y), size = Size(totalWidth, dividerWidth))
-                y += dividerWidth
-                val rh = rowHeights[rowIndex]
-                if (rowIndex % 2 == 1) drawRect(color = altRowBg, topLeft = Offset(0f, y), size = Size(totalWidth, rh))
-                drawTableRow(cells, colCount, colWidth, cellPadH, cellPadV, dividerWidth, y, rh, alignments, outlineColor)
-                y += rh
+            val headerMeasured = remember(headers, colWidth) {
+                headers.map { textMeasurer.measure(buildInlineFormatted(it, colors), style = headerStyle, constraints = androidx.compose.ui.unit.Constraints(maxWidth = (colWidth - cellPadH * 2).coerceAtLeast(0f).toInt())) }
             }
+            val headerRowHeight = headerMeasured.maxOfOrNull { it.size.height }?.plus(cellPadV * 2) ?: 0f
+
+            val rowsMeasured = remember(rows, colWidth) {
+                rows.map { row ->
+                    row.map { cell ->
+                        textMeasurer.measure(buildInlineFormatted(cell, colors), style = cellStyle, constraints = androidx.compose.ui.unit.Constraints(maxWidth = (colWidth - cellPadH * 2).coerceAtLeast(0f).toInt()))
+                    }
+                }
+            }
+            val rowHeights = rowsMeasured.map { row -> row.maxOfOrNull { it.size.height }?.plus(cellPadV * 2) ?: 0f }
+            val totalHeight = headerRowHeight + dividerWidth * rows.size + rowHeights.sum()
+
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(with(density) { totalHeight.toDp() })
+                    .border(dividerWidth.dp, outlineColor.copy(alpha = 0.4f), androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius.dp))
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius.dp))
+                    .drawBehind {
+                        var y = 0f
+
+                        drawRect(color = headerBg, topLeft = Offset(0f, 0f), size = Size(totalWidth, headerRowHeight))
+                        drawTableRow(headerMeasured, colCount, colWidth, cellPadH, cellPadV, dividerWidth, y, headerRowHeight, alignments, outlineColor)
+                        y += headerRowHeight
+
+                        rowsMeasured.forEachIndexed { rowIndex, cells ->
+                            drawRect(color = outlineColor.copy(alpha = 0.4f), topLeft = Offset(0f, y), size = Size(totalWidth, dividerWidth))
+                            y += dividerWidth
+                            val rh = rowHeights[rowIndex]
+                            if (rowIndex % 2 == 1) drawRect(color = altRowBg, topLeft = Offset(0f, y), size = Size(totalWidth, rh))
+                            drawTableRow(cells, colCount, colWidth, cellPadH, cellPadV, dividerWidth, y, rh, alignments, outlineColor)
+                            y += rh
+                        }
+                    }
+            ) {}
         }
     }
 }

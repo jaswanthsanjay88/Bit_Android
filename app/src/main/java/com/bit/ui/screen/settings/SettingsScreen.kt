@@ -1,36 +1,37 @@
 package com.bit.ui.screen.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,24 +40,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.widget.Toast
 import com.bit.global.Standards
 import com.bit.plugins.PluginManager
 import com.bit.service.ModelDownloadService
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.GlassCard
-import com.bit.ui.components.GlassDivider
 import com.bit.ui.components.GlassSectionCard
-import com.bit.ui.components.SettingsClickableRow
+import com.bit.ui.components.GlassDivider
 import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.Glass
 import com.bit.viewmodel.SettingsViewModel
 import com.bit.stt.SherpaSTTEngine
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import com.bit.viewmodel.ModelConfigEditorViewModel
+import com.bit.ui.screen.model_config.ConfigEditorPanel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -66,42 +72,32 @@ fun SettingsScreen(
     onAiMemoryClick: () -> Unit = {},
     onEmbeddingSetupClick: () -> Unit = {},
     onDiagnosticsClick: () -> Unit = {},
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    configEditorViewModel: ModelConfigEditorViewModel = hiltViewModel()
 ) {
-    // Intercept back actions robustly to prevent app exit
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var editorModel by remember { mutableStateOf<com.bit.models.table_schema.Model?>(null) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    // Intercept back actions to go back to category list first
     BackHandler {
-        onNavigateBack()
+        if (selectedCategory != null) {
+            selectedCategory = null
+        } else {
+            onNavigateBack()
+        }
     }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val hasSttModel = remember(context) { SherpaSTTEngine.hasModelFiles(context) }
-
-    // Dynamic Profile Info
-    val profileName by viewModel.profileName.collectAsStateWithLifecycle()
-    val profileEmail by viewModel.profileEmail.collectAsStateWithLifecycle()
-    val profilePhone by viewModel.profilePhone.collectAsStateWithLifecycle()
-
-    // Dialog Edit States
-    var showEditNameDialog by remember { mutableStateOf(false) }
-    var showEditEmailDialog by remember { mutableStateOf(false) }
-    var showEditPhoneDialog by remember { mutableStateOf(false) }
-    var editNameInput by remember { mutableStateOf("") }
-    var editEmailInput by remember { mutableStateOf("") }
-    var editPhoneInput by remember { mutableStateOf("") }
-
-    LaunchedEffect(showEditNameDialog) {
-        if (showEditNameDialog) editNameInput = profileName
-    }
-    LaunchedEffect(showEditEmailDialog) {
-        if (showEditEmailDialog) editEmailInput = profileEmail
-    }
-    LaunchedEffect(showEditPhoneDialog) {
-        if (showEditPhoneDialog) editPhoneInput = profilePhone
-    }
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
     // App settings
     val streamingEnabled by viewModel.streamingEnabled.collectAsStateWithLifecycle()
     val chatMemoryEnabled by viewModel.chatMemoryEnabled.collectAsStateWithLifecycle()
+    val globalSystemPrompt by viewModel.globalSystemPrompt.collectAsStateWithLifecycle()
+    val globalPrependPrompt by viewModel.globalPrependPrompt.collectAsStateWithLifecycle()
+    val globalPostpendPrompt by viewModel.globalPostpendPrompt.collectAsStateWithLifecycle()
     val toolCallingEnabled by viewModel.toolCallingEnabled.collectAsStateWithLifecycle()
     val toolCallingBypassEnabled by viewModel.toolCallingBypassEnabled.collectAsStateWithLifecycle()
     val imageBlurEnabled by viewModel.imageBlurEnabled.collectAsStateWithLifecycle()
@@ -146,377 +142,405 @@ fun SettingsScreen(
     val voices = ttsVoices.ifEmpty { DEFAULT_VOICES }
 
     Scaffold(
+        containerColor = Color.Black,
         topBar = {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(Color.Black)
                     .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm)
                     .statusBarsPadding(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                ActionButton(
-                    onClickListener = onNavigateBack,
-                    icon = TnIcons.ArrowLeft,
-                    contentDescription = "Back",
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = Glass.Surface,
-                        contentColor = Glass.TextPrimary
+                IconButton(
+                    onClick = {
+                        haptics.selection()
+                        if (selectedCategory != null) {
+                            selectedCategory = null
+                        } else {
+                            onNavigateBack()
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White
                     )
+                }
+                Spacer(modifier = Modifier.width(Standards.SpacingMd))
+                Text(
+                    text = when (selectedCategory) {
+                        "services" -> "Services & Models"
+                        "chat" -> "Responses & Chat"
+                        "hardware" -> "Hardware Tuning"
+                        "intelligence" -> "Intelligence & Tools"
+                        "voice" -> "Voice Settings"
+                        "storage" -> "Storage & Diagnostics"
+                        "about" -> "About BIT"
+                        else -> "Settings"
+                    },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             }
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(horizontal = Standards.SpacingMd),
-            verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-        ) {
-            // ── Dynamic Profile Section (ChatGPT Style) ──
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = Standards.SpacingMd),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Box(
-                        modifier = Modifier.size(92.dp),
-                        contentAlignment = Alignment.BottomEnd
-                    ) {
-                        // Initials Avatar with custom blue/silver gradient
-                        val initials = profileName.ifEmpty { "User" }.split(" ")
-                            .mapNotNull { it.firstOrNull()?.toString() }
-                            .joinToString("")
-                            .take(2)
-                            .uppercase()
+        AnimatedContent(
+            targetState = selectedCategory,
+            transitionSpec = {
+                if (targetState != null) {
+                    slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
+                } else {
+                    slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
+                }
+            },
+            modifier = Modifier.padding(padding).background(Color.Black),
+            label = "settings_navigation"
+        ) { category ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
+                verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+            ) {
+                when (category) {
+                    "services" -> {
+                        // ── Services & Models ──
+                        modelConfigurationSection(
+                            hardwareTuningEnabled = hardwareTuningEnabled,
+                            installedModels = installedModels,
+                            onModelSelected = { model -> 
+                                configEditorViewModel.selectModel(model)
+                                editorModel = model 
+                            },
+                            onEmbeddingSetup = onEmbeddingSetupClick,
+                            onModelEditor = onModelEditor
+                        )
+                        huggingFaceTokenSection(
+                            tokenState = hfTokenState,
+                            testResult = hfTestResult,
+                            onSaveToken = viewModel::saveHfToken,
+                            onClearToken = viewModel::clearHfToken,
+                            onTestConnection = viewModel::testHfConnection
+                        )
+                    }
+                    "chat" -> {
+                        // ── Responses & Chat Experience ──
+                        llmSettingsSection(
+                            streamingEnabled = streamingEnabled,
+                            chatMemoryEnabled = chatMemoryEnabled,
+                            speedModeEnabled = speedModeEnabled,
+                            viewModel = viewModel
+                        )
+                        systemPromptSection(
+                            globalSystemPrompt = globalSystemPrompt,
+                            globalPrependPrompt = globalPrependPrompt,
+                            globalPostpendPrompt = globalPostpendPrompt,
+                            viewModel = viewModel
+                        )
+                        chatSettingsSection(
+                            codeHighlightEnabled = codeHighlightEnabled,
+                            viewModel = viewModel
+                        )
+                    }
+                    "hardware" -> {
+                        // ── Hardware Tuning ──
+                        hardwareTuningSection(
+                            hardwareTuningEnabled = hardwareTuningEnabled,
+                            performanceMode = performanceMode,
+                            hardwareProfile = hardwareProfile,
+                            viewModel = viewModel
+                        )
+                    }
+                    "intelligence" -> {
+                        // ── Intelligence & Tools ──
+                        generalSettingsSection(
+                            toolCallingEnabled = toolCallingEnabled,
+                            toolCallingBypassEnabled = toolCallingBypassEnabled,
+                            hasToolCallingModel = hasToolCallingModel,
+                            toolCallingDownloadState = toolCallingDownloadState,
+                            viewModel = viewModel
+                        )
+                        aiMemorySection(
+                            aiMemoryEnabled = aiMemoryEnabled,
+                            onAiMemoryClick = onAiMemoryClick,
+                            viewModel = viewModel
+                        )
+                    }
+                    "voice" -> {
+                        // ── Voice Settings (TTS & STT) ──
+                        ttsSettingsSection(
+                            installedTtsModelId = installedTtsModelId,
+                            ttsDownloadStates = ttsDownloadStates,
+                            ttsModelLoaded = ttsModelLoaded,
+                            loadTTSOnStart = loadTTSOnStart,
+                            ttsSettings = ttsSettings,
+                            voices = voices,
+                            viewModel = viewModel
+                        )
+                        sttSettingsSection(
+                            hasSttModel = hasSttModel,
+                            sttThreads = sttThreads,
+                            sttLanguage = sttLanguage,
+                            sttDownloadStates = ttsDownloadStates,
+                            viewModel = viewModel
+                        )
+                    }
+                    "storage" -> {
+                        // ── Storage & Diagnostics ──
+                        item {
+                            GlassSectionCard(
+                                title = "System Storage",
+                                icon = TnIcons.Refresh,
+                                description = "Securely manage, backup, or reset your local data footprints"
+                            ) {
+                                DataManagementSection(viewModel = viewModel)
+                            }
+                        }
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            Glass.AccentPrimary,
-                                            Glass.AccentSecondary
-                                         )
-                                    ),
-                                    shape = CircleShape
+                        item {
+                            GlassCard(
+                                onClick = {
+                                    haptics.selection()
+                                    onDiagnosticsClick()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                backgroundColor = Glass.Surface,
+                                borderColor = Glass.BorderSubtle,
+                                cornerRadius = Standards.CardCornerRadius,
+                                contentPadding = PaddingValues(Standards.CardPadding)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                                ) {
+                                    Icon(
+                                        imageVector = TnIcons.Terminal,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(Standards.IconLg),
+                                        tint = Glass.AccentSecondary
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "System Diagnostics",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Glass.TextPrimary
+                                        )
+                                        Text(
+                                            text = "View logs, native audits, and crash reports",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Glass.TextSecondary
+                                        )
+                                    }
+                                    Icon(
+                                        imageVector = TnIcons.ChevronRight,
+                                        contentDescription = null,
+                                        tint = Glass.TextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    "about" -> {
+                        // ── About ──
+                        aboutSection(appVersion = viewModel.appVersion)
+                    }
+                    else -> {
+                        // ── Main Dashboard list (Cleaned up Material Design 3 style) ──
+                        item {
+                            SettingsGroup(title = "Models") {
+                                SettingsItem(
+                                    title = "Services & Models",
+                                    description = "Manage installed LLMs and RAG embeddings",
+                                    icon = TnIcons.Sparkles,
+                                    onClick = {
+                                        selectedCategory = "services"
+                                    }
                                 )
-                                .clickable { showEditNameDialog = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = initials,
-                                style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Glass.TextOnAccent
-                            )
+                            }
                         }
 
-                        // Edit Badge
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .background(Glass.SurfaceElevated, CircleShape)
-                                .border(1.dp, Glass.Border, CircleShape)
-                                .clickable { showEditNameDialog = true },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = TnIcons.Edit,
-                                contentDescription = "Edit Profile",
-                                modifier = Modifier.size(13.dp),
-                                tint = Glass.TextPrimary
-                            )
+                        item {
+                            SettingsGroup(title = "General Settings") {
+                                SettingsItem(
+                                    title = "Responses & Chat",
+                                    description = "System prompts, language models, and chat experience",
+                                    icon = Icons.AutoMirrored.Filled.Chat,
+                                    onClick = {
+                                        selectedCategory = "chat"
+                                    }
+                                )
+                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
+                                SettingsItem(
+                                    title = "Intelligence & Tools",
+                                    description = "Tool calling capabilities and AI plugins",
+                                    icon = Icons.Default.Psychology,
+                                    onClick = {
+                                        selectedCategory = "intelligence"
+                                    }
+                                )
+                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
+                                SettingsItem(
+                                    title = "Voice Processing",
+                                    description = "Text-to-Speech (TTS) and Speech-to-Text (STT) models",
+                                    icon = Icons.Default.RecordVoiceOver,
+                                    onClick = {
+                                        selectedCategory = "voice"
+                                    }
+                                )
+                            }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(Standards.SpacingSm))
+                        item {
+                            SettingsGroup(title = "Device & Storage") {
+                                SettingsItem(
+                                    title = "Hardware Tuning",
+                                    description = "CPU threads, compute cores, and performance modes",
+                                    icon = Icons.Default.Memory,
+                                    onClick = {
+                                        selectedCategory = "hardware"
+                                    }
+                                )
+                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
+                                SettingsItem(
+                                    title = "Storage & Diagnostics",
+                                    description = "Manage memory, diagnostics, and app data",
+                                    icon = Icons.Default.Storage,
+                                    onClick = {
+                                        selectedCategory = "storage"
+                                    }
+                                )
+                            }
+                        }
 
-                    // Dynamic User Name
-                    Text(
-                        text = profileName.ifEmpty { "User" },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (profileName.isEmpty()) Glass.TextMuted else Glass.TextPrimary,
-                        modifier = Modifier.clickable { showEditNameDialog = true }
-                    )
-                }
-            }
-
-            // ── Dynamic Account Section (ChatGPT Style) ──
-            item {
-                Text(
-                    text = "Account",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Glass.TextSecondary,
-                    modifier = Modifier.padding(start = Standards.SpacingXs, bottom = Standards.SpacingXxs)
-                )
-                GlassCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = Glass.Surface,
-                    borderColor = Glass.BorderSubtle,
-                    cornerRadius = Standards.CardCornerRadius,
-                    contentPadding = PaddingValues(horizontal = Standards.CardPadding, vertical = Standards.SpacingXs)
-                ) {
-                    Column {
-                        SettingsClickableRow(
-                            title = "Email",
-                            description = profileEmail.ifEmpty { "Not set" },
-                            icon = TnIcons.User,
-                            onClick = { showEditEmailDialog = true }
-                        )
-                        GlassDivider()
-                        SettingsClickableRow(
-                            title = "Phone number",
-                            description = profilePhone.ifEmpty { "Not set" },
-                            icon = TnIcons.Settings,
-                            onClick = { showEditPhoneDialog = true }
-                        )
+                        item {
+                            SettingsGroup(title = "About") {
+                                SettingsItem(
+                                    title = "About BIT",
+                                    description = "App version, developer info, and ratings",
+                                    icon = Icons.Default.Info,
+                                    onClick = {
+                                        selectedCategory = "about"
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
-
-            // ── General AI Plugins ──
-            generalSettingsSection(
-                toolCallingEnabled = toolCallingEnabled,
-                toolCallingBypassEnabled = toolCallingBypassEnabled,
-                hasToolCallingModel = hasToolCallingModel,
-                toolCallingDownloadState = toolCallingDownloadState,
-                viewModel = viewModel
-            )
-
-            // ── LLM Engine Settings ──
-            llmSettingsSection(
-                streamingEnabled = streamingEnabled,
-                chatMemoryEnabled = chatMemoryEnabled,
-                speedModeEnabled = speedModeEnabled,
-                viewModel = viewModel
-            )
-
-            // ── Chat Experience ──
-            chatSettingsSection(
-                codeHighlightEnabled = codeHighlightEnabled,
-                viewModel = viewModel
-            )
-
-            // ── Hardware Tuning ──
-            hardwareTuningSection(
-                hardwareTuningEnabled = hardwareTuningEnabled,
-                performanceMode = performanceMode,
-                hardwareProfile = hardwareProfile,
-                viewModel = viewModel
-            )
-
-            // ── Model Configurations ──
-            modelConfigurationSection(
-                hardwareTuningEnabled = hardwareTuningEnabled,
-                installedModels = installedModels,
-                onModelEditor = onModelEditor,
-                onEmbeddingSetup = onEmbeddingSetupClick
-            )
-
-            // ── AI Memory ──
-            aiMemorySection(
-                aiMemoryEnabled = aiMemoryEnabled,
-                onAiMemoryClick = onAiMemoryClick,
-                viewModel = viewModel
-            )
-
-            // ── TTS Text-to-Speech ──
-            ttsSettingsSection(
-                installedTtsModelId = installedTtsModelId,
-                ttsDownloadStates = ttsDownloadStates,
-                ttsModelLoaded = ttsModelLoaded,
-                loadTTSOnStart = loadTTSOnStart,
-                ttsSettings = ttsSettings,
-                voices = voices,
-                viewModel = viewModel
-            )
-
-            // ── STT Speech-to-Text ──
-            sttSettingsSection(
-                hasSttModel = hasSttModel,
-                sttThreads = sttThreads,
-                sttLanguage = sttLanguage,
-                sttDownloadStates = ttsDownloadStates,
-                viewModel = viewModel
-            )
-
-            // ── Image Generation ──
-            // imageGenerationSection(
-            //     imageBlurEnabled = imageBlurEnabled,
-            //     viewModel = viewModel
-            // )
-
-            // ── HuggingFace Access Token ──
-            huggingFaceTokenSection(
-                tokenState = hfTokenState,
-                testResult = hfTestResult,
-                onSaveToken = viewModel::saveHfToken,
-                onClearToken = viewModel::clearHfToken,
-                onTestConnection = viewModel::testHfConnection
-            )
-
-            // ── Data Management Card ──
-            item {
-                Spacer(Modifier.height(Standards.SpacingSm))
-                Text(
-                    text = "Data Management",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Glass.TextSecondary,
-                    modifier = Modifier.padding(start = Standards.SpacingXs, bottom = Standards.SpacingXxs)
-                )
-                GlassSectionCard(
-                    title = "System Storage",
-                    icon = TnIcons.Refresh,
-                    description = "Securely manage, backup, or reset your local data footprints"
-                ) {
-                    DataManagementSection(viewModel = viewModel)
-                }
-            }
-
-            // ── Diagnostics ──
-            item {
-                Spacer(Modifier.height(Standards.SpacingSm))
-                Text(
-                    text = "System Diagnostics",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Glass.TextSecondary,
-                    modifier = Modifier.padding(start = Standards.SpacingXs, bottom = Standards.SpacingXxs)
-                )
-                GlassCard(
-                    onClick = onDiagnosticsClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = Glass.Surface,
-                    borderColor = Glass.BorderSubtle,
-                    cornerRadius = Standards.CardCornerRadius,
-                    contentPadding = PaddingValues(Standards.CardPadding)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-                    ) {
-                        Icon(
-                            imageVector = TnIcons.Terminal,
-                            contentDescription = null,
-                            modifier = Modifier.size(Standards.IconLg),
-                            tint = Glass.AccentSecondary
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "System Diagnostics",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Glass.TextPrimary
-                            )
-                            Text(
-                                text = "View logs, native audits, and crash reports",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Glass.TextSecondary
-                            )
-                        }
-                        Icon(
-                            imageVector = TnIcons.ChevronRight,
-                            contentDescription = null,
-                            tint = Glass.TextSecondary
-                        )
-                    }
-                }
-            }
-
-            // ── About ──
-            aboutSection(appVersion = viewModel.appVersion)
-
-            item { Spacer(Modifier.height(Standards.SpacingXl)) }
         }
     }
 
-    // ── Dialogs to Edit Profile dynamically ──
-    if (showEditNameDialog) {
-        ProfileEditDialog(
-            title = "Edit Full Name",
-            label = "Full Name",
-            initialValue = editNameInput,
-            onDismiss = { showEditNameDialog = false },
-            onSave = { viewModel.updateProfileName(it) }
-        )
-    }
-
-    if (showEditEmailDialog) {
-        ProfileEditDialog(
-            title = "Edit Email Address",
-            label = "Email Address",
-            initialValue = editEmailInput,
-            onDismiss = { showEditEmailDialog = false },
-            onSave = { viewModel.updateProfileEmail(it) }
-        )
-    }
-
-    if (showEditPhoneDialog) {
-        ProfileEditDialog(
-            title = "Edit Phone Number",
-            label = "Phone Number",
-            initialValue = editPhoneInput,
-            onDismiss = { showEditPhoneDialog = false },
-            onSave = { viewModel.updateProfilePhone(it) }
-        )
+    if (editorModel != null) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                editorModel = null
+            },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            modifier = Modifier.fillMaxHeight(0.85f)
+        ) {
+            ConfigEditorPanel(
+                model = editorModel!!,
+                viewModel = configEditorViewModel,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
 @Composable
-private fun ProfileEditDialog(
+fun SettingsGroup(
     title: String,
-    label: String,
-    initialValue: String,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    content: @Composable () -> Unit
 ) {
-    var textInput by remember { mutableStateOf(initialValue) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title, fontWeight = FontWeight.SemiBold) },
-        text = {
-            OutlinedTextField(
-                value = textInput,
-                onValueChange = { textInput = it },
-                label = { Text(label) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = Glass.TextPrimary,
-                    unfocusedTextColor = Glass.TextPrimary,
-                    focusedBorderColor = Glass.BorderActive,
-                    unfocusedBorderColor = Glass.Border
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp)
+    ) {
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp
+        )
+        // Grouped MD3 card using solid GlassCard
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsItem(
+    title: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                haptics.selection()
+                onClick()
+            }
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Tonal Icon Container (rounded circle)
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
                 )
+            }
+        }
+        
+        Spacer(modifier = Modifier.width(16.dp))
+        
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                color = Color.White
             )
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (textInput.isNotBlank()) {
-                        onSave(textInput.trim())
-                    }
-                    onDismiss()
-                }
-            ) {
-                Text("Save", color = Glass.AccentPrimary)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = Glass.TextSecondary)
-            }
-        },
-        containerColor = Glass.SurfaceElevated,
-        textContentColor = Glass.TextPrimary,
-        titleContentColor = Glass.TextPrimary,
-        shape = RoundedCornerShape(Standards.RadiusLg)
-    )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        Icon(
+            imageVector = TnIcons.ChevronRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.size(20.dp)
+        )
+    }
 }

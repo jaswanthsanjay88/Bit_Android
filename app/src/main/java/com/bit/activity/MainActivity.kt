@@ -89,6 +89,9 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             NeuroVerseTheme {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.bit.ui.theme.LocalBitHaptics provides com.bit.ui.theme.rememberBitHaptics(enabled = true)
+                ) {
                 val context = this@MainActivity
 
                 // Compute target destination from onboarding state + installed models
@@ -158,6 +161,7 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    }
 
     override fun onDestroy() {
         super.onDestroy()
@@ -183,7 +187,6 @@ sealed class Screen(val route: String) {
     object AiMemory : Screen("ai_memory")
     object ImageGenSetup : Screen("image_gen_setup")
     object EmbeddingSetup : Screen("embedding_setup")
-    object HybridSettings : Screen("hybrid_settings")
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -317,9 +320,6 @@ fun AppNavigation(
                         navController.navigate(route)
                     },
                 onVaultManagerClick = {},
-                onHybridSettingsClick = {
-                    navController.navigate(Screen.HybridSettings.route)
-                },
                 onImageGenSetupNeeded = {
                     navController.navigate(Screen.ImageGenSetup.route)
                 },
@@ -369,11 +369,6 @@ fun AppNavigation(
             )
         }
 
-        composable(Screen.HybridSettings.route) {
-            com.bit.ui.screen.hybrid_settings.HybridSettingsScreen(onBackClick = {
-                navController.popBackStack()
-            })
-        }
 
         composable(Screen.AiMemory.route) {
             AiMemoryScreen(

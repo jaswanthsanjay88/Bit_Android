@@ -8,17 +8,15 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import nl.siegmann.epublib.epub.EpubReader
-import org.apache.poi.hssf.usermodel.HSSFWorkbook
-import org.apache.poi.hwpf.HWPFDocument
-import org.apache.poi.hwpf.extractor.WordExtractor
-import org.apache.poi.xssf.usermodel.XSSFWorkbook
-import org.apache.poi.xwpf.usermodel.XWPFDocument
+import org.jsoup.Jsoup
 import java.io.InputStream
+import java.util.zip.ZipInputStream
+import java.util.regex.Pattern
 
 /**
  * Utility class for parsing various document formats into plain text.
- * Supports: PDF, EPUB, Excel (.xlsx, .xls), Word (.docx, .doc), and plain text files.
+ * Supports: PDF, EPUB, Excel (.xlsx), Word (.docx), PowerPoint (.pptx), ODF (.odt), and plain text files.
+ * Custom lightweight ZIP/XML parsers are used to avoid heavy Apache POI dependencies.
  */
 object DocumentParser {
     private const val TAG = "DocumentParser"
@@ -34,15 +32,13 @@ object DocumentParser {
         const val XLS = "application/vnd.ms-excel"
         const val DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         const val DOC = "application/msword"
+        const val PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        const val PPT = "application/vnd.ms-powerpoint"
+        const val ODT = "application/vnd.oasis.opendocument.text"
     }
 
     /**
      * Parse a document from a URI into plain text.
-     *
-     * @param uri The URI of the document
-     * @param context Android context for accessing content resolver
-     * @param mimeType Optional MIME type hint. If not provided, will be inferred from URI
-     * @return Result containing the extracted text or an error
      */
     suspend fun parseDocument(
         uri: Uri,
@@ -60,9 +56,11 @@ object DocumentParser {
                     MimeTypes.PDF -> parsePdf(inputStream, context)
                     MimeTypes.EPUB -> parseEpub(inputStream)
                     MimeTypes.XLSX -> parseXlsx(inputStream)
-                    MimeTypes.XLS -> parseXls(inputStream)
                     MimeTypes.DOCX -> parseDocx(inputStream)
+                    MimeTypes.PPTX -> parsePptx(inputStream)
+                    MimeTypes.ODT -> parseOdt(inputStream)
                     MimeTypes.DOC -> parseDoc(inputStream)
+                    MimeTypes.XLS -> parseXls(inputStream)
                     "text/plain" -> parsePlainText(inputStream)
                     else -> {
                         // Try to infer from file extension
@@ -71,9 +69,11 @@ object DocumentParser {
                             fileName.endsWith(".pdf", ignoreCase = true) -> parsePdf(inputStream, context)
                             fileName.endsWith(".epub", ignoreCase = true) -> parseEpub(inputStream)
                             fileName.endsWith(".xlsx", ignoreCase = true) -> parseXlsx(inputStream)
-                            fileName.endsWith(".xls", ignoreCase = true) -> parseXls(inputStream)
                             fileName.endsWith(".docx", ignoreCase = true) -> parseDocx(inputStream)
+                            fileName.endsWith(".pptx", ignoreCase = true) -> parsePptx(inputStream)
+                            fileName.endsWith(".odt", ignoreCase = true) -> parseOdt(inputStream)
                             fileName.endsWith(".doc", ignoreCase = true) -> parseDoc(inputStream)
+                            fileName.endsWith(".xls", ignoreCase = true) -> parseXls(inputStream)
                             fileName.endsWith(".txt", ignoreCase = true) -> parsePlainText(inputStream)
                             else -> {
                                 Log.w(TAG, "Unknown file type: $detectedMimeType / $fileName, treating as plain text")
@@ -93,11 +93,29 @@ object DocumentParser {
     }
 
     /**
+     * Unescape XML entity characters (e.g. &amp;, &lt;, &gt;, &quot;, &apos;).
+     */
+    private fun unescapeXml(text: String): String {
+        return text
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&#x9;", "\t")
+            .replace("&#xA;", "\n")
+            .replace("&#xD;", "\r")
+            .replace(Regex("&#(\\d+);")) { matchResult ->
+                val code = matchResult.groupValues[1].toIntOrNull()
+                if (code != null) code.toChar().toString() else matchResult.value
+            }
+    }
+
+    /**
      * Parse a PDF document using PDFBox-Android
      */
     private fun parsePdf(inputStream: InputStream, context: Context): String {
         return try {
-            // Initialize PDFBox-Android once (thread-safe via volatile flag)
             if (!pdfBoxInitialized) {
                 synchronized(this) {
                     if (!pdfBoxInitialized) {
@@ -109,7 +127,7 @@ object DocumentParser {
 
             PDDocument.load(inputStream).use { document ->
                 val stripper = PDFTextStripper()
-                stripper.getText(document)
+                stripper.getText(document) ?: ""
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing PDF: ${e.message}", e)
@@ -122,28 +140,25 @@ object DocumentParser {
      */
     private fun parseEpub(inputStream: InputStream): String {
         return try {
-            val book = EpubReader().readEpub(inputStream)
             val textBuilder = StringBuilder()
-
-            // Extract text from all chapters/resources
-            book.contents.forEach { resource ->
-                try {
-                    val content = String(resource.data, Charsets.UTF_8)
-                    // Remove HTML tags for plain text
-                    val plainText = content
-                        .replace(Regex("<[^>]*>"), " ")
-                        .replace(Regex("\\s+"), " ")
-                        .trim()
-
-                    if (plainText.isNotBlank()) {
-                        textBuilder.append(plainText)
-                        textBuilder.append("\n\n")
+            ZipInputStream(inputStream).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name ?: ""
+                    if (entryName.endsWith(".xhtml", ignoreCase = true) ||
+                        entryName.endsWith(".html", ignoreCase = true) ||
+                        entryName.endsWith(".htm", ignoreCase = true)
+                    ) {
+                        val html = zip.bufferedReader(Charsets.UTF_8).readText()
+                        val doc = Jsoup.parse(html)
+                        val cleanText = doc.text().trim()
+                        if (cleanText.isNotBlank()) {
+                            textBuilder.append(cleanText).append("\n\n")
+                        }
                     }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Failed to parse EPUB resource: ${resource.href}", e)
+                    entry = zip.nextEntry
                 }
             }
-
             textBuilder.toString().trim()
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing EPUB: ${e.message}", e)
@@ -152,131 +167,34 @@ object DocumentParser {
     }
 
     /**
-     * Parse an Excel .xlsx file (Office Open XML format)
-     */
-    private fun parseXlsx(inputStream: InputStream): String {
-        return try {
-            val workbook = XSSFWorkbook(inputStream)
-            val textBuilder = StringBuilder()
-
-            for (sheetIndex in 0 until workbook.numberOfSheets) {
-                val sheet = workbook.getSheetAt(sheetIndex)
-                textBuilder.append("Sheet: ${sheet.sheetName}\n")
-                textBuilder.append("=" .repeat(40))
-                textBuilder.append("\n\n")
-
-                for (row in sheet) {
-                    val rowText = row.mapNotNull { cell ->
-                        when (cell.cellType) {
-                            org.apache.poi.ss.usermodel.CellType.STRING -> cell.stringCellValue
-                            org.apache.poi.ss.usermodel.CellType.NUMERIC -> cell.numericCellValue.toString()
-                            org.apache.poi.ss.usermodel.CellType.BOOLEAN -> cell.booleanCellValue.toString()
-                            org.apache.poi.ss.usermodel.CellType.FORMULA -> {
-                                try {
-                                    cell.stringCellValue
-                                } catch (e: Exception) {
-                                    cell.numericCellValue.toString()
-                                }
-                            }
-                            else -> null
-                        }
-                    }.joinToString("\t")
-
-                    if (rowText.isNotBlank()) {
-                        textBuilder.append(rowText)
-                        textBuilder.append("\n")
-                    }
-                }
-                textBuilder.append("\n")
-            }
-
-            workbook.close()
-            textBuilder.toString().trim()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing XLSX: ${e.message}", e)
-            throw Exception("Failed to parse Excel file (.xlsx): ${e.message}", e)
-        }
-    }
-
-    /**
-     * Parse an Excel .xls file (legacy binary format)
-     */
-    private fun parseXls(inputStream: InputStream): String {
-        return try {
-            val workbook = HSSFWorkbook(inputStream)
-            val textBuilder = StringBuilder()
-
-            for (sheetIndex in 0 until workbook.numberOfSheets) {
-                val sheet = workbook.getSheetAt(sheetIndex)
-                textBuilder.append("Sheet: ${sheet.sheetName}\n")
-                textBuilder.append("=".repeat(40))
-                textBuilder.append("\n\n")
-
-                for (row in sheet) {
-                    val rowText = row.mapNotNull { cell ->
-                        when (cell.cellType) {
-                            org.apache.poi.ss.usermodel.CellType.STRING -> cell.stringCellValue
-                            org.apache.poi.ss.usermodel.CellType.NUMERIC -> cell.numericCellValue.toString()
-                            org.apache.poi.ss.usermodel.CellType.BOOLEAN -> cell.booleanCellValue.toString()
-                            org.apache.poi.ss.usermodel.CellType.FORMULA -> {
-                                try {
-                                    cell.stringCellValue
-                                } catch (e: Exception) {
-                                    cell.numericCellValue.toString()
-                                }
-                            }
-                            else -> null
-                        }
-                    }.joinToString("\t")
-
-                    if (rowText.isNotBlank()) {
-                        textBuilder.append(rowText)
-                        textBuilder.append("\n")
-                    }
-                }
-                textBuilder.append("\n")
-            }
-
-            workbook.close()
-            textBuilder.toString().trim()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing XLS: ${e.message}", e)
-            throw Exception("Failed to parse Excel file (.xls): ${e.message}", e)
-        }
-    }
-
-    /**
      * Parse a Word .docx file (Office Open XML format)
      */
     private fun parseDocx(inputStream: InputStream): String {
         return try {
-            val document = XWPFDocument(inputStream)
             val textBuilder = StringBuilder()
-
-            // Extract text from paragraphs
-            document.paragraphs.forEach { paragraph ->
-                val text = paragraph.text?.trim()
-                if (!text.isNullOrBlank()) {
-                    textBuilder.append(text)
-                    textBuilder.append("\n")
-                }
-            }
-
-            // Extract text from tables
-            document.tables.forEach { table ->
-                table.rows.forEach { row ->
-                    val rowText = row.tableCells.mapNotNull { cell ->
-                        cell.text?.trim()
-                    }.filter { it.isNotBlank() }.joinToString("\t")
-
-                    if (rowText.isNotBlank()) {
-                        textBuilder.append(rowText)
-                        textBuilder.append("\n")
+            ZipInputStream(inputStream).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name ?: ""
+                    if (entryName == "word/document.xml") {
+                        val content = zip.bufferedReader(Charsets.UTF_8).readText()
+                        val pMatcher = Pattern.compile("<w:p[^>]*>(.*?)</w:p>").matcher(content)
+                        while (pMatcher.find()) {
+                            val pContent = pMatcher.group(1) ?: ""
+                            val tMatcher = Pattern.compile("<w:t[^>]*>(.*?)</w:t>").matcher(pContent)
+                            val paragraphText = StringBuilder()
+                            while (tMatcher.find()) {
+                                paragraphText.append(unescapeXml(tMatcher.group(1) ?: ""))
+                            }
+                            if (paragraphText.isNotEmpty()) {
+                                textBuilder.append(paragraphText).append("\n")
+                            }
+                        }
+                        break
                     }
+                    entry = zip.nextEntry
                 }
             }
-
-            document.close()
             textBuilder.toString().trim()
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing DOCX: ${e.message}", e)
@@ -285,19 +203,151 @@ object DocumentParser {
     }
 
     /**
-     * Parse a Word .doc file (legacy binary format)
+     * Parse an Excel .xlsx file (Office Open XML format)
+     */
+    private fun parseXlsx(inputStream: InputStream): String {
+        return try {
+            val sharedStrings = mutableListOf<String>()
+            val textBuilder = StringBuilder()
+            val entries = mutableMapOf<String, ByteArray>()
+
+            ZipInputStream(inputStream).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name ?: ""
+                    if (!entry.isDirectory && entryName.isNotEmpty()) {
+                        entries[entryName] = zip.readBytes()
+                    }
+                    entry = zip.nextEntry
+                }
+            }
+
+            // 1. Shared Strings Table
+            val sharedStringsBytes = entries["xl/sharedStrings.xml"]
+            if (sharedStringsBytes != null) {
+                val content = String(sharedStringsBytes, Charsets.UTF_8)
+                val matcher = Pattern.compile("<t[^>]*>(.*?)</t>").matcher(content)
+                while (matcher.find()) {
+                    sharedStrings.add(unescapeXml(matcher.group(1) ?: ""))
+                }
+            }
+
+            // 2. Sheets
+            entries.keys.filter { it.startsWith("xl/worksheets/sheet") && it.endsWith(".xml") }
+                .sorted()
+                .forEach { sheetKey ->
+                    val sheetBytes = entries[sheetKey] ?: return@forEach
+                    val content = String(sheetBytes, Charsets.UTF_8)
+
+                    val rowMatcher = Pattern.compile("<row[^>]*>(.*?)</row>").matcher(content)
+                    while (rowMatcher.find()) {
+                        val rowContent = rowMatcher.group(1) ?: ""
+                        val cellMatcher = Pattern.compile("<c[^>]*>(.*?)</c>").matcher(rowContent)
+                        val rowCells = mutableListOf<String>()
+                        while (cellMatcher.find()) {
+                            val cellContent = cellMatcher.group(0) ?: ""
+                            val vMatcher = Pattern.compile("<v>(.*?)</v>").matcher(cellContent)
+                            if (vMatcher.find()) {
+                                val rawVal = vMatcher.group(1) ?: ""
+                                if (cellContent.contains("t=\"s\"") || cellContent.contains("t='s'")) {
+                                    val idx = rawVal.toIntOrNull()
+                                    if (idx != null && idx >= 0 && idx < sharedStrings.size) {
+                                        rowCells.add(sharedStrings[idx])
+                                    } else {
+                                        rowCells.add(rawVal)
+                                    }
+                                } else {
+                                    rowCells.add(rawVal)
+                                }
+                            }
+                        }
+                        if (rowCells.isNotEmpty()) {
+                            textBuilder.append(rowCells.joinToString("\t")).append("\n")
+                        }
+                    }
+                    textBuilder.append("\n")
+                }
+
+            textBuilder.toString().trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing XLSX: ${e.message}", e)
+            throw Exception("Failed to parse Excel file (.xlsx): ${e.message}", e)
+        }
+    }
+
+    /**
+     * Parse a PowerPoint .pptx file
+     */
+    private fun parsePptx(inputStream: InputStream): String {
+        return try {
+            val textBuilder = StringBuilder()
+            ZipInputStream(inputStream).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name ?: ""
+                    if (entryName.startsWith("ppt/slides/slide") && entryName.endsWith(".xml")) {
+                        val content = zip.bufferedReader(Charsets.UTF_8).readText()
+                        val tMatcher = Pattern.compile("<a:t[^>]*>(.*?)</a:t>").matcher(content)
+                        val slideText = StringBuilder()
+                        while (tMatcher.find()) {
+                            slideText.append(unescapeXml(tMatcher.group(1) ?: "")).append(" ")
+                        }
+                        if (slideText.isNotEmpty()) {
+                            val slideName = entryName.substringAfterLast("/").substringBefore(".")
+                            textBuilder.append("Slide [").append(slideName).append("]: ").append(slideText.toString().trim()).append("\n\n")
+                        }
+                    }
+                    entry = zip.nextEntry
+                }
+            }
+            textBuilder.toString().trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing PPTX: ${e.message}", e)
+            throw Exception("Failed to parse PowerPoint document (.pptx): ${e.message}", e)
+        }
+    }
+
+    /**
+     * Parse an ODF Text document (.odt)
+     */
+    private fun parseOdt(inputStream: InputStream): String {
+        return try {
+            val textBuilder = StringBuilder()
+            ZipInputStream(inputStream).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name ?: ""
+                    if (entryName == "content.xml") {
+                        val content = zip.bufferedReader(Charsets.UTF_8).readText()
+                        val matcher = Pattern.compile("<text:[ph][^>]*>(.*?)</text:[ph]>").matcher(content)
+                        while (matcher.find()) {
+                            val rawText = (matcher.group(1) ?: "").replace(Regex("<[^>]*>"), "")
+                            textBuilder.append(unescapeXml(rawText)).append("\n")
+                        }
+                        break
+                    }
+                    entry = zip.nextEntry
+                }
+            }
+            textBuilder.toString().trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing ODT: ${e.message}", e)
+            throw Exception("Failed to parse OpenDocument (.odt): ${e.message}", e)
+        }
+    }
+
+    /**
+     * Legacy Word format (.doc) placeholder
      */
     private fun parseDoc(inputStream: InputStream): String {
-        return try {
-            val document = HWPFDocument(inputStream)
-            val extractor = WordExtractor(document)
-            val text = extractor.text
-            extractor.close()
-            text.trim()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing DOC: ${e.message}", e)
-            throw Exception("Failed to parse Word document (.doc): ${e.message}", e)
-        }
+        throw Exception("Legacy binary word format (.doc) is not supported offline. Please save as .docx and re-import.")
+    }
+
+    /**
+     * Legacy Excel format (.xls) placeholder
+     */
+    private fun parseXls(inputStream: InputStream): String {
+        throw Exception("Legacy binary excel format (.xls) is not supported offline. Please save as .xlsx and re-import.")
     }
 
     /**
@@ -316,14 +366,16 @@ object DocumentParser {
      * Get human-readable file type name from MIME type
      */
     fun getFileTypeName(mimeType: String?): String {
-        return when (mimeType) {
+        val mime = mimeType ?: ""
+        return when (mime) {
             MimeTypes.PDF -> "PDF"
             MimeTypes.EPUB -> "EPUB"
             MimeTypes.XLSX, MimeTypes.XLS -> "Excel"
             MimeTypes.DOCX, MimeTypes.DOC -> "Word"
+            MimeTypes.PPTX, MimeTypes.PPT -> "PowerPoint"
+            MimeTypes.ODT -> "OpenDocument"
             "text/plain" -> "Text"
             else -> "Document"
         }
     }
-
 }

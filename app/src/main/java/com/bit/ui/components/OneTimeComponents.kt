@@ -137,15 +137,11 @@ fun TitleRow(
     with(sharedTransitionScope) {
         Box(modifier = modifier) {
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = androidx.compose.ui.graphics.Color.Transparent,
                 shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                border = null,
                 modifier = Modifier
                     .height(Standards.ActionIconSize)
-                    .sharedBounds(
-                        sharedTransitionScope.rememberSharedContentState(key = "chat_header"),
-                        animatedVisibilityScope = animatedVisibilityScope
-                    )
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

@@ -405,11 +405,45 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _availableRemoteModels = MutableStateFlow<List<String>>(emptyList())
+    val availableRemoteModels: StateFlow<List<String>> = _availableRemoteModels
+
+    private val _isFetchingRemoteModels = MutableStateFlow(false)
+    val isFetchingRemoteModels: StateFlow<Boolean> = _isFetchingRemoteModels
+
+    private val _remoteFetchError = MutableStateFlow<String?>(null)
+    val remoteFetchError: StateFlow<String?> = _remoteFetchError
+
+    fun fetchAvailableRemoteModels(provider: String, baseUrl: String, apiKey: String) {
+        viewModelScope.launch {
+            _isFetchingRemoteModels.value = true
+            _remoteFetchError.value = null
+            _availableRemoteModels.value = emptyList()
+            try {
+                val models = com.bit.network.ExternalModelApiClient.fetchModels(baseUrl, apiKey)
+                if (models.isEmpty()) {
+                    _remoteFetchError.value = "No models found at this endpoint"
+                } else {
+                    _availableRemoteModels.value = models
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch models", e)
+                _remoteFetchError.value = e.message ?: "Failed to fetch models"
+            } finally {
+                _isFetchingRemoteModels.value = false
+            }
+        }
+    }
+
+    fun clearRemoteModels() {
+        _availableRemoteModels.value = emptyList()
+        _remoteFetchError.value = null
+    }
+
     fun configureRemoteApi(provider: String, baseUrl: String, modelName: String, apiKey: String) {
         viewModelScope.launch {
-            val providerClean = provider.lowercase(java.util.Locale.US)
-            val modelClean = modelName.lowercase(java.util.Locale.US).replace(" ", "-")
-            val modelId = "api-$providerClean-$modelClean"
+            val providerClean = provider.lowercase(java.util.Locale.US).replace(" ", "-")
+            val modelId = "api-$providerClean"
 
             // 1. Create and insert Model record
             val model = com.bit.models.table_schema.Model(

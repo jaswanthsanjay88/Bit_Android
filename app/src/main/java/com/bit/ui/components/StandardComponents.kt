@@ -93,14 +93,14 @@ fun SwitchRow(
                     imageVector = icon,
                     contentDescription = null,
                     modifier = Modifier.size(Standards.IconMd),
-                    tint = if (enabled) Glass.AccentPrimary else Glass.TextMuted
+                    tint = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else if (iconRes != null) {
                 Icon(
                     painter = painterResource(iconRes),
                     contentDescription = null,
                     modifier = Modifier.size(Standards.IconMd),
-                    tint = if (enabled) Glass.AccentPrimary else Glass.TextMuted
+                    tint = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -110,13 +110,13 @@ fun SwitchRow(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = titleColor ?: if (enabled) Glass.TextPrimary else Glass.TextMuted
+                    color = titleColor ?: if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (description != null) {
                     Text(
                         text = description,
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (enabled) Glass.TextSecondary else Glass.TextMuted
+                        color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                 }
             }
@@ -205,14 +205,14 @@ fun SettingsClickableRow(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(Standards.IconMd),
-                tint = if (enabled) Glass.AccentPrimary else Glass.TextMuted
+                tint = if (enabled) Color.White else Glass.TextMuted
             )
         } else if (iconRes != null) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = null,
                 modifier = Modifier.size(Standards.IconMd),
-                tint = if (enabled) Glass.AccentPrimary else Glass.TextMuted
+                tint = if (enabled) Color.White else Glass.TextMuted
             )
         }
 

@@ -157,6 +157,21 @@ abstract class BaseOpenAiProvider : LlmProvider {
         emit: suspend (StreamEvent) -> Unit
     ) {
         val pendingToolCalls = mutableMapOf<Int, PendingToolCall>()
+        val toolParser = com.bit.api.util.StreamingToolParser()
+
+        val customEmitter: suspend (StreamEvent) -> Unit = { event ->
+            if (event is StreamEvent.TextChunk) {
+                toolParser.feed(
+                    content = event.text,
+                    onText = { emit(StreamEvent.TextChunk(it)) },
+                    onToolCall = { name, args ->
+                        emit(StreamEvent.ToolCallRequest(java.util.UUID.randomUUID().toString(), name, args))
+                    }
+                )
+            } else {
+                emit(event)
+            }
+        }
 
         while (currentCoroutineContext().isActive) {
             val line = try {
@@ -175,7 +190,7 @@ abstract class BaseOpenAiProvider : LlmProvider {
                 val choice = response.choices?.firstOrNull()
 
                 choice?.delta?.let { delta ->
-                    parseDeltaContent(delta, config, thinkParser) { emit(it) }
+                    parseDeltaContent(delta, config, thinkParser) { customEmitter(it) }
 
                     delta.toolCalls?.forEach { tc ->
                         val existing = if (tc.id != null) pendingToolCalls.values.firstOrNull { it.id == tc.id } else null
@@ -214,8 +229,12 @@ abstract class BaseOpenAiProvider : LlmProvider {
         }
 
         thinkParser.flush(
-            onText = { emit(StreamEvent.TextChunk(it)) },
+            onText = { customEmitter(StreamEvent.TextChunk(it)) },
             onThought = { emit(StreamEvent.ThoughtChunk(it)) }
+        )
+        
+        toolParser.flush(
+            onText = { emit(StreamEvent.TextChunk(it)) }
         )
 
         if (!currentCoroutineContext().isActive) {

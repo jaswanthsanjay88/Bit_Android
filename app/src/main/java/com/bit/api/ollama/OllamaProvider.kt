@@ -170,6 +170,22 @@ class OllamaProvider : LlmProvider {
             val retryableCodes = setOf(401, 429, 502, 503, 504)
             var attempt = 0
             var done = false
+            val thinkParser = StreamingThinkTagParser()
+            val toolParser = com.bit.api.util.StreamingToolParser()
+            
+            val customEmitter: suspend (StreamEvent) -> Unit = { event ->
+                if (event is StreamEvent.TextChunk) {
+                    toolParser.feed(
+                        content = event.text,
+                        onText = { emit(StreamEvent.TextChunk(it)) },
+                        onToolCall = { name, args ->
+                            emit(StreamEvent.ToolCallRequest(java.util.UUID.randomUUID().toString(), name, args))
+                        }
+                    )
+                } else {
+                    emit(event)
+                }
+            }
 
             while (attempt < maxAttempts && !done) {
                 attempt++
@@ -178,7 +194,6 @@ class OllamaProvider : LlmProvider {
                 if (handle.code == 200) {
                     done = true
                     var line: String? = null
-                    val thinkParser = StreamingThinkTagParser()
                     var receivedStructuredThinking = false
 
                     while (currentCoroutineContext().isActive) {
@@ -212,12 +227,12 @@ class OllamaProvider : LlmProvider {
 
                                 if (msg.content.isNotEmpty()) {
                                     if (receivedStructuredThinking) {
-                                        emit(StreamEvent.TextChunk(msg.content))
+                                        customEmitter(StreamEvent.TextChunk(msg.content))
                                     } else {
                                         thinkParser.feed(
                                             content = msg.content,
                                             thinkingEnabled = config.thinkingEnabled,
-                                            onText = { emit(StreamEvent.TextChunk(it)) },
+                                            onText = { customEmitter(StreamEvent.TextChunk(it)) },
                                             onThought = { emit(StreamEvent.ThoughtChunk(it)) }
                                         )
                                     }
@@ -225,8 +240,11 @@ class OllamaProvider : LlmProvider {
                             }
                             if (response.done) {
                                 thinkParser.flush(
-                                    onText = { emit(StreamEvent.TextChunk(it)) },
+                                    onText = { customEmitter(StreamEvent.TextChunk(it)) },
                                     onThought = { emit(StreamEvent.ThoughtChunk(it)) }
+                                )
+                                toolParser.flush(
+                                    onText = { emit(StreamEvent.TextChunk(it)) }
                                 )
                                 val total = (response.promptEvalCount ?: 0) + (response.evalCount ?: 0)
                                 emit(StreamEvent.UsageUpdate(total))

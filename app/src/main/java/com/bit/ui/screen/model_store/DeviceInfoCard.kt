@@ -16,10 +16,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import com.bit.global.Standards
-import com.bit.ui.components.ActionButton
 import com.bit.ui.components.GlassSectionCard
 import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.Glass
+import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
 import java.util.Locale
 
 // ── DeviceInfoCard ──
@@ -37,11 +39,18 @@ internal fun DeviceInfoCard(deviceInfo: Map<String, String>) {
         iconTint = Glass.AccentSecondary,
         trailing = {
             if (remainingEntries.isNotEmpty()) {
-                ActionButton(
-                    onClickListener = { expanded = !expanded },
-                    icon = if (expanded) TnIcons.ChevronUp else TnIcons.ChevronDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand"
-                )
+                FilledTonalIconButton(
+                    onClick = { expanded = !expanded },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (expanded) TnIcons.ChevronUp else TnIcons.ChevronDown,
+                        contentDescription = if (expanded) "Collapse" else "Expand",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     ) {

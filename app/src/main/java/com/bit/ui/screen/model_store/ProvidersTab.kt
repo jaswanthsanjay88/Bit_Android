@@ -75,6 +75,8 @@ private fun ProviderListView(
         "OpenAI",
         "Anthropic Claude",
         "DeepSeek",
+        "Hugging Face",
+        "NVIDIA NIM",
         "Ollama",
         "OpenRouter",
         "Custom API"
@@ -135,15 +137,24 @@ private fun ProviderListView(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Icon(
-                            imageVector = when (provider) {
-                                "Google Gemini" -> TnIcons.Sparkles
-                                "Ollama" -> TnIcons.Terminal
-                                else -> TnIcons.Upload
-                            },
-                            contentDescription = null,
-                            tint = if (configured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        )
+                        val iconRes = com.bit.ui.components.providerIcon(provider)
+                        if (iconRes != 0) {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = iconRes),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = when (provider) {
+                                    "Ollama" -> TnIcons.Terminal
+                                    else -> TnIcons.Upload
+                                },
+                                contentDescription = null,
+                                tint = if (configured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            )
+                        }
 
                         Column {
                             Text(
@@ -234,6 +245,11 @@ private fun ProviderDetailView(
     var testStatus by remember { mutableStateOf<String?>(null) }
     var isTesting by remember { mutableStateOf(false) }
 
+    var availableModels by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isFetchingModels by remember { mutableStateOf(false) }
+    var fetchError by remember { mutableStateOf<String?>(null) }
+    var modelDropdownExpanded by remember { mutableStateOf(false) }
+
     LaunchedEffect(existingModel) {
         existingModel?.let { model ->
             val config = viewModel.getModelConfig(model.id)
@@ -270,24 +286,85 @@ private fun ProviderDetailView(
 
         OutlinedTextField(
             value = endpointUrl,
-            onValueChange = { endpointUrl = it },
+            onValueChange = { endpointUrl = it; availableModels = emptyList() },
             label = { Text("Base Endpoint URL") },
             modifier = Modifier.fillMaxWidth()
         )
 
         OutlinedTextField(
-            value = modelName,
-            onValueChange = { modelName = it },
-            label = { Text("Model ID") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        OutlinedTextField(
             value = apiKey,
-            onValueChange = { apiKey = it },
+            onValueChange = { apiKey = it; availableModels = emptyList() },
             label = { Text("API Key / Access Token") },
             modifier = Modifier.fillMaxWidth()
         )
+
+        Button(
+            onClick = {
+                isFetchingModels = true
+                fetchError = null
+                coroutineScope.launch {
+                    try {
+                        val models = com.bit.network.ExternalModelApiClient.fetchModels(endpointUrl, apiKey)
+                        if (models.isEmpty()) {
+                            fetchError = "No models found"
+                        } else {
+                            availableModels = models
+                            modelDropdownExpanded = true
+                        }
+                    } catch (e: Exception) {
+                        fetchError = e.localizedMessage ?: e.message ?: "Failed to fetch models"
+                    } finally {
+                        isFetchingModels = false
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !isFetchingModels && endpointUrl.isNotBlank() && apiKey.isNotBlank(),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
+        ) {
+            if (isFetchingModels) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary)
+            } else {
+                Text("Fetch Available Models")
+            }
+        }
+
+        fetchError?.let { err ->
+            Text(err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+
+        Box(modifier = Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = modelName,
+                onValueChange = { modelName = it },
+                label = { Text("Model ID") },
+                modifier = Modifier.fillMaxWidth(),
+                trailingIcon = {
+                    if (availableModels.isNotEmpty()) {
+                        IconButton(onClick = { modelDropdownExpanded = true }) {
+                            Text("▼", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            )
+            if (availableModels.isNotEmpty()) {
+                DropdownMenu(
+                    expanded = modelDropdownExpanded,
+                    onDismissRequest = { modelDropdownExpanded = false },
+                    modifier = Modifier.fillMaxWidth(0.9f).background(MaterialTheme.colorScheme.surface)
+                ) {
+                    availableModels.forEach { model ->
+                        DropdownMenuItem(
+                            text = { Text(model, color = MaterialTheme.colorScheme.onSurface) },
+                            onClick = {
+                                modelName = model
+                                modelDropdownExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),

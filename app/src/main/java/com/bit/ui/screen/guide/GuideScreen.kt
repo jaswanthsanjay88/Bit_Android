@@ -28,19 +28,21 @@ fun GuideScreen(
     animatedVisibilityScope: AnimatedVisibilityScope,
     onContinue: () -> Unit
 ) {
-    val totalSlides = 3
+    val totalSlides = 4
     val pagerState = rememberPagerState(pageCount = { totalSlides })
     val coroutineScope = rememberCoroutineScope()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BitColors.Background)
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(horizontal = 24.dp)
-            .padding(bottom = 24.dp)
-    ) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp)
+        ) {
         // ── Top Header Brand ──
         Box(
             modifier = Modifier
@@ -73,7 +75,7 @@ fun GuideScreen(
                             fontWeight = FontWeight.W500,
                             letterSpacing = 0.08.sp
                         ),
-                        color = BitColors.TextTertiary
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                 }
             }
@@ -126,12 +128,9 @@ fun GuideScreen(
                 ) {
                     Text(
                         text = slide.title,
-                        style = androidx.compose.ui.text.TextStyle(
-                            color = BitColors.TextPrimary,
-                            fontSize = 32.sp,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            color = MaterialTheme.colorScheme.onBackground,
                             fontWeight = FontWeight.SemiBold,
-                            lineHeight = 36.sp,
-                            letterSpacing = (-0.5).sp,
                             textAlign = TextAlign.Center
                         )
                     )
@@ -140,15 +139,44 @@ fun GuideScreen(
 
                     Text(
                         text = slide.description,
-                        style = androidx.compose.ui.text.TextStyle(
-                            color = BitColors.TextSecondary,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Normal,
-                            lineHeight = 22.sp,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         ),
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
+
+                    if (page == 3) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            IconButton(onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://linkedin.com/in/jaswanthsanjay"))
+                                context.startActivity(intent)
+                            }) {
+                                Icon(
+                                    painter = androidx.compose.ui.res.painterResource(id = com.bit.R.drawable.ic_linkedin),
+                                    contentDescription = "LinkedIn",
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            IconButton(onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/jaswanthsanjay"))
+                                context.startActivity(intent)
+                            }) {
+                                Icon(
+                                    painter = androidx.compose.ui.res.painterResource(id = com.bit.R.drawable.ic_github),
+                                    contentDescription = "GitHub",
+                                    tint = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -158,7 +186,7 @@ fun GuideScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Page Indicator: 3 dashes
+                // Page Indicator: 4 dashes
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -166,7 +194,7 @@ fun GuideScreen(
                     repeat(totalSlides) { index ->
                         val isActive = index == pagerState.currentPage
                         val width = if (isActive) 24.dp else 8.dp
-                        val color = if (isActive) BitColors.TextPrimary else BitColors.Border
+                        val color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                         Box(
                             modifier = Modifier
                                 .height(6.dp)
@@ -192,17 +220,11 @@ fun GuideScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = BitColors.Inverse,
-                        contentColor = BitColors.OnInverse
-                    )
+                        .height(56.dp)
                 ) {
                     Text(
                         text = if (pagerState.currentPage == totalSlides - 1) "Get Started" else "Continue",
-                        style = androidx.compose.ui.text.TextStyle(
-                            fontSize = 15.sp,
+                        style = MaterialTheme.typography.labelLarge.copy(
                             fontWeight = FontWeight.Bold
                         )
                     )
@@ -211,6 +233,8 @@ fun GuideScreen(
         }
     }
 }
+}
+
 
 private data class OnboardingSlide(
     val title: String,
@@ -226,8 +250,12 @@ private fun getOnboardingSlide(index: Int): OnboardingSlide = when (index) {
         title = "Private by design",
         description = "Everything stays encrypted. Your chats, documents, and memories never leave your device."
     )
-    else -> OnboardingSlide(
+    2 -> OnboardingSlide(
         title = "Tailored to you",
         description = "Select the optimal offline model configured for your device memory and performance."
+    )
+    else -> OnboardingSlide(
+        title = "Built by Jaswanth Sanjay",
+        description = "AI Engineer & Full-Stack Developer. I independently designed, developed, and deployed this complete app, taking ownership from system architecture to interface design."
     )
 }

@@ -379,32 +379,14 @@ object RemoteInferenceClient {
         return when (val r = scraper.search(query, count)) {
             is DuckDuckGoScraper.SearchResponse.Success -> {
                 val results = r.results
-                val executor = java.util.concurrent.Executors.newFixedThreadPool(5)
-                val futures = results.map { res ->
-                    executor.submit(java.util.concurrent.Callable<JSONObject> {
-                        val content = try {
-                            fetchAndCleanUrl(res.url)
-                        } catch (e: Exception) {
-                            "Failed to scrape: ${e.message}"
-                        }
-                        JSONObject().apply {
-                            put("title", res.title)
-                            put("url", res.url)
-                            put("description", res.snippet)
-                            put("content", content)
-                        }
+                val finalResults = org.json.JSONArray()
+                results.forEach { res ->
+                    finalResults.put(JSONObject().apply {
+                        put("title", res.title)
+                        put("url", res.url)
+                        put("description", res.snippet)
                     })
                 }
-
-                val finalResults = org.json.JSONArray()
-                futures.forEach { future ->
-                    try {
-                        finalResults.put(future.get(10, java.util.concurrent.TimeUnit.SECONDS))
-                    } catch (e: Exception) {
-                        // ignore or add placeholder
-                    }
-                }
-                executor.shutdown()
 
                 JSONObject().apply {
                     put("type", "web_search")

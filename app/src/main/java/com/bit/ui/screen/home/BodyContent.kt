@@ -23,7 +23,8 @@ import com.bit.models.messages.ContentType
 import com.bit.models.messages.Role
 import com.bit.models.table_schema.Model
 import com.bit.ui.components.lazyMarkdownItems
-import com.bit.ui.components.AgentExecutionView
+import com.bit.ui.components.ReasoningTraceCard
+import com.bit.ui.components.toTraceStep
 import com.bit.ui.theme.Motion
 import com.bit.viewmodel.ChatViewModel
 import com.bit.viewmodel.LLMModelViewModel
@@ -57,22 +58,15 @@ data class ParsedMessage(
 sealed class ChatMessageItem {
     data class UserMessage(val message: com.bit.models.messages.Messages) : ChatMessageItem()
     data class AssistantMessage(val message: com.bit.models.messages.Messages, val isLastAssistant: Boolean) : ChatMessageItem()
-    data class PluginResultGroup(val results: List<com.bit.models.messages.Messages>, val key: String) : ChatMessageItem()
 }
 
 fun groupMessages(messages: List<com.bit.models.messages.Messages>, lastAssistantIndex: Int): List<ChatMessageItem> {
     val result = mutableListOf<ChatMessageItem>()
-    var currentGroup = mutableListOf<com.bit.models.messages.Messages>()
     
     messages.forEachIndexed { index, msg ->
         if (msg.content.contentType == ContentType.PluginResult) {
-            currentGroup.add(msg)
+            // Skip PluginResult, tool steps are handled inside AssistantMessage
         } else {
-            if (currentGroup.isNotEmpty()) {
-                val groupKey = currentGroup.first().msgId + "-group"
-                result.add(ChatMessageItem.PluginResultGroup(currentGroup.toList(), groupKey))
-                currentGroup = mutableListOf()
-            }
             if (msg.role == Role.User) {
                 result.add(ChatMessageItem.UserMessage(msg))
             } else {
@@ -80,10 +74,6 @@ fun groupMessages(messages: List<com.bit.models.messages.Messages>, lastAssistan
                 result.add(ChatMessageItem.AssistantMessage(msg, isLastAssistant))
             }
         }
-    }
-    if (currentGroup.isNotEmpty()) {
-        val groupKey = currentGroup.first().msgId + "-group"
-        result.add(ChatMessageItem.PluginResultGroup(currentGroup.toList(), groupKey))
     }
     return result
 }
@@ -181,7 +171,7 @@ fun parseThinkingTags(content: String): ParsedMessage {
     )
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BodyContent(
     paddingValues: PaddingValues,
@@ -227,7 +217,9 @@ fun BodyContent(
             .background(MaterialTheme.colorScheme.background)
             .then(if (liquidState != null) Modifier.liquefiable(liquidState) else Modifier)
             .hazeSource(state = hazeState)
-            .padding(paddingValues)
+            .padding(
+                bottom = paddingValues.calculateBottomPadding()
+            )
     ) {
         if (messages.isEmpty() && !chatState.isGenerating) {
             EmptyMessagesState()
@@ -235,11 +227,30 @@ fun BodyContent(
             val deduped = remember(messages.size) { messages.distinctBy { it.msgId } }
             val lastAssistantIndex = remember(deduped.size) { deduped.indexOfLast { it.role == Role.Assistant } }
             val groupedItems = remember(deduped) { groupMessages(deduped, lastAssistantIndex) }
+ 
+            val lastUserMessage = remember(deduped) { deduped.lastOrNull { it.role == Role.User } }
+            val lastAssistantMessage = remember(deduped) { deduped.lastOrNull { it.role == Role.Assistant } }
+            val hasUserMessageInList = remember(deduped, lastUserMessage, lastAssistantMessage) {
+                if (lastUserMessage != null) {
+                    if (lastAssistantMessage != null) {
+                        deduped.indexOf(lastUserMessage) > deduped.indexOf(lastAssistantMessage)
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                }
+            }
 
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = Standards.SpacingSm),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars),
+                contentPadding = PaddingValues(
+                    top = 56.dp + Standards.SpacingSm,
+                    bottom = Standards.SpacingSm
+                ),
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
             ) {
                 groupedItems.forEach { item ->
@@ -250,16 +261,11 @@ fun BodyContent(
                                 UserMessageBubble(
                                     message = message,
                                     editable = !chatState.isGenerating,
-                                    onEditRequest = { chatViewModel.startEditingPrompt(it) },
-                                    onForkRequest = { chatViewModel.forkConversation(it) }
+                                    onEditRequest = { chatViewModel.startEditingPrompt(it) }
                                 )
                             }
                         }
-                        is ChatMessageItem.PluginResultGroup -> {
-                            item(key = item.key) {
-                                com.bit.ui.components.PluginResultGroupCard(messages = item.results)
-                            }
-                        }
+
                         is ChatMessageItem.AssistantMessage -> {
                             val message = item.message
                             val isLastAssistant = item.isLastAssistant
@@ -300,8 +306,7 @@ fun BodyContent(
                                         { chatViewModel.regenerateLastMessage() }
                                     } else null,
                                     isRegenerateEnabled = !chatState.isGenerating,
-                                    onEdit = { chatViewModel.startEditingPrompt(it) },
-                                    onFork = { chatViewModel.forkConversation(it) }
+                                    onEdit = { chatViewModel.startEditingPrompt(it) }
                                 )
                             }
                         }
@@ -309,7 +314,7 @@ fun BodyContent(
                 }
 
                 // If currently generating, append active streaming items at the end of the same LazyColumn!
-                if (chatState.isGenerating && streaming.userMessage != null) {
+                if (chatState.isGenerating && streaming.userMessage != null && !hasUserMessageInList) {
                     item(key = "streaming-user-query") {
                         UserMessageBubble(
                             message = com.bit.models.messages.Messages(
@@ -328,22 +333,28 @@ fun BodyContent(
                         }
                     }
 
-                    if (agent.phase != AgentPhase.Idle) {
-                        item(key = "streaming-agent-view") {
-                            AgentExecutionView(
+                    val hasReasoningTrace = agent.phase != AgentPhase.Idle || agent.toolChainSteps.isNotEmpty() || agent.plan != null || agent.summary != null
+                    val streamingPluginMsgs = messages.filter { it.content.contentType == ContentType.PluginResult }
+
+                    if (hasReasoningTrace) {
+                        item(key = "streaming-reasoning-trace") {
+                            val traceSteps = agent.toolChainSteps.map { it.toTraceStep() }
+                            ReasoningTraceCard(
+                                steps = traceSteps,
                                 plan = agent.plan,
-                                steps = agent.toolChainSteps,
                                 summary = agent.summary,
-                                phase = agent.phase,
-                                currentStep = agent.currentRound
+                                isLive = agent.phase != AgentPhase.Complete && agent.phase != AgentPhase.Idle,
+                                currentRound = agent.currentRound,
+                                maxRounds = 5
                             )
                         }
-                    }
-
-                    val streamingPluginMsgs = messages.filter { it.content.contentType == ContentType.PluginResult }
-                    if (streamingPluginMsgs.isNotEmpty() && agent.phase == AgentPhase.Idle) {
-                        item(key = "streaming-plugin-group") {
-                            com.bit.ui.components.PluginResultGroupCard(messages = streamingPluginMsgs)
+                    } else if (streamingPluginMsgs.isNotEmpty()) {
+                        item(key = "streaming-reasoning-trace") {
+                            val traceSteps = streamingPluginMsgs.mapNotNull { it.toTraceStep() }
+                            ReasoningTraceCard(
+                                steps = traceSteps,
+                                isLive = false
+                            )
                         }
                     }
 
@@ -420,44 +431,24 @@ fun BodyContent(
             }
         }
 
-        // Scrim + Dynamic Action Window — single AnimatedVisibility to avoid double state reads
-        AnimatedVisibility(
-            visible = config.showDynamicWindow,
-            enter = fadeIn(Motion.entrance()),
-            exit = fadeOut(Motion.exit())
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // Scrim background
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.6f))
-                        .clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() }
-                        ) {
-                            chatViewModel.hideDynamicWindow()
-                        }
+        // Modal Bottom Sheet for model selection details
+        if (config.showDynamicWindow) {
+            ModalBottomSheet(
+                onDismissRequest = { chatViewModel.hideDynamicWindow() },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
+            ) {
+                val ragCount by com.bit.plugins.PluginManager.enabledPluginNames.collectAsStateWithLifecycle()
+                val ttsLoaded by com.bit.tts.TTSManager.isModelLoaded.collectAsStateWithLifecycle()
+
+                DynamicActionWindow(
+                    chatViewModel = chatViewModel,
+                    modelViewModel = llmModelViewModel,
+                    enabledToolCount = ragCount.size,
+                    ttsModelLoaded = ttsLoaded,
+                    onModelSelectedNavigate = onModelSelectedNavigate
                 )
-
-                // Window content with spring animation
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Standards.SpacingLg, vertical = Standards.SpacingLg),
-                    contentAlignment = Alignment.TopCenter
-                ) {
-                    val ragCount by com.bit.plugins.PluginManager.enabledPluginNames.collectAsStateWithLifecycle()
-                    val ttsLoaded by com.bit.tts.TTSManager.isModelLoaded.collectAsStateWithLifecycle()
-
-                    DynamicActionWindow(
-                        chatViewModel = chatViewModel,
-                        modelViewModel = llmModelViewModel,
-                        enabledToolCount = ragCount.size,
-                        ttsModelLoaded = ttsLoaded,
-                        onModelSelectedNavigate = onModelSelectedNavigate
-                    )
-                }
             }
         }
     }

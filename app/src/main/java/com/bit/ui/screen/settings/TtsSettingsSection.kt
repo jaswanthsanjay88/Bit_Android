@@ -1,5 +1,7 @@
 package com.bit.ui.screen.settings
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -85,6 +87,7 @@ internal fun LazyListScope.ttsSettingsSection(
     viewModel: SettingsViewModel
 ) {
     item {
+        val haptics = com.bit.ui.theme.LocalBitHaptics.current
         GlassSectionCard(
             title = "Text-to-Speech",
             icon = TnIcons.Adjustments,
@@ -231,11 +234,14 @@ internal fun LazyListScope.ttsSettingsSection(
                 GlassDivider()
 
                 SettingsSwitchRow(
-                    title = "Auto-speak",
-                    description = "Automatically speak assistant responses",
+                    title = "Automatically read after response",
+                    description = "Automatically speak assistant responses when generation completes",
                     checked = ttsSettings.autoSpeak,
-                    onCheckedChange = { viewModel.updateAutoSpeak(it) },
-                    enabled = ttsModelLoaded
+                    onCheckedChange = {
+                        haptics.selection()
+                        viewModel.updateAutoSpeak(it)
+                    },
+                    enabled = true
                 )
             }
         }
@@ -252,7 +258,7 @@ internal fun LazyListScope.sttSettingsSection(
     item {
         GlassSectionCard(
             title = "Speech-to-Text",
-            icon = TnIcons.Microphone,
+            icon = Icons.Rounded.Mic,
             description = "Configure offline Whisper recognizer"
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)) {
@@ -340,3 +346,4 @@ internal fun LazyListScope.sttSettingsSection(
         }
     }
 }
+

@@ -53,7 +53,6 @@ fun HomeScreen(
     onStoreButtonClicked: (String?) -> Unit,
     onSettingsClick: () -> Unit,
     onVaultManagerClick: () -> Unit,
-    onHybridSettingsClick: () -> Unit,
     onImageGenSetupNeeded: () -> Unit,
     onModelSelectedNavigate: (Model) -> Unit = {},
     chatViewModel: ChatViewModel,
@@ -63,9 +62,9 @@ fun HomeScreen(
     val context = LocalContext.current
     val appSettings = remember { AppSettingsDataStore(context) }
     val codeHighlightEnabled by appSettings.codeHighlightEnabled
-        .collectAsStateWithLifecycle(initialValue = true)
+         .collectAsStateWithLifecycle(initialValue = true)
     val toolCallingEnabled by appSettings.toolCallingEnabled
-        .collectAsStateWithLifecycle(initialValue = true)
+         .collectAsStateWithLifecycle(initialValue = true)
     val liquidState = rememberLiquidState()
     val hazeState = rememberHazeState()
 
@@ -99,10 +98,6 @@ fun HomeScreen(
                 HomeDrawerScreen(
                     onVaultManagerClick = onVaultManagerClick,
                     onSettingsClick = onSettingsClick,
-                    onHybridSettingsClick = {
-                        drawerState.close()
-                        onHybridSettingsClick()
-                    },
                     onChatSelected = {
                         chatViewModel.loadChat(it)
                         drawerState.close()
@@ -173,7 +168,6 @@ fun HomeScreen(
                             onMenuClick = { drawerState.toggle() },
                             onSettingsClick = onSettingsClick,
                             showDynamicWindow = { chatViewModel.showDynamicWindow() },
-                            liquidState = liquidState,
                             hazeState = hazeState
                         )
                     },
@@ -213,28 +207,7 @@ fun HomeScreen(
                 }
             }
 
-            // Floating TTS Player Capsule
-            val ttsIsPlaying by chatViewModel.ttsIsPlaying.collectAsStateWithLifecycle()
-            val ttsSynthesizing by chatViewModel.ttsSynthesizing.collectAsStateWithLifecycle()
-
-            AnimatedVisibility(
-                visible = ttsIsPlaying || ttsSynthesizing,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 70.dp)
-            ) {
-                FloatingTtsPlayer(
-                    isPlaying = ttsIsPlaying,
-                    isSynthesizing = ttsSynthesizing,
-                    onPlayPauseToggle = {
-                        chatViewModel.stopTTS()
-                    },
-                    onClose = {
-                        chatViewModel.stopTTS()
-                    },
-                    hazeState = hazeState
-                )
-            }
+            // Floating TTS Player removed by user request
         }
     } // CompositionLocalProvider
 }

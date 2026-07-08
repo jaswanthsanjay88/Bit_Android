@@ -34,6 +34,7 @@ import com.bit.ui.components.GlassSectionCard
 import com.bit.ui.components.StatusBadge
 import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.Glass
+import com.bit.R
 
 // ── State types ──
 
@@ -58,7 +59,7 @@ fun LazyListScope.huggingFaceTokenSection(
     item {
         GlassSectionCard(
             title = "HuggingFace Access",
-            icon = TnIcons.Lock,
+            iconRes = R.drawable.provider_huggingface,
             description = "Authenticate to download gated model resources (e.g. Llama, Gemma)"
         ) {
             HuggingFaceTokenContent(

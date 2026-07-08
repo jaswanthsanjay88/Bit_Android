@@ -54,14 +54,6 @@ class NVApplication : Application() {
         TTSManager.init(applicationContext, autoLoad = false)
         Log.d(TAG, "TTSManager initialized")
 
-        // Start Local OpenAI API Server (Main process only to prevent EADDRINUSE conflict with :inference)
-        if (isMainProcess()) {
-            com.bit.service.LocalApiServer.start()
-            Log.d(TAG, "LocalApiServer started")
-        } else {
-            Log.d(TAG, "Skipping LocalApiServer startup in background process")
-        }
-
         // Run data integrity check after UMS is ready (deferred to let UI render first)
         appScope.launch {
             delay(2000) // Let Activity.onCreate + first frame complete before scanning

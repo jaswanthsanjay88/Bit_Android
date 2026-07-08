@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -71,33 +72,22 @@ fun GlassCard(
         label = "glassCardScale"
     )
 
-    val glassBrush = Brush.linearGradient(
-        colors = listOf(
-            backgroundColor.copy(alpha = (backgroundColor.alpha * 1.4f).coerceAtMost(1f)),
-            backgroundColor.copy(alpha = (backgroundColor.alpha * 0.6f).coerceAtMost(1f))
-        )
-    )
-
-    val borderBrush = Brush.linearGradient(
-        colors = listOf(
-            borderColor.copy(alpha = (borderColor.alpha * 1.8f).coerceAtMost(1f)),
-            borderColor.copy(alpha = (borderColor.alpha * 0.4f).coerceAtMost(1f))
-        )
-    )
+    val finalBgColor = MaterialTheme.colorScheme.surfaceVariant
+    val finalBorderColor = MaterialTheme.colorScheme.outlineVariant
 
     val baseModifier = modifier
         .scale(scale)
         .clip(shape)
-        .background(glassBrush, shape)
-        .border(borderWidth, borderBrush, shape)
+        .background(finalBgColor, shape)
+        .border(borderWidth, finalBorderColor, shape)
 
     val finalModifier = if (onClick != null) {
-        val haptic = LocalHapticFeedback.current
+        val haptics = com.bit.ui.theme.LocalBitHaptics.current
         baseModifier.clickable(
             interactionSource = interactionSource,
             indication = null,
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                haptics.selection()
                 onClick()
             }
         )
@@ -121,7 +111,8 @@ fun GlassSectionCard(
     modifier: Modifier = Modifier,
     title: String,
     icon: ImageVector? = null,
-    iconTint: Color = Glass.AccentPrimary,
+    iconRes: Int? = null,
+    iconTint: Color = Color.White,
     description: String? = null,
     backgroundColor: Color = Glass.Surface,
     borderColor: Color = Glass.BorderSubtle,
@@ -142,34 +133,43 @@ fun GlassSectionCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
             ) {
-                if (icon != null) {
+                if (icon != null || iconRes != null) {
                     Box(
                         modifier = Modifier
                             .size(32.dp)
-                            .background(iconTint.copy(alpha = 0.12f), RoundedCornerShape(8.dp)),
+                            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(8.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(Standards.IconMd),
-                            tint = iconTint
-                        )
+                        if (icon != null) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                modifier = Modifier.size(Standards.IconMd),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        } else if (iconRes != null) {
+                            Icon(
+                                painter = painterResource(id = iconRes),
+                                contentDescription = null,
+                                modifier = Modifier.size(Standards.IconMd),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Glass.TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     if (description != null) {
                         Text(
                             text = description,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Glass.TextMuted,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -225,9 +225,9 @@ fun GlassChip(
         .border(1.dp, borderColor, shape)
 
     val finalModifier = if (onClick != null) {
-        val haptic = LocalHapticFeedback.current
+        val haptics = com.bit.ui.theme.LocalBitHaptics.current
         baseModifier.clickable(onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptics.selection()
             onClick()
         })
     } else {
@@ -278,21 +278,12 @@ fun GlassChip(
 @Composable
 fun GlassDivider(
     modifier: Modifier = Modifier,
-    color: Color = Glass.Divider
+    color: Color = Color(0xFF222225)
 ) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(
-                brush = Brush.horizontalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        color,
-                        color,
-                        Color.Transparent
-                    )
-                )
-            )
+            .background(color)
     )
 }

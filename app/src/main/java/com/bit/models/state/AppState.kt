@@ -6,6 +6,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.bit.plugins.PluginManager
 import com.bit.ui.icons.TnIcons
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 
 sealed class AppState {
     // Idle states
@@ -54,13 +56,13 @@ fun AppState.getDisplayText(): String = when (this) {
 fun AppState.getIcon(): ImageVector = when (this) {
     is AppState.Welcome -> TnIcons.User
     is AppState.NoModelLoaded -> TnIcons.Photo
-    is AppState.ModelLoaded -> TnIcons.Sparkles
+    is AppState.ModelLoaded -> TnIcons.Sparkles // Sparkles outline (idle)
     is AppState.LoadingModel -> TnIcons.Settings
-    is AppState.GeneratingText,
-    is AppState.GeneratingImage,
-    is AppState.GeneratingAudio,
-    is AppState.ExecutingPlugin,
-    is AppState.PluginExecutionComplete -> TnIcons.Wrench
+    is AppState.GeneratingText -> Icons.Filled.AutoAwesome // Sparkles filled (active generation)
+    is AppState.GeneratingImage -> Icons.Filled.Image
+    is AppState.GeneratingAudio -> Icons.Filled.VolumeUp
+    is AppState.ExecutingPlugin -> Icons.Filled.Build // Wrench filled (active tool)
+    is AppState.PluginExecutionComplete -> TnIcons.Wrench // Wrench outline (complete/idle)
     is AppState.Error -> TnIcons.AlertTriangle
 }
 

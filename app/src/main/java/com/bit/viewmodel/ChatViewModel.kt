@@ -59,6 +59,7 @@ import com.bit.api.StreamEvent
 import com.bit.api.LlmProviderResolver
 import com.bit.api.ChatMessage
 import com.bit.api.Participant
+import com.bit.util.SearchResultFormatter
 
 enum class AgentPhase { Idle, Planning, Executing, Summarizing, Complete }
 
@@ -555,25 +556,32 @@ class ChatViewModel @Inject constructor(
                 LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value && !hasTools)
                 val ragContext = _currentRagContext.value
 
-                // For existing chats, save user message upfront
-                if (!isNewChat) {
-                    val chatId = _currentChatId.value ?: run {
-                        reportError("No chat selected")
-                        return@launch  // finally will call resetStreamingState()
-                    }
-                    chatManager.addUserMessage(chatId, prompt).onSuccess { userMsg ->
-                        currentUserMessage = userMsg
+                val chatId = if (isNewChat) {
+                    var createdId: String? = null
+                    chatManager.createNewChat().onSuccess { id ->
+                        createdId = id
+                        _currentChatId.value = id
+                        // Trigger title generation in background immediately!
+                        generateChatTitleAsync(id, prompt, "")
                     }.onFailure { e ->
-                        reportError("Failed to save message: ${e.message}")
-                        return@launch  // finally will call resetStreamingState()
+                        reportError("Failed to create chat: ${e.message}")
+                    }
+                    createdId ?: return@launch
+                } else {
+                    _currentChatId.value ?: run {
+                        reportError("No chat selected")
+                        return@launch
                     }
                 }
 
-                if (hasTools) {
-                    agentFlow(prompt, ragContext, maxTokens, isNewChat)
-                } else {
-                    simpleFlow(prompt, ragContext, maxTokens, isNewChat)
+                chatManager.addUserMessage(chatId, prompt).onSuccess { userMsg ->
+                    currentUserMessage = userMsg
+                }.onFailure { e ->
+                    reportError("Failed to save message: ${e.message}")
+                    return@launch
                 }
+
+                executeUnifiedGeneration(prompt, ragContext, maxTokens, isNewChat)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -770,11 +778,7 @@ class ChatViewModel @Inject constructor(
                 LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value && !hasTools)
                 val ragContext = _currentRagContext.value
 
-                if (hasTools) {
-                    agentFlow(prompt, ragContext, maxTokens, isNewChat = false, isRegeneration = true)
-                } else {
-                    simpleFlow(prompt, ragContext, maxTokens, isNewChat = false, isRegeneration = true)
-                }
+                executeUnifiedGeneration(prompt, ragContext, maxTokens, isNewChat = false, isRegeneration = true)
 
                 // Generation completed successfully — now delete old message from DB
                 if (lastAssistantMsg != null) {
@@ -803,275 +807,142 @@ class ChatViewModel @Inject constructor(
     private suspend fun getCurrentModelMaxTokens(): Int =
         getGgufModelSchema().inferenceParams.maxTokens
 
-    // ==================== Agent Flow (Plan → Execute → Summarize) ====================
+    // ==================== Unified Generation Flow (Agora Architecture) ====================
 
-    private suspend fun agentFlow(
+    private suspend fun executeUnifiedGeneration(
         prompt: String,
         ragContext: String?,
         maxTokens: Int,
         isNewChat: Boolean,
         isRegeneration: Boolean = false
     ) {
-        val fullPrompt = ragContext?.let { "$it\n\n$prompt" } ?: prompt
-
-        // Phase 1: Plan (Skip model call to align with Agora's direct execution architecture and prevent hangs)
-        _agentPhase.value = AgentPhase.Planning
         AppStateManager.setGeneratingText()
-        Log.d(TAG, "Agent Phase 1: Planning (Direct)")
-        val plan = "Determine if any tools are needed to answer the query."
-        _agentPlan.value = plan
-        Log.d(TAG, "Agent plan: $plan")
+        val appSettings = AppSettingsDataStore(appContext)
+        val globalPrepend = appSettings.globalPrependPrompt.first()
+        val globalPostpend = appSettings.globalPostpendPrompt.first()
+        
+        var finalPrompt = prompt
+        if (globalPrepend.isNotBlank()) finalPrompt = "$globalPrepend\n$finalPrompt"
+        if (globalPostpend.isNotBlank()) finalPrompt = "$finalPrompt\n$globalPostpend"
+        
+        val fullPrompt = ragContext?.let { "$it\n\n$finalPrompt" } ?: finalPrompt
 
-        // Phase 2: Bounded generate-execute loop
-        _agentPhase.value = AgentPhase.Executing
+        // Reset state
         _streamingAssistantMessage.value = ""
-        Log.d(TAG, "Agent Phase 2: Generate → Execute loop")
-        val steps = executeAgentLoop(fullPrompt, plan)
-        Log.d(TAG, "Agent execution complete: ${steps.size} steps executed")
+        _agentPlan.value = null
+        _agentSummary.value = null
+        _toolChainSteps.value = emptyList()
+        _agentPhase.value = AgentPhase.Executing
 
-        // If no tools were executed or all failed, fall back to simple text generation
-        if (steps.isEmpty() || steps.all { !it.success }) {
-            Log.d(TAG, "No successful tool calls, falling back to simple flow")
-            _agentPhase.value = AgentPhase.Idle
-            _agentPlan.value = null
-            PluginManager.clearGrammar()
-            simpleFlow(prompt, ragContext, maxTokens, isNewChat, isRegeneration)
-            return
-        }
+        val activeProviderType = ActiveModelSession.currentModelType.value
+        val hasTools = PluginManager.hasEnabledTools()
+                && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
 
-        // Phase 3: Summary (Reuse streamed response from the execution loop to avoid redundant API request)
-        val cachedSummary = _streamingAssistantMessage.value
-        val summary = if (cachedSummary.isNotBlank()) {
-            Log.d(TAG, "Agent already generated final response during execution, skipping Phase 3 (Summary)")
-            cachedSummary
-        } else {
-            _agentPhase.value = AgentPhase.Summarizing
-            _streamingAssistantMessage.value = ""
-            AppStateManager.setGeneratingText()
-            Log.d(TAG, "Agent Phase 3: Generating summary")
-            generateSummary(fullPrompt, steps)
-        }
-        _agentSummary.value = summary
-        _streamingAssistantMessage.value = summary
-        _agentPhase.value = AgentPhase.Complete
-        Log.d(TAG, "Agent flow complete")
-
-        // Persist
-        persistAgentChat(prompt, isNewChat, plan, steps, summary)
-
-    }
-
-    /** Phase 1: Generate a brief plan describing which tools to use. */
-    private suspend fun generatePlan(prompt: String): String {
-        PluginManager.clearGrammar()
-        val toolDescriptions = PluginManager.getToolDescriptionsText()
-        val systemPrompt = buildString {
-            appendLine("Available tools:")
-            appendLine(toolDescriptions)
-            appendLine()
-            appendLine("Write a 1-2 sentence plan: which tools to call and what arguments to pass. Be specific and concise.")
-        }
-        val messages = listOf(
-            JSONObject().put("role", "system").put("content", systemPrompt),
-            JSONObject().put("role", "user").put("content", prompt)
-        )
-        return generatePlainText(messages, maxTokens = PLAN_MAX_TOKENS)
-    }
-
-    /**
-     * Phase 2: Bounded generate → execute loop.
-     * Each round: generate 1 tool call (grammar-constrained) → execute it → feed result back.
-     * Stops when: no tool call generated, duplicate detected, or max rounds reached.
-     */
-    private suspend fun executeAgentLoop(
-        prompt: String,
-        plan: String,
-        maxRounds: Int = 5
-    ): List<ToolChainStepData> {
         val steps = mutableListOf<ToolChainStepData>()
         val seenCalls = mutableSetOf<String>()
-        var consecutiveFailures = 0
-        _toolChainSteps.value = emptyList()
+        var finalResponse = ""
+        var round = 0
+        val maxRounds = 5
 
-        val toolSignatures = PluginManager.getToolSignaturesText()
         val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
-        val truncatedPlan = plan.take(200)
 
-        for (round in 1..maxRounds) {
-            // Generate next tool call
-            PluginManager.restoreGrammar()
-            _streamingAssistantMessage.value = "" // Reset streaming message for this turn's response
-            // Build proper multi-turn messages: system + user + tool call/result pairs
-            val messages = mutableListOf<JSONObject>()
+        while (round < maxRounds) {
+            round++
+            Log.d(TAG, "Unified tool loop: starting round $round")
 
-            // System prompt always includes tool signatures (model needs param info every round)
-            messages.add(JSONObject().put("role", "system").put("content", buildString {
-                appendLine("Tools: $toolSignatures")
-                if (steps.isEmpty()) appendLine("Plan: $truncatedPlan")
-                if (PluginManager.isWebSearchEnabled.value) {
-                    appendLine("Web search guidelines:")
-                    appendLine("Use web_search for current, time-sensitive, or uncertain facts. Use web_fetch when a search result needs source-level detail. Prefer primary or official sources for technical, legal, medical, financial, or high-impact claims. When web search is used, cite sources and distinguish sourced facts from inference.")
-                }
-                appendLine("Call the next tool needed, or generate a text response if done.")
-            }))
+            // Build conversation messages for this turn
+            val conversationMessages = buildConversationMessagesWithSteps(fullPrompt, steps, isRegeneration)
 
-            // Original user request
-            messages.add(JSONObject().put("role", "user").put("content", prompt))
-
-            // Previous tool call + result pairs (full context so model sees what already happened)
-            for (step in steps) {
-                messages.add(JSONObject().put("role", "assistant").put("content",
-                    """{"name":"${step.toolName}","arguments":${step.args}}"""
-                ))
-                messages.add(JSONObject().put("role", "user").put("content",
-                    "Tool '${step.toolName}' result: ${step.result}"
-                ))
+            // Generate response (streaming)
+            val result = if (activeProviderType == ProviderType.API) {
+                generateRemoteUnified(conversationMessages, steps, hasTools, maxTokens)
+            } else {
+                generateGgufUnified(conversationMessages, hasTools, maxTokens)
             }
-            Log.d(TAG, "Agent loop round $round: generating tool call")
-            val toolCalls = try {
-                generateAndCollectToolCalls(messages, maxTokens = 300)
-            } catch (e: Exception) {
-                Log.e(TAG, "Network or inference error during agent execution: ${e.message}", e)
-                steps.add(ToolChainStepData(
-                    round = steps.size + 1,
-                    toolName = "Error",
-                    pluginName = "System",
-                    args = "",
-                    result = "Error: ${e.message ?: "Connection aborted"}",
-                    executionTimeMs = 0,
-                    success = false
-                ))
-                _toolChainSteps.value = steps.toList()
-                break
-            }
-            if (toolCalls.isEmpty()) {
-                Log.d(TAG, "Agent loop round $round: no tool call generated, stopping")
+
+            if (result.toolCalls.isEmpty()) {
+                // No tool calls generated. This is the final text response!
+                finalResponse = result.text
                 break
             }
 
-            // Process each tool call from this generation (usually 1)
-            var generatedDuplicate = false
-            for ((rawName, rawArgs) in toolCalls) {
+            // Process the tool calls
+            var toolExecuted = false
+            for ((rawName, rawArgs) in result.toolCalls) {
                 val callKey = "${rawName.lowercase()}:${rawArgs.hashCode()}"
                 if (callKey in seenCalls) {
-                    Log.w(TAG, "Duplicate tool call detected, stopping loop: $rawName")
-                    generatedDuplicate = true
-                    break
+                    Log.w(TAG, "Duplicate tool call detected, skipping: $rawName")
+                    continue
                 }
                 seenCalls.add(callKey)
 
-                _currentToolChainRound.value = steps.size + 1
-
-                // Parse
                 val parsed = extractToolCallFromArgs(rawName, rawArgs)
                 if (parsed == null) {
                     Log.e(TAG, "Failed to parse tool call: $rawName")
-                    steps.add(ToolChainStepData(
-                        round = steps.size + 1,
-                        toolName = rawName,
-                        pluginName = "Unknown",
-                        args = rawArgs.take(500),
-                        result = "Failed to parse arguments",
-                        executionTimeMs = 0,
-                        success = false
-                    ))
-                    _toolChainSteps.value = steps.toList()
-                    consecutiveFailures++
-                    if (consecutiveFailures >= 2) {
-                        Log.w(TAG, "2 consecutive failures, stopping agent loop")
-                        break
-                    }
                     continue
                 }
 
-                // Execute
                 val (toolName, argsObj) = parsed
                 val normalizedName = normalizeToolName(toolName)
-
-                // Validate tool name against enabled tools
                 if (normalizedName.lowercase() !in enabledNames) {
-                    Log.w(TAG, "Hallucinated tool name '$normalizedName', not in enabled tools: $enabledNames")
-                    steps.add(ToolChainStepData(
-                        round = steps.size + 1,
-                        toolName = normalizedName,
-                        pluginName = "Unknown",
-                        args = rawArgs.take(500),
-                        result = "Tool not found: $normalizedName",
-                        executionTimeMs = 0,
-                        success = false
-                    ))
-                    _toolChainSteps.value = steps.toList()
-                    consecutiveFailures++
-                    if (consecutiveFailures >= 2) {
-                        Log.w(TAG, "2 consecutive failures, stopping agent loop")
-                        break
-                    }
+                    Log.w(TAG, "Hallucinated tool name: $normalizedName")
                     continue
                 }
 
+                // Show executing plugin in UI
                 AppStateManager.setExecutingPlugin("", normalizedName)
+                _agentPhase.value = AgentPhase.Executing
 
+                // Execute tool
+                val startTime = System.currentTimeMillis()
                 val toolCall = ToolCall(name = normalizedName, arguments = argsObj)
-                val result = PluginManager.executeToolForMultiTurn(toolCall)
+                val toolResult = PluginManager.executeToolForMultiTurn(toolCall)
+                val executionTime = System.currentTimeMillis() - startTime
 
-                val isSuccess = !result.isError
-                if (isSuccess) {
-                    consecutiveFailures = 0
-                    AppStateManager.setPluginExecutionComplete(
-                        pluginName = result.pluginName,
-                        toolName = normalizedName,
-                        success = true,
-                        executionTimeMs = result.executionTimeMs
-                    )
-                } else {
-                    consecutiveFailures++
-                    AppStateManager.setPluginExecutionComplete(
-                        pluginName = result.pluginName,
-                        toolName = normalizedName,
-                        success = false,
-                        executionTimeMs = result.executionTimeMs,
-                        errorMessage = result.resultJson
-                    )
-                }
+                val isSuccess = !toolResult.isError
+                AppStateManager.setPluginExecutionComplete(
+                    pluginName = toolResult.pluginName,
+                    toolName = normalizedName,
+                    success = isSuccess,
+                    executionTimeMs = executionTime,
+                    errorMessage = if (isSuccess) null else toolResult.resultJson
+                )
 
-                steps.add(ToolChainStepData(
+                // Add step data
+                val step = ToolChainStepData(
                     round = steps.size + 1,
                     toolName = normalizedName,
-                    pluginName = result.pluginName,
+                    pluginName = toolResult.pluginName,
                     args = rawArgs.take(2000),
-                    result = result.resultJson.take(2000),
-                    executionTimeMs = result.executionTimeMs,
+                    result = toolResult.resultJson,
+                    executionTimeMs = executionTime,
                     success = isSuccess
-                ))
+                )
+                steps.add(step)
                 _toolChainSteps.value = steps.toList()
-                Log.d(TAG, "Agent loop round $round: executed ${normalizedName} (${result.executionTimeMs}ms)")
+                toolExecuted = true
 
-                if (consecutiveFailures >= 2) {
-                    Log.w(TAG, "2 consecutive failures, stopping agent loop")
-                    break
-                }
-
-                // Add plugin result message for in-memory UI display
-                if (result.rawData != null) {
+                // Add PluginResult message to in-memory UI
+                if (toolResult.rawData != null) {
                     val resultData = PluginResultData(
-                        pluginName = result.pluginName,
+                        pluginName = toolResult.pluginName,
                         toolName = normalizedName,
                         inputParams = argsObj.toString(),
-                        resultData = result.resultJson,
+                        resultData = toolResult.resultJson,
                         success = isSuccess
                     )
                     val pluginMessage = Messages(
                         role = Role.Assistant,
                         content = MessageContent(
                             contentType = ContentType.PluginResult,
-                            content = "Plugin '${result.pluginName}' executed tool '$normalizedName'",
+                            content = "Plugin '${toolResult.pluginName}' executed tool '$normalizedName'",
                             pluginResultData = resultData
                         ),
                         modelId = currentModelId,
-                            pluginMetrics = PluginExecutionMetrics(
-                            pluginName = result.pluginName,
+                        pluginMetrics = PluginExecutionMetrics(
+                            pluginName = toolResult.pluginName,
                             toolName = normalizedName,
-                            executionTimeMs = result.executionTimeMs,
+                            executionTimeMs = executionTime,
                             success = isSuccess
                         )
                     )
@@ -1084,35 +955,274 @@ class ChatViewModel @Inject constructor(
                 }
             }
 
-            if (generatedDuplicate || consecutiveFailures >= 2) break
+            if (!toolExecuted) {
+                // If we generated tool calls but none were executed, stop.
+                finalResponse = result.text
+                break
+            }
         }
 
-        return steps
+        // Clean final response and update state
+        val cleanResponse = filterToolCallSyntax(finalResponse).trim()
+        _streamingAssistantMessage.value = cleanResponse
+
+        // Save to DB and finish
+        _agentPhase.value = if (steps.isNotEmpty()) AgentPhase.Complete else AgentPhase.Idle
+
+        if (steps.isNotEmpty()) {
+            val finalSummary = cleanResponse.takeIf { it.isNotBlank() } ?: "Tool execution completed."
+            _agentSummary.value = finalSummary
+            persistAgentChat(prompt, isNewChat, "Determine if any tools are needed to answer the query.", steps, finalSummary)
+        } else {
+            // Simple flow path
+            if (isNewChat) {
+                createChatWithMessages(prompt, cleanResponse, currentMetrics)
+            } else {
+                val chatId = _currentChatId.value ?: return
+                val pendingUserMsg = currentUserMessage
+                if (!userMessageAdded.get() && pendingUserMsg != null) {
+                    _messages.add(pendingUserMsg)
+                    userMessageAdded.set(true)
+                }
+
+                val ragResultItems = _currentRagResults.value.takeIf { it.isNotEmpty() }?.map { result ->
+                    RagResultItem(
+                        ragName = result.ragName,
+                        content = result.content,
+                        score = result.score,
+                        nodeId = result.nodeId
+                    )
+                }
+
+                if (cleanResponse.isNotBlank()) {
+                    val assistantMessage = Messages(
+                        role = Role.Assistant,
+                        content = MessageContent(contentType = ContentType.Text, content = cleanResponse),
+                        modelId = currentModelId,
+                        decodingMetrics = currentMetrics,
+                        ragResults = ragResultItems
+                    )
+                    _messages.add(assistantMessage)
+                    chatManager.addMessage(chatId, assistantMessage)
+                }
+                AppStateManager.setGenerationComplete()
+                AppStateManager.chatRefreshed()
+                resetStreamingState()
+                viewModelScope.launch { autoSpeakIfEnabled(cleanResponse, _messages.lastOrNull { it.role == Role.Assistant }?.msgId) }
+            }
+        }
     }
 
-    /** Phase 3: Generate a natural language summary from all tool results. */
-    private suspend fun generateSummary(
-        prompt: String,
-        steps: List<ToolChainStepData>
-    ): String {
-        PluginManager.clearGrammar()
-        val resultsText = steps.mapIndexed { i, step ->
-            "${i + 1}. ${step.pluginName} (${step.toolName}): ${step.result}"
-        }.joinToString("\n")
+    private suspend fun buildConversationMessagesWithSteps(
+        userPrompt: String,
+        steps: List<ToolChainStepData>,
+        isRegeneration: Boolean
+    ): List<JSONObject> {
+        val result = mutableListOf<JSONObject>()
+        val systemPrompt = getCurrentModelSystemPrompt(userQuery = userPrompt)
+        if (systemPrompt.isNotEmpty()) {
+            result.add(JSONObject().put("role", "system").put("content", systemPrompt))
+        }
 
-        val systemPrompt = "You are a helpful assistant. Summarize the tool execution results concisely for the user."
-        val userContent = "My request: $prompt\n\nTool Results:\n$resultsText\n\nProvide a helpful summary."
+        // Add history up to now
+        if (chatMemoryEnabled.value || isRegeneration) {
+            _messages.forEach { msg ->
+                when (msg.role) {
+                    Role.User -> result.add(JSONObject().put("role", "user").put("content", msg.content.content))
+                    Role.Assistant -> {
+                        when (msg.content.contentType) {
+                            ContentType.Text -> result.add(JSONObject().put("role", "assistant").put("content", msg.content.content))
+                            else -> {}
+                        }
+                    }
+                }
+            }
+        }
 
-        val messages = listOf(
-            JSONObject().put("role", "system").put("content", systemPrompt),
-            JSONObject().put("role", "user").put("content", userContent)
+        // Add current user prompt
+        result.add(JSONObject().put("role", "user").put("content", userPrompt))
+
+        // Add current steps' tool calls and results
+        for (step in steps) {
+            result.add(JSONObject().put("role", "assistant").put("content",
+                """{"name":"${step.toolName}","arguments":${step.args}}"""
+            ))
+            
+            // Format the search result or tool result using SearchResultFormatter!
+            val formattedResult = SearchResultFormatter.format(step.result, appContext)
+            
+            result.add(JSONObject().put("role", "user").put("content",
+                "Tool '${step.toolName}' result: $formattedResult"
+            ))
+        }
+
+        return sanitizeRoleAlternation(result)
+    }
+
+    private suspend fun generateRemoteUnified(
+        messages: List<JSONObject>,
+        steps: List<ToolChainStepData>,
+        hasTools: Boolean,
+        maxTokens: Int
+    ): GenerationResult {
+        val remoteCfg = getRemoteInferenceConfig() ?: throw IllegalStateException("Remote API model is missing endpoint configuration")
+
+        val provider = LlmProviderResolver.resolveProvider(remoteCfg.endpoint, remoteCfg.model)
+        val apiKey = LlmProviderResolver.cleanApiKey(remoteCfg.authHeader)
+        val baseUrl = LlmProviderResolver.cleanBaseUrl(remoteCfg.endpoint)
+
+        val chatMessages = mutableListOf<ChatMessage>()
+        
+        // Add previous history
+        for (obj in messages) {
+            val role = obj.optString("role")
+            val content = obj.optString("content")
+            
+            // Skip the unstructured tool text that buildConversationMessagesWithSteps added
+            if (role == "assistant" && content.startsWith("{\"name\":")) continue
+            if (role == "user" && content.startsWith("Tool '")) continue
+            
+            val participant = if (role.lowercase() == "user") com.bit.api.Participant.USER else com.bit.api.Participant.MODEL
+            chatMessages.add(ChatMessage(text = content, participant = participant))
+        }
+        
+        // Add proper tool calls and results
+        for (step in steps) {
+            val tc = com.bit.api.ToolCallData(
+                toolName = step.toolName,
+                arguments = step.args,
+                result = step.result
+            )
+            val toolCallId = com.bit.api.util.buildToolCallId(step.toolName, step.args)
+            val tcWithId = tc.copy(toolCallId = toolCallId)
+            
+            chatMessages.add(ChatMessage(
+                id = com.bit.api.Constants.TOOL_MSG_PREFIX + java.util.UUID.randomUUID().toString(),
+                text = "",
+                participant = com.bit.api.Participant.MODEL,
+                toolCall = tcWithId
+            ))
+            
+            chatMessages.add(ChatMessage(
+                id = com.bit.api.Constants.RESULT_MSG_PREFIX + java.util.UUID.randomUUID().toString(),
+                text = "",
+                participant = com.bit.api.Participant.USER,
+                toolCall = tcWithId
+            ))
+        }
+
+        val jsonSerializer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val tools = if (hasTools) {
+            PluginManager.getEnabledToolDefinitions().map { toolDef ->
+                val toolJsonString = toolDef.build().toOpenAIFormat().toString()
+                jsonSerializer.decodeFromString<com.bit.api.ToolDefinition>(toolJsonString)
+            }
+        } else null
+
+        val config = ProviderConfig(
+            apiKey = apiKey,
+            modelId = remoteCfg.model,
+            systemPrompt = null,
+            baseUrl = baseUrl,
+            tools = tools,
+            thinkingEnabled = _thinkingModeEnabled.value,
+            maxTokens = maxTokens
         )
-        val summary = generatePlainText(messages, maxTokens = SUMMARY_MAX_TOKENS)
-        PluginManager.restoreGrammar()  // Re-enable grammar for next message
-        return summary
+
+        val textBuilder = java.lang.StringBuilder()
+        val toolCalls = mutableListOf<Pair<String, String>>()
+
+        provider.generateResponse(chatMessages, config).collect { event ->
+            when (event) {
+                is StreamEvent.TextChunk -> {
+                    textBuilder.append(event.text)
+                    _streamingAssistantMessage.value = textBuilder.toString()
+                }
+                is StreamEvent.ToolCallRequest -> {
+                    toolCalls.add(Pair(event.name, event.arguments))
+                }
+                is StreamEvent.ToolCallsRequest -> {
+                    event.calls.forEach { call ->
+                        toolCalls.add(Pair(call.name, call.arguments))
+                    }
+                }
+                is StreamEvent.Error -> {
+                    throw Exception(event.message)
+                }
+                else -> {}
+            }
+        }
+
+        val text = textBuilder.toString().trim()
+        val finalToolCalls = mutableListOf<Pair<String, String>>()
+        finalToolCalls.addAll(toolCalls)
+
+        if (finalToolCalls.isEmpty() && text.isNotBlank()) {
+            val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+            parseToolCallsFromText(text)?.let { parsed ->
+                val valid = parsed.filter { (name, _) ->
+                    normalizeToolName(name).lowercase() in enabledNames
+                }
+                finalToolCalls.addAll(valid)
+            }
+        }
+
+        return GenerationResult(text = text, toolCalls = finalToolCalls)
     }
 
-    /** Persist agent chat results to vault. */
+    private suspend fun generateGgufUnified(
+        messages: List<JSONObject>,
+        hasTools: Boolean,
+        maxTokens: Int
+    ): GenerationResult {
+        if (hasTools) {
+            PluginManager.restoreGrammar()
+        } else {
+            PluginManager.clearGrammar()
+        }
+
+        val jsonArray = JSONArray(messages)
+        val textBuilder = java.lang.StringBuilder()
+        val toolCalls = mutableListOf<Pair<String, String>>()
+
+        LlmModelWorker.ggufGenerateMultiTurnStreaming(
+            jsonArray.toString(), maxTokens
+        ).collect { event ->
+            when (event) {
+                is GenerationEvent.Token -> {
+                    textBuilder.append(event.text)
+                    _streamingAssistantMessage.value = textBuilder.toString()
+                }
+                is GenerationEvent.ToolCall -> {
+                    toolCalls.add(Pair(event.name, event.args))
+                }
+                is GenerationEvent.Metrics -> {
+                    currentMetrics = event.metrics
+                }
+                is GenerationEvent.Error -> {
+                    throw Exception(event.message)
+                }
+                else -> {}
+            }
+        }
+
+        val text = textBuilder.toString().trim()
+        val finalToolCalls = mutableListOf<Pair<String, String>>()
+        finalToolCalls.addAll(toolCalls)
+
+        if (finalToolCalls.isEmpty() && text.isNotBlank()) {
+            val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+            parseToolCallsFromText(text)?.let { parsed ->
+                val valid = parsed.filter { (name, _) ->
+                    normalizeToolName(name).lowercase() in enabledNames
+                }
+                finalToolCalls.addAll(valid)
+            }
+        }
+
+        return GenerationResult(text = text, toolCalls = finalToolCalls)
+    }
+
     private suspend fun persistAgentChat(
         prompt: String,
         isNewChat: Boolean,
@@ -1129,136 +1239,46 @@ class ChatViewModel @Inject constructor(
             )
         }
 
-        if (isNewChat) {
-            chatManager.createNewChat().onSuccess { newChatId ->
-                _currentChatId.value = newChatId
-                chatManager.addUserMessage(newChatId, prompt)
+        val chatId = _currentChatId.value ?: return
 
-                // Save plugin result messages
-                _messages.filter { it.content.contentType == ContentType.PluginResult }
-                    .forEach { chatManager.addMessage(newChatId, it) }
-
-                // Save assistant message with full agent data
-                chatManager.addAssistantMessage(
-                    chatId = newChatId,
-                    content = summary,
-                    decodingMetrics = currentMetrics,
-                    ragResults = ragResultItems,
-                    toolChainSteps = steps,
-                    agentPlan = plan,
-                    agentSummary = summary
-                )
-
-                // Reload to get proper IDs
-                chatManager.getChatMessages(newChatId).onSuccess { loadedMessages ->
-                    _messages.clear()
-                    _messages.addAll(loadedMessages)
-                }
-
-                AppStateManager.setGenerationComplete()
-                AppStateManager.chatRefreshed()
-                val spokenMsgId = _messages.lastOrNull { it.role == Role.Assistant }?.msgId
-                resetStreamingState()
-                viewModelScope.launch { autoSpeakIfEnabled(summary, spokenMsgId) }
-            }.onFailure { e ->
-                reportError("Failed to create chat: ${e.message}")
-                resetStreamingState()
-            }
-        } else {
-            val chatId = _currentChatId.value ?: return
-
-            // Add user message to in-memory list if not already added
-            val pendingUserMsg = currentUserMessage
-            if (!userMessageAdded.get() && pendingUserMsg != null) {
-                _messages.add(pendingUserMsg)
-                userMessageAdded.set(true)
-            }
-
-            val assistantMessage = Messages(
-                role = Role.Assistant,
-                content = MessageContent(contentType = ContentType.Text, content = summary),
-                modelId = currentModelId,
-                decodingMetrics = currentMetrics,
-                ragResults = ragResultItems,
-                toolChainSteps = steps,
-                agentPlan = plan,
-                agentSummary = summary
-            )
-            _messages.add(assistantMessage)
-
-            chatManager.addMessage(chatId, assistantMessage)
-
-            AppStateManager.setGenerationComplete()
-            AppStateManager.chatRefreshed()
-            val spokenMsgId = assistantMessage.msgId
-            resetStreamingState()
-            viewModelScope.launch { autoSpeakIfEnabled(summary, spokenMsgId) }
+        // Add user message to in-memory list if not already added
+        val pendingUserMsg = currentUserMessage
+        if (!userMessageAdded.get() && pendingUserMsg != null) {
+            _messages.add(pendingUserMsg)
+            userMessageAdded.set(true)
         }
-    }
 
-    // ==================== Simple Flow (no tools) ====================
+        val assistantMessage = Messages(
+            role = Role.Assistant,
+            content = MessageContent(contentType = ContentType.Text, content = summary),
+            modelId = currentModelId,
+            decodingMetrics = currentMetrics,
+            ragResults = ragResultItems,
+            toolChainSteps = steps,
+            agentPlan = plan,
+            agentSummary = summary
+        )
+        _messages.add(assistantMessage)
 
-    private suspend fun simpleFlow(
-        prompt: String,
-        ragContext: String?,
-        maxTokens: Int,
-        isNewChat: Boolean,
-        isRegeneration: Boolean = false
-    ) {
-        AppStateManager.setGeneratingText()
-        val fullPrompt = ragContext?.let { "$it\n\n$prompt" } ?: prompt
+        // Save plugin result messages
+        _messages.filter { it.content.contentType == ContentType.PluginResult }
+            .forEach { chatManager.addMessage(chatId, it) }
+
+        chatManager.addMessage(chatId, assistantMessage)
 
         if (isNewChat) {
-            val conversationMessages = buildConversationMessages(fullPrompt)
-            val genResult = generateWithToolCalls(conversationMessages, maxTokens)
-            val finalResponse = filterToolCallSyntax(genResult.text)
-
-            _streamingAssistantMessage.value = finalResponse
-            createChatWithMessages(prompt, finalResponse, currentMetrics)
-        } else {
-            val chatId = _currentChatId.value ?: return
-
-            val conversationMessages = buildConversationMessages(fullPrompt, isRegeneration)
-            val genResult = generateWithToolCalls(conversationMessages, maxTokens)
-            val finalResponse = filterToolCallSyntax(genResult.text)
-
-            _streamingAssistantMessage.value = finalResponse
-
-            val pendingUserMsg = currentUserMessage
-            if (!userMessageAdded.get() && pendingUserMsg != null) {
-                _messages.add(pendingUserMsg)
-                userMessageAdded.set(true)
-            }
-
-            val ragResultItems = _currentRagResults.value.takeIf { it.isNotEmpty() }?.map { result ->
-                RagResultItem(
-                    ragName = result.ragName,
-                    content = result.content,
-                    score = result.score,
-                    nodeId = result.nodeId
-                )
-            }
-
-            if (finalResponse.isNotBlank()) {
-                val assistantMessage = Messages(
-                    role = Role.Assistant,
-                    content = MessageContent(contentType = ContentType.Text, content = finalResponse),
-                    modelId = currentModelId,
-                    decodingMetrics = currentMetrics,
-                    ragResults = ragResultItems
-                )
-                _messages.add(assistantMessage)
-                chatManager.addMessage(chatId, assistantMessage)
-                AppStateManager.setGenerationComplete()
-                AppStateManager.chatRefreshed()
-                val spokenMsgId = assistantMessage.msgId
-                resetStreamingState()
-                viewModelScope.launch { autoSpeakIfEnabled(finalResponse, spokenMsgId) }
-            } else {
-                AppStateManager.setGenerationComplete()
-                resetStreamingState()
+            // Reload to get proper IDs
+            chatManager.getChatMessages(chatId).onSuccess { loadedMessages ->
+                _messages.clear()
+                _messages.addAll(loadedMessages)
             }
         }
+
+        AppStateManager.setGenerationComplete()
+        AppStateManager.chatRefreshed()
+        val spokenMsgId = assistantMessage.msgId
+        resetStreamingState()
+        viewModelScope.launch { autoSpeakIfEnabled(summary, spokenMsgId) }
     }
 
     private data class RemoteInferenceConfig(
@@ -1290,115 +1310,6 @@ class ChatViewModel @Inject constructor(
             )
         } catch (_: Exception) {
             null
-        }
-    }
-
-    private suspend fun simpleRemoteFlow(
-        prompt: String,
-        ragContext: String?,
-        isNewChat: Boolean
-    ) {
-        AppStateManager.setGeneratingText()
-        val fullPrompt = ragContext?.let { "$it\n\n$prompt" } ?: prompt
-        val remoteCfg = getRemoteInferenceConfig()
-        if (remoteCfg == null) {
-            reportError("Remote API model is missing endpoint configuration")
-            return
-        }
-
-        if (!remoteCfg.endpoint.startsWith("http")) {
-            reportError("Invalid remote endpoint: ${remoteCfg.endpoint}. Please ensure it starts with http:// or https://")
-            return
-        }
-
-        val remoteResult = withContext(Dispatchers.IO) {
-            val messages = mutableListOf<RemoteInferenceClient.Message>()
-            
-            // Add system prompt with date/time
-            val systemPrompt = getCurrentModelSystemPrompt()
-            if (systemPrompt.isNotEmpty()) {
-                messages.add(
-                    RemoteInferenceClient.Message(
-                        role = "system",
-                        content = systemPrompt
-                    )
-                )
-            }
-            
-            // Build conversation history from current messages (excluding pending)
-            if (!isNewChat) {
-                _messages.forEach { msg ->
-                    val role = when (msg.role) {
-                        Role.User -> "user"
-                        Role.Assistant -> "assistant"
-                    }
-                    messages.add(
-                        RemoteInferenceClient.Message(
-                            role = role,
-                            content = msg.content.content
-                        )
-                    )
-                }
-            }
-            
-            // Add current user message
-            messages.add(RemoteInferenceClient.Message("user", fullPrompt))
-            
-            // Use history-aware method for chat endpoints
-            val normalizedEndpoint = remoteCfg.endpoint.trim().lowercase()
-            val isChatEndpoint = normalizedEndpoint.contains("/api/chat") ||
-                normalizedEndpoint.contains("/v1/chat/completions")
-            
-            if (isChatEndpoint && messages.size > 1) {
-                RemoteInferenceClient.inferWithHistory(
-                    endpoint = remoteCfg.endpoint,
-                    model = remoteCfg.model,
-                    messages = messages,
-                    stream = remoteCfg.stream,
-                    authHeader = remoteCfg.authHeader
-                )
-            } else {
-                RemoteInferenceClient.infer(
-                    endpoint = remoteCfg.endpoint,
-                    model = remoteCfg.model,
-                    prompt = fullPrompt,
-                    stream = remoteCfg.stream,
-                    authHeader = remoteCfg.authHeader
-                )
-            }
-        }
-
-        val finalResponse = remoteResult.text.trim()
-        _streamingAssistantMessage.value = finalResponse
-
-        if (isNewChat) {
-            createChatWithMessages(prompt, finalResponse, null)
-            return
-        }
-
-        val chatId = _currentChatId.value ?: return
-        val pendingUserMsg = currentUserMessage
-        if (!userMessageAdded.get() && pendingUserMsg != null) {
-            _messages.add(pendingUserMsg)
-            userMessageAdded.set(true)
-        }
-
-        if (finalResponse.isNotBlank()) {
-            val assistantMessage = Messages(
-                role = Role.Assistant,
-                content = MessageContent(contentType = ContentType.Text, content = finalResponse),
-                modelId = currentModelId
-            )
-            _messages.add(assistantMessage)
-            chatManager.addMessage(chatId, assistantMessage)
-            AppStateManager.setGenerationComplete()
-            AppStateManager.chatRefreshed()
-            val spokenMsgId = assistantMessage.msgId
-            resetStreamingState()
-            viewModelScope.launch { autoSpeakIfEnabled(finalResponse, spokenMsgId) }
-        } else {
-            AppStateManager.setGenerationComplete()
-            resetStreamingState()
         }
     }
 
@@ -1584,17 +1495,23 @@ class ChatViewModel @Inject constructor(
             val apiKey = LlmProviderResolver.cleanApiKey(remoteCfg.authHeader)
             val baseUrl = LlmProviderResolver.cleanBaseUrl(remoteCfg.endpoint)
             
-            val chatMessages = messages.map { obj ->
+            var sysPrompt: String? = null
+            val chatMessages = messages.mapNotNull { obj ->
                 val role = obj.optString("role")
                 val content = obj.optString("content")
-                val participant = if (role.lowercase() == "user") Participant.USER else Participant.MODEL
-                ChatMessage(text = content, participant = participant)
+                if (role.lowercase() == "system") {
+                    sysPrompt = content
+                    null
+                } else {
+                    val participant = if (role.lowercase() == "user") Participant.USER else Participant.MODEL
+                    ChatMessage(text = content, participant = participant)
+                }
             }
             
             val config = ProviderConfig(
                 apiKey = apiKey,
                 modelId = remoteCfg.model,
-                systemPrompt = null,
+                systemPrompt = sysPrompt,
                 baseUrl = baseUrl,
                 thinkingEnabled = _thinkingModeEnabled.value,
                 maxTokens = maxTokens
@@ -1915,26 +1832,57 @@ class ChatViewModel @Inject constructor(
      * Returns empty string if no system prompt is configured.
      */
     private suspend fun getCurrentModelSystemPrompt(userQuery: String = ""): String {
-        val basePrompt = getGgufModelSchema().inferenceParams.systemPrompt
+        val modelId = ActiveModelSession.currentModelId.value
+        val modelConfig = AppContainer.getModelRepository().getConfigByModelId(modelId)
+        
+        var modelSpecificPrompt: String? = null
+        if (modelConfig != null) {
+            val inferenceJson = modelConfig.modelInferenceParams
+            if (!inferenceJson.isNullOrBlank()) {
+                try {
+                    val json = org.json.JSONObject(inferenceJson)
+                    modelSpecificPrompt = json.optString("systemPrompt").takeIf { it.isNotBlank() }
+                } catch (e: Exception) {
+                    // Ignore parsing error
+                }
+            }
+        }
+        
+        val basePrompt = modelSpecificPrompt ?: appSettings.globalSystemPrompt.first()
+        val currentDateTime = java.util.Date()
+        val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+        val dateSdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
 
-        val hasActiveTools = PluginManager.hasEnabledTools()
-            && PluginManager.isToolCallingModelLoaded.value
-        val thinkingDirective = if (_thinkingModeEnabled.value && !hasActiveTools) "/think" else "/no_think"
+        val runtimeValues = mapOf(
+            "{${com.bit.data.PredefinedVariables.TIME}}" to sdf.format(currentDateTime),
+            "{${com.bit.data.PredefinedVariables.DATE}}" to dateSdf.format(currentDateTime),
+            "{${com.bit.data.PredefinedVariables.SENT_TIME}}" to sdf.format(currentDateTime),
+            "{${com.bit.data.PredefinedVariables.SENT_DATE}}" to dateSdf.format(currentDateTime),
+            "{${com.bit.data.PredefinedVariables.ACTIVE_MEMORY}}" to ""
+        )
 
-        val currentDateTimeStr = java.text.SimpleDateFormat(
-            "EEEE, d MMMM yyyy, HH:mm",
-            java.util.Locale.US
-        ).format(java.util.Date())
+        // For string replacement on the user's base prompt
+        var compiledPrompt = basePrompt
+        for ((key, value) in runtimeValues) {
+            compiledPrompt = compiledPrompt.replace(key, value)
+        }
 
         return buildString {
-            append(thinkingDirective)
-            append("\n\nSystem Info:\n- Current Date and Time: ").append(currentDateTimeStr)
-            if (basePrompt.isNotEmpty()) {
-                append("\n\n")
-                append(basePrompt)
+            if (compiledPrompt.isNotEmpty()) {
+                append(compiledPrompt).append("\n\n")
             }
-            if (PluginManager.isWebSearchEnabled.value) {
-                append("\n\nWeb search:\nUse web_search for current, time-sensitive, or uncertain facts. Use web_fetch when a search result needs source-level detail. Prefer primary or official sources for technical, legal, medical, financial, or high-impact claims. When web search is used, cite sources and distinguish sourced facts from inference.")
+            
+            if (PluginManager.hasEnabledTools()) {
+                val toolsJsonArray = org.json.JSONArray()
+                PluginManager.getEnabledToolDefinitions().forEach { toolDef ->
+                    toolsJsonArray.put(toolDef.build().toOpenAIFormat())
+                }
+                append("Tool Schema Injection:\n")
+                append("You have access to a UNION of the following tools. You MUST use them if they are relevant to the user's request. To call a tool, wrap a JSON object in <tool_call> tags like this: <tool_call>{\"name\": \"tool_name\", \"arguments\": {\"arg1\": \"value1\"}}</tool_call>\n")
+                append("<temp_tool_neuron>\nCRITICAL INSTRUCTION: You must choose one tool from the union of available tools below if the user asks for real-time data, web searches, or specific actions.\n</temp_tool_neuron>\n")
+                append("Available tools:\n")
+                append(toolsJsonArray.toString(2))
+                append("\n\n")
             }
         }
     }
@@ -2568,7 +2516,12 @@ class ChatViewModel @Inject constructor(
                 return@launch
             }
 
-            var cleanTitle = generatedTitle.trim().replace("\n", " ").replace("\"", "")
+            var cleanTitle = generatedTitle
+                .replace(Regex("<think>[\\s\\S]*?(?:</think>|$)", RegexOption.IGNORE_CASE), "")
+                .trim()
+                .replace("\n", " ")
+                .replace("\"", "")
+            
             if (cleanTitle.endsWith(".")) {
                 cleanTitle = cleanTitle.dropLast(1)
             }
@@ -2871,51 +2824,29 @@ class ChatViewModel @Inject constructor(
             )
 
             chatManager.updateMessage(chatId, updated).onSuccess {
-                _messages[msgIndex] = updated
                 _promptEditState.value = null
 
-                val isLatestUser = _messages.lastOrNull { it.role == Role.User }?.msgId == updated.msgId
-                val hasAssistantReply = _messages.lastOrNull { it.role == Role.Assistant } != null
-                if (updated.role == Role.User && isLatestUser && hasAssistantReply) {
+                if (updated.role == Role.User) {
+                    // Identify and delete all subsequent messages in UI list and DB
+                    val messagesToDelete = _messages.subList(msgIndex + 1, _messages.size).toList()
+                    messagesToDelete.forEach { msg ->
+                        chatManager.deleteMessage(msg.msgId)
+                    }
+
+                    // Keep only messages up to the edited one
+                    val keptMessages = _messages.take(msgIndex + 1).toMutableList()
+                    keptMessages[msgIndex] = updated
+
+                    _messages.clear()
+                    _messages.addAll(keptMessages)
+
+                    // Trigger regeneration
                     regenerateLastMessage()
+                } else {
+                    _messages[msgIndex] = updated
                 }
             }.onFailure { e ->
                 reportError("Failed to edit prompt: ${e.message}")
-            }
-        }
-    }
-
-    fun forkConversation(message: Messages) {
-        val chatId = _currentChatId.value ?: return
-        val msgIndex = _messages.indexOfFirst { it.msgId == message.msgId }
-        if (msgIndex < 0) return
-
-        viewModelScope.launch {
-            // Get all messages up to the selected message (inclusive)
-            val subset = _messages.take(msgIndex + 1).map { msg ->
-                msg.copy(msgId = java.util.UUID.randomUUID().toString())
-            }
-
-            chatManager.createNewChat().onSuccess { newChatId ->
-                var success = true
-                for (msg in subset) {
-                    chatManager.addMessage(newChatId, msg).onFailure {
-                        success = false
-                    }
-                }
-                if (success) {
-                    _currentChatId.value = newChatId
-                    _messages.clear()
-                    chatManager.getChatMessages(newChatId).onSuccess { loadedMessages ->
-                        _messages.addAll(loadedMessages)
-                        AppStateManager.setHasMessages(loadedMessages.isNotEmpty())
-                    }
-                    AppStateManager.chatRefreshed()
-                } else {
-                    reportError("Failed to copy messages to the new fork")
-                }
-            }.onFailure { e ->
-                reportError("Failed to fork conversation: ${e.message}")
             }
         }
     }
@@ -2950,7 +2881,7 @@ class ChatViewModel @Inject constructor(
                     ggufMsg
                 )
 
-                val summaryResult = generatePlainText(ggufList, 256)
+                val summaryResult = generatePlainText(ggufList, 1024)
                 val summary = summaryResult.trim().takeIf { it.isNotBlank() } ?: "Summary of earlier messages."
 
                 val summaryMessage = Messages(

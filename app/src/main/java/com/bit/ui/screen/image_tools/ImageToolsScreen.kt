@@ -648,7 +648,7 @@ private fun MaskDrawingSection(
     onPickNewImage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     val strokes = remember { mutableStateListOf<DrawingStroke>() }
     val currentPoints = remember { mutableStateListOf<Offset>() }
     var brushSize by remember { mutableStateOf(30f) }
@@ -675,7 +675,7 @@ private fun MaskDrawingSection(
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptics.selection()
                         strokes.clear()
                         currentPoints.clear()
                         onMaskChanged(null)
@@ -687,7 +687,7 @@ private fun MaskDrawingSection(
                     style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.clickable {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptics.selection()
                         strokes.clear()
                         currentPoints.clear()
                         onMaskChanged(null)
@@ -708,7 +708,7 @@ private fun MaskDrawingSection(
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            haptics.selection()
                             currentPoints.clear()
                             currentPoints.add(offset)
                         },
@@ -731,7 +731,7 @@ private fun MaskDrawingSection(
                                     )
                                     onMaskChanged(mask)
                                 }
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                haptics.selection()
                             }
                         }
                     )
@@ -845,3 +845,4 @@ private fun generateMaskBitmap(
 
     return Bitmap.createScaledBitmap(mask, inputWidth, inputHeight, true)
 }
+

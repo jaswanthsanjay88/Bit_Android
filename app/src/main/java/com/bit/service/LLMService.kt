@@ -151,33 +151,35 @@ class LLMService : Service() {
             val fd = pfd.detachFd()
 
             scope.launch(Dispatchers.IO) {
-                try {
-                    AppStateManager.setLoadingModel(modelName)
+                ParcelFileDescriptor.adoptFd(fd).use {
+                    try {
+                        AppStateManager.setLoadingModel(modelName)
 
-                    val config = ModelConfig(
-                        modelId = modelName,
-                        modelLoadingParams = loadingParams,
-                        modelInferenceParams = inferenceParams
-                    )
+                        val config = ModelConfig(
+                            modelId = modelName,
+                            modelLoadingParams = loadingParams,
+                            modelInferenceParams = inferenceParams
+                        )
 
-                    val success = ggufEngine.loadFromFd(fd, config)
+                        val success = ggufEngine.loadFromFd(fd, config)
 
-                    if (success) {
-                        try {
-                            val speedMode = AppSettingsDataStore(applicationContext).speedModeEnabled.first()
-                            ggufEngine.setSpeculativeDecoding(speedMode)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to apply speculative decoding on load FD", e)
+                        if (success) {
+                            try {
+                                val speedMode = AppSettingsDataStore(applicationContext).speedModeEnabled.first()
+                                ggufEngine.setSpeculativeDecoding(speedMode)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to apply speculative decoding on load FD", e)
+                            }
+                            AppStateManager.setModelLoaded(modelName)
+                            callback.onSuccess()
+                        } else {
+                            AppStateManager.setError("Failed to load model from FD: $modelName")
+                            callback.onError("Failed to load model from file descriptor")
                         }
-                        AppStateManager.setModelLoaded(modelName)
-                        callback.onSuccess()
-                    } else {
-                        AppStateManager.setError("Failed to load model from FD: $modelName")
-                        callback.onError("Failed to load model from file descriptor")
+                    } catch (e: Exception) {
+                        AppStateManager.setError(e.message ?: "Unknown error loading model from FD")
+                        callback.onError(e.message ?: "Unknown error")
                     }
-                } catch (e: Exception) {
-                    AppStateManager.setError(e.message ?: "Unknown error loading model from FD")
-                    callback.onError(e.message ?: "Unknown error")
                 }
             }
         }

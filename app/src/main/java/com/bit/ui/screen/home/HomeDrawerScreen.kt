@@ -21,6 +21,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -33,7 +37,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,7 +74,6 @@ fun HomeDrawerScreen(
     onChatSelected: (String) -> Unit,
     onSettingsClick: () -> Unit,
     onVaultManagerClick: () -> Unit,
-    onHybridSettingsClick: () -> Unit,
     onStoreClick: () -> Unit,
     chatViewModel: com.bit.viewmodel.ChatViewModel,
     viewModel: ChatListViewModel = hiltViewModel()
@@ -105,18 +115,40 @@ fun HomeDrawerScreen(
                         titleContentColor = MaterialTheme.colorScheme.onSurface
                     ),
                     actions = {
-                        ActionButton(
-                            onClickListener = onStoreClick,
-                            icon = TnIcons.StoreFront,
-                            contentDescription = "Open model store",
+                        TextButton(
+                            onClick = onStoreClick,
                             modifier = Modifier.padding(end = 4.dp)
-                        )
-                        ActionButton(
-                            onClickListener = onSettingsClick,
-                            icon = TnIcons.Settings,
-                            contentDescription = "Open settings",
+                        ) {
+                            Icon(
+                                imageVector = TnIcons.StoreFront,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "Store",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        TextButton(
+                            onClick = onSettingsClick,
                             modifier = Modifier.padding(end = 6.dp)
-                        )
+                        ) {
+                            Icon(
+                                imageVector = TnIcons.Settings,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "Settings",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
@@ -193,6 +225,9 @@ fun HomeDrawerScreen(
                                     chatViewModel.startNewConversation()
                                 }
                             },
+                            onRenameChat = { chatId, newTitle ->
+                                viewModel.renameChat(chatId, newTitle)
+                            },
                             chatViewModel = chatViewModel
                         )
                     }
@@ -208,45 +243,6 @@ fun HomeDrawerScreen(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
             Spacer(modifier = Modifier.height(Standards.SpacingSm))
-
-            // Bottom Footer Row
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = Standards.SpacingSm)
-            ) {
-                // Hybrid Server
-                Card(
-                    onClick = onHybridSettingsClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    shape = RoundedCornerShape(Standards.RadiusMd)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp, horizontal = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = TnIcons.Terminal,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "Hybrid",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -259,6 +255,7 @@ private fun ChatList(
     onRefresh: () -> Unit,
     onChatClick: (String) -> Unit,
     onDeleteChat: (String) -> Unit,
+    onRenameChat: (String, String) -> Unit,
     chatViewModel: com.bit.viewmodel.ChatViewModel
 ) {
     var isManualRefreshing by remember { mutableStateOf(false) }
@@ -304,6 +301,7 @@ private fun ChatList(
                     isActive = isActive,
                     onClick = { onChatClick(chat.chatId) },
                     onDelete = { onDeleteChat(chat.chatId) },
+                    onRename = { newTitle -> onRenameChat(chat.chatId, newTitle) },
                     onFold = { chatViewModel.foldOlderMessages() }
                 )
             }
@@ -311,16 +309,20 @@ private fun ChatList(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ChatListItem(
     chat: ChatInfo,
     isActive: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    onRename: (String) -> Unit,
     onFold: () -> Unit
 ) {
     var isDeleting by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(isDeleting) {
         if (isDeleting) {
@@ -329,105 +331,185 @@ private fun ChatListItem(
         }
     }
 
-    Card(
-        onClick = onClick,
-        shape = RoundedCornerShape(Standards.RadiusMd),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isActive) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f)
-                             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isActive) MaterialTheme.colorScheme.secondary
-                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
+    Box {
+        Surface(
+            shape = RoundedCornerShape(Standards.RadiusMd),
+            color = if (isActive) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+            contentColor = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 52.dp)
-                .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { showMenu = true }
+                )
         ) {
             Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp)
+                    .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (!chat.title.isNullOrBlank()) chat.title else "Chat ${chat.chatId.take(8)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Text(
-                    text = "•",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Text(
-                    text = "${chat.messageCount} msgs",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Text(
-                    text = "•",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Text(
-                    text = formatRelativeTime(chat.lastMessageTime ?: chat.createdAt),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (isDeleting) {
-                LoadingIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = MaterialTheme.colorScheme.error
-                )
-            } else {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (isActive && chat.messageCount >= 6) {
-                        IconButton(
-                            onClick = onFold,
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                TnIcons.Eraser,
-                                contentDescription = "Prune chat history",
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                    Text(
+                        text = if (!chat.title.isNullOrBlank()) chat.title else "New Chat",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+    
+                    Row(
+                        modifier = Modifier.wrapContentWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+        
+                        Text(
+                            text = "${chat.messageCount} msgs",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+        
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+        
+                        Text(
+                            text = formatRelativeTime(chat.lastMessageTime ?: chat.createdAt),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
                     }
+                }
+    
+                if (isDeleting) {
+                    LoadingIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
                     IconButton(
-                        onClick = {
-                            isDeleting = true
-                            onDelete()
-                        },
+                        onClick = { showMenu = true },
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
-                            TnIcons.Trash,
-                            contentDescription = "Delete chat",
-                            tint = MaterialTheme.colorScheme.error,
+                            TnIcons.DotsVertical,
+                            contentDescription = "Options",
+                            tint = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Rename") },
+                onClick = {
+                    showMenu = false
+                    showRenameDialog = true
+                },
+                leadingIcon = {
+                    Icon(
+                        TnIcons.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            )
+            DropdownMenuItem(
+                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                onClick = {
+                    showMenu = false
+                    showDeleteConfirm = true
+                },
+                leadingIcon = {
+                    Icon(
+                        TnIcons.Trash,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            )
+        }
+
+        if (showRenameDialog) {
+            var newTitle by remember { mutableStateOf(chat.title ?: "") }
+            AlertDialog(
+                onDismissRequest = { showRenameDialog = false },
+                title = { Text("Rename Chat") },
+                text = {
+                    OutlinedTextField(
+                        value = newTitle,
+                        onValueChange = { newTitle = it },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Enter new chat title") }
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (newTitle.isNotBlank()) {
+                                onRename(newTitle.trim())
+                            }
+                            showRenameDialog = false
+                        }
+                    ) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRenameDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text("Delete Chat") },
+                text = { Text("Are you sure you want to delete this chat? This action cannot be undone.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDeleteConfirm = false
+                            isDeleting = true
+                            onDelete()
+                        }
+                    ) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
         }
     }
 }

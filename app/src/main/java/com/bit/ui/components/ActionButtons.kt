@@ -5,6 +5,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import com.bit.ui.theme.Motion
+import com.bit.ui.theme.bouncyClick
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,10 +82,10 @@ fun ActionButton(
     ),
     enabled: Boolean = true
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     FilledIconButton(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptics.selection()
             onClickListener()
         },
         enabled = enabled,
@@ -114,7 +115,7 @@ fun ActionProgressButton(
         contentColor = MaterialTheme.colorScheme.primary
     )
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -130,7 +131,7 @@ fun ActionProgressButton(
         // Icon button in center
         FilledIconButton(
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                haptics.selection()
                 onClickListener()
             },
             colors = colors,
@@ -162,22 +163,21 @@ fun ActionButton(
     ),
     enabled: Boolean = true
 ) {
-    val haptic = LocalHapticFeedback.current
-    FilledIconButton(
-        onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            onClickListener()
-        },
-        enabled = enabled,
-        colors = colors,
+    Surface(
         shape = shape,
-        modifier = modifier.size(Standards.ActionIconSize)
+        color = if (enabled) colors.containerColor else colors.disabledContainerColor,
+        contentColor = if (enabled) colors.contentColor else colors.disabledContentColor,
+        modifier = modifier
+            .size(Standards.ActionIconSize)
+            .bouncyClick(enabled = enabled, onClick = onClickListener)
     ) {
-        Icon(
-            icon,
-            contentDescription = contentDescription,
-            Modifier.padding(Standards.ActionIconPadding)
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                icon,
+                contentDescription = contentDescription,
+                Modifier.padding(Standards.ActionIconPadding)
+            )
+        }
     }
 }
 
@@ -193,7 +193,7 @@ fun MultiActionButton(
     contentColor: Color = MaterialTheme.colorScheme.primary,
     dividerColor: Color = MaterialTheme.colorScheme.outline.copy(0.3f)
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     Surface(
         shape = shape,
         color = containerColor,
@@ -209,11 +209,11 @@ fun MultiActionButton(
                     modifier = Modifier
                         .size(Standards.ActionIconSize)
                         .then(
-                            if (action.enabled) Modifier.clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                action.onClick()
-                            }
-                            else Modifier
+                            Modifier.bouncyClick(
+                                enabled = action.enabled,
+                                scaleDown = 0.85f,
+                                onClick = action.onClick
+                            )
                         )
                 ) {
                     if (action.isLoading) {
@@ -270,10 +270,10 @@ fun ActionTextButton(
     ),
     shape: Shape = RoundedCornerShape(Standards.RadiusSm)
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     FilledTonalButton(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptics.selection()
             onClickListener()
         },
         shape = shape,
@@ -303,10 +303,10 @@ fun ActionTextButton(
     shape: Shape = RoundedCornerShape(Standards.RadiusSm),
     enabled: Boolean = true
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     FilledTonalButton(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptics.selection()
             onClickListener()
         },
         shape = shape,
@@ -338,11 +338,11 @@ fun ActionToggleButton(
         checkedContentColor = MaterialTheme.colorScheme.onPrimary
     )
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     FilledIconToggleButton(
         checked = checked,
         onCheckedChange = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptics.selection()
             onCheckedChange(it)
         },
         enabled = enabled,
@@ -374,11 +374,11 @@ fun ActionToggleButton(
         checkedContentColor = MaterialTheme.colorScheme.onPrimary
     )
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     FilledIconToggleButton(
         checked = checked,
         onCheckedChange = {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            haptics.selection()
             onCheckedChange(it)
         },
         enabled = enabled,
@@ -397,9 +397,7 @@ fun ActionToggleButton(
 // ==================== ActionSwitch ====================
 
 /**
- * Custom toggle switch matching ActionButton dimensions and styling.
- * Same height (30dp) and corner radius (6dp) as MultiActionButton.
- * Uses spring animations for bouncy, satisfying toggling.
+ * Standard Material 3 Switch with monochrome styling.
  */
 @SuppressLint("ModifierParameter")
 @Composable
@@ -407,74 +405,26 @@ fun ActionSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    width: Dp = 52.dp,
-    height: Dp = Standards.ActionIconSize,
-    thumbSize: Dp = 22.dp,
-    shape: Shape = RoundedCornerShape(Standards.RadiusMd)
+    enabled: Boolean = true
 ) {
-    val haptic = LocalHapticFeedback.current
-    val interactionSource = remember { MutableInteractionSource() }
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
-    val trackColor by animateColorAsState(
-        targetValue = when {
-            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-            checked -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.06f)
+    androidx.compose.material3.Switch(
+        checked = checked,
+        onCheckedChange = {
+            haptics.selection()
+            onCheckedChange(it)
         },
-        animationSpec = Motion.state(),
-        label = "actionSwitchTrack"
-    )
-
-    val thumbColor by animateColorAsState(
-        targetValue = when {
-            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-            checked -> MaterialTheme.colorScheme.onPrimary
-            else -> MaterialTheme.colorScheme.outline
-        },
-        animationSpec = Motion.state(),
-        label = "actionSwitchThumb"
-    )
-
-    val thumbOffset by animateDpAsState(
-        targetValue = if (checked) width - thumbSize - 4.dp else 4.dp,
-        animationSpec = Motion.interactive(),
-        label = "actionSwitchOffset"
-    )
-
-    val thumbScale by animateFloatAsState(
-        targetValue = if (enabled) 1f else 0.9f,
-        animationSpec = Motion.interactive(),
-        label = "actionSwitchScale"
-    )
-
-    Box(
-        modifier = modifier
-            .width(width)
-            .height(height)
-            .clip(shape)
-            .background(trackColor)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                enabled = enabled,
-                role = Role.Switch,
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onCheckedChange(!checked)
-                }
-            ),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Box(
-            modifier = Modifier
-                .offset(x = thumbOffset)
-                .size(thumbSize)
-                .scale(thumbScale)
-                .background(thumbColor, RoundedCornerShape(Standards.RadiusSm))
-                .border(1.dp, trackColor.copy(alpha = 0.15f), RoundedCornerShape(Standards.RadiusSm))
+        enabled = enabled,
+        modifier = modifier,
+        colors = androidx.compose.material3.SwitchDefaults.colors(
+            checkedThumbColor = Color.Black,
+            checkedTrackColor = Color.White,
+            uncheckedThumbColor = Color.LightGray,
+            uncheckedTrackColor = Color.Black,
+            uncheckedBorderColor = Color.DarkGray
         )
-    }
+    )
 }
 
 // ==================== ActionToggleGroup ====================
@@ -496,7 +446,7 @@ fun <T> ActionToggleGroup(
 ) {
     if (items.isEmpty()) return
 
-    val haptic = LocalHapticFeedback.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     val selectedIndex = items.indexOf(selectedItem).coerceAtLeast(0)
     val density = LocalDensity.current
     val containerWidth = remember { androidx.compose.runtime.mutableIntStateOf(0) }
@@ -517,7 +467,7 @@ fun <T> ActionToggleGroup(
             .fillMaxWidth()
             .height(Standards.ActionIconSize)
             .onSizeChanged { containerWidth.intValue = it.width },
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
+        color = Color(0xFF1A1A1A), // Dark container for contrast
         shape = RoundedCornerShape(Standards.RadiusSm)
     ) {
         Box {
@@ -530,7 +480,7 @@ fun <T> ActionToggleGroup(
                         .width(itemWidth - 4.dp)
                         .height(Standards.ActionIconSize - 4.dp)
                         .background(
-                            MaterialTheme.colorScheme.primary,
+                            Color.White, // White background for selected item
                             RoundedCornerShape(Standards.SpacingXs)
                         )
                 )
@@ -548,9 +498,9 @@ fun <T> ActionToggleGroup(
 
                     val contentColor by animateColorAsState(
                         targetValue = when {
-                            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                            isSelected -> MaterialTheme.colorScheme.onPrimary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            !enabled -> Color.DarkGray
+                            isSelected -> Color.Black // Black text on white background
+                            else -> Color.LightGray // Light gray text for unselected
                         },
                         animationSpec = Motion.state(),
                         label = "toggleItemColor$index"
@@ -566,7 +516,7 @@ fun <T> ActionToggleGroup(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    haptics.selection()
                                     onItemSelected(item)
                                 }
                             ),

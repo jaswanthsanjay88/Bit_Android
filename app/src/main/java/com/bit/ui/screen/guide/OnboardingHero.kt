@@ -10,7 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import com.bit.ui.theme.BitColors
+import androidx.compose.material3.MaterialTheme
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -28,7 +28,76 @@ fun OnboardingHero(
             0 -> WireframeSphere(modifier = Modifier.fillMaxSize())
             1 -> SecureWaveform(modifier = Modifier.fillMaxSize())
             2 -> MorphingModelChips(modifier = Modifier.fillMaxSize())
+            3 -> DeveloperProfile(modifier = Modifier.fillMaxSize())
         }
+    }
+}
+
+@Composable
+fun DeveloperProfile(modifier: Modifier = Modifier) {
+    val infiniteTransition = rememberInfiniteTransition(label = "dev")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.8f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    val onBackgroundColor = MaterialTheme.colorScheme.onBackground
+    Canvas(modifier = modifier) {
+        val centerX = size.width / 2f
+        val centerY = size.height / 2f
+        val radius = size.minDimension * 0.25f
+        
+        drawCircle(
+            color = onBackgroundColor.copy(alpha = 0.1f),
+            radius = radius * pulse,
+            center = Offset(centerX, centerY)
+        )
+        
+        drawCircle(
+            color = onBackgroundColor,
+            radius = radius * 0.8f,
+            center = Offset(centerX, centerY),
+            style = Stroke(width = 2.dp.toPx())
+        )
+        
+        // Abstract code brackets
+        val bracketSize = radius * 0.4f
+        val startX = centerX - bracketSize * 1.5f
+        val startY = centerY
+        
+        // Left bracket
+        drawLine(
+            color = onBackgroundColor,
+            start = Offset(startX, startY - bracketSize),
+            end = Offset(startX - bracketSize, startY),
+            strokeWidth = 2.dp.toPx()
+        )
+        drawLine(
+            color = onBackgroundColor,
+            start = Offset(startX - bracketSize, startY),
+            end = Offset(startX, startY + bracketSize),
+            strokeWidth = 2.dp.toPx()
+        )
+        
+        // Right bracket
+        val endX = centerX + bracketSize * 1.5f
+        drawLine(
+            color = onBackgroundColor,
+            start = Offset(endX, startY - bracketSize),
+            end = Offset(endX + bracketSize, startY),
+            strokeWidth = 2.dp.toPx()
+        )
+        drawLine(
+            color = onBackgroundColor,
+            start = Offset(endX + bracketSize, startY),
+            end = Offset(endX, startY + bracketSize),
+            strokeWidth = 2.dp.toPx()
+        )
     }
 }
 
@@ -45,6 +114,10 @@ fun WireframeSphere(modifier: Modifier = Modifier) {
         label = "rotation"
     )
 
+    val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant
+    val onBackgroundColor = MaterialTheme.colorScheme.onBackground
+    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+
     Canvas(modifier = modifier) {
         val centerX = size.width / 2f
         val centerY = size.height / 2f
@@ -52,7 +125,7 @@ fun WireframeSphere(modifier: Modifier = Modifier) {
 
         // Outer bounds circle
         drawCircle(
-            color = BitColors.Border,
+            color = outlineVariantColor,
             radius = radius,
             center = Offset(centerX, centerY),
             style = Stroke(width = 1f)
@@ -65,7 +138,7 @@ fun WireframeSphere(modifier: Modifier = Modifier) {
             val opacity = (0.15f + 0.7f * kotlin.math.abs(widthFactor)).coerceIn(0.15f, 0.8f)
 
             drawOval(
-                color = BitColors.TextPrimary.copy(alpha = opacity),
+                color = onBackgroundColor.copy(alpha = opacity),
                 topLeft = Offset(centerX - radius * kotlin.math.abs(widthFactor), centerY - radius),
                 size = Size(radius * 2f * kotlin.math.abs(widthFactor), radius * 2f),
                 style = Stroke(width = 1.5f)
@@ -80,7 +153,7 @@ fun WireframeSphere(modifier: Modifier = Modifier) {
             val currentRadius = radius * cos(kotlin.math.asin(i.toFloat() / (latLines + 1)))
 
             drawOval(
-                color = BitColors.TextSecondary.copy(alpha = 0.25f),
+                color = onSurfaceVariantColor.copy(alpha = 0.25f),
                 topLeft = Offset(centerX - currentRadius, centerY + yOffset - (currentRadius * 0.15f)),
                 size = Size(currentRadius * 2f, currentRadius * 0.3f),
                 style = Stroke(width = 1f)
@@ -108,6 +181,8 @@ fun SecureWaveform(modifier: Modifier = Modifier) {
         )
     }
 
+    val onBackgroundColor = MaterialTheme.colorScheme.onBackground
+
     Canvas(modifier = modifier) {
         val width = size.width
         val height = size.height
@@ -129,7 +204,7 @@ fun SecureWaveform(modifier: Modifier = Modifier) {
             val y = (height - barHeight) / 2f
 
             drawRoundRect(
-                color = BitColors.TextPrimary.copy(alpha = 0.15f + 0.7f * phase),
+                color = onBackgroundColor.copy(alpha = 0.15f + 0.7f * phase),
                 topLeft = Offset(x, y),
                 size = Size(barWidth, barHeight),
                 cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
@@ -150,6 +225,9 @@ fun MorphingModelChips(modifier: Modifier = Modifier) {
         ),
         label = "morph"
     )
+
+    val onBackgroundColor = MaterialTheme.colorScheme.onBackground
+    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
 
     Canvas(modifier = modifier) {
         val centerX = size.width / 2f
@@ -172,7 +250,7 @@ fun MorphingModelChips(modifier: Modifier = Modifier) {
             }
 
             val strokeW = if (i == 2) 2.dp.toPx() else 1.dp.toPx()
-            val color = if (i == 2) BitColors.TextPrimary else BitColors.TextSecondary
+            val color = if (i == 2) onBackgroundColor else onSurfaceVariantColor
 
             val w = chipW * scale
             val h = chipH * scale

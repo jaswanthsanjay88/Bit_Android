@@ -143,7 +143,7 @@ internal fun BottomBar(
     val isVlmLoaded by chatViewModel.isVlmLoaded.collectAsStateWithLifecycle()
     val huggingFaceToken by chatViewModel.huggingFaceToken.collectAsStateWithLifecycle()
 
-    var isPlusExpanded by remember { mutableStateOf(false) }
+    var showAttachmentSheet by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var attachedFiles by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
@@ -152,7 +152,7 @@ internal fun BottomBar(
     ) { uri: Uri? ->
         uri?.let {
             attachedImages = attachedImages + it
-            isPlusExpanded = false
+            showAttachmentSheet = false
         }
     }
 
@@ -161,7 +161,7 @@ internal fun BottomBar(
     ) { uri: Uri? ->
         uri?.let {
             attachedFiles = attachedFiles + it
-            isPlusExpanded = false
+            showAttachmentSheet = false
         }
     }
 
@@ -230,6 +230,44 @@ internal fun BottomBar(
         onDismiss = { memoryViewModel.dismissMemoryOverlay() },
         onMemoryEnabledChange = { memoryViewModel.setMemoryEnabled(it) },
         onRefreshStats = { memoryViewModel.refreshStats() }
+    )
+
+    // Add Attachment Sheet
+    AddAttachmentBottomSheet(
+        show = showAttachmentSheet,
+        onDismiss = { showAttachmentSheet = false },
+        onModelClick = {
+            if (config.showModelList) chatViewModel.hideModelList() else chatViewModel.showModelList()
+            showAttachmentSheet = false
+        },
+        onGalleryClick = {
+            galleryLauncher.launch("image/*")
+            showAttachmentSheet = false
+        },
+        onFilesClick = {
+            fileLauncher.launch("*/*")
+            showAttachmentSheet = false
+        },
+        toolCallingEnabled = toolCallingEnabled,
+        isWebSearchEnabled = isWebSearchEnabled,
+        onWebSearchToggle = { pluginViewModel.toggleWebSearch(it) },
+        isMemoryEnabled = isMemoryEnabled,
+        onMemoryClick = {
+            memoryViewModel.toggleMemoryOverlay()
+            showAttachmentSheet = false
+        },
+        isRagEnabled = isRagEnabledForChat,
+        onRagClick = {
+            ragViewModel.toggleRagForChat(!isRagEnabledForChat)
+            showAttachmentSheet = false
+        },
+        activePluginCount = enabledPluginNames.count { it != "Web Search" },
+        onPluginClick = {
+            pluginViewModel.showPluginOverlay()
+            showAttachmentSheet = false
+        },
+        isThinkingEnabled = chatState.thinkingEnabled,
+        onThinkingToggle = { chatViewModel.setThinkingMode(it) }
     )
 
     Column(
@@ -305,73 +343,6 @@ internal fun BottomBar(
                     .padding(top = Standards.SpacingSm, bottom = Standards.SpacingMd)
             ) {
 
-                // ── Centered Feature Toggle Chips (Icon Only, No Scroll) ──
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = Standards.SpacingSm),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Web Search chip
-                    if (toolCallingEnabled) {
-                        GlassChip(
-                            text = "",
-                            icon = TnIcons.World,
-                            isActive = isWebSearchEnabled,
-                            activeColor = Glass.AccentSecondary,
-                            onClick = { pluginViewModel.toggleWebSearch(!isWebSearchEnabled) }
-                        )
-                    }
-
-                    // RAG chip
-                    GlassChip(
-                        text = "",
-                        icon = TnIcons.Database,
-                        isActive = isRagEnabledForChat && loadedRags.isNotEmpty(),
-                        activeColor = Glass.AccentTertiary,
-                        onClick = {
-                            if (loadedRags.isEmpty()) {
-                                context.startActivity(Intent(context, RagActivity::class.java))
-                            } else {
-                                ragViewModel.toggleRagForChat(!isRagEnabledForChat)
-                            }
-                        }
-                    )
-
-                    // Plugins chip
-                    if (toolCallingEnabled && nonWebSearchPlugins.isNotEmpty()) {
-                        val activePluginCount = enabledPluginNames.count { it != "Web Search" }
-                        GlassChip(
-                            text = "",
-                            icon = TnIcons.Wrench,
-                            isActive = activePluginCount > 0,
-                            activeColor = Glass.AccentPrimary,
-                            onClick = { pluginViewModel.showPluginOverlay() }
-                        )
-                    }
-
-                    // Memory chip
-                    GlassChip(
-                        text = "",
-                        icon = TnIcons.Brain,
-                        isActive = isMemoryEnabled,
-                        activeColor = Glass.AccentWarm,
-                        onClick = { memoryViewModel.toggleMemoryOverlay() }
-                    )
-
-                    // Thinking mode chip
-                    if (isTextModelLoaded) {
-                        GlassChip(
-                            text = "",
-                            icon = TnIcons.BulbFilled,
-                            isActive = chatState.thinkingEnabled,
-                            activeColor = Glass.AccentWarm,
-                            onClick = { chatViewModel.setThinkingMode(!chatState.thinkingEnabled) }
-                        )
-                    }
-                }
-
                 // ── Edit prompt banner ──
                 AnimatedVisibility(visible = promptEditState != null) {
                     Row(
@@ -424,89 +395,19 @@ internal fun BottomBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-                    ) {
                         ActionButton(
                             onClickListener = {
-                                if (isVlmLoaded) {
-                                    isPlusExpanded = !isPlusExpanded
-                                } else {
-                                    if (config.showModelList) {
-                                        chatViewModel.hideModelList()
-                                    } else {
-                                        chatViewModel.showModelList()
-                                    }
-                                }
+                                showAttachmentSheet = true
                             },
-                            icon = if (isVlmLoaded && isPlusExpanded) TnIcons.X else TnIcons.Plus,
+                            icon = TnIcons.Plus,
                             contentDescription = "Expand Options",
                             modifier = Modifier.size(44.dp),
+                            shape = CircleShape,
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = Color(0x22FFFFFF), // 13% transparent white circle
                                 contentColor = Glass.AccentPrimary
                             )
                         )
-
-                        AnimatedVisibility(
-                            visible = isVlmLoaded && isPlusExpanded,
-                            enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
-                            exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut()
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // 1. Models
-                                ActionButton(
-                                    onClickListener = {
-                                        isPlusExpanded = false
-                                        if (config.showModelList) {
-                                            chatViewModel.hideModelList()
-                                        } else {
-                                            chatViewModel.showModelList()
-                                        }
-                                    },
-                                    icon = TnIcons.BrainCircuit,
-                                    contentDescription = "Select Models",
-                                    modifier = Modifier.size(40.dp),
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = Color(0x1AFFFFFF),
-                                        contentColor = Glass.TextPrimary
-                                    )
-                                )
-
-                                // 2. Gallery
-                                ActionButton(
-                                    onClickListener = {
-                                        galleryLauncher.launch("image/*")
-                                    },
-                                    icon = TnIcons.Photo,
-                                    contentDescription = "Gallery",
-                                    modifier = Modifier.size(40.dp),
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = Color(0x1AFFFFFF),
-                                        contentColor = Glass.TextPrimary
-                                    )
-                                )
-
-                                // 3. Files
-                                ActionButton(
-                                    onClickListener = {
-                                        fileLauncher.launch("*/*")
-                                    },
-                                    icon = TnIcons.Folder,
-                                    contentDescription = "Files",
-                                    modifier = Modifier.size(40.dp),
-                                    colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = Color(0x1AFFFFFF),
-                                        contentColor = Glass.TextPrimary
-                                    )
-                                )
-                            }
-                        }
-                    }
 
                     // Capsule Input Bar
                     Row(
@@ -738,15 +639,15 @@ internal fun BottomBar(
 
                             // Waveform Mode or Send circular button
                             if (chatState.isGenerating) {
-                                // Generating stop button - White circle with Black stop square
+                                // Generating stop button - Error container red circle with red/white stop square
                                 ActionButton(
                                     onClickListener = { chatViewModel.stop() },
                                     icon = TnIcons.PlayerStop,
                                     contentDescription = "Stop generation",
                                     modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.filledIconButtonColors(
-                                        containerColor = Color.White,
-                                        contentColor = Color.Black
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
                                     )
                                 )
                             } else {
@@ -934,4 +835,117 @@ private fun EqualizerBars(
             )
         }
     }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun AddAttachmentBottomSheet(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    onModelClick: () -> Unit,
+    onGalleryClick: () -> Unit,
+    onFilesClick: () -> Unit,
+    toolCallingEnabled: Boolean,
+    isWebSearchEnabled: Boolean,
+    onWebSearchToggle: (Boolean) -> Unit,
+    isMemoryEnabled: Boolean,
+    onMemoryClick: () -> Unit,
+    isRagEnabled: Boolean,
+    onRagClick: () -> Unit,
+    activePluginCount: Int,
+    onPluginClick: () -> Unit,
+    isThinkingEnabled: Boolean,
+    onThinkingToggle: (Boolean) -> Unit
+) {
+    if (show) {
+        androidx.compose.material3.ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh
+        ) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).padding(bottom = 32.dp)) {
+                // Header row: X + centered title
+                Box(Modifier.fillMaxWidth()) {
+                    androidx.compose.material3.IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart)) {
+                        Icon(TnIcons.X, null, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+                    }
+                    Text("Add to chat", modifier = Modifier.align(Alignment.Center), style = androidx.compose.material3.MaterialTheme.typography.titleMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // Zone 1: instant-action grid
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    GridActionButton(icon = TnIcons.Photo, label = "Photos", onClick = onGalleryClick)
+                    GridActionButton(icon = TnIcons.Folder, label = "Files", onClick = onFilesClick)
+                    GridActionButton(icon = TnIcons.BrainCircuit, label = "Models", onClick = onModelClick)
+                }
+
+                Spacer(Modifier.height(16.dp))
+                androidx.compose.material3.HorizontalDivider(color = androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant)
+                Spacer(Modifier.height(8.dp))
+
+                // Zone 2: persistent toggles
+                if (toolCallingEnabled) {
+                    ToggleRow(icon = TnIcons.World, title = "Web search", checked = isWebSearchEnabled, onCheckedChange = onWebSearchToggle)
+                }
+                ToggleRow(icon = TnIcons.Database, title = "Connectors", subtitle = if (isRagEnabled) "On" else "Off", onClick = onRagClick)
+                if (toolCallingEnabled) {
+                    ToggleRow(icon = TnIcons.Wrench, title = "Tool access", subtitle = if (activePluginCount > 0) "$activePluginCount active" else "Auto", onClick = onPluginClick)
+                }
+                ToggleRow(icon = TnIcons.Brain, title = "Memory", subtitle = if (isMemoryEnabled) "On" else "Off", onClick = onMemoryClick)
+                ToggleRow(icon = TnIcons.BulbFilled, title = "Reasoning", checked = isThinkingEnabled, onCheckedChange = onThinkingToggle)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GridActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        androidx.compose.material3.Surface(
+            onClick = onClick,
+            shape = androidx.compose.foundation.shape.CircleShape,
+            color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHighest,
+            modifier = Modifier.size(48.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(24.dp), tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(text = label, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    checked: Boolean? = null,
+    onCheckedChange: ((Boolean) -> Unit)? = null,
+    subtitle: String? = null,
+    onClick: (() -> Unit)? = null
+) {
+    androidx.compose.material3.ListItem(
+        modifier = if (onClick != null) Modifier.clickable { onClick() } else Modifier,
+        leadingContent = {
+            Icon(imageVector = icon, contentDescription = title, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+        },
+        headlineContent = {
+            Text(text = title, style = androidx.compose.material3.MaterialTheme.typography.bodyLarge, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurface)
+        },
+        trailingContent = {
+            if (checked != null && onCheckedChange != null) {
+                androidx.compose.material3.Switch(checked = checked, onCheckedChange = onCheckedChange)
+            } else if (subtitle != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(text = subtitle, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(imageVector = TnIcons.ChevronRight, contentDescription = null, tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                }
+            }
+        },
+        colors = androidx.compose.material3.ListItemDefaults.colors(
+            containerColor = Color.Transparent
+        )
+    )
 }

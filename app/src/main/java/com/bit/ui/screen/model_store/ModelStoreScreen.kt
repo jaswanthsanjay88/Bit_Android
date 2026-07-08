@@ -36,6 +36,14 @@ import com.bit.ui.theme.Motion
 import com.bit.viewmodel.ModelStoreViewModel
 import com.bit.ui.icons.TnIcons
 
+import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+
 enum class StoreTab {
     MODELS, INSTALLED, PROVIDERS, ADVANCED
 }
@@ -85,24 +93,48 @@ fun ModelStoreScreen(
                             )
                         },
                         navigationIcon = {
-                            ActionButton(
-                                onClickListener = onNavigateBack,
-                                icon = TnIcons.ArrowLeft,
-                                contentDescription = "Back"
-                            )
+                            FilledTonalIconButton(
+                                onClick = onNavigateBack,
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.ArrowLeft,
+                                    contentDescription = "Back",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         },
                         actions = {
                             if (selectedTab == StoreTab.MODELS) {
-                                ActionButton(
-                                    onClickListener = { viewModel.refreshModels() },
-                                    icon = TnIcons.Refresh,
-                                    contentDescription = "Refresh"
-                                )
-                                ActionButton(
-                                    onClickListener = { showSearch = true },
-                                    icon = TnIcons.Search,
-                                    contentDescription = "Search"
-                                )
+                                Row {
+                                    FilledTonalIconButton(
+                                        onClick = { viewModel.refreshModels() },
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = TnIcons.Refresh,
+                                            contentDescription = "Refresh",
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    FilledTonalIconButton(
+                                        onClick = { showSearch = true },
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = TnIcons.Search,
+                                            contentDescription = "Search",
+                                            tint = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
@@ -118,19 +150,11 @@ fun ModelStoreScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Material 3 Standard TabRow
-            TabRow(
+            // Material 3 SecondaryTabRow
+            SecondaryTabRow(
                 selectedTabIndex = selectedTab.ordinal,
                 containerColor = MaterialTheme.colorScheme.background,
-                contentColor = MaterialTheme.colorScheme.primary,
-                indicator = { tabPositions ->
-                    if (selectedTab.ordinal < tabPositions.size) {
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab.ordinal]),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
+                contentColor = MaterialTheme.colorScheme.primary
             ) {
                 Tab(
                     selected = selectedTab == StoreTab.MODELS,
