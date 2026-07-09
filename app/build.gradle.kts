@@ -19,12 +19,21 @@ android {
         applicationId = "com.bit"
         minSdk = 29
         targetSdk = 36
-        versionCode = 30
-        versionName = "2.0.3"
+        versionCode = 31
+        versionName = "1.0.2"
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
         buildConfigField("String", "ALIAS", getProperty("ALIAS"))
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = true
+        }
     }
 
     androidResources {
@@ -35,6 +44,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

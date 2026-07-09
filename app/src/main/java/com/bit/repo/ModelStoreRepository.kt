@@ -339,22 +339,7 @@ class ModelStoreRepository(private val context: Context) {
             )
         )
 
-        models.add(
-            HuggingFaceModel(
-                id = "kokoro-multi-lang-v1_0",
-                name = "Kokoro v1.0 (Multi-Language 82M)",
-                description = "Frontier-class Kokoro TTS engine: 53 voices, 24kHz, extremely natural offline speech synthesis",
-                fileUri = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2",
-                approximateSize = "340 MB",
-                modelType = ModelType.TTS,
-                isZip = false,
-                runOnCpu = true,
-                textEmbeddingSize = 0,
-                tags = listOf("TTS", "English", "Chinese", "Kokoro", "sherpa-onnx"),
-                requiresNPU = false,
-                repositoryUrl = "csukuangfj/kokoro-multi-lang-v1_0"
-            )
-        )
+
 
         // 2. Scan enabled TTS repositories
         repositories.forEach { repo ->

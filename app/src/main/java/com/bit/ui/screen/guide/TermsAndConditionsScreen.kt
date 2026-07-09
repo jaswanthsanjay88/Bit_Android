@@ -386,7 +386,7 @@ fun TermsAndConditionsScreen(
                         For questions about these Terms and Conditions, please contact:
 
                         Email: jaswanthsanjay88@gmail.com
-                        GitHub: https://github.com/jaswanthsanjay88/BIT
+                        GitHub: https://github.com/jaswanthsanjay88/BIT_Android
                         Terms Version: 2.0
                         Last Updated: February 2026
                     """.trimIndent()

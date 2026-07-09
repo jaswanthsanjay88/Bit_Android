@@ -6,7 +6,7 @@ BIT is built across multiple repositories. Here's how they fit together.
 
 ## Project Ecosystem
 
-### [BIT](https://github.com/jaswanthsanjay88/BIT)
+### [BIT](https://github.com/jaswanthsanjay88/BIT_Android)
 The main Android app. UI, chat engine, RAG pipeline, plugin system, AI memory, backup/restore — everything the user interacts with.
 
 ---
@@ -34,7 +34,7 @@ BIT (app)
 
 Contributions are welcome across all three repos. If you're working on:
 
-- **UI, chat, plugins, RAG, memory** — contribute to [BIT](https://github.com/jaswanthsanjay88/BIT)
+- **UI, chat, plugins, RAG, memory** — contribute to [BIT](https://github.com/jaswanthsanjay88/BIT_Android)
 - **Inference performance, model loading, native crashes** — contribute to [Ai-Systems-New](https://github.com/jaswanthsanjay88/Ai-Systems-New) or [llama.cpp-android](https://github.com/jaswanthsanjay88/llama.cpp-android)
 
 See the main [README](README.md) for contribution guidelines.

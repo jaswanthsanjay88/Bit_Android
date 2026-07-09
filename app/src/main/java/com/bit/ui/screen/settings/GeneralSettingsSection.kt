@@ -639,7 +639,7 @@ internal fun LazyListScope.aboutSection(appVersion: String) {
                 icon = androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = com.bit.R.drawable.ic_github),
                 onClick = {
                     haptics.selection()
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/jaswanthsanjay88/BIT")))
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/jaswanthsanjay88/BIT_Android")))
                 }
             )
 
@@ -649,7 +649,7 @@ internal fun LazyListScope.aboutSection(appVersion: String) {
                 icon = TnIcons.AlertCircle,
                 onClick = {
                     haptics.selection()
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/jaswanthsanjay88/BIT/issues")))
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/jaswanthsanjay88/BIT_Android/issues")))
                 }
             )
         }

@@ -31,7 +31,6 @@ import kotlinx.serialization.json.Json
 enum class SetupOption {
     TEXT,
     TEXT_RECOMMENDED,
-    TEXT_TTS,
     IMAGE_GEN,
     POWER_MODE
 }
@@ -93,20 +92,6 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         repositoryUrl = "unsloth/Llama-3.2-3B-Instruct-GGUF"
     )
 
-    private val ttsModel = HuggingFaceModel(
-        id = "kokoro-multi-lang-v1_0",
-        name = "Kokoro v1.0 (TTS)",
-        description = "Frontier-class Kokoro speech synthesis model (24kHz, 53 voices)",
-        fileUri = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2",
-        approximateSize = "340 MB",
-        modelType = ModelType.TTS,
-        isZip = false,
-        runOnCpu = true,
-        textEmbeddingSize = 0,
-        tags = listOf("TTS", "Kokoro", "sherpa-onnx"),
-        requiresNPU = false,
-        repositoryUrl = "csukuangfj/kokoro-multi-lang-v1_0"
-    )
 
     private fun getImageModel(): HuggingFaceModel {
         val isQualcomm = modelStoreRepository.isQualcommDevice()
@@ -208,14 +193,6 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         val recommendedModel = recommendedTextModel.value
 
         when {
-            currentStates.containsKey(recommendedModel.id) && currentStates.containsKey(ttsModel.id) -> {
-                _selectedOption.value = SetupOption.TEXT_TTS
-                _primaryModelId.value = recommendedModel.id
-            }
-            currentStates.containsKey(llama1bModel.id) && currentStates.containsKey(ttsModel.id) -> {
-                _selectedOption.value = SetupOption.TEXT_TTS
-                _primaryModelId.value = llama1bModel.id
-            }
             currentStates.containsKey(llama1bModel.id) -> {
                 _selectedOption.value = SetupOption.TEXT
                 _primaryModelId.value = llama1bModel.id
@@ -249,11 +226,7 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
                 _primaryModelId.value = model.id
                 downloadModel(model)
             }
-            SetupOption.TEXT_TTS -> {
-                _primaryModelId.value = llama1bModel.id
-                downloadModel(llama1bModel)
-                downloadModel(ttsModel)
-            }
+
             SetupOption.IMAGE_GEN -> {
                 val imageModel = getImageModel()
                 _primaryModelId.value = imageModel.id

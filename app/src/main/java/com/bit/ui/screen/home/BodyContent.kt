@@ -244,11 +244,11 @@ fun BodyContent(
 
             LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.statusBars),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
-                    top = 56.dp + Standards.SpacingSm,
+                    top = 80.dp + with(androidx.compose.ui.platform.LocalDensity.current) {
+                        WindowInsets.statusBars.getTop(this).toDp()
+                    },
                     bottom = Standards.SpacingSm
                 ),
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)

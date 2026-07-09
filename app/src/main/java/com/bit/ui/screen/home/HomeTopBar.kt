@@ -112,22 +112,6 @@ internal fun TopBar(
                 )
             }
         },
-        modifier = Modifier
-            .statusBarsPadding()
-            .then(
-                if (hazeState != null) {
-                    Modifier.hazeEffect(state = hazeState) {
-                        style = dev.chrisbanes.haze.HazeStyle(
-                            backgroundColor = background,
-                            tint = dev.chrisbanes.haze.HazeTint(Color.Black.copy(alpha = 0.25f)),
-                            blurRadius = 24.dp,
-                            noiseFactor = 0.05f
-                        )
-                        progressive = dev.chrisbanes.haze.HazeProgressive.verticalGradient(
-                            androidx.compose.animation.core.EaseIn, 1f, 0f, 0f, 1f
-                        )
-                    }
-                } else Modifier
-            )
+        modifier = Modifier.statusBarsPadding()
     )
 }

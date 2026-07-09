@@ -81,14 +81,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 isEnabled = true,
                 category = ModelCategory.GENERAL
             ),
-            HFModelRepository(
-                id = "kokoro-multi-lang-v1_0",
-                name = "Kokoro TTS (TTS)",
-                repoPath = "csukuangfj/kokoro-multi-lang-v1_0",
-                modelType = ModelType.TTS,
-                isEnabled = true,
-                category = ModelCategory.GENERAL
-            ),
+
             HFModelRepository(
                 id = "sherpa-whisper-tiny",
                 name = "Whisper Tiny (STT)",

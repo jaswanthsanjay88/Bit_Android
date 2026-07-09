@@ -409,12 +409,7 @@ private fun ModelPickerContent(
             ))
         }
         
-        list.add(PickerItem(
-            SetupOption.TEXT_TTS,
-            "Llama + Kokoro Speech",
-            "980 MB",
-            "Generative chat with state-of-the-art local text-to-speech."
-        ))
+
 
         list.add(PickerItem(
             SetupOption.POWER_MODE,

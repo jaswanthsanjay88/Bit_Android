@@ -2,19 +2,10 @@
 
 **Offline AI assistant for Android.** Run LLMs, generate images, search documents — all on-device. No cloud. No subscriptions. No data leaves your phone.
 
-[![Platform](https://img.shields.io/badge/Platform-Android_12%2B-3DDC84?logo=android&logoColor=white)](https://github.com/jaswanthsanjay88/BIT)
+[![Platform](https://img.shields.io/badge/Platform-Android_12%2B-3DDC84?logo=android&logoColor=white)](https://github.com/jaswanthsanjay88/BIT_Android)
 [![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/mVPwHDhrAP)
 
-<p align="left">
-  <a href="https://play.google.com/store/apps/details?id=com.bit">
-    <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png"
-         alt="Get it on Google Play"
-         height="80"/>
-  </a>
-</p>
-
-[Download APK](https://github.com/jaswanthsanjay88/BIT/releases) · [Discord](https://discord.gg/mVPwHDhrAP) · [Report Issue](https://github.com/jaswanthsanjay88/BIT/issues)
+[Download APK](https://github.com/jaswanthsanjay88/BIT_Android/releases) · [Report Issue](https://github.com/jaswanthsanjay88/BIT_Android/issues)
 
 ---
 
@@ -24,7 +15,7 @@
 - **Image generation** — Stable Diffusion 1.5 on-device, with inpainting support
 - **Image tools** — Upscale and segment images locally (depth, style transfer, inpainting coming soon)
 - **RAG** — Inject PDFs, Word docs, Excel, EPUB into conversations with semantic search
-- **Plugins** — Web search, file manager, calculator, notepad, date/time, system info, dev utils — all callable by the LLM
+- **Tool Calls** — On-device tool calls allowing the LLM to perform actions, explained in detail inside the Application
 - **AI memory** — The AI remembers facts about you across conversations, with deduplication and a forgetting curve
 - **Text-to-speech** — 10 voices, 5 languages, on-device synthesis
 - **Encrypted storage** — AES-256-GCM with hardware-backed keys for all chat data
@@ -47,7 +38,7 @@
 
 ### 1. Install
 
-[Google Play](https://play.google.com/store/apps/details?id=com.bit) or [GitHub Releases](https://github.com/jaswanthsanjay88/BIT/releases).
+[GitHub Releases](https://github.com/jaswanthsanjay88/BIT_Android/releases).
 
 ### 2. Get a model
 
@@ -110,18 +101,8 @@ The RAG pipeline uses hybrid retrieval: FTS4 BM25 + vector search + Reciprocal R
 
 Encrypted RAGs support admin passwords and read-only user access.
 
-### Plugin System
-7 built-in plugins the LLM can call during conversations:
-
-| Plugin | What it does |
-|--------|-------------|
-| **Web Search** | Search the web and scrape content |
-| **File Manager** | List, read, create files |
-| **Calculator** | Math expressions and unit conversion |
-| **Notepad** | Save and retrieve notes |
-| **Date & Time** | Current time, timezone conversion, date math |
-| **System Info** | RAM, battery, storage, device details |
-| **Dev Utils** | Hash, encode, format, text transforms |
+### Tool Calling
+The LLM can execute on-device tool calls during conversations. All tools and their functionalities are explained in detail inside the Application.
 
 ### AI Memory
 Inspired by [Mem0](https://github.com/mem0ai/mem0). After conversations, the LLM extracts facts about you and stores them for future context. Deduplication via Jaccard similarity, with a forgetting curve so stale memories decay. You can view, edit, and delete memories from the Memory screen.
@@ -160,8 +141,8 @@ Export everything to an encrypted `.tnbackup` file (PBKDF2 + AES-256-GCM):
 ### Build
 
 ```bash
-git clone https://github.com/jaswanthsanjay88/BIT.git
-cd BIT
+git clone https://github.com/jaswanthsanjay88/BIT_Android.git
+cd BIT_Android
 
 # Debug
 ./gradlew assembleDebug
@@ -257,10 +238,10 @@ If you find a security vulnerability:
 
 ## License
 
-[Apache License 2.0](LICENSE) — use it, modify it, distribute it. Attribution appreciated.
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file or [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) for details.
 
 ---
 
 Built by [Jaswanth Sanjay](https://github.com/jaswanthsanjay88)
 
-[Star the repo](https://github.com/jaswanthsanjay88/BIT) · [Report a bug](https://github.com/jaswanthsanjay88/BIT/issues) · [Join Discord](https://discord.gg/mVPwHDhrAP)
+[Star the repo](https://github.com/jaswanthsanjay88/BIT_Android) · [Report a bug](https://github.com/jaswanthsanjay88/BIT_Android/issues)

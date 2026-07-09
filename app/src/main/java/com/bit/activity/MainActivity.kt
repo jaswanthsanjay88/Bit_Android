@@ -237,7 +237,10 @@ fun AppNavigation(
 
             // ============ ONBOARDING SCREENS ============
 
-            composable(Screen.Intro.route) {
+            composable(
+                route = Screen.Intro.route,
+                exitTransition = { fadeOut(animationSpec = tween(150)) }
+            ) {
                 com.bit.ui.screen.intro.IntroScreen(
                     innerPadding = PaddingValues(0.dp),
                     sharedTransitionScope = this@SharedTransitionLayout,

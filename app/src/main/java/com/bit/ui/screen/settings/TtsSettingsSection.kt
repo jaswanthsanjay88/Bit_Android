@@ -67,13 +67,7 @@ internal val AVAILABLE_TTS_MODELS = listOf(
         size = "~28 MB",
         url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2"
     ),
-    TtsModelInfo(
-        id = "kokoro-multi-lang-v1_0",
-        name = "Kokoro v1.0 (Multi-Language)",
-        description = "Kokoro 82M multilingual text-to-speech engine",
-        size = "~84 MB",
-        url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2"
-    )
+
 )
 
 // ── TTS Settings Section ──
@@ -366,21 +360,7 @@ data class VoiceInfo(
 
 private fun getVoiceInfo(modelId: String?, voiceId: String): VoiceInfo {
     return when (modelId) {
-        "kokoro-multi-lang-v1_0" -> {
-            when (voiceId) {
-                "0" -> VoiceInfo(voiceId, "Bella", "Female", "US")
-                "1" -> VoiceInfo(voiceId, "Sarah", "Female", "US")
-                "2" -> VoiceInfo(voiceId, "Nicole", "Female", "US")
-                "3" -> VoiceInfo(voiceId, "Sky", "Female", "US")
-                "4" -> VoiceInfo(voiceId, "Adam", "Male", "US")
-                "5" -> VoiceInfo(voiceId, "Michael", "Male", "US")
-                "6" -> VoiceInfo(voiceId, "Emma", "Female", "UK")
-                "7" -> VoiceInfo(voiceId, "Isabella", "Female", "UK")
-                "8" -> VoiceInfo(voiceId, "George", "Male", "UK")
-                "9" -> VoiceInfo(voiceId, "Lewis", "Male", "UK")
-                else -> VoiceInfo(voiceId, "Speaker $voiceId", "Female", "US")
-            }
-        }
+
         "vits-ljs-tts" -> {
             if (voiceId == "0") VoiceInfo(voiceId, "LJSpeech", "Female", "US")
             else VoiceInfo(voiceId, "Speaker $voiceId", "Female", "US")

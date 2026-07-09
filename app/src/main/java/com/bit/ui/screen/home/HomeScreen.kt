@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.material3.MaterialTheme
@@ -160,17 +162,6 @@ fun HomeScreen(
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.fillMaxSize(),
-                    topBar = {
-                        TopBar(
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedVisibilityScope = animatedVisibilityScope,
-                            onStoreButtonClicked = onStoreButtonClicked,
-                            onMenuClick = { drawerState.toggle() },
-                            onSettingsClick = onSettingsClick,
-                            showDynamicWindow = { chatViewModel.showDynamicWindow() },
-                            hazeState = hazeState
-                        )
-                    },
                     bottomBar = {
                         BottomBar(
                             chatViewModel = chatViewModel,
@@ -181,14 +172,38 @@ fun HomeScreen(
                             hazeState = hazeState
                         )
                     }) { paddingValues ->
-                    BodyContent(
-                        paddingValues = paddingValues,
-                        chatViewModel = chatViewModel,
-                        llmModelViewModel = llmModelViewModel,
-                        liquidState = liquidState,
-                        hazeState = hazeState,
-                        onModelSelectedNavigate = onModelSelectedNavigate
-                    )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        BodyContent(
+                            paddingValues = paddingValues,
+                            chatViewModel = chatViewModel,
+                            llmModelViewModel = llmModelViewModel,
+                            liquidState = liquidState,
+                            hazeState = hazeState,
+                            onModelSelectedNavigate = onModelSelectedNavigate
+                        )
+
+                        // Top Blur Scrim: dynamic progressive vertical blur zone
+                        com.bit.ui.components.TopBlurScrim(
+                            hazeState = hazeState,
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            height = 100.dp + with(LocalDensity.current) {
+                                WindowInsets.statusBars.getTop(this).toDp()
+                            },
+                            blurRadius = 26.dp,
+                            tintColor = Color.Black,
+                            tintAlpha = 0.55f
+                        )
+
+                        // Top bar floats on top
+                        TopBar(
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            onStoreButtonClicked = onStoreButtonClicked,
+                            onMenuClick = { drawerState.toggle() },
+                            onSettingsClick = onSettingsClick,
+                            showDynamicWindow = { chatViewModel.showDynamicWindow() }
+                        )
+                    }
                 }
 
                 // Scrim overlay to intercept input and close when drawer is open
