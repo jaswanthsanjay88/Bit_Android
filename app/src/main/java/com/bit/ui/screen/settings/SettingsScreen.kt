@@ -78,6 +78,7 @@ fun SettingsScreen(
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var editorModel by remember { mutableStateOf<com.bit.models.table_schema.Model?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showCredits by remember { mutableStateOf(false) }
 
     // Intercept back actions to go back to category list first
     BackHandler {
@@ -350,7 +351,10 @@ fun SettingsScreen(
                     }
                     "about" -> {
                         // ── About ──
-                        aboutSection(appVersion = viewModel.appVersion)
+                        aboutSection(
+                            appVersion = viewModel.appVersion,
+                            onTriggerCredits = { showCredits = true }
+                        )
                     }
                     else -> {
                         // ── Main Dashboard list (Cleaned up Material Design 3 style) ──
@@ -453,6 +457,19 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxSize()
             )
         }
+    }
+
+    if (showCredits) {
+        EndCreditsOverlay(
+            audioResIds = listOf(
+                com.bit.R.raw.credits_song_1,
+                com.bit.R.raw.credits_song_2,
+                com.bit.R.raw.credits_song_3,
+                com.bit.R.raw.credits_song_4
+            ),
+            lines = bitCreditLines,
+            onDismiss = { showCredits = false }
+        )
     }
 }
 

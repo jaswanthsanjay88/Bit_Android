@@ -502,7 +502,7 @@ internal fun LazyListScope.imageGenerationSection(
 
 // ── About Section ──
 
-internal fun LazyListScope.aboutSection(appVersion: String) {
+internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: () -> Unit) {
     // ── Hero Block Card ──
     item {
         val haptics = com.bit.ui.theme.LocalBitHaptics.current
@@ -528,7 +528,7 @@ internal fun LazyListScope.aboutSection(appVersion: String) {
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = TnIcons.Sparkles,
+                            imageVector = com.bit.ui.icons.TnIcons.Sparkles,
                             contentDescription = "App logo",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(32.dp)
@@ -556,17 +556,22 @@ internal fun LazyListScope.aboutSection(appVersion: String) {
                     thickness = 1.dp
                 )
 
-                // Version and Developer rows using M3 ListItem
-                androidx.compose.material3.ListItem(
-                    headlineContent = { Text("Application Version") },
-                    trailingContent = { Text("Version $appVersion", fontWeight = FontWeight.Bold) },
-                    colors = androidx.compose.material3.ListItemDefaults.colors(
-                        containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        headlineColor = Glass.TextPrimary,
-                        supportingColor = Glass.TextSecondary,
-                        trailingIconColor = Glass.TextSecondary
+                // Version and Developer rows using M3 ListItem wrapped in secret easter egg hold trigger
+                HoldToRevealTrigger(
+                    onRevealed = { onTriggerCredits() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    androidx.compose.material3.ListItem(
+                        headlineContent = { Text("Application Version") },
+                        trailingContent = { Text("Version $appVersion", fontWeight = FontWeight.Bold) },
+                        colors = androidx.compose.material3.ListItemDefaults.colors(
+                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                            headlineColor = Glass.TextPrimary,
+                            supportingColor = Glass.TextSecondary,
+                            trailingIconColor = Glass.TextSecondary
+                        )
                     )
-                )
+                }
                 
                 androidx.compose.material3.ListItem(
                     headlineContent = { Text("Developer") },
