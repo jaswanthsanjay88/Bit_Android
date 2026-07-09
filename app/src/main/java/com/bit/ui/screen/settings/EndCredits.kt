@@ -53,11 +53,7 @@ fun EndCreditsOverlay(
 ) {
     val context = LocalContext.current
     var visible by remember { mutableStateOf(true) }
-    val animatedScroll by animateFloatAsState(
-        targetValue = 1f,
-        animationSpec = tween(scrollDurationMs, easing = LinearEasing),
-        label = "creditsScroll"
-    )
+    val animatedScroll = remember { Animatable(0f) }
 
     // Guard to prevent finger release of the trigger long-press from immediately dismissing credits
     var dismissEnabled by remember { mutableStateOf(false) }
@@ -89,6 +85,7 @@ fun EndCreditsOverlay(
     }
 
     LaunchedEffect(Unit) {
+        // Start audio fade-in
         mediaPlayer?.start()
         for (i in 0..10) {
             mediaPlayer?.setVolume(i / 10f, i / 10f)
@@ -96,12 +93,16 @@ fun EndCreditsOverlay(
         }
     }
 
-    // auto-dismiss shortly after the scroll (and song) finishes
-    LaunchedEffect(animatedScroll) {
-        if (animatedScroll >= 0.999f) {
-            delay(800)
-            visible = false
-        }
+    LaunchedEffect(Unit) {
+        // Animate credits scroll
+        animatedScroll.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(scrollDurationMs, easing = LinearEasing)
+        )
+
+        // Once scroll finishes, fade out and dismiss
+        delay(800)
+        visible = false
     }
 
     LaunchedEffect(visible) {
@@ -129,7 +130,7 @@ fun EndCreditsOverlay(
                     }
                 }
         ) {
-            CreditRoll(lines = lines, progress = animatedScroll)
+            CreditRoll(lines = lines, progress = animatedScroll.value)
 
             Icon(
                 imageVector = Icons.Filled.Close,
