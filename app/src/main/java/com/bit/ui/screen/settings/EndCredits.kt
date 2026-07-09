@@ -59,7 +59,19 @@ fun EndCreditsOverlay(
         label = "creditsScroll"
     )
 
-    // Select a random song from the list
+    // Guard to prevent finger release of the trigger long-press from immediately dismissing credits
+    var dismissEnabled by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(1000) // Ignore any dismiss click for the first 1s of credits presentation
+        dismissEnabled = true
+    }
+
+    // Intercept system back button to cleanly close overlay
+    androidx.activity.compose.BackHandler(enabled = visible) {
+        visible = false
+    }
+
     val selectedAudioResId = remember { audioResIds.random() }
 
     // --- audio playback lifecycle ---
@@ -89,6 +101,11 @@ fun EndCreditsOverlay(
         if (animatedScroll >= 0.999f) {
             delay(800)
             visible = false
+        }
+    }
+
+    LaunchedEffect(visible) {
+        if (!visible) {
             delay(500)
             onDismiss()
         }
@@ -107,7 +124,9 @@ fun EndCreditsOverlay(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
-                    visible = false
+                    if (dismissEnabled) {
+                        visible = false
+                    }
                 }
         ) {
             CreditRoll(lines = lines, progress = animatedScroll)
@@ -120,7 +139,11 @@ fun EndCreditsOverlay(
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
                     .padding(20.dp)
-                    .clickable { visible = false }
+                    .clickable {
+                        if (dismissEnabled) {
+                            visible = false
+                        }
+                    }
             )
         }
     }
@@ -194,16 +217,23 @@ fun HoldToRevealTrigger(
     val progress = remember { Animatable(0f) }
     val haptic = LocalHapticFeedback.current
 
+    var hasTriggered by remember { mutableStateOf(false) }
+
     LaunchedEffect(isHolding) {
         if (isHolding) {
+            hasTriggered = false
             progress.snapTo(0f)
             progress.animateTo(1f, tween(holdDurationMs, easing = LinearEasing))
             if (progress.value >= 1f) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onRevealed()
+                hasTriggered = true
             }
         } else {
             progress.stop()
+            if (hasTriggered) {
+                onRevealed()
+                hasTriggered = false
+            }
             progress.animateTo(0f, tween(200))
         }
     }
