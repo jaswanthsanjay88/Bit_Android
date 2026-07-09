@@ -1,247 +1,104 @@
-# BIT
+# BIT — Android Offline AI Client Powered by llama.kt
 
-**Offline AI assistant for Android.** Run LLMs, generate images, search documents — all on-device. No cloud. No subscriptions. No data leaves your phone.
-
-[![Platform](https://img.shields.io/badge/Platform-Android_12%2B-3DDC84?logo=android&logoColor=white)](https://github.com/jaswanthsanjay88/BIT_Android)
-[![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](LICENSE)
-
-[Download APK](https://github.com/jaswanthsanjay88/BIT_Android/releases) · [Report Issue](https://github.com/jaswanthsanjay88/BIT_Android/issues)
+BIT is a fully offline, privacy-first AI assistant client for Android. Built entirely on top of the llama.kt SDK, BIT enables running Large Language Models (LLMs), Vision-Language Models (VLMs), on-device image generation, text-to-speech, and secure local Document Retrieval (RAG) without external servers, subscriptions, or data leaving the device.
 
 ---
 
-## What It Does
+## Powered by the llama.kt SDK
 
-- **Text generation** — Load any GGUF model (Llama, Mistral, Gemma, Phi, Qwen, etc.) and chat with it locally
-- **Image generation** — Stable Diffusion 1.5 on-device, with inpainting support
-- **Image tools** — Upscale and segment images locally (depth, style transfer, inpainting coming soon)
-- **RAG** — Inject PDFs, Word docs, Excel, EPUB into conversations with semantic search
-- **Tool Calls** — On-device tool calls allowing the LLM to perform actions, explained in detail inside the Application
-- **AI memory** — The AI remembers facts about you across conversations, with deduplication and a forgetting curve
-- **Text-to-speech** — 10 voices, 5 languages, on-device synthesis
-- **Encrypted storage** — AES-256-GCM with hardware-backed keys for all chat data
-- **System backup** — Export everything as an encrypted `.tnbackup` file
+At the core of the BIT client is the llama.kt SDK. Located in the llama-kt module, this SDK functions as a unified native bridge between high-performance C++ inference backends and the Android Kotlin runtime. 
+
+The SDK encapsulates:
+- Native llama.cpp Bindings: Custom JNI bindings that execute local inference for GGUF formatted models with optimized memory mappings and low-latency token streaming.
+- Context and KV Cache Management: Programmatic sliding window eviction, prompt estimation, and memory management through native pointers.
+- Multimodal Vision (VLM) Projector Support: Loading clip projectors alongside text models to perform on-device image description and visual understanding.
+- Logit Bias and Custom Mood Samplers: Granular temperature, top-k, top-p, and min-p configuration overrides passed directly to the native sampler stack.
+
+---
+
+## Application Architecture
+
+The project is structured as a modularized Android application to isolate native engine operations from the presentation layer:
+
+- app: The main application module containing the Jetpack Compose user interface, ViewModels, navigation, and application state.
+- llama-kt: The core Kotlin SDK wrapping the native llama.cpp library and JNI bindings.
+- ums: User Management System and secure session management.
+- neuron-packet: Parser and manager for local encrypted RAG packets (.neuron).
+- system_encryptor: Cryptographic utilities utilizing AES-256-GCM backed by the Android Keystore System.
+- file_ops: On-device file management and backup utilities.
+- memory-vault: Storage engine that manages the long-term episodic memory of the assistant.
+
+---
+
+## Key Features
+
+- On-Device Text Generation: Powered by llama.kt, the application runs modern GGUF models (such as Llama, Mistral, Gemma, Phi, Qwen) with native hardware acceleration.
+- Visual Chat (VLM): Analyze images locally by loading clip projector models through the VLM implementation in the SDK.
+- Tool Calling: Local tool execution allowing the LLM to interact with the device (performing system checks, calculations, notepad reads, and local file operations). Detailed tools and parameters are defined and explained inside the Application.
+- On-Device Image Generation: Build images using Stable Diffusion 1.5 with support for inpainting and local upscaling.
+- Document RAG: Query local PDF, Word, Excel, EPUB, and TXT files using hybrid retrieval (vector search combined with FTS4 BM25).
+- Long-Term AI Memory: Episodic memory extraction and storage with decay curves, allowing the assistant to retain facts across chat sessions.
+- On-Device Text-to-Speech: Native speech synthesis using ONNX Runtime with multiple voices and language configurations.
+- Secure Backups: Encrypt and export chat history, memories, and model settings to a local .tnbackup file.
 
 ---
 
 ## Requirements
 
-| | Minimum | Recommended |
-|---|---------|-------------|
-| **Android** | 10 (API 29) | 12+ |
-| **RAM** | 6 GB | 8–12 GB |
-| **Storage** | 4 GB free | 10 GB free |
-| **CPU** | ARM64 or x86_64 | Snapdragon 8 Gen 1+ |
+| Metric | Minimum | Recommended |
+|---|---|---|
+| Android OS | Android 10 (API 29) | Android 12 (API 31) or higher |
+| Device RAM | 6 GB | 8 GB to 12 GB |
+| Free Storage | 4 GB | 10 GB or higher |
+| Processor | ARM64 or x86_64 | Snapdragon 8 Gen 1 or higher |
 
 ---
 
 ## Getting Started
 
-### 1. Install
+### 1. Installation
+Install the application using the pre-compiled APK binaries available in the GitHub Releases section.
 
-[GitHub Releases](https://github.com/jaswanthsanjay88/BIT_Android/releases).
-
-### 2. Get a model
-
-**From the in-app Model Store (recommended):**
-1. Open the drawer menu → Model Store
-2. Add a HuggingFace repository (e.g. `bartowski/Phi-3.5-mini-instruct-GGUF`)
-3. Pick a quantization and download
-
-**Or manually:**
-1. Download a `.gguf` file from [HuggingFace](https://huggingface.co/models?other=gguf)
-2. Use the model picker in BIT to load it
-
-### 3. Chat
-
-Select your model, wait for it to load, start typing. Responses stream in real-time.
-
-### Recommended models for getting started
-
-| Use case | Model | Size |
-|----------|-------|------|
-| Quick test | Qwen3.5 0.8B Q4_K_M | ~600 MB |
-| General use | Qwen3.5 4B Q4_K_M | ~2.8 GB |
-| Power users | Qwen3.5 9B Q4_K_M | ~5.5 GB |
-
-> Pick Q4_K_M for a good balance between quality and size. Use Q6_K if your device has the RAM for it.
+### 2. Loading a Model
+Models can be acquired in two ways:
+- In-App Model Store: Open the drawer menu, go to the Model Store, register a Hugging Face repository, and download a quantized GGUF file.
+- Manual Import: Download a GGUF model manually to your device storage and use the model picker inside the application to reference it.
 
 ---
 
-## Features
+## Build Instructions
 
-### Text Generation
-- Any GGUF model works — load via file picker (no storage permissions needed, uses SAF)
-- Configurable parameters: temperature, top-k, top-p, min-p, repeat penalty, context length
-- Function calling with grammar-constrained JSON output
-- Thinking mode for models that support it
-- Per-model configs saved to database
+To build the project locally, ensure you have the Android SDK, NDK, and CMake installed.
 
-### Image Generation
-- Stable Diffusion 1.5 (censored and uncensored variants)
-- Text-to-image and inpainting
-- Configurable steps, CFG scale, seed, negative prompts, schedulers
-
-### Image Tools
-| Tool | Status |
-|------|--------|
-| Upscaling | Ready |
-| Segmentation (MobileSAM) | Ready |
-| Depth estimation | Model pending |
-| Style transfer | Model pending |
-| LaMa inpainting | Model pending |
-
-### RAG (Document Intelligence)
-Create knowledge bases from:
-- **Files** — PDF, Word (.doc/.docx), Excel (.xls/.xlsx), EPUB, TXT
-- **Text** — Paste any text content
-- **Chat history** — Convert past conversations into searchable knowledge
-- **Neuron Packets** — Import encrypted `.neuron` RAG files
-
-The RAG pipeline uses hybrid retrieval: FTS4 BM25 + vector search + Reciprocal Rank Fusion + Maximal Marginal Relevance. Results are injected into the conversation context automatically.
-
-Encrypted RAGs support admin passwords and read-only user access.
-
-### Tool Calling
-The LLM can execute on-device tool calls during conversations. All tools and their functionalities are explained in detail inside the Application.
-
-### AI Memory
-Inspired by [Mem0](https://github.com/mem0ai/mem0). After conversations, the LLM extracts facts about you and stores them for future context. Deduplication via Jaccard similarity, with a forgetting curve so stale memories decay. You can view, edit, and delete memories from the Memory screen.
-
-### Text-to-Speech
-On-device TTS via Supertonic (ONNX Runtime). 10 voices (5 female, 5 male), 5 languages (EN, KR, ES, PT, FR). Adjustable speed and quality. Auto-speak option reads responses aloud.
-
-### Hardware Tuning
-Auto-detects CPU topology (P-cores, E-cores) and recommends thread count, context size, and cache settings. Three modes: Performance, Balanced, Power Saver.
-
-### System Backup
-Export everything to an encrypted `.tnbackup` file (PBKDF2 + AES-256-GCM):
-- Chat history, AI memories, personas, knowledge graphs
-- Model configs and app settings
-- RAG files and AI models (optional, can be large)
-
----
-
-## Privacy
-
-- **Zero data collection.** No telemetry, no analytics, no crash reporting.
-- **Everything stays on-device.** Conversations, generated images, documents, TTS audio — none of it leaves your phone.
-- **Encrypted storage.** AES-256-GCM with Android KeyStore. On supported devices, keys live in the Trusted Execution Environment.
-- **No storage permissions.** Models load through Android's file picker (SAF). The app can't access arbitrary files.
-- **Open source.** Read the code yourself.
-
----
-
-## Building from Source
-
-### Prerequisites
-- Android Studio Meerkat (2025.1.1)+
-- JDK 17
-- Android SDK 36+, NDK 26.x
-
-### Build
-
+### 1. Clone the Repository
+Clone the repository recursively to fetch the llama.kt submodule:
 ```bash
-git clone https://github.com/jaswanthsanjay88/BIT_Android.git
-cd BIT_Android
+git clone --recursive https://github.com/jaswanthsanjay88/Bit_Android.git
+cd Bit_Android
+```
 
-# Debug
+### 2. Configure Submodules
+If cloned without recursive flags, initialize the submodules manually:
+```bash
+git submodule update --init --recursive
+```
+
+### 3. Build Binaries
+Use the Gradle wrapper to build the application. 
+
+Build a debug package:
+```bash
 ./gradlew assembleDebug
-./gradlew installDebug
+```
 
-# Release
+Build signed release packages:
+```bash
 ./gradlew assembleRelease
 ```
-
-APKs land in `app/build/outputs/apk/`.
-
-If you hit NDK issues, make sure NDK 26.x is installed via SDK Manager. For memory issues during build, bump the Gradle heap in `gradle.properties`:
-
-```properties
-org.gradle.jvmargs=-Xmx4096m
-```
-
----
-
-## Architecture
-
-| Layer | Technology |
-|-------|-----------|
-| Language | Kotlin, C++ (JNI) |
-| UI | Jetpack Compose |
-| Text inference | llama.cpp |
-| Image inference | LocalDream (SD 1.5) |
-| TTS | Supertonic (ONNX Runtime) |
-| Database | Room + UMS (custom binary format) |
-| Encryption | AES-256-GCM, Android KeyStore |
-| DI | Dagger Hilt |
-| Async | Kotlin Coroutines + Flow |
-
-### Modules
-| Module | Purpose |
-|--------|---------|
-| `app` | Main Android application |
-| `ums` | Unified Memory System — binary record storage with JNI |
-| `neuron-packet` | Encrypted RAG packet format with access control |
-| `memory-vault` | Legacy encrypted storage (read-only, used for migration) |
-| `system_encryptor` | Native encryption primitives |
-| `file_ops` | Native file operations |
-
----
-
-## Contributing
-
-See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the project ecosystem and related repos.
-
-### How to contribute
-1. Fork the repo
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Make focused commits with clear messages
-4. **Test on a real device** — emulators don't reflect real performance
-5. Open a PR with a description of what you changed and how you tested it
-
-### Priority areas
-- Bug fixes and stability
-- Device compatibility testing (especially mid-range phones)
-- Performance improvements
-- Documentation and translations
-- New plugins
-
-### What not to do
-- Don't submit untested code
-- Don't add cloud dependencies or telemetry
-- Don't break offline functionality
-- Don't add broad storage permissions
-
----
-
-## Security
-
-If you find a security vulnerability:
-1. **Do not** open a public GitHub issue
-2. Email jaswanthsanjay88@gmail.com
-3. Include reproduction steps
-4. Allow reasonable time for a fix before disclosure
-
----
-
-## Acknowledgments
-
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) — LLM inference engine
-- [LocalDream](https://github.com/xororz/local-dream) — Stable Diffusion on Android
-- [ONNX Runtime](https://onnxruntime.ai/) — TTS inference
-- [Mem0](https://github.com/mem0ai/mem0) — AI memory architecture inspiration
-- [SillyTavern](https://github.com/SillyTavern/SillyTavern) — Character card format reference
-- [Apache POI](https://poi.apache.org/), [PDFBox-Android](https://github.com/TomRoush/PdfBox-Android), [EpubLib](https://github.com/psiegman/epublib) — Document parsing
-- [Jetpack Compose](https://developer.android.com/jetpack/compose), [Room](https://developer.android.com/training/data-storage/room), [Hilt](https://dagger.dev/hilt/), [OkHttp](https://square.github.io/okhttp/), [Coil 3](https://coil-kt.github.io/coil/), [Jsoup](https://jsoup.org/)
+The release build is configured to split compilation outputs by target architecture (Universal, ARM64, and x86_64) to optimize file sizes. The output files are saved in the app/build/outputs/apk/release/ directory.
 
 ---
 
 ## License
 
-This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file or [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) for details.
-
----
-
-Built by [Jaswanth Sanjay](https://github.com/jaswanthsanjay88)
-
-[Star the repo](https://github.com/jaswanthsanjay88/BIT_Android) · [Report a bug](https://github.com/jaswanthsanjay88/BIT_Android/issues)
+This project is licensed under the Apache License 2.0. See the LICENSE file or visit the Apache License 2.0 page (https://www.apache.org/licenses/LICENSE-2.0) for detailed licensing terms.
