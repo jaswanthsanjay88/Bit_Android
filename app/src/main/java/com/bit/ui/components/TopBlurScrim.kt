@@ -3,14 +3,18 @@ package com.bit.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.chrisbanes.haze.HazeProgressive
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeEffect
 
 @Composable
 fun TopBlurScrim(
@@ -26,18 +30,23 @@ fun TopBlurScrim(
             .fillMaxWidth()
             .height(height)
     ) {
-        // Layer 1: The dynamic progressive vertical blur and tint under a single shader
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                 .hazeEffect(state = hazeState) {
                     style = HazeStyle(
                         tint = HazeTint(tintColor.copy(alpha = tintAlpha)),
                         blurRadius = blurRadius
                     )
-                    progressive = HazeProgressive.verticalGradient(
-                        startIntensity = 1f,
-                        endIntensity = 0f
+                }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color.Black, Color.Transparent)
+                        ),
+                        blendMode = BlendMode.DstIn
                     )
                 }
         )
