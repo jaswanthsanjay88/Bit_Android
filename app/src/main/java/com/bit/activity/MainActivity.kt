@@ -152,12 +152,36 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Non-blocking GitHub update check on every app start
+                val updateChecker = remember { com.bit.update.UpdateChecker(context) }
+                var pendingUpdate by remember { mutableStateOf<com.bit.update.UpdateInfo?>(null) }
+
+                LaunchedEffect(Unit) {
+                    withContext(Dispatchers.IO) {
+                        when (val result = updateChecker.checkForUpdate()) {
+                            is com.bit.update.UpdateCheckResult.UpdateAvailable -> {
+                                withContext(Dispatchers.Main) {
+                                    pendingUpdate = result.info
+                                }
+                            }
+                            else -> {}
+                        }
+                    }
+                }
+
                 AppNavigation(
                     startDestination = Screen.Intro.route,
                     targetDestination = targetDestination,
                     hasModelsInstalled = hasModelsInstalled,
                     needsMigration = needsMigration
                 )
+
+                pendingUpdate?.let { info ->
+                    com.bit.update.UpdateBottomSheet(
+                        update = info,
+                        onDismiss = { pendingUpdate = null }
+                    )
+                }
             }
         }
     }
