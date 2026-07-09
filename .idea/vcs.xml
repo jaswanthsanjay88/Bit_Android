@@ -2,11 +2,6 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/_temp_toolneuron" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/agora_clean" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/agora_clean/thirdparty/llama.cpp" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/agora_clean/thirdparty/proot" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/claude-android-skill" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/llama-kt" vcs="Git" />
   </component>
 </project>
