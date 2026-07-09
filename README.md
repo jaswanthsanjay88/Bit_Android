@@ -1,5 +1,7 @@
 # BIT — Android Offline AI Client Powered by llama.kt
 
+![BIT Banner](docs/img/BIT_Banner.png)
+
 BIT is a fully offline, privacy-first AI assistant client for Android. Built entirely on top of the llama.kt SDK, BIT enables running Large Language Models (LLMs), Vision-Language Models (VLMs), on-device image generation, text-to-speech, and secure local Document Retrieval (RAG) without external servers, subscriptions, or data leaving the device.
 
 ---
