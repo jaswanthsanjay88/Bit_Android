@@ -186,11 +186,11 @@ fun HomeScreen(
                         com.bit.ui.components.TopBlurScrim(
                             hazeState = hazeState,
                             modifier = Modifier.align(Alignment.TopCenter),
-                            height = 100.dp + with(LocalDensity.current) {
+                            height = 140.dp + with(LocalDensity.current) {
                                 WindowInsets.statusBars.getTop(this).toDp()
                             },
                             blurRadius = 26.dp,
-                            tintColor = Color.Black,
+                            tintColor = MaterialTheme.colorScheme.background,
                             tintAlpha = 0.55f
                         )
 

@@ -519,6 +519,7 @@ class GGUFEngine {
 sealed class GenerationEvent {
     data class Token(val text: String) : GenerationEvent()
     data class ToolCall(val name: String, val args: String) : GenerationEvent()
+    data class ToolResult(val callId: String, val name: String, val result: String) : GenerationEvent()
     data object Done : GenerationEvent()
     data class Error(val message: String) : GenerationEvent()
     data class Metrics(val metrics: DecodingMetrics) : GenerationEvent()
@@ -531,6 +532,7 @@ sealed class GenerationEvent {
 private fun LibGenerationEvent.toLocal(): GenerationEvent = when (this) {
     is LibGenerationEvent.Token -> GenerationEvent.Token(text)
     is LibGenerationEvent.ToolCall -> GenerationEvent.ToolCall(name, argsJson)
+    is LibGenerationEvent.ToolResult -> GenerationEvent.ToolResult(callId, name, result)
     is LibGenerationEvent.Done -> GenerationEvent.Done
     is LibGenerationEvent.Error -> GenerationEvent.Error(message)
     is LibGenerationEvent.Metrics -> GenerationEvent.Metrics(metrics.toLocal())

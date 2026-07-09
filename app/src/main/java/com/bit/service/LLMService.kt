@@ -67,6 +67,7 @@ class LLMService : Service() {
                                 )
                             }
                             is GenerationEvent.ToolCall -> callback.onToolCall(event.name, event.args)
+                            is GenerationEvent.ToolResult -> {}
                             is GenerationEvent.Progress -> callback.onProgress(event.progress)
                             is GenerationEvent.ThinkingBlock -> {}
                             is GenerationEvent.PartialResponse -> {}

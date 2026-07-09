@@ -686,6 +686,7 @@ class ChatViewModel @Inject constructor(
                             throw Exception(event.message)
                         }
                         is GenerationEvent.ToolCall -> { /* VLM doesn't support tool calling */ }
+                        is GenerationEvent.ToolResult -> {}
                         is GenerationEvent.ThinkingBlock -> {}
                         is GenerationEvent.PartialResponse -> {}
                     }
@@ -1620,6 +1621,7 @@ class ChatViewModel @Inject constructor(
                     nativeToolCalls.add(Pair(event.name, event.args))
                     Log.d(TAG, "Native tool call received: ${event.name}")
                 }
+                is GenerationEvent.ToolResult -> {}
                 is GenerationEvent.ThinkingBlock -> {}
                 is GenerationEvent.PartialResponse -> {}
             }
@@ -1764,6 +1766,7 @@ class ChatViewModel @Inject constructor(
                     Log.e(TAG, "Generation error during tool call collection: ${event.message}")
                     throw Exception(event.message)
                 }
+                is GenerationEvent.ToolResult -> {}
                 is GenerationEvent.ThinkingBlock -> {}
                 is GenerationEvent.PartialResponse -> {}
             }
