@@ -278,9 +278,7 @@ fun BodyContent(
                             // Markdown content — each element is a lazy item
                             if (message.content.contentType == ContentType.Text) {
                                 val raw = message.content.content
-                                val parsedText = if (THINK_TAG_REGEX.containsMatchIn(raw)) {
-                                    raw.replace(THINK_TAG_REGEX, "").trim()
-                                } else raw
+                                val parsedText = parseThinkingTags(raw).actualContent
                                 if (parsedText.isNotEmpty()) {
                                     lazyMarkdownItems(
                                         text = parsedText,

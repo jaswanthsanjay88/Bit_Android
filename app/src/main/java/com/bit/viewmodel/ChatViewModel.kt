@@ -1083,10 +1083,13 @@ class ChatViewModel @Inject constructor(
             
             // Format the search result or tool result using SearchResultFormatter!
             val formattedResult = SearchResultFormatter.format(step.result, appContext)
-            
-            result.add(JSONObject().put("role", "user").put("content",
+            val contentText = if (step.toolName == "web_search") {
+                "Tool '${step.toolName}' result: $formattedResult\n\n[Instruction: If the search results above do not clearly state a fact, state that you cannot find it. Do not invent or assume any details.]"
+            } else {
                 "Tool '${step.toolName}' result: $formattedResult"
-            ))
+            }
+            
+            result.add(JSONObject().put("role", "user").put("content", contentText))
         }
 
         return sanitizeRoleAlternation(result)

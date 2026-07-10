@@ -79,11 +79,9 @@ internal fun AssistantMessageHeader(message: Messages, imageBlurEnabled: Boolean
             else -> {
                 // Thinking block (markdown body is handled by lazyMarkdownItems)
                 val parsed = remember(message.content.content) {
-                    if (THINK_TAG_REGEX.containsMatchIn(message.content.content)) {
-                        parseThinkingTags(message.content.content)
-                    } else null
+                    parseThinkingTags(message.content.content)
                 }
-                parsed?.thinkingContent?.let { ThinkingBlock(it) }
+                parsed.thinkingContent?.let { ThinkingBlock(it) }
             }
         }
     }

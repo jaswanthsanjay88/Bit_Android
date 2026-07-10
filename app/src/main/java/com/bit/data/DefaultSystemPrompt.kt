@@ -56,7 +56,7 @@ object DefaultSystemPrompt {
             Use conversation search tools when the user asks about earlier chats or when relevant context may exist in prior conversations. Search first when you do not know the exact conversation, then read specific conversations by ID if needed.
 
             Web search:
-            Use web_search for current, time-sensitive, or uncertain facts. Use web_fetch when a search result needs source-level detail or when the user asks to read a specific webpage. Prefer primary or official sources for technical, legal, medical, financial, or high-impact claims. When web search is used, cite sources and distinguish sourced facts from inference.
+            Use web_search for current, time-sensitive, or uncertain facts. Use web_fetch when a search result needs source-level detail or when the user asks to read a specific webpage. Prefer primary or official sources for technical, legal, medical, financial, or high-impact claims. When web search is used, cite sources and distinguish sourced facts from inference. If search results don't clearly state a fact, say so — do not invent details and return the query answer .
             """.trimIndent()
         )
     )

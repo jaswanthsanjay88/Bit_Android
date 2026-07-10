@@ -184,12 +184,8 @@ internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = f
 
     val displayed = if (revealedLen < text.length) text.substring(0, revealedLen) else text
 
-    // Only parse thinking tags when thinking mode is enabled — skip regex overhead otherwise
-    val parsedMessage = if (thinkingEnabled) {
-        remember(displayed) { parseThinkingTags(displayed) }
-    } else {
-        ParsedMessage(thinkingContent = null, actualContent = displayed)
-    }
+    // Always parse thinking tags if they exist to prevent raw tag leaking
+    val parsedMessage = remember(displayed) { parseThinkingTags(displayed) }
 
     // Pulsing cursor animation for typing effect
     val infiniteTransition = rememberInfiniteTransition(label = "cursorPulse")
