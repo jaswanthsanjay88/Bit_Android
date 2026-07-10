@@ -15,6 +15,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.HazeProgressive
 
 @Composable
 fun TopBlurScrim(
@@ -38,6 +39,10 @@ fun TopBlurScrim(
                     style = HazeStyle(
                         tint = HazeTint(tintColor.copy(alpha = tintAlpha)),
                         blurRadius = blurRadius
+                    )
+                    progressive = HazeProgressive.verticalGradient(
+                        startIntensity = 1f,
+                        endIntensity = 0f
                     )
                 }
                 .drawWithContent {
