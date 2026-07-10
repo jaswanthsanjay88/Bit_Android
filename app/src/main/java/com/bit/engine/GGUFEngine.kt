@@ -47,8 +47,9 @@ class GGUFEngine {
             else -> com.dark.gguf_lib.InferenceBackend.CPU
         }
 
-        val success = try {
-            engine.load(
+        var success = false
+        try {
+            success = engine.load(
                 path = model.modelPath,
                 contextSize = loading.ctxSize,
                 threads = loading.threads,
@@ -57,10 +58,44 @@ class GGUFEngine {
                 cacheTypeK = cacheTypeIntToString(loading.cacheTypeK),
                 cacheTypeV = cacheTypeIntToString(loading.cacheTypeV)
             )
-        } catch (e: OutOfMemoryError) {
-            Log.e(TAG, "OOM loading model", e)
-            try { engine.unload() } catch (_: Throwable) {}
-            false
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed loading model on primary attempt", e)
+        }
+
+        // Retry 1: Fallback to standard f16 KV cache (maximum compatibility) if primary attempt fails
+        if (!success && (loading.cacheTypeK != 1 || loading.cacheTypeV != 1)) {
+            Log.w(TAG, "Retrying model load with unquantized f16 KV cache for compatibility...")
+            try {
+                success = engine.load(
+                    path = model.modelPath,
+                    contextSize = loading.ctxSize,
+                    threads = loading.threads,
+                    flashAttn = loading.flashAttn,
+                    backend = backend,
+                    cacheTypeK = "f16",
+                    cacheTypeV = "f16"
+                )
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed loading model on retry 1 (f16 cache)", e)
+            }
+        }
+
+        // Retry 2: Fallback to CPU backend if NPU/GPU fails
+        if (!success && backend != com.dark.gguf_lib.InferenceBackend.CPU) {
+            Log.w(TAG, "Retrying model load on CPU backend with f16 KV cache...")
+            try {
+                success = engine.load(
+                    path = model.modelPath,
+                    contextSize = loading.ctxSize,
+                    threads = loading.threads,
+                    flashAttn = loading.flashAttn,
+                    backend = com.dark.gguf_lib.InferenceBackend.CPU,
+                    cacheTypeK = "f16",
+                    cacheTypeV = "f16"
+                )
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed loading model on retry 2 (CPU fallback)", e)
+            }
         }
 
         if (success) {
@@ -83,10 +118,13 @@ class GGUFEngine {
             if (inference.chatTemplate.isNotEmpty()) {
                 engine.setChatTemplate(inference.chatTemplate)
             }
+        } else {
+            try { engine.unload() } catch (_: Throwable) {}
         }
 
         success
     }
+
 
     suspend fun loadFromFd(fd: Int, config: ModelConfig? = null): Boolean = withContext(Dispatchers.IO) {
         if (engine.isLoaded) unload()
@@ -105,8 +143,9 @@ class GGUFEngine {
             else -> com.dark.gguf_lib.InferenceBackend.CPU
         }
 
-        val success = try {
-            engine.loadFromFd(
+        var success = false
+        try {
+            success = engine.loadFromFd(
                 fd = fd,
                 contextSize = loading.ctxSize,
                 threads = loading.threads,
@@ -115,10 +154,44 @@ class GGUFEngine {
                 cacheTypeK = cacheTypeIntToString(loading.cacheTypeK),
                 cacheTypeV = cacheTypeIntToString(loading.cacheTypeV)
             )
-        } catch (e: OutOfMemoryError) {
-            Log.e(TAG, "OOM loading model from FD", e)
-            try { engine.unload() } catch (_: Throwable) {}
-            false
+        } catch (e: Throwable) {
+            Log.e(TAG, "Failed loading model from FD on primary attempt", e)
+        }
+
+        // Retry 1: Fallback to standard f16 KV cache (maximum compatibility) if primary attempt fails
+        if (!success && (loading.cacheTypeK != 1 || loading.cacheTypeV != 1)) {
+            Log.w(TAG, "Retrying model load from FD with unquantized f16 KV cache for compatibility...")
+            try {
+                success = engine.loadFromFd(
+                    fd = fd,
+                    contextSize = loading.ctxSize,
+                    threads = loading.threads,
+                    flashAttn = loading.flashAttn,
+                    backend = backend,
+                    cacheTypeK = "f16",
+                    cacheTypeV = "f16"
+                )
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed loading model from FD on retry 1 (f16 cache)", e)
+            }
+        }
+
+        // Retry 2: Fallback to CPU backend if NPU/GPU fails
+        if (!success && backend != com.dark.gguf_lib.InferenceBackend.CPU) {
+            Log.w(TAG, "Retrying model load from FD on CPU backend with f16 KV cache...")
+            try {
+                success = engine.loadFromFd(
+                    fd = fd,
+                    contextSize = loading.ctxSize,
+                    threads = loading.threads,
+                    flashAttn = loading.flashAttn,
+                    backend = com.dark.gguf_lib.InferenceBackend.CPU,
+                    cacheTypeK = "f16",
+                    cacheTypeV = "f16"
+                )
+            } catch (e: Throwable) {
+                Log.e(TAG, "Failed loading model from FD on retry 2 (CPU fallback)", e)
+            }
         }
 
         if (success) {
@@ -141,6 +214,8 @@ class GGUFEngine {
             if (inference.chatTemplate.isNotEmpty()) {
                 engine.setChatTemplate(inference.chatTemplate)
             }
+        } else {
+            try { engine.unload() } catch (_: Throwable) {}
         }
 
         success

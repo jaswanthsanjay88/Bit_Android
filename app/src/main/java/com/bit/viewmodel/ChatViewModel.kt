@@ -122,7 +122,12 @@ class ChatViewModel @Inject constructor(
 
     fun startSttRecording() {
         if (!audioCaptureService.hasRecordPermission()) {
-            _error.value = "Microphone permission required"
+            reportError("Microphone permission required")
+            return
+        }
+        
+        if (!com.bit.stt.SherpaSTTEngine.hasModelFiles(appContext)) {
+            reportError("STT model not downloaded. Download CSukuangfj/sherpa-onnx-whisper-tiny.en in Settings.")
             return
         }
         
@@ -161,17 +166,17 @@ class ChatViewModel @Inject constructor(
             _isGenerating.value = true
             try {
                 if (!com.bit.stt.SherpaSTTEngine.hasModelFiles(appContext)) {
-                    _error.value = "STT model not downloaded. Download CSukuangfj/sherpa-onnx-whisper-tiny.en in Settings."
+                    reportError("STT model not downloaded. Download CSukuangfj/sherpa-onnx-whisper-tiny.en in Settings.")
                     return@launch
                 }
                 val transcribedText = com.bit.stt.SherpaSTTEngine.transcribe(appContext, audioBytes)
                 if (transcribedText.isNotBlank()) {
                     onTranscribed(transcribedText)
                 } else {
-                    _error.value = "No speech recognized"
+                    reportError("No speech recognized")
                 }
             } catch (e: Exception) {
-                _error.value = e.message ?: "Transcription failed"
+                reportError(e.message ?: "Transcription failed")
             } finally {
                 _isGenerating.value = false
                 _isSttTranscribing.value = false
@@ -499,7 +504,7 @@ class ChatViewModel @Inject constructor(
 
     fun switchToTextGeneration() {
         if (!isAnyTextModelLoaded) {
-            _error.value = "Text generation model not loaded"
+            reportError("Text generation model not loaded")
             return
         }
         _currentGenerationType.value = ModelType.TEXT_GENERATION
@@ -507,7 +512,7 @@ class ChatViewModel @Inject constructor(
 
     fun switchToImageGeneration() {
         if (!LlmModelWorker.isDiffusionModelLoaded.value) {
-            _error.value = "Image generation model not loaded"
+            reportError("Image generation model not loaded")
             return
         }
         _currentGenerationType.value = ModelType.IMAGE_GENERATION
@@ -738,7 +743,7 @@ class ChatViewModel @Inject constructor(
 
     fun regenerateLastMessage() {
         if (!isAnyTextModelLoaded) {
-            _error.value = "Please load a text generation model first"
+            reportError("Please load a text generation model first")
             return
         }
         if (_isGenerating.value) return
@@ -748,7 +753,7 @@ class ChatViewModel @Inject constructor(
         // Find the last user message to get the prompt
         val lastUserMsg = _messages.lastOrNull { it.role == Role.User }
         if (lastUserMsg == null) {
-            _error.value = "No user message to regenerate from"
+            reportError("No user message to regenerate from")
             return
         }
 
@@ -822,9 +827,28 @@ class ChatViewModel @Inject constructor(
         val globalPrepend = appSettings.globalPrependPrompt.first()
         val globalPostpend = appSettings.globalPostpendPrompt.first()
         
+        val currentDateTime = java.util.Date()
+        val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+        val dateSdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+
+        val runtimeValues = mapOf(
+            "{${com.bit.data.PredefinedVariables.TIME}}" to sdf.format(currentDateTime),
+            "{${com.bit.data.PredefinedVariables.DATE}}" to dateSdf.format(currentDateTime),
+            "{${com.bit.data.PredefinedVariables.SENT_TIME}}" to sdf.format(currentDateTime),
+            "{${com.bit.data.PredefinedVariables.SENT_DATE}}" to dateSdf.format(currentDateTime),
+            "{${com.bit.data.PredefinedVariables.ACTIVE_MEMORY}}" to ""
+        )
+
+        var finalPrepend = globalPrepend
+        var finalPostpend = globalPostpend
+        for ((key, value) in runtimeValues) {
+            finalPrepend = finalPrepend.replace(key, value)
+            finalPostpend = finalPostpend.replace(key, value)
+        }
+
         var finalPrompt = prompt
-        if (globalPrepend.isNotBlank()) finalPrompt = "$globalPrepend\n$finalPrompt"
-        if (globalPostpend.isNotBlank()) finalPrompt = "$finalPrompt\n$globalPostpend"
+        if (finalPrepend.isNotBlank()) finalPrompt = "$finalPrepend\n$finalPrompt"
+        if (finalPostpend.isNotBlank()) finalPrompt = "$finalPrompt\n$finalPostpend"
         
         val fullPrompt = ragContext?.let { "$it\n\n$finalPrompt" } ?: finalPrompt
 
