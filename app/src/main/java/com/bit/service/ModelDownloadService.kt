@@ -999,7 +999,32 @@ class ModelDownloadService : Service() {
                 } else {
                     com.bit.models.engine_schema.GgufLoadingParams()
                 }
-                val ggufSchema = GgufEngineSchema(loadingParams = loadingParams)
+
+                val isSmall = modelId.contains("350m", ignoreCase = true) ||
+                        modelName.contains("350m", ignoreCase = true) ||
+                        modelId.contains("125m", ignoreCase = true) ||
+                        modelName.contains("125m", ignoreCase = true) ||
+                        modelId.contains("160m", ignoreCase = true) ||
+                        modelName.contains("160m", ignoreCase = true) ||
+                        modelId.contains("tiny", ignoreCase = true) ||
+                        modelName.contains("tiny", ignoreCase = true) ||
+                        modelId.contains("mini", ignoreCase = true) ||
+                        modelName.contains("mini", ignoreCase = true)
+
+                val inferenceParams = if (isSmall) {
+                    com.bit.models.engine_schema.GgufInferenceParams(
+                        temperature = 0.4f,
+                        maxTokens = 256,
+                        repeatPenalty = 1.1f
+                    )
+                } else {
+                    com.bit.models.engine_schema.GgufInferenceParams()
+                }
+
+                val ggufSchema = GgufEngineSchema(
+                    loadingParams = loadingParams,
+                    inferenceParams = inferenceParams
+                )
                 ModelConfig(
                     modelId = modelId,
                     modelLoadingParams = ggufSchema.toLoadingJson(),

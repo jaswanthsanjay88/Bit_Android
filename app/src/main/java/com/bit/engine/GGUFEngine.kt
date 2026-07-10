@@ -30,6 +30,16 @@ class GGUFEngine {
 
     val isLoaded: Boolean get() = engine.isLoaded
 
+    private fun isSmallModel(modelId: String, modelName: String): Boolean {
+        val id = modelId.lowercase()
+        val name = modelName.lowercase()
+        return id.contains("350m") || name.contains("350m") ||
+               id.contains("125m") || name.contains("125m") ||
+               id.contains("160m") || name.contains("160m") ||
+               id.contains("tiny") || name.contains("tiny") ||
+               id.contains("mini") || name.contains("mini")
+    }
+
     suspend fun load(model: Model, config: ModelConfig?): Boolean = withContext(Dispatchers.IO) {
         if (engine.isLoaded) unload()
 
@@ -39,7 +49,15 @@ class GGUFEngine {
         )
 
         val loading = schema.loadingParams
-        val inference = schema.inferenceParams
+        var inference = schema.inferenceParams
+
+        if (isSmallModel(model.id, model.modelName)) {
+            inference = inference.copy(
+                temperature = if (inference.temperature == 0.7f) 0.4f else inference.temperature,
+                maxTokens = if (inference.maxTokens == 4096) 256 else inference.maxTokens,
+                repeatPenalty = if (inference.repeatPenalty == 1.0f) 1.1f else inference.repeatPenalty
+            )
+        }
 
         val backend = when {
             loading.npuAcceleration -> com.dark.gguf_lib.InferenceBackend.NPU_QNN
@@ -110,6 +128,17 @@ class GGUFEngine {
                 seed = inference.seed
             )
 
+            if (inference.repeatPenalty != 1.0f) {
+                try {
+                    val samplerJson = org.json.JSONObject()
+                        .put("repeatPenalty", inference.repeatPenalty)
+                        .toString()
+                    engine.updateSamplerParams(samplerJson)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to apply repetition penalty sampler params", e)
+                }
+            }
+
             currentModelId = model.id
 
             if (inference.systemPrompt.isNotEmpty()) {
@@ -135,7 +164,23 @@ class GGUFEngine {
         )
 
         val loading = schema.loadingParams
-        val inference = schema.inferenceParams
+        var inference = schema.inferenceParams
+
+        val model = config?.modelId?.let {
+            try {
+                com.bit.di.AppContainer.getModelRepository().getModelById(it)
+            } catch (e: Exception) {
+                null
+            }
+        }
+
+        if (model != null && isSmallModel(model.id, model.modelName)) {
+            inference = inference.copy(
+                temperature = if (inference.temperature == 0.7f) 0.4f else inference.temperature,
+                maxTokens = if (inference.maxTokens == 4096) 256 else inference.maxTokens,
+                repeatPenalty = if (inference.repeatPenalty == 1.0f) 1.1f else inference.repeatPenalty
+            )
+        }
 
         val backend = when {
             loading.npuAcceleration -> com.dark.gguf_lib.InferenceBackend.NPU_QNN
@@ -206,7 +251,18 @@ class GGUFEngine {
                 seed = inference.seed
             )
 
-            currentModelId = "fd_$fd"
+            if (inference.repeatPenalty != 1.0f) {
+                try {
+                    val samplerJson = org.json.JSONObject()
+                        .put("repeatPenalty", inference.repeatPenalty)
+                        .toString()
+                    engine.updateSamplerParams(samplerJson)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to apply repetition penalty sampler params", e)
+                }
+            }
+
+            currentModelId = config?.modelId ?: "fd_$fd"
 
             if (inference.systemPrompt.isNotEmpty()) {
                 engine.setSystemPrompt(inference.systemPrompt)

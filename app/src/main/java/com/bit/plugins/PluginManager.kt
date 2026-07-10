@@ -278,11 +278,11 @@ object PluginManager {
         return getEnabledToolDefinitions().map { it.name }
     }
 
-    /**
-     * Manually sync enabled plugin tools with the LLM.
-     * Now uses enableToolCallingGguf() with grammar configuration.
-     * Works with any model that has a chat template (model-agnostic).
-     */
+    private fun isSmallModel(modelId: String): Boolean {
+        val id = modelId.lowercase()
+        return id.contains("350m") || id.contains("125m") || id.contains("160m") || id.contains("tiny") || id.contains("mini")
+    }
+
     fun syncToolsWithLLM() {
         val toolDefinitions = getEnabledToolDefinitions()
 
@@ -293,6 +293,14 @@ object PluginManager {
         }
         if (modelType == null) {
             Log.d(TAG, "No model loaded; deferring tool sync.")
+            return
+        }
+
+        val activeModelId = ActiveModelSession.currentModelId.value
+        if (isSmallModel(activeModelId)) {
+            LlmModelWorker.clearToolsGguf()
+            _isToolCallingModelLoaded.value = false
+            Log.d(TAG, "Active model is a small model ($activeModelId); stripping tool schemas.")
             return
         }
 

@@ -30,7 +30,8 @@ data class GgufInferenceParams(
     val maxTokens: Int = 4096,
     val systemPrompt: String = "",
     val chatTemplate: String = "",
-    val toolsJson: String = ""  // JSON array of tool definitions
+    val toolsJson: String = "",  // JSON array of tool definitions
+    val repeatPenalty: Float = 1.0f
 )
 
 @Serializable

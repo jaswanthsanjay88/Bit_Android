@@ -839,8 +839,15 @@ class ChatViewModel @Inject constructor(
             "{${com.bit.data.PredefinedVariables.ACTIVE_MEMORY}}" to ""
         )
 
-        var finalPrepend = globalPrepend
-        var finalPostpend = globalPostpend
+        val activeModelId = currentModelId ?: ""
+        val isSmall = activeModelId.contains("350m", ignoreCase = true) ||
+                activeModelId.contains("125m", ignoreCase = true) ||
+                activeModelId.contains("160m", ignoreCase = true) ||
+                activeModelId.contains("tiny", ignoreCase = true) ||
+                activeModelId.contains("mini", ignoreCase = true)
+
+        var finalPrepend = if (isSmall) "" else globalPrepend
+        var finalPostpend = if (isSmall) "" else globalPostpend
         for ((key, value) in runtimeValues) {
             finalPrepend = finalPrepend.replace(key, value)
             finalPostpend = finalPostpend.replace(key, value)
@@ -862,6 +869,7 @@ class ChatViewModel @Inject constructor(
         val activeProviderType = ActiveModelSession.currentModelType.value
         val hasTools = PluginManager.hasEnabledTools()
                 && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
+                && !isSmall
 
         val steps = mutableListOf<ToolChainStepData>()
         val seenCalls = mutableSetOf<String>()

@@ -472,12 +472,17 @@ class ModelStoreRepository(private val context: Context) {
                             repo.repoPath.contains("Qwen", ignoreCase = false) ||
                             repo.name.contains("qwen", ignoreCase = true)
 
+                    val isSmallRepo = repo.repoPath.contains("350m", ignoreCase = true) ||
+                            repo.name.contains("350m", ignoreCase = true) ||
+                            repo.id.contains("350m", ignoreCase = true)
+
                     files.filter { file ->
                         file.path.endsWith(".gguf") &&
                                 // Filter out mmproj/vision projection files - these are not standalone models
                                 !file.path.contains("mmproj", ignoreCase = true) &&
                                 !file.path.contains("vision-adapter", ignoreCase = true) &&
-                                !file.path.contains("projector", ignoreCase = true)
+                                !file.path.contains("projector", ignoreCase = true) &&
+                                !(isSmallRepo && file.path.contains("q4_0", ignoreCase = true))
                     }.forEach { file ->
                             val fileName = file.path.substringAfterLast("/")
                             val sizeStr = formatDecimalBytes(file.size ?: 0)
