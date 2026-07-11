@@ -144,6 +144,24 @@ fun GeneratingIndicator(
 }
 
 fun parseThinkingTags(content: String): ParsedMessage {
+    // Handle orphaned </think> (Qwen3-style: thinking content without opening <think> tag)
+    val orphanClose = content.indexOf("</think>", ignoreCase = true)
+    if (orphanClose != -1) {
+        val hasOpenTag = THINK_OPEN_TAGS.any {
+            val idx = content.indexOf(it, ignoreCase = true)
+            idx != -1 && idx < orphanClose
+        }
+        if (!hasOpenTag) {
+            // Everything before </think> is thinking content, everything after is actual content
+            val thinkingContent = content.substring(0, orphanClose).trim()
+            val actualContent = content.substring(orphanClose + 8).trim()
+            return ParsedMessage(
+                thinkingContent = thinkingContent.ifEmpty { null },
+                actualContent = actualContent
+            )
+        }
+    }
+
     // Fast path: no think tags at all
     val openTag = THINK_OPEN_TAGS.firstOrNull { content.contains(it, ignoreCase = true) }
         ?: return ParsedMessage(null, content.trim())

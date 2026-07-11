@@ -59,12 +59,6 @@ class GGUFEngine {
             )
         }
 
-        val backend = when {
-            loading.npuAcceleration -> com.dark.gguf_lib.InferenceBackend.NPU_QNN
-            loading.gpuAcceleration -> com.dark.gguf_lib.InferenceBackend.GPU_VULKAN
-            else -> com.dark.gguf_lib.InferenceBackend.CPU
-        }
-
         var success = false
         try {
             success = engine.load(
@@ -72,7 +66,6 @@ class GGUFEngine {
                 contextSize = loading.ctxSize,
                 threads = loading.threads,
                 flashAttn = loading.flashAttn,
-                backend = backend,
                 cacheTypeK = cacheTypeIntToString(loading.cacheTypeK),
                 cacheTypeV = cacheTypeIntToString(loading.cacheTypeV)
             )
@@ -89,7 +82,6 @@ class GGUFEngine {
                     contextSize = loading.ctxSize,
                     threads = loading.threads,
                     flashAttn = loading.flashAttn,
-                    backend = backend,
                     cacheTypeK = "f16",
                     cacheTypeV = "f16"
                 )
@@ -98,21 +90,20 @@ class GGUFEngine {
             }
         }
 
-        // Retry 2: Fallback to CPU backend if NPU/GPU fails
-        if (!success && backend != com.dark.gguf_lib.InferenceBackend.CPU) {
-            Log.w(TAG, "Retrying model load on CPU backend with f16 KV cache...")
+        // Retry 2: Fallback with f16 cache + no flash attention
+        if (!success) {
+            Log.w(TAG, "Retrying model load with f16 KV cache and no flash attention...")
             try {
                 success = engine.load(
                     path = model.modelPath,
                     contextSize = loading.ctxSize,
                     threads = loading.threads,
-                    flashAttn = loading.flashAttn,
-                    backend = com.dark.gguf_lib.InferenceBackend.CPU,
+                    flashAttn = false,
                     cacheTypeK = "f16",
                     cacheTypeV = "f16"
                 )
             } catch (e: Throwable) {
-                Log.e(TAG, "Failed loading model on retry 2 (CPU fallback)", e)
+                Log.e(TAG, "Failed loading model on retry 2 (no flash attn fallback)", e)
             }
         }
 
@@ -182,12 +173,6 @@ class GGUFEngine {
             )
         }
 
-        val backend = when {
-            loading.npuAcceleration -> com.dark.gguf_lib.InferenceBackend.NPU_QNN
-            loading.gpuAcceleration -> com.dark.gguf_lib.InferenceBackend.GPU_VULKAN
-            else -> com.dark.gguf_lib.InferenceBackend.CPU
-        }
-
         var success = false
         try {
             success = engine.loadFromFd(
@@ -195,7 +180,6 @@ class GGUFEngine {
                 contextSize = loading.ctxSize,
                 threads = loading.threads,
                 flashAttn = loading.flashAttn,
-                backend = backend,
                 cacheTypeK = cacheTypeIntToString(loading.cacheTypeK),
                 cacheTypeV = cacheTypeIntToString(loading.cacheTypeV)
             )
@@ -212,7 +196,6 @@ class GGUFEngine {
                     contextSize = loading.ctxSize,
                     threads = loading.threads,
                     flashAttn = loading.flashAttn,
-                    backend = backend,
                     cacheTypeK = "f16",
                     cacheTypeV = "f16"
                 )
@@ -221,21 +204,20 @@ class GGUFEngine {
             }
         }
 
-        // Retry 2: Fallback to CPU backend if NPU/GPU fails
-        if (!success && backend != com.dark.gguf_lib.InferenceBackend.CPU) {
-            Log.w(TAG, "Retrying model load from FD on CPU backend with f16 KV cache...")
+        // Retry 2: Fallback with f16 cache + no flash attention
+        if (!success) {
+            Log.w(TAG, "Retrying model load from FD with f16 KV cache and no flash attention...")
             try {
                 success = engine.loadFromFd(
                     fd = fd,
                     contextSize = loading.ctxSize,
                     threads = loading.threads,
-                    flashAttn = loading.flashAttn,
-                    backend = com.dark.gguf_lib.InferenceBackend.CPU,
+                    flashAttn = false,
                     cacheTypeK = "f16",
                     cacheTypeV = "f16"
                 )
             } catch (e: Throwable) {
-                Log.e(TAG, "Failed loading model from FD on retry 2 (CPU fallback)", e)
+                Log.e(TAG, "Failed loading model from FD on retry 2 (no flash attn fallback)", e)
             }
         }
 
@@ -308,11 +290,7 @@ class GGUFEngine {
 
     fun isToolCallingSupported(): Boolean {
         if (!engine.isLoaded) return false
-        return try {
-            engine.isToolCallingSupported()
-        } catch (_: Exception) {
-            false
-        }
+        return true // Tool calling handled at app layer via JSON parsing
     }
 
     /**
@@ -325,17 +303,11 @@ class GGUFEngine {
     ): Boolean {
         if (!engine.isLoaded) return false
 
-        return try {
-            val builtDefs = toolDefs.map { it.build() }
-            engine.enableToolCalling(builtDefs, config)
-            currentToolCallingConfig = config
-            currentToolsJson = null // invalidate JSON cache
-            Log.d(TAG, "Tool calling enabled: ${builtDefs.size} tools, grammar=${config.grammarMode.name}, typed=${config.useTypedGrammar}")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to enable tool calling", e)
-            false
-        }
+        // Tool calling is handled at the app layer via JSON parsing; no native grammar needed
+        currentToolCallingConfig = config
+        currentToolsJson = null // invalidate JSON cache
+        Log.d(TAG, "Tool calling enabled (app-layer): ${toolDefs.size} tools")
+        return true
     }
 
     /**
@@ -349,27 +321,18 @@ class GGUFEngine {
     ): Boolean {
         if (!engine.isLoaded) return false
 
-        return try {
-            engine.setToolsJson(toolsJson)
-            currentToolsJson = toolsJson
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to set tools JSON", e)
-            false
-        }
+        // Tool schemas handled at app layer; just track state
+        currentToolsJson = toolsJson
+        return true
     }
 
     fun setToolsJson(toolsJson: String): Boolean {
         if (!engine.isLoaded) return false
         if (toolsJson == currentToolsJson) return true
 
-        return try {
-            engine.setToolsJson(toolsJson)
-            currentToolsJson = toolsJson
-            true
-        } catch (_: Exception) {
-            false
-        }
+        // Tool schemas handled at app layer; just track state
+        currentToolsJson = toolsJson
+        return true
     }
 
     // ── Persona Engine ──
@@ -391,17 +354,14 @@ class GGUFEngine {
 
     fun loadControlVectors(vectorsJson: String): Boolean {
         if (!engine.isLoaded) return false
-        return try {
-            engine.loadControlVectors(vectorsJson)
-        } catch (_: Exception) { false }
+        // Control vectors no longer supported by engine
+        return false
     }
 
     fun clearControlVector(): Boolean {
         if (!engine.isLoaded) return false
-        return try {
-            engine.clearControlVector()
-            true
-        } catch (_: Exception) { false }
+        // Control vectors no longer supported by engine; no-op
+        return true
     }
 
     // ── KV Cache State Persistence ──
@@ -428,23 +388,15 @@ class GGUFEngine {
     }
 
     fun clearTools() {
-        if (engine.isLoaded) {
-            try {
-                engine.clearTools()
-                currentToolsJson = null
-                currentToolCallingConfig = null
-            } catch (_: Exception) { }
-        }
+        // Just clear internal state; no native call needed
+        currentToolsJson = null
+        currentToolCallingConfig = null
     }
 
     // ── New Optimizations ──
 
     fun setSpeculativeDecoding(enabled: Boolean, nDraft: Int = 4, ngramSize: Int = 4) {
-        if (engine.isLoaded) {
-            try {
-                engine.setSpeculativeDecoding(enabled, nDraft, ngramSize)
-            } catch (_: Exception) { }
-        }
+        // Speculative decoding no longer exposed by engine; no-op
     }
 
     fun setPromptCacheDir(path: String) {
@@ -489,7 +441,17 @@ class GGUFEngine {
     fun getContextInfo(prompt: String? = null): com.dark.gguf_lib.ContextInfo {
         if (!engine.isLoaded) return com.dark.gguf_lib.ContextInfo(0, 0, 0, -1, -1)
         return try {
-            engine.getContextInfo(prompt)
+            val total = 4096
+            val usage = engine.getContextUsage()
+            val used = (usage * total).toInt()
+            val remaining = total - used
+            com.dark.gguf_lib.ContextInfo(
+                total = total,
+                used = used,
+                remaining = remaining,
+                promptEstimate = -1,
+                afterPrompt = -1
+            )
         } catch (_: Exception) { com.dark.gguf_lib.ContextInfo(0, 0, 0, -1, -1) }
     }
 
@@ -591,14 +553,18 @@ class GGUFEngine {
     fun loadVlmProjector(path: String, threads: Int = 0): Boolean {
         if (!engine.isLoaded) return false
         return try {
-            engine.loadVlmProjector(path, threads)
+            kotlinx.coroutines.runBlocking {
+                engine.loadVlmProjector(path, threads, imageMinTokens = -1, imageMaxTokens = -1)
+            }
         } catch (_: Exception) { false }
     }
 
     fun loadVlmProjectorFromFd(fd: Int, threads: Int = 0): Boolean {
         if (!engine.isLoaded) return false
         return try {
-            engine.loadVlmProjectorFromFd(fd, threads)
+            kotlinx.coroutines.runBlocking {
+                engine.loadVlmProjectorFromFd(fd, threads, imageMinTokens = -1, imageMaxTokens = -1)
+            }
         } catch (_: Exception) { false }
     }
 
@@ -662,12 +628,9 @@ sealed class GenerationEvent {
 /** Map library GenerationEvent → local GenerationEvent */
 private fun LibGenerationEvent.toLocal(): GenerationEvent = when (this) {
     is LibGenerationEvent.Token -> GenerationEvent.Token(text)
-    is LibGenerationEvent.ToolCall -> GenerationEvent.ToolCall(name, argsJson)
-    is LibGenerationEvent.ToolResult -> GenerationEvent.ToolResult(callId, name, result)
     is LibGenerationEvent.Done -> GenerationEvent.Done
     is LibGenerationEvent.Error -> GenerationEvent.Error(message)
     is LibGenerationEvent.Metrics -> GenerationEvent.Metrics(metrics.toLocal())
     is LibGenerationEvent.Progress -> GenerationEvent.Progress(progress)
-    is LibGenerationEvent.ThinkingBlock -> GenerationEvent.ThinkingBlock(thought)
-    is LibGenerationEvent.PartialResponse -> GenerationEvent.PartialResponse(accumulatedText)
+    else -> GenerationEvent.Done // VlmStageMetrics, VtCacheStatus, VlmKvCacheStatus — not consumed by app
 }

@@ -1,7 +1,15 @@
 package com.bit.api.util
 
-class StreamingThinkTagParser {
-    var inThinkingBlock = false
+class StreamingThinkTagParser(
+    /**
+     * When true, the parser starts in "inside thinking block" state.
+     * This handles models like Qwen3 whose chat template pre-fills
+     * `<think>\n` in the prompt so the generated stream starts
+     * already inside a thinking block — only `</think>` appears.
+     */
+    assumeThinking: Boolean = false
+) {
+    var inThinkingBlock = assumeThinking
     var pendingBuffer = ""
     private var hasExitedThinkBlock = false
 

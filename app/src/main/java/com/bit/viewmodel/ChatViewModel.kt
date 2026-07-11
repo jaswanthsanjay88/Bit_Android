@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.bit.data.AppSettingsDataStore
 import com.bit.di.AppContainer
 import com.bit.engine.GenerationEvent
+import com.bit.api.util.StreamingThinkTagParser
 import com.bit.models.engine_schema.GgufEngineSchema
 import com.bit.models.engine_schema.GgufInferenceParams
 import com.bit.models.messages.ContentType
@@ -667,21 +668,35 @@ class ChatViewModel @Inject constructor(
                 AppStateManager.setGeneratingText()
 
                 val resultBuilder = StringBuilder()
+                val thinkingBuilder = StringBuilder()
                 var lastEmitTime = 0L
+                val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
+                val vlmThinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
 
                 LlmModelWorker.vlmGenerateStreaming(
                     jsonArray.toString(), imageData, maxTokens
                 ).collect { event ->
                     when (event) {
                         is GenerationEvent.Token -> {
-                            resultBuilder.append(event.text)
-                            val now = System.currentTimeMillis()
-                            if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                                _streamingAssistantMessage.value = resultBuilder.toString()
-                                lastEmitTime = now
-                            }
+                            vlmThinkParser.feed(
+                                content = event.text,
+                                thinkingEnabled = thinkingActive,
+                                onText = { text ->
+                                    resultBuilder.append(text)
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                                        _streamingAssistantMessage.value = resultBuilder.toString()
+                                        lastEmitTime = now
+                                    }
+                                },
+                                onThought = { thought -> thinkingBuilder.append(thought) }
+                            )
                         }
                         is GenerationEvent.Done -> {
+                            vlmThinkParser.flush(
+                                onText = { resultBuilder.append(it) },
+                                onThought = { thinkingBuilder.append(it) }
+                            )
                             _streamingAssistantMessage.value = resultBuilder.toString()
                         }
                         is GenerationEvent.Metrics -> { currentMetrics = event.metrics }
@@ -1219,15 +1234,25 @@ class ChatViewModel @Inject constructor(
 
         val jsonArray = JSONArray(messages)
         val textBuilder = java.lang.StringBuilder()
+        val thinkBuilder = java.lang.StringBuilder()
         val toolCalls = mutableListOf<Pair<String, String>>()
+        val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
+        val thinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
 
         LlmModelWorker.ggufGenerateMultiTurnStreaming(
             jsonArray.toString(), maxTokens
         ).collect { event ->
             when (event) {
                 is GenerationEvent.Token -> {
-                    textBuilder.append(event.text)
-                    _streamingAssistantMessage.value = textBuilder.toString()
+                    thinkParser.feed(
+                        content = event.text,
+                        thinkingEnabled = thinkingActive,
+                        onText = { text ->
+                            textBuilder.append(text)
+                            _streamingAssistantMessage.value = textBuilder.toString()
+                        },
+                        onThought = { thought -> thinkBuilder.append(thought) }
+                    )
                 }
                 is GenerationEvent.ToolCall -> {
                     toolCalls.add(Pair(event.name, event.args))
@@ -1237,6 +1262,13 @@ class ChatViewModel @Inject constructor(
                 }
                 is GenerationEvent.Error -> {
                     throw Exception(event.message)
+                }
+                is GenerationEvent.Done -> {
+                    thinkParser.flush(
+                        onText = { textBuilder.append(it) },
+                        onThought = { thinkBuilder.append(it) }
+                    )
+                    _streamingAssistantMessage.value = textBuilder.toString()
                 }
                 else -> {}
             }
@@ -1605,12 +1637,15 @@ class ChatViewModel @Inject constructor(
 
         val jsonArray = JSONArray(messages)
         val resultBuilder = StringBuilder()
+        val thinkResultBuilder = StringBuilder()
         val utf8Buffer = Utf8TokenBuffer()
         val nativeToolCalls = mutableListOf<Pair<String, String>>()
         currentMetrics = null
         var lastEmitTime = 0L
         var lastRepCheckLen = 0
         var repetitionTrimIndex = -1
+        val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
+        val agentThinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
 
         val generationFlow = LlmModelWorker.ggufGenerateMultiTurnStreaming(jsonArray.toString(), maxTokens)
 
@@ -1619,12 +1654,19 @@ class ChatViewModel @Inject constructor(
                 is GenerationEvent.Token -> {
                     val validText = utf8Buffer.append(event.text)
                     if (validText.isNotEmpty()) {
-                        resultBuilder.append(validText)
-                    }
-                    val now = System.currentTimeMillis()
-                    if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                        _streamingAssistantMessage.value = resultBuilder.toString()
-                        lastEmitTime = now
+                        agentThinkParser.feed(
+                            content = validText,
+                            thinkingEnabled = thinkingActive,
+                            onText = { text ->
+                                resultBuilder.append(text)
+                                val now = System.currentTimeMillis()
+                                if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                                    _streamingAssistantMessage.value = resultBuilder.toString()
+                                    lastEmitTime = now
+                                }
+                            },
+                            onThought = { thought -> thinkResultBuilder.append(thought) }
+                        )
                     }
 
                     // Periodically check for repetition loops
@@ -1641,7 +1683,18 @@ class ChatViewModel @Inject constructor(
                 is GenerationEvent.Done -> {
                     // Flush any remaining buffered bytes
                     val remaining = utf8Buffer.flush()
-                    if (remaining.isNotEmpty()) resultBuilder.append(remaining)
+                    if (remaining.isNotEmpty()) {
+                        agentThinkParser.feed(
+                            content = remaining,
+                            thinkingEnabled = thinkingActive,
+                            onText = { resultBuilder.append(it) },
+                            onThought = { thinkResultBuilder.append(it) }
+                        )
+                    }
+                    agentThinkParser.flush(
+                        onText = { resultBuilder.append(it) },
+                        onThought = { thinkResultBuilder.append(it) }
+                    )
                     _streamingAssistantMessage.value = resultBuilder.toString()
                     // Update context usage after generation completes
                     _contextUsagePercent.value = LlmModelWorker.getContextUsageGguf()
@@ -1780,21 +1833,37 @@ class ChatViewModel @Inject constructor(
 
         val toolCalls = mutableListOf<Pair<String, String>>()
         val textBuilder = StringBuilder()
+        val thinkTextBuilder = StringBuilder()
         val jsonArray = JSONArray(messages)
+        val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
+        val tcThinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
 
         LlmModelWorker.ggufGenerateMultiTurnStreaming(
             jsonArray.toString(), maxTokens
         ).collect { event ->
             when (event) {
                 is GenerationEvent.Token -> {
-                    textBuilder.append(event.text)
-                    _streamingAssistantMessage.value = textBuilder.toString()
+                    tcThinkParser.feed(
+                        content = event.text,
+                        thinkingEnabled = thinkingActive,
+                        onText = { text ->
+                            textBuilder.append(text)
+                            _streamingAssistantMessage.value = textBuilder.toString()
+                        },
+                        onThought = { thought -> thinkTextBuilder.append(thought) }
+                    )
                 }
                 is GenerationEvent.ToolCall -> {
                     toolCalls.add(Pair(event.name, event.args))
                     Log.d(TAG, "Collected tool call: ${event.name}")
                 }
-                is GenerationEvent.Done -> {}
+                is GenerationEvent.Done -> {
+                    tcThinkParser.flush(
+                        onText = { textBuilder.append(it) },
+                        onThought = { thinkTextBuilder.append(it) }
+                    )
+                    _streamingAssistantMessage.value = textBuilder.toString()
+                }
                 is GenerationEvent.Metrics -> { currentMetrics = event.metrics }
                 is GenerationEvent.Progress -> { /* progress tracked elsewhere */ }
                 is GenerationEvent.Error -> {
@@ -2556,6 +2625,7 @@ class ChatViewModel @Inject constructor(
 
             var cleanTitle = generatedTitle
                 .replace(Regex("<think>[\\s\\S]*?(?:</think>|$)", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("^[\\s\\S]*?</think>", RegexOption.IGNORE_CASE), "")
                 .trim()
                 .replace("\n", " ")
                 .replace("\"", "")
@@ -2739,6 +2809,8 @@ class ChatViewModel @Inject constructor(
     private fun stripThinkingTags(text: String): String {
         // Remove complete thinking blocks
         var cleaned = text.replace(Regex("<think>(.*?)</think>|\\[THINK](.*?)\\[/THINK]|<reasoning>(.*?)</reasoning>|<\\|channel>thought(.*?)(?:<channel\\|>|<\\|channel\\|>)", RegexOption.DOT_MATCHES_ALL), "")
+        // Also strip orphaned closing tags (Qwen3-style: no opening tag, just </think>)
+        cleaned = cleaned.replace(Regex("^[\\s\\S]*?</think>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)), "")
         
         // Handle partial/in-progress thinking blocks
         val openTags = listOf("<|channel>thought", "<think>", "[THINK]", "<reasoning>")
