@@ -15,6 +15,7 @@ add_compile_options($<$<NOT:$<CONFIG:Debug>>:-DNDEBUG>)
 add_link_options(
     -Wl,--gc-sections
     -Wl,--icf=safe
+    -Wl,-Bsymbolic
     -Wl,--exclude-libs,ALL
     -Wl,-z,max-page-size=16384
 )

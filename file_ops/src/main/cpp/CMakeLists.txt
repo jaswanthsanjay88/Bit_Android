@@ -17,6 +17,7 @@ add_compile_options($<$<NOT:$<CONFIG:Debug>>:-DNDEBUG>)
 add_link_options(
     -Wl,--gc-sections              # strip unused sections
     -Wl,--icf=safe                 # merge identical functions
+    -Wl,-Bsymbolic
     -Wl,--exclude-libs,ALL         # hide static-lib symbols
 )
 add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto>)

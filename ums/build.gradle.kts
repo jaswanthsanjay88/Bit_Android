@@ -27,7 +27,7 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17 -fvisibility=hidden")
-                arguments("-DOPENSSL_NO_ASM=1")
+                arguments("-DOPENSSL_NO_ASM=1", "-DANDROID_STL=c++_shared")
             }
         }
         ndk {

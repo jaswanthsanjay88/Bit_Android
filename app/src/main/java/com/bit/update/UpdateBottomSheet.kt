@@ -30,6 +30,20 @@ fun UpdateBottomSheet(
     var stage by remember { mutableStateOf(UpdateStage.PROMPT) }
     var downloadId by remember { mutableStateOf(-1L) }
     var progress by remember { mutableFloatStateOf(0f) }
+    var receiverRef by remember { mutableStateOf<android.content.BroadcastReceiver?>(null) }
+
+    // Clean up receiver on sheet dispose
+    DisposableEffect(Unit) {
+        onDispose {
+            receiverRef?.let {
+                try {
+                    context.unregisterReceiver(it)
+                } catch (e: Exception) {
+                    // Ignore
+                }
+            }
+        }
+    }
 
     // Poll download progress while downloading
     LaunchedEffect(stage) {
@@ -113,6 +127,10 @@ fun UpdateBottomSheet(
                                 return@Button
                             }
                             downloadId = downloader.startDownload(update)
+                            receiverRef = downloader.registerInstallOnComplete(downloadId) {
+                                stage = UpdateStage.READY_TO_INSTALL
+                                progress = 1.0f
+                            }
                             stage = UpdateStage.DOWNLOADING
                         },
                         modifier = Modifier.fillMaxWidth().height(52.dp),

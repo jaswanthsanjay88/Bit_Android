@@ -859,7 +859,14 @@ class ChatViewModel @Inject constructor(
                 activeModelId.contains("125m", ignoreCase = true) ||
                 activeModelId.contains("160m", ignoreCase = true) ||
                 activeModelId.contains("tiny", ignoreCase = true) ||
-                activeModelId.contains("mini", ignoreCase = true)
+                activeModelId.contains("mini", ignoreCase = true) ||
+                activeModelId.contains("1b", ignoreCase = true) ||
+                activeModelId.contains("2b", ignoreCase = true) ||
+                activeModelId.contains("3b", ignoreCase = true) ||
+                activeModelId.contains("1.5b", ignoreCase = true) ||
+                activeModelId.contains("1.7b", ignoreCase = true) ||
+                activeModelId.contains("1.8b", ignoreCase = true) ||
+                activeModelId.contains("qwen3", ignoreCase = true)
 
         var finalPrepend = if (isSmall) "" else globalPrepend
         var finalPostpend = if (isSmall) "" else globalPostpend
@@ -882,9 +889,15 @@ class ChatViewModel @Inject constructor(
         _agentPhase.value = AgentPhase.Executing
 
         val activeProviderType = ActiveModelSession.currentModelType.value
+        val isQwen3 = activeModelId.contains("qwen3", ignoreCase = true)
+        val isTooTinyForTools = activeModelId.contains("350m", ignoreCase = true) ||
+                activeModelId.contains("125m", ignoreCase = true) ||
+                activeModelId.contains("160m", ignoreCase = true) ||
+                activeModelId.contains("tiny", ignoreCase = true) ||
+                activeModelId.contains("mini", ignoreCase = true)
         val hasTools = PluginManager.hasEnabledTools()
-                && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
-                && !isSmall
+                && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API || isQwen3)
+                && !isTooTinyForTools
 
         val steps = mutableListOf<ToolChainStepData>()
         val seenCalls = mutableSetOf<String>()
@@ -899,13 +912,27 @@ class ChatViewModel @Inject constructor(
             Log.d(TAG, "Unified tool loop: starting round $round")
 
             // Build conversation messages for this turn
-            val conversationMessages = buildConversationMessagesWithSteps(fullPrompt, steps, isRegeneration)
+            val conversationMessages = buildConversationMessagesWithSteps(fullPrompt, steps, isRegeneration, hasTools)
 
             // Generate response (streaming)
             val result = if (activeProviderType == ProviderType.API) {
                 generateRemoteUnified(conversationMessages, steps, hasTools, maxTokens)
             } else {
-                generateGgufUnified(conversationMessages, hasTools, maxTokens)
+                if (hasTools) {
+                    // 2-stage routing for local GGUF models with tools
+                    val routed = com.bit.plugins.TwoStageToolRouter.route(
+                        conversationMessages,
+                        PluginManager.getEnabledToolDefinitions()
+                    )
+                    if (routed != null) {
+                        GenerationResult(text = "", toolCalls = listOf(routed))
+                    } else {
+                        // No tool needed or none selected, run final generation
+                        generateGgufUnified(conversationMessages, hasTools = false, maxTokens = maxTokens)
+                    }
+                } else {
+                    generateGgufUnified(conversationMessages, hasTools = false, maxTokens = maxTokens)
+                }
             }
 
             if (result.toolCalls.isEmpty()) {
@@ -1064,10 +1091,11 @@ class ChatViewModel @Inject constructor(
     private suspend fun buildConversationMessagesWithSteps(
         userPrompt: String,
         steps: List<ToolChainStepData>,
-        isRegeneration: Boolean
+        isRegeneration: Boolean,
+        hasTools: Boolean = false
     ): List<JSONObject> {
         val result = mutableListOf<JSONObject>()
-        val systemPrompt = getCurrentModelSystemPrompt(userQuery = userPrompt)
+        val systemPrompt = getCurrentModelSystemPrompt(userQuery = userPrompt, hasTools = hasTools)
         if (systemPrompt.isNotEmpty()) {
             result.add(JSONObject().put("role", "system").put("content", systemPrompt))
         }
@@ -1938,7 +1966,7 @@ class ChatViewModel @Inject constructor(
      * Read the system prompt from the currently loaded model's config.
      * Returns empty string if no system prompt is configured.
      */
-    private suspend fun getCurrentModelSystemPrompt(userQuery: String = ""): String {
+    private suspend fun getCurrentModelSystemPrompt(userQuery: String = "", hasTools: Boolean = false): String {
         val modelId = ActiveModelSession.currentModelId.value
         val modelConfig = AppContainer.getModelRepository().getConfigByModelId(modelId)
         
@@ -1979,17 +2007,24 @@ class ChatViewModel @Inject constructor(
                 append(compiledPrompt).append("\n\n")
             }
             
-            if (PluginManager.hasEnabledTools()) {
+            if (hasTools && PluginManager.hasEnabledTools()) {
                 val toolsJsonArray = org.json.JSONArray()
                 PluginManager.getEnabledToolDefinitions().forEach { toolDef ->
                     toolsJsonArray.put(toolDef.build().toOpenAIFormat())
                 }
-                append("Tool Schema Injection:\n")
-                append("You have access to a UNION of the following tools. You MUST use them if they are relevant to the user's request. To call a tool, wrap a JSON object in <tool_call> tags like this: <tool_call>{\"name\": \"tool_name\", \"arguments\": {\"arg1\": \"value1\"}}</tool_call>\n")
-                append("<temp_tool_neuron>\nCRITICAL INSTRUCTION: You must choose one tool from the union of available tools below if the user asks for real-time data, web searches, or specific actions.\n</temp_tool_neuron>\n")
-                append("Available tools:\n")
-                append(toolsJsonArray.toString(2))
-                append("\n\n")
+                val isQwen3 = modelId.contains("qwen3", ignoreCase = true)
+                if (isQwen3) {
+                    append("<tools>\n")
+                    append(toolsJsonArray.toString(2))
+                    append("\n</tools>\n\n")
+                } else {
+                    append("Tool Schema Injection:\n")
+                    append("You have access to a UNION of the following tools. You MUST use them if they are relevant to the user's request. To call a tool, wrap a JSON object in <tool_call> tags like this: <tool_call>{\"name\": \"tool_name\", \"arguments\": {\"arg1\": \"value1\"}}</tool_call>\n")
+                    append("<temp_tool_neuron>\nCRITICAL INSTRUCTION: You must choose one tool from the union of available tools below if the user asks for real-time data, web searches, or specific actions.\n</temp_tool_neuron>\n")
+                    append("Available tools:\n")
+                    append(toolsJsonArray.toString(2))
+                    append("\n\n")
+                }
             }
         }
     }
@@ -2004,7 +2039,7 @@ class ChatViewModel @Inject constructor(
         isRegeneration: Boolean = false
     ): List<JSONObject> {
         val result = mutableListOf<JSONObject>()
-        val systemPrompt = getCurrentModelSystemPrompt(userQuery = userPrompt)
+        val systemPrompt = getCurrentModelSystemPrompt(userQuery = userPrompt, hasTools = false)
         if (systemPrompt.isNotEmpty()) {
             result.add(JSONObject().put("role", "system").put("content", systemPrompt))
         }

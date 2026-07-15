@@ -22,6 +22,8 @@ interface ILLMService {
     void setGrammarModeGguf(int mode);
     void setTypedGrammarGguf(boolean enabled);
     boolean isToolCallingSupportedGguf();
+    boolean setCustomGrammarGguf(String grammar);
+    boolean clearCustomGrammarGguf();
 
     // Persona engine: dynamic sampling + logit bias + control vectors
     boolean updateSamplerParamsGguf(String paramsJson);

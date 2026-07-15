@@ -274,6 +274,18 @@ object PluginManager {
         }
     }
 
+    /**
+     * Get compact tool descriptions (names and descriptions only) for routing prompts.
+     */
+    fun getCompactToolDescriptionsText(): String {
+        return getEnabledToolDefinitions().joinToString("\n") { toolDef ->
+            val openAI = toolDef.build().toOpenAIFormat()
+            val name = openAI.optString("name", toolDef.name)
+            val desc = openAI.optString("description", "")
+            "- $name: $desc"
+        }
+    }
+
     fun getEnabledToolNames(): List<String> {
         return getEnabledToolDefinitions().map { it.name }
     }

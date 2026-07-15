@@ -200,6 +200,7 @@ internal fun RepoCardListView(
     }
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val explorerResults by viewModel.explorerResults.collectAsStateWithLifecycle()
+    val uniqueExplorerResults = remember(explorerResults) { explorerResults.distinctBy { it.id } }
     val isExplorerLoading by viewModel.isExplorerLoading.collectAsStateWithLifecycle()
     val explorerError by viewModel.explorerError.collectAsStateWithLifecycle()
 
@@ -284,7 +285,7 @@ internal fun RepoCardListView(
                     )
                 }
 
-                if (explorerResults.isEmpty() && !isExplorerLoading) {
+                if (uniqueExplorerResults.isEmpty() && !isExplorerLoading) {
                     item {
                         Text(
                             text = explorerError ?: "No online Hugging Face repositories found for \"$searchQuery\"",
@@ -296,7 +297,7 @@ internal fun RepoCardListView(
                 }
 
                 items(
-                    items = explorerResults,
+                    items = uniqueExplorerResults,
                     key = { it.id }
                 ) { explorerRepo ->
                     RepoListItem(
@@ -491,7 +492,7 @@ internal fun RepoDetailView(
     onResumeDownload: (String, String) -> Unit = { _, _ -> }
 ) {
     val repoModels = remember(viewModel.filteredModels.collectAsStateWithLifecycle().value, repoKey) {
-        viewModel.getModelsForRepo(repoKey)
+        viewModel.getModelsForRepo(repoKey).distinctBy { it.id }
     }
     val groupedRepos = remember(viewModel.filteredModels.collectAsStateWithLifecycle().value) {
         viewModel.getGroupedRepos()

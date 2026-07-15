@@ -83,7 +83,7 @@ fun AiMemoryScreen(
             val matchesCategory = selectedCategory == null ||
                     memory.category == selectedCategory
             matchesSearch && matchesCategory
-        }
+        }.distinctBy { it.id }
     }
 
     val staleCount = remember(allMemories) {

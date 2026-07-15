@@ -349,7 +349,7 @@ fun BodyContent(
                         }
                     }
 
-                    val hasReasoningTrace = agent.phase != AgentPhase.Idle || agent.toolChainSteps.isNotEmpty() || agent.plan != null || agent.summary != null
+                    val hasReasoningTrace = agent.toolChainSteps.isNotEmpty() || agent.plan != null || agent.summary != null
                     val streamingPluginMsgs = messages.filter { it.content.contentType == ContentType.PluginResult }
 
                     if (hasReasoningTrace) {

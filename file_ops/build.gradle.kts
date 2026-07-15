@@ -17,6 +17,7 @@ android {
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17 -fvisibility=hidden")
+                arguments("-DANDROID_STL=c++_shared")
             }
         }
         ndk {

@@ -263,12 +263,13 @@ private fun RagList(
     onRagDelete: (String) -> Unit,
     showLoadButton: Boolean
 ) {
+    val uniqueRags = remember(rags) { rags.distinctBy { it.id } }
     LazyColumn(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = Standards.SpacingLg, vertical = Standards.SpacingSm),
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
     ) {
-        items(rags, key = { it.id }) { rag ->
+        items(uniqueRags, key = { it.id }) { rag ->
             RagListItem(
                 rag = rag,
                 onRagSelected = onRagSelected,

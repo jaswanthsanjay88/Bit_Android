@@ -234,6 +234,12 @@ class LLMService : Service() {
         override fun isToolCallingSupportedGguf(): Boolean =
             ggufEngine.isToolCallingSupported()
 
+        override fun setCustomGrammarGguf(grammar: String): Boolean =
+            ggufEngine.setGrammar(grammar)
+
+        override fun clearCustomGrammarGguf(): Boolean =
+            ggufEngine.clearGrammar()
+
         // ── Persona Engine ──
 
         override fun updateSamplerParamsGguf(paramsJson: String): Boolean =

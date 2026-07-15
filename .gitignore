@@ -43,3 +43,7 @@ hs_err_*.log
 
 # Kotlin build cache
 .kotlin/
+
+# Reference directories
+/.aisystems_ref/
+/.toolneuron_ref/

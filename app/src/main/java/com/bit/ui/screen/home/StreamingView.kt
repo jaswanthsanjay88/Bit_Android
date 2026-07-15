@@ -106,7 +106,7 @@ internal fun StreamingView(
         }
 
         // Show unified reasoning trace or plugin results
-        val hasReasoningTrace = agentPhase != AgentPhase.Idle || toolChainSteps.isNotEmpty() || agentPlan != null || agentSummary != null
+        val hasReasoningTrace = toolChainSteps.isNotEmpty() || agentPlan != null || agentSummary != null
         val pluginMsgs = remember(messages) {
             messages.filter { it.content.contentType == ContentType.PluginResult }
         }

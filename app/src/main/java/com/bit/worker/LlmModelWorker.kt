@@ -459,6 +459,30 @@ object LlmModelWorker {
     }
 
     /**
+     * Set custom GBNF grammar constraint.
+     */
+    fun setCustomGrammarGguf(grammar: String): Boolean {
+        return try {
+            _serviceFlow.value?.setCustomGrammarGguf(grammar) ?: false
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to set custom grammar: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Clear custom GBNF grammar constraint.
+     */
+    fun clearCustomGrammarGguf(): Boolean {
+        return try {
+            _serviceFlow.value?.clearCustomGrammarGguf() ?: false
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to clear custom grammar: ${e.message}")
+            false
+        }
+    }
+
+    /**
      * Check if the loaded model supports tool calling.
      * Returns true for any model with a built-in chat template (model-agnostic).
      */

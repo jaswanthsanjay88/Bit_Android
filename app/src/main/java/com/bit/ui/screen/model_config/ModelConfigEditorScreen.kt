@@ -202,13 +202,14 @@ private fun ModelListPanel(
     onModelSelected: (Model) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val uniqueModels = remember(models) { models.distinctBy { it.id } }
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
     ) {
         Column {
             Text(
-                text = "Models (${models.size})",
+                text = "Models (${uniqueModels.size})",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(Standards.SpacingLg)
@@ -218,7 +219,7 @@ private fun ModelListPanel(
                 contentPadding = PaddingValues(horizontal = Standards.SpacingSm, vertical = Standards.SpacingSm),
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
             ) {
-                items(models, key = { it.id }) { model ->
+                items(uniqueModels, key = { it.id }) { model ->
                     ModelListItem(
                         model = model,
                         isSelected = selectedModel?.id == model.id,

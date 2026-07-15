@@ -14,8 +14,11 @@ import com.dark.ums.UnifiedMemorySystem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.security.KeyStore
+import java.security.SecureRandom
+import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 object VaultManager {
 
@@ -49,11 +52,32 @@ object VaultManager {
             if (_isReady.value) return true
             val u = UnifiedMemorySystem()
             val path = basePath(context)
-            val appKey = deriveAppKey(context)
-            val ok = if (u.exists(path)) {
+            var appKey = deriveAppKey(context)
+            var ok = if (u.exists(path)) {
                 u.openWithPassphrase(path, appKey, passphrase)
             } else {
                 u.createWithPassphrase(path, appKey, passphrase)
+            }
+            if (!ok && u.exists(path)) {
+                android.util.Log.w("VaultManager", "Failed to open vault (wrong key or corruption). Resetting database to start fresh.")
+                try {
+                    val file = java.io.File(path)
+                    if (file.exists()) {
+                        file.deleteRecursively()
+                    }
+                    val bf = bootstrapFile(context)
+                    if (bf.exists()) {
+                        bf.delete()
+                    }
+                    val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+                    if (ks.containsAlias(KEYSTORE_ALIAS)) {
+                        ks.deleteEntry(KEYSTORE_ALIAS)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("VaultManager", "Failed to clear vault on reset fallback", e)
+                }
+                appKey = deriveAppKey(context)
+                ok = u.createWithPassphrase(path, appKey, passphrase)
             }
             if (!ok) return false
             initRepos(u)
@@ -86,62 +110,122 @@ object VaultManager {
 
     private const val KEYSTORE_ALIAS = "ums_app_key"
 
+    private fun bootstrapFile(context: Context): java.io.File {
+        val dir = java.io.File(context.filesDir, "app_bootstrap")
+        dir.mkdirs()
+        return java.io.File(dir, "k.bin")
+    }
+
     fun deriveAppKey(context: Context): ByteArray {
-        val ks = KeyStore.getInstance("AndroidKeyStore")
-        ks.load(null)
         try {
-            val key: SecretKey = if (ks.containsAlias(KEYSTORE_ALIAS)) {
-                (ks.getEntry(KEYSTORE_ALIAS, null) as KeyStore.SecretKeyEntry).secretKey
-            } else {
-                generateNewKey()
+            val pair = readDek(context)
+            if (pair != null) {
+                return unwrap(pair.first, pair.second)
             }
-            return key.encoded ?: deriveFromHardwareKey(key)
+            val fresh = ByteArray(32)
+            SecureRandom().nextBytes(fresh)
+            val (iv, ct) = wrap(fresh)
+            writeDek(context, iv, ct)
+            return fresh
         } catch (e: Exception) {
-            // Delete the invalid key and try once more with the correct configuration
             try {
+                val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
                 if (ks.containsAlias(KEYSTORE_ALIAS)) {
                     ks.deleteEntry(KEYSTORE_ALIAS)
                 }
-                // Clear any partially created database to avoid passphrase mismatch
                 val path = basePath(context)
                 val file = java.io.File(path)
                 if (file.exists()) {
                     file.deleteRecursively()
                 }
+                val bf = bootstrapFile(context)
+                if (bf.exists()) {
+                    bf.delete()
+                }
             } catch (ignored: Exception) {}
 
-            val key = generateNewKey()
-            return key.encoded ?: deriveFromHardwareKey(key)
+            val fresh = ByteArray(32)
+            SecureRandom().nextBytes(fresh)
+            val (iv, ct) = wrap(fresh)
+            writeDek(context, iv, ct)
+            return fresh
         }
     }
 
-    private fun generateNewKey(): SecretKey {
-        val gen = KeyGenerator.getInstance(
-            KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore"
-        )
-        gen.init(
-            KeyGenParameterSpec.Builder(
-                KEYSTORE_ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            )
-                .setKeySize(256)
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setRandomizedEncryptionRequired(false) // Required to allow caller-provided fixed IV for deterministic derivation
-                .build()
-        )
-        return gen.generateKey()
+    private fun getOrCreateKeystoreKey(): SecretKey {
+        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        if (ks.containsAlias(KEYSTORE_ALIAS)) {
+            val entry = ks.getEntry(KEYSTORE_ALIAS, null) as? KeyStore.SecretKeyEntry
+            if (entry != null) return entry.secretKey
+        }
+
+        val kg = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        return try {
+            kg.init(buildKeySpec(preferStrongBox = true))
+            kg.generateKey()
+        } catch (e: Exception) {
+            kg.init(buildKeySpec(preferStrongBox = false))
+            kg.generateKey()
+        }
     }
 
-    private fun deriveFromHardwareKey(key: SecretKey): ByteArray {
-        // Use GCM with a fixed IV to get deterministic output per device.
-        // This is safe because: (1) only used once for key derivation, not encryption,
-        // (2) the plaintext is a fixed constant, (3) we hash the result.
-        val fixedIv = "BITKD_12B_IV".toByteArray() // 12 bytes for GCM
-        val spec = javax.crypto.spec.GCMParameterSpec(128, fixedIv)
-        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, key, spec)
-        val ciphertext = cipher.doFinal("BIT-UMS-KeyDerivation".toByteArray())
-        return java.security.MessageDigest.getInstance("SHA-256").digest(ciphertext)
+    private fun buildKeySpec(preferStrongBox: Boolean): KeyGenParameterSpec {
+        val builder = KeyGenParameterSpec.Builder(
+            KEYSTORE_ALIAS,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .setKeySize(256)
+            .setRandomizedEncryptionRequired(true)
+        if (preferStrongBox && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            builder.setIsStrongBoxBacked(true)
+        }
+        return builder.build()
+    }
+
+    private fun wrap(plaintext: ByteArray): Pair<ByteArray, ByteArray> {
+        val key = getOrCreateKeystoreKey()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key)
+        val iv = cipher.iv
+        val ct = cipher.doFinal(plaintext)
+        return iv to ct
+    }
+
+    private fun unwrap(iv: ByteArray, ct: ByteArray): ByteArray {
+        val key = getOrCreateKeystoreKey()
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
+        return cipher.doFinal(ct)
+    }
+
+    private fun writeDek(context: Context, iv: ByteArray, ct: ByteArray) {
+        val file = bootstrapFile(context)
+        val bos = java.io.ByteArrayOutputStream()
+        val dos = java.io.DataOutputStream(bos)
+        dos.writeInt(iv.size)
+        dos.write(iv)
+        dos.writeInt(ct.size)
+        dos.write(ct)
+        file.writeBytes(bos.toByteArray())
+    }
+
+    private fun readDek(context: Context): Pair<ByteArray, ByteArray>? {
+        val file = bootstrapFile(context)
+        if (!file.exists()) return null
+        return try {
+            val bytes = file.readBytes()
+            val dis = java.io.DataInputStream(java.io.ByteArrayInputStream(bytes))
+            val ivLen = dis.readInt()
+            val iv = ByteArray(ivLen)
+            dis.readFully(iv)
+            val ctLen = dis.readInt()
+            val ct = ByteArray(ctLen)
+            dis.readFully(ct)
+            iv to ct
+        } catch (e: Exception) {
+            null
+        }
     }
 }

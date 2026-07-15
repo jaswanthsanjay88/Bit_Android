@@ -90,6 +90,7 @@ internal fun AdvancedTab(
     val existingRepoPaths = repositories.map { it.repoPath.lowercase() }.toSet()
     var showAddDialog by remember { mutableStateOf(false) }
     var editingRepository by remember { mutableStateOf<HFModelRepository?>(null) }
+    val uniqueRepositories = remember(repositories) { repositories.distinctBy { it.id } }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -128,7 +129,7 @@ internal fun AdvancedTab(
             )
         }
 
-        items(repositories, key = { it.id }) { repo ->
+        items(uniqueRepositories, key = { it.id }) { repo ->
             RepositoryCard(
                 repository = repo,
                 validationResult = validationResults[repo.id],

@@ -352,6 +352,22 @@ class GGUFEngine {
         } catch (_: Exception) { false }
     }
 
+    fun setGrammar(gbnf: String): Boolean {
+        if (!engine.isLoaded) return false
+        return try {
+            engine.setGrammar(gbnf)
+            true
+        } catch (_: Exception) { false }
+    }
+
+    fun clearGrammar(): Boolean {
+        if (!engine.isLoaded) return false
+        return try {
+            engine.clearGrammar()
+            true
+        } catch (_: Exception) { false }
+    }
+
     fun loadControlVectors(vectorsJson: String): Boolean {
         if (!engine.isLoaded) return false
         // Control vectors no longer supported by engine
