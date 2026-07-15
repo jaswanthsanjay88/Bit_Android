@@ -21,6 +21,7 @@ private enum class UpdateStage { PROMPT, DOWNLOADING, READY_TO_INSTALL, ERROR }
 @Composable
 fun UpdateBottomSheet(
     update: UpdateInfo,
+    updateChecker: UpdateChecker? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -109,10 +110,11 @@ fun UpdateBottomSheet(
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                Text(
-                    text = update.changelog.ifBlank { "No changelog provided for this release." },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BitColors.TextPrimary
+                MarkdownText(
+                    markdown = update.changelog.ifBlank { "No changelog provided for this release." },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = BitColors.TextPrimary,
+                    secondaryColor = BitColors.TextSecondary
                 )
             }
 
@@ -144,7 +146,10 @@ fun UpdateBottomSheet(
                     }
                     Spacer(Modifier.height(8.dp))
                     TextButton(
-                        onClick = onDismiss,
+                        onClick = {
+                            updateChecker?.skipVersion(update.version)
+                            onDismiss()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = BitColors.TextSecondary

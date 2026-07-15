@@ -1,54 +1,98 @@
-# Contributors & Related Projects
+# Contributors
 
-BIT is built across multiple repositories. Here's how they fit together.
+This file recognizes individuals who have contributed to the BIT project.
 
----
+## Creator & Lead Architect
 
-## Project Ecosystem
-
-### [BIT](https://github.com/jaswanthsanjay88/BIT_Android)
-The main Android app. UI, chat engine, RAG pipeline, plugin system, AI memory, backup/restore — everything the user interacts with.
-
----
-
-## How They Connect
-
-```
-BIT (app)
-    |
-    +-- Ai-Systems-New (native AI libraries)
-    |       |
-    |       +-- llama.cpp-android (GGUF inference JNI bridge)
-    |       +-- Stable Diffusion engine
-    |       +-- TTS engine (ONNX Runtime)
-    |       +-- Embedding engine
-    |
-    +-- ums (Unified Memory System, in-repo module)
-    +-- neuron-packet (encrypted RAG format, in-repo module)
-    +-- system_encryptor (native crypto, in-repo module)
-```
-
----
-
-## Contributing
-
-Contributions are welcome across all three repos. If you're working on:
-
-- **UI, chat, plugins, RAG, memory** — contribute to [BIT](https://github.com/jaswanthsanjay88/BIT_Android)
-- **Inference performance, model loading, native crashes** — contribute to [Ai-Systems-New](https://github.com/jaswanthsanjay88/Ai-Systems-New) or [llama.cpp-android](https://github.com/jaswanthsanjay88/llama.cpp-android)
-
-See the main [README](README.md) for contribution guidelines.
-
----
-
-## Maintainer
-
-**[Jaswanth Sanjay](https://github.com/jaswanthsanjay88)** — creator and primary maintainer of all three repositories.
-
----
+| Name | Role | GitHub |
+|---|---|---|
+| **Jaswanth Sanjay Nekkanti** | Creator, Lead Developer, and System Architect | [@jaswanthsanjay88](https://github.com/jaswanthsanjay88) |
 
 ## Contributors
 
-<!-- Add contributors here as the project grows -->
+Contributions of any size are valued. The following individuals have contributed code, documentation, bug reports, or other improvements to the project.
 
-Want to see your name here? Check the open issues on any of the repos above and submit a PR.
+<!-- 
+Add contributors in the following format:
+
+| Name | GitHub | Contributions |
+|---|---|---|
+| Jane Doe | [@janedoe](https://github.com/janedoe) | Feature: Vision model support |
+
+-->
+
+*No external contributors yet. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get started.*
+
+---
+
+## Acknowledgments
+
+BIT is made possible by the following genuine open-source projects, tools, and communities.
+
+### Engines and Runtimes
+
+| Project | Credit |
+|---|---|
+| llama.kt SDK | Built on ggml & KleidiAI runtime optimization |
+| sherpa-onnx | k2-fsa team |
+| Stable Diffusion engine | On-device latent diffusion engine |
+| ONNX Runtime | Microsoft |
+| PDFium & miniz | Native PDF & C compression engines |
+| nlohmann/json | Niels Lohmann |
+
+### Models in the Catalog
+
+| Model Family | Developer / Host |
+|---|---|
+| Llama | Meta AI |
+| Qwen & Qwen3 | Qwen team / Alibaba |
+| Mistral & Gemma | Mistral AI / Google |
+| Whisper | OpenAI |
+| Piper voices | Michael Hansen |
+
+*Models hosted on [Hugging Face](https://huggingface.co/).*
+
+### Document & RAG Stack
+
+- PDFBox Android by Tom Roush
+- Jsoup by Jonathan Hedley
+- Apache Commons Compress & XZ by Tukaani
+
+### Android Stack & Libraries
+
+- Android & AOSP
+- Jetpack Compose & Material 3
+- AndroidX & CameraX
+- Hilt (Google Dagger)
+- Kotlin & Coroutines
+- kotlinx.serialization
+- Room Database & DataStore Preferences
+- Coil 3, OkHttp & Retrofit
+
+### Look and Feel
+
+| Component | Developer |
+|---|---|
+| Tabler Icons | Tabler |
+| Haze | Chris Banes |
+| Backdrop & Capsule | Kyant0 |
+| Liquid | Fletch McKee |
+
+### Built With
+
+- Android Studio
+- Gradle
+
+### Search Backend
+
+- DuckDuckGo
+
+### Special Thanks
+
+- Every person who installed this
+- Every bug report
+- The open-source community
+
+---
+
+*Made with care.*

@@ -179,6 +179,7 @@ class MainActivity : ComponentActivity() {
                 pendingUpdate?.let { info ->
                     com.bit.update.UpdateBottomSheet(
                         update = info,
+                        updateChecker = updateChecker,
                         onDismiss = { pendingUpdate = null }
                     )
                 }

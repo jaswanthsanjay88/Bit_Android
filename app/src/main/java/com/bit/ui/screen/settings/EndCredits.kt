@@ -1,10 +1,10 @@
 package com.bit.ui.screen.settings
 
+import android.content.Context
 import android.media.MediaPlayer
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,16 +31,61 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
+/**
+ * Ensures fair non-repeating song selection (deck shuffle algorithm).
+ * Every song in [audioResIds] plays once before any song repeats (e.g. 1 -> 4 -> 3 -> 2),
+ * and the first song of the next deck is guaranteed not to match the last played song (preventing 2 -> 2 back-to-back repeats).
+ */
+object CreditsAudioDeck {
+    private const val PREFS_NAME = "bit_credits_audio_prefs"
+    private const val KEY_LAST_AUDIO_ID = "last_audio_res_id"
+    private const val KEY_REMAINING_DECK = "remaining_deck_res_ids"
+
+    fun getNextAudioResId(context: Context, audioResIds: List<Int>): Int {
+        if (audioResIds.isEmpty()) return 0
+        if (audioResIds.size == 1) return audioResIds[0]
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val lastId = prefs.getInt(KEY_LAST_AUDIO_ID, -1)
+        val savedDeckStr = prefs.getString(KEY_REMAINING_DECK, null)
+
+        var deck = savedDeckStr?.split(",")
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.filter { it in audioResIds } ?: emptyList()
+
+        if (deck.isEmpty()) {
+            var newDeck = audioResIds.shuffled()
+            if (newDeck.first() == lastId && newDeck.size > 1) {
+                newDeck = newDeck.drop(1) + newDeck.first()
+            }
+            deck = newDeck
+        }
+
+        val nextId = deck.first()
+        val remainingDeck = deck.drop(1)
+
+        prefs.edit()
+            .putInt(KEY_LAST_AUDIO_ID, nextId)
+            .putString(KEY_REMAINING_DECK, remainingDeck.joinToString(","))
+            .apply()
+
+        return nextId
+    }
+}
+
 sealed class CreditLine {
     data class Heading(val text: String) : CreditLine()
     data class Role(val text: String) : CreditLine()
     data class Name(val text: String) : CreditLine()
+    data class AccentText(val text: String) : CreditLine()
+    data class Subtext(val text: String) : CreditLine()
     data class Space(val heightDp: Int = 48) : CreditLine()
 }
 
@@ -49,7 +94,7 @@ fun EndCreditsOverlay(
     audioResIds: List<Int>,
     lines: List<CreditLine>,
     onDismiss: () -> Unit,
-    scrollDurationMs: Int = 26000
+    scrollDurationMs: Int = 38000
 ) {
     val context = LocalContext.current
     var visible by remember { mutableStateOf(true) }
@@ -68,7 +113,9 @@ fun EndCreditsOverlay(
         visible = false
     }
 
-    val selectedAudioResId = remember { audioResIds.random() }
+    val selectedAudioResId = remember {
+        CreditsAudioDeck.getNextAudioResId(context, audioResIds)
+    }
 
     // --- audio playback lifecycle ---
     val mediaPlayer = remember {
@@ -77,7 +124,19 @@ fun EndCreditsOverlay(
             setVolume(0f, 0f)
         }
     }
+
     DisposableEffect(Unit) {
+        mediaPlayer?.setOnCompletionListener {
+            try {
+                val nextId = CreditsAudioDeck.getNextAudioResId(context, audioResIds)
+                MediaPlayer.create(context, nextId)?.apply {
+                    setVolume(1f, 1f)
+                    start()
+                }
+            } catch (e: Exception) {
+                // Ignore audio transitions on exit
+            }
+        }
         onDispose {
             mediaPlayer?.stop()
             mediaPlayer?.release()
@@ -156,11 +215,13 @@ private fun CreditRoll(lines: List<CreditLine>, progress: Float) {
         lines.sumOf { line ->
             when (line) {
                 is CreditLine.Heading -> 90
-                is CreditLine.Role -> 40
-                is CreditLine.Name -> 60
+                is CreditLine.Role -> 50
+                is CreditLine.Name -> 40
+                is CreditLine.AccentText -> 45
+                is CreditLine.Subtext -> 35
                 is CreditLine.Space -> line.heightDp
             }
-        } * 3.5f
+        } * 3.2f
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -187,17 +248,35 @@ private fun CreditRoll(lines: List<CreditLine>, progress: Float) {
                     is CreditLine.Role -> Text(
                         text = line.text,
                         color = Color.White.copy(alpha = 0.55f),
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 24.dp, bottom = 2.dp)
+                        modifier = Modifier.padding(top = 28.dp, bottom = 6.dp)
                     )
                     is CreditLine.Name -> Text(
                         text = line.text,
                         color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                    is CreditLine.AccentText -> Text(
+                        text = line.text,
+                        color = Color(0xFF9FA8DA),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        fontStyle = FontStyle.Italic,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 32.dp, bottom = 4.dp)
+                    )
+                    is CreditLine.Subtext -> Text(
+                        text = line.text,
+                        color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 12.dp)
                     )
                     is CreditLine.Space -> Spacer(Modifier.height(line.heightDp.dp))
                 }
@@ -280,34 +359,66 @@ fun HoldToRevealTrigger(
 
 val bitCreditLines = listOf(
     CreditLine.Space(120),
-    CreditLine.Heading("BIT"),
-    CreditLine.Name("Offline On-Device AI Assistant"),
-    CreditLine.Space(64),
 
-    CreditLine.Role("CREATED BY"),
-    CreditLine.Name("Nekkanti Jaswanth Sanjay"),
+    CreditLine.Heading("BIT"),
+    CreditLine.Name("Offline On-Device AI Client"),
     CreditLine.Space(48),
 
-    CreditLine.Role("SYSTEM ARCHITECTURE"),
-    CreditLine.Name("Jaswanth Sanjay"),
+    CreditLine.Role("CREATOR & ARCHITECT"),
+    CreditLine.Name("Jaswanth Sanjay Nekkanti"),
+    CreditLine.Space(48),
 
-    CreditLine.Role("INTERFACE DESIGN"),
-    CreditLine.Name("Jaswanth Sanjay"),
+    // ENGINES AND RUNTIMES
+    CreditLine.Role("ENGINES AND RUNTIMES"),
+    CreditLine.Name("llama.kt SDK"),
+    CreditLine.Name("ggml and KleidiAI runtime"),
+    CreditLine.Name("sherpa-onnx by k2-fsa team"),
+    CreditLine.Name("Stable Diffusion engine"),
+    CreditLine.Name("ONNX Runtime"),
+    CreditLine.Name("PDFium and miniz"),
+    CreditLine.Space(48),
 
-    CreditLine.Role("ON-DEVICE INFERENCE"),
-    CreditLine.Name("llama.cpp"),
-    CreditLine.Space(64),
+    // MODELS IN THE CATALOG
+    CreditLine.Role("MODELS IN THE CATALOG"),
+    CreditLine.Name("Llama by Meta AI"),
+    CreditLine.Name("Qwen3 by the Qwen team"),
+    CreditLine.Name("Mistral and Gemma"),
+    CreditLine.Name("Whisper by OpenAI"),
+    CreditLine.Name("Piper voices by Michael Hansen"),
+    CreditLine.Name("Hosted on HuggingFace"),
+    CreditLine.Space(48),
 
+    // DOCUMENT AND RAG PIPELINE
+    CreditLine.Role("DOCUMENT AND RAG PIPELINE"),
+    CreditLine.Name("PDFBox Android by Tom Roush"),
+    CreditLine.Name("Jsoup by Jonathan Hedley"),
+    CreditLine.Name("Apache Commons Compress"),
+    CreditLine.Space(48),
+
+    // ANDROID STACK
+    CreditLine.Role("ANDROID STACK"),
+    CreditLine.Name("Android OS and AOSP"),
+    CreditLine.Name("Jetpack Compose and Material Design 3"),
+    CreditLine.Name("Hilt and Room Database"),
+    CreditLine.Name("Kotlin and Coroutines"),
+    CreditLine.Name("kotlinx.serialization"),
+    CreditLine.Space(48),
+
+    // BUILT WITH
     CreditLine.Role("BUILT WITH"),
-    CreditLine.Name("Kotlin · Jetpack Compose"),
-    CreditLine.Name("Material Design 3"),
+    CreditLine.Name("Android Studio"),
+    CreditLine.Name("Gradle"),
+    CreditLine.Space(48),
+
+    // SPECIAL THANKS
+    CreditLine.Role("SPECIAL THANKS"),
+    CreditLine.Name("Every person who installed this"),
+    CreditLine.Name("Every bug report"),
+    CreditLine.Name("The open-source community"),
     CreditLine.Space(64),
 
-    CreditLine.Role("SPECIAL THANKS"),
-    CreditLine.Name("llama.cpp developers"),
-    CreditLine.Name("Everyone who believed offline-first AI was worth building"),
-    CreditLine.Space(96),
-
-    CreditLine.Heading("Thank you for using BIT"),
+    // FOOTER
+    CreditLine.AccentText("Made with care by Jaswanth Sanjay Nekkanti"),
+    CreditLine.Subtext("Tap anywhere to leave."),
     CreditLine.Space(160)
 )
