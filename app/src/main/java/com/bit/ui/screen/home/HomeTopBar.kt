@@ -80,16 +80,16 @@ internal fun TopBar(
                                 Modifier.hazeEffect(state = hazeState) {
                                     style = dev.chrisbanes.haze.HazeStyle(
                                         backgroundColor = surfaceContainer,
-                                        tint = dev.chrisbanes.haze.HazeTint(Color.Black.copy(alpha = 0.45f)),
+                                        tint = dev.chrisbanes.haze.HazeTint(background.copy(alpha = 0.55f)),
                                         blurRadius = 20.dp,
-                                        noiseFactor = 0.05f
+                                        noiseFactor = 0.03f
                                     )
                                 }
                             } else Modifier
                         )
                         .border(
                             width = 0.5.dp,
-                            color = Color.White.copy(alpha = 0.15f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                             shape = RoundedCornerShape(32.dp)
                         )
                 ) {

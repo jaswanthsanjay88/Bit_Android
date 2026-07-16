@@ -94,7 +94,7 @@ fun EndCreditsOverlay(
     audioResIds: List<Int>,
     lines: List<CreditLine>,
     onDismiss: () -> Unit,
-    scrollDurationMs: Int = 38000
+    scrollDurationMs: Int? = null
 ) {
     val context = LocalContext.current
     var visible by remember { mutableStateOf(true) }
@@ -125,6 +125,14 @@ fun EndCreditsOverlay(
         }
     }
 
+    // Dynamically synchronize credit roll speed with the actual background song duration
+    val effectiveScrollDurationMs = remember(selectedAudioResId, scrollDurationMs) {
+        scrollDurationMs ?: run {
+            val dur = mediaPlayer?.duration ?: -1
+            if (dur > 3000) dur else 22000
+        }
+    }
+
     DisposableEffect(Unit) {
         mediaPlayer?.setOnCompletionListener {
             try {
@@ -152,11 +160,11 @@ fun EndCreditsOverlay(
         }
     }
 
-    LaunchedEffect(Unit) {
-        // Animate credits scroll
+    LaunchedEffect(effectiveScrollDurationMs) {
+        // Animate credits scroll in lockstep with song duration
         animatedScroll.animateTo(
             targetValue = 1f,
-            animationSpec = tween(scrollDurationMs, easing = LinearEasing)
+            animationSpec = tween(effectiveScrollDurationMs, easing = LinearEasing)
         )
 
         // Once scroll finishes, fade out and dismiss

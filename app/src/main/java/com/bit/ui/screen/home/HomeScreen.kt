@@ -182,16 +182,16 @@ fun HomeScreen(
                             onModelSelectedNavigate = onModelSelectedNavigate
                         )
 
-                        // Top Blur Scrim: dynamic progressive vertical blur zone
+                        // Top Blur Scrim: dynamic frosted-glass vertical blur zone
                         com.bit.ui.components.TopBlurScrim(
                             hazeState = hazeState,
                             modifier = Modifier.align(Alignment.TopCenter),
-                            height = 140.dp + with(LocalDensity.current) {
+                            height = 100.dp + with(LocalDensity.current) {
                                 WindowInsets.statusBars.getTop(this).toDp()
                             },
-                            blurRadius = 26.dp,
+                            blurRadius = 20.dp,
                             tintColor = MaterialTheme.colorScheme.background,
-                            tintAlpha = 0.55f
+                            tintAlpha = 0.6f
                         )
 
                         // Top bar floats on top
@@ -201,7 +201,8 @@ fun HomeScreen(
                             onStoreButtonClicked = onStoreButtonClicked,
                             onMenuClick = { drawerState.toggle() },
                             onSettingsClick = onSettingsClick,
-                            showDynamicWindow = { chatViewModel.showDynamicWindow() }
+                            showDynamicWindow = { chatViewModel.showDynamicWindow() },
+                            hazeState = hazeState
                         )
                     }
                 }
