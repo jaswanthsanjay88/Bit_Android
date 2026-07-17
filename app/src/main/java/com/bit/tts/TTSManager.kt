@@ -42,6 +42,8 @@ object TTSManager {
     private val _isModelLoaded = MutableStateFlow(false)
     val isModelLoaded: StateFlow<Boolean> = _isModelLoaded.asStateFlow()
 
+    val playbackAmplitude: StateFlow<Float> = playbackManager.playbackAmplitude
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 

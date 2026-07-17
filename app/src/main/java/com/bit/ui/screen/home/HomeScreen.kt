@@ -169,6 +169,7 @@ fun HomeScreen(
                             toolCallingEnabled = toolCallingEnabled,
                             onModelSelectedNavigate = onModelSelectedNavigate,
                             onLiveVoiceClick = { showLiveVoiceMode = true },
+                            onSettingsClick = onSettingsClick,
                             liquidState = liquidState
                         )
                     }) { paddingValues ->

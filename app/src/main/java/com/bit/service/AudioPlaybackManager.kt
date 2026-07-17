@@ -7,12 +7,18 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Plays synthesized TTS audio (WAV/PCM) via Android AudioTrack.
  * Handles WAV header parsing and completion callbacks.
  */
 class AudioPlaybackManager {
+
+    private val _playbackAmplitude = MutableStateFlow(0f)
+    val playbackAmplitude: StateFlow<Float> = _playbackAmplitude.asStateFlow()
 
     companion object {
         private const val TAG = "AudioPlaybackManager"
@@ -77,12 +83,17 @@ class AudioPlaybackManager {
                 val durationMs = (pcmData.size.toDouble() / (sampleRate * 2) * 1000).toLong()
                 Log.d(TAG, "Expected duration: ${durationMs}ms")
 
+                val bytesPer50ms = (sampleRate * 0.05 * 2).toInt()
                 var elapsed = 0L
                 while (isPlaying && elapsed < durationMs &&
                     audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING
                 ) {
-                    delay(100)
-                    elapsed += 100
+                    val sliceIndex = (elapsed / 50).toInt()
+                    val startOffset = sliceIndex * bytesPer50ms
+                    _playbackAmplitude.value = calculateRms(pcmData, startOffset, bytesPer50ms)
+                    
+                    delay(50)
+                    elapsed += 50
                 }
 
                 Log.i(TAG, "Playback completed")
@@ -94,6 +105,23 @@ class AudioPlaybackManager {
         }
     }
 
+    private fun calculateRms(pcmData: ByteArray, startOffset: Int, length: Int): Float {
+        if (length <= 0 || startOffset + length > pcmData.size) return 0f
+        var sum = 0.0
+        val numSamples = length / 2
+        for (i in 0 until numSamples) {
+            val idx = startOffset + i * 2
+            if (idx + 1 >= pcmData.size) break
+            val low = pcmData[idx].toInt() and 0xFF
+            val high = pcmData[idx + 1].toInt()
+            val sample = ((high shl 8) or low).toShort()
+            sum += sample * sample
+        }
+        val mean = sum / numSamples
+        val rms = Math.sqrt(mean)
+        return (rms / 32767.0).toFloat().coerceIn(0f, 1f)
+    }
+
     fun stop() {
         isPlaying = false
         stopInternal()
@@ -101,6 +129,7 @@ class AudioPlaybackManager {
 
     private fun stopInternal() {
         isPlaying = false
+        _playbackAmplitude.value = 0f
         try {
             audioTrack?.stop()
             audioTrack?.release()

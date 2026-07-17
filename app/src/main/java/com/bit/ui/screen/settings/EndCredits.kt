@@ -227,27 +227,36 @@ fun EndCreditsOverlay(
 
 @Composable
 private fun CreditRoll(lines: List<CreditLine>, progress: Float) {
-    val estimatedTotalHeightPx = remember(lines) {
-        lines.sumOf { line ->
-            when (line) {
-                is CreditLine.Heading -> 90
-                is CreditLine.Role -> 50
-                is CreditLine.Name -> 40
-                is CreditLine.AccentText -> 45
-                is CreditLine.Subtext -> 35
-                is CreditLine.Space -> line.heightDp
-            }
-        } * 3.2f
-    }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val screenHeightPx = constraints.maxHeight.toFloat()
+        
+        val estimatedTotalHeightPx = remember(lines) {
+            lines.sumOf { line ->
+                when (line) {
+                    is CreditLine.Heading -> 90
+                    is CreditLine.Role -> 50
+                    is CreditLine.Name -> 40
+                    is CreditLine.AccentText -> 45
+                    is CreditLine.Subtext -> 35
+                    is CreditLine.Space -> line.heightDp
+                }
+            } * with(density) { 3.2.dp.toPx() }
+        }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+        // Top of column starts exactly at the bottom of the screen (screenHeightPx/2 offset from center)
+        val startY = (screenHeightPx + estimatedTotalHeightPx) / 2f
+        // Bottom of column ends exactly at the top of the screen (-screenHeightPx/2 offset from center)
+        val endY = -(screenHeightPx + estimatedTotalHeightPx) / 2f
+        val currentY = startY + progress * (endY - startY)
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.Center)
                 .graphicsLayer {
-                    translationY = (1f - progress) * (estimatedTotalHeightPx * 0.55f) -
-                        (progress * estimatedTotalHeightPx * 0.55f)
+                    translationY = currentY
                 },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -107,6 +108,8 @@ class ChatViewModel @Inject constructor(
 
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating
+
+    val isLiveVoiceModeActive = mutableStateOf(false)
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
@@ -530,7 +533,9 @@ class ChatViewModel @Inject constructor(
             reportError(hint)
             return
         }
-        if (_isGenerating.value) return
+        if (_isGenerating.value) {
+            stop()
+        }
 
         _isGenerating.value = true
         _streamingUserMessage.value = prompt
@@ -547,7 +552,8 @@ class ChatViewModel @Inject constructor(
         )
         AppStateManager.setHasMessages(true)
 
-        generationJob = viewModelScope.launch {
+        var job: Job? = null
+        job = viewModelScope.launch {
             try {
                 // Let Compose render the StreamingView before native engine saturates CPU
                 kotlinx.coroutines.yield()
@@ -594,9 +600,12 @@ class ChatViewModel @Inject constructor(
                 Log.e(TAG, "Error in sendChat", e)
                 reportError(e.message)
             } finally {
-                resetStreamingState()
+                if (generationJob == job) {
+                    resetStreamingState()
+                }
             }
         }
+        generationJob = job
     }
 
     // Keep old name as alias for backward compatibility with callers
@@ -618,7 +627,9 @@ class ChatViewModel @Inject constructor(
             reportError("Please load a vision projector (proj) first")
             return
         }
-        if (_isGenerating.value) return
+        if (_isGenerating.value) {
+            stop()
+        }
 
         _isGenerating.value = true
         _streamingUserMessage.value = prompt
@@ -644,7 +655,8 @@ class ChatViewModel @Inject constructor(
         )
         AppStateManager.setHasMessages(true)
 
-        generationJob = viewModelScope.launch {
+        var job: Job? = null
+        job = viewModelScope.launch {
             try {
                 // Let Compose render the StreamingView before native engine saturates CPU
                 kotlinx.coroutines.yield()
@@ -743,9 +755,12 @@ class ChatViewModel @Inject constructor(
                 Log.e(TAG, "Error in sendChatWithImages", e)
                 reportError(e.message)
             } finally {
-                resetStreamingState()
+                if (generationJob == job) {
+                    resetStreamingState()
+                }
             }
         }
+        generationJob = job
     }
 
     /**
@@ -790,7 +805,8 @@ class ChatViewModel @Inject constructor(
         currentMetrics = null
         _error.value = null
 
-        generationJob = viewModelScope.launch {
+        var job: Job? = null
+        job = viewModelScope.launch {
             try {
                 val maxTokens = getCurrentModelMaxTokens()
                 val activeProviderType = ActiveModelSession.currentModelType.value
@@ -814,9 +830,12 @@ class ChatViewModel @Inject constructor(
                 restoreRegenerationSnapshot()
                 reportError(e.message)
             } finally {
-                resetStreamingState()
+                if (generationJob == job) {
+                    resetStreamingState()
+                }
             }
         }
+        generationJob = job
     }
 
     private fun restoreRegenerationSnapshot() {
@@ -1967,6 +1986,9 @@ class ChatViewModel @Inject constructor(
      * Returns empty string if no system prompt is configured.
      */
     private suspend fun getCurrentModelSystemPrompt(userQuery: String = "", hasTools: Boolean = false): String {
+        if (isLiveVoiceModeActive.value) {
+            return "You are in Live Voice Mode. Respond to the user in short, highly conversational, natural sentences. Do NOT use lists, headers, bullet points, code blocks, or markdown formatting of any kind. Keep your replies concise (1-3 sentences max) and easy to understand when spoken aloud. Avoid introductory phrases like 'Here is what I found:' or restating the question. Speak naturally, as if in a face-to-face chat."
+        }
         val modelId = ActiveModelSession.currentModelId.value
         val modelConfig = AppContainer.getModelRepository().getConfigByModelId(modelId)
         
