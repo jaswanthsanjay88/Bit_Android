@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.snapshotFlow
+import com.bit.models.messages.ContentType
 import com.bit.models.messages.Messages
 import com.bit.models.messages.Role
 import com.bit.service.AudioCaptureService
@@ -255,7 +256,10 @@ class LiveModeController(
             snapshotFlow {
                 Pair(chatViewModel.messages.lastOrNull(), chatViewModel.isGenerating.value)
             }.collect { (lastMsg, isGenerating) ->
-                if (lastMsg != null && lastMsg.role == Role.Assistant) {
+                val isAssistantText = lastMsg != null && lastMsg.role == Role.Assistant &&
+                        (lastMsg.content.contentType == ContentType.Text || lastMsg.content.contentType == ContentType.TextWithImage)
+
+                if (isAssistantText) {
                     val fullText = lastMsg.content.content
                     val cleanText = cleanTextForLiveVoice(fullText)
  
@@ -279,6 +283,8 @@ class LiveModeController(
                     } else if (isGenerating) {
                         _state.value = LiveModeState.Thinking("Thinking…")
                     }
+                } else if (isGenerating) {
+                    _state.value = LiveModeState.Thinking("Thinking…")
                 }
  
                 // If LLM finished generation
@@ -405,17 +411,24 @@ fun LiveVoiceOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.padding(bottom = 16.dp)
             ) {
-                if (state is LiveModeState.Speaking || state is LiveModeState.Listening) {
+                val statusText = when (state) {
+                    is LiveModeState.Speaking -> "Tap anywhere to interrupt"
+                    is LiveModeState.Listening -> "Listening..."
+                    is LiveModeState.Thinking -> "Thinking..."
+                    else -> ""
+                }
+                if (statusText.isNotEmpty()) {
                     Text(
-                        text = "Tap anywhere to interrupt",
+                        text = statusText,
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.5f),
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                 }
 
                 Surface(
-                    color = Color(0xFF1F1F1F),
+                    color = Color(0xCC1F1F1F),
                     shape = RoundedCornerShape(100.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF)),
                     shadowElevation = 8.dp
@@ -431,7 +444,7 @@ fun LiveVoiceOverlay(
                             onClick = { /* Add prompt attachment */ },
                             modifier = Modifier
                                 .size(48.dp)
-                                .background(Color(0x22FFFFFF), CircleShape)
+                                .background(Color(0xFF2A2A2A), CircleShape)
                         ) {
                             Icon(TnIcons.Plus, contentDescription = "Add", tint = Color.White)
                         }
@@ -439,9 +452,9 @@ fun LiveVoiceOverlay(
                         // Center Stop / Mic button
                         IconButton(
                             onClick = {
-                                if (state is LiveModeState.Speaking || state is LiveModeState.Listening) {
+                                if (state is LiveModeState.Speaking || state is LiveModeState.Thinking) {
                                     controller.interrupt()
-                                } else {
+                                } else if (state is LiveModeState.Idle) {
                                     controller.start()
                                 }
                             },
@@ -450,7 +463,7 @@ fun LiveVoiceOverlay(
                                 .background(Color.White, CircleShape)
                         ) {
                             Icon(
-                                imageVector = if (state is LiveModeState.Speaking || state is LiveModeState.Listening) TnIcons.PlayerStop else TnIcons.LiveWaveform,
+                                imageVector = if (state is LiveModeState.Speaking || state is LiveModeState.Thinking) TnIcons.PlayerStop else TnIcons.LiveWaveform,
                                 contentDescription = "Stop or Start",
                                 tint = Color.Black,
                                 modifier = Modifier.size(24.dp)
@@ -462,7 +475,7 @@ fun LiveVoiceOverlay(
                             onClick = onClose,
                             modifier = Modifier
                                 .size(48.dp)
-                                .background(Color(0x22FFFFFF), CircleShape)
+                                .background(Color(0xFF2A2A2A), CircleShape)
                         ) {
                             Icon(TnIcons.X, contentDescription = "Close Live Mode", tint = Color.White)
                         }
@@ -675,17 +688,26 @@ fun LiveLogoVisual(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            VoiceWaveform(
-                amplitude = effectiveAmp,
-                isAnimating = state is LiveModeState.Listening || state is LiveModeState.Speaking,
-                modifier = Modifier
-                    .size(48.dp)
-                    .graphicsLayer {
-                        if (state is LiveModeState.Thinking) {
-                            alpha = breathingAlpha
+            if (state is LiveModeState.Thinking || state is LiveModeState.Speaking) {
+                Icon(
+                    imageVector = TnIcons.PlayerStop,
+                    contentDescription = "Stop Icon",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .graphicsLayer {
+                            if (state is LiveModeState.Thinking) {
+                                alpha = breathingAlpha
+                            }
                         }
-                    }
-            )
+                )
+            } else {
+                VoiceWaveform(
+                    amplitude = effectiveAmp,
+                    isAnimating = state is LiveModeState.Listening,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
         }
     }
 }
