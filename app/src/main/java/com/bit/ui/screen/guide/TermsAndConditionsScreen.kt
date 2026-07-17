@@ -41,7 +41,7 @@ fun TermsAndConditionsScreen(
             Spacer(modifier = Modifier.height(40.dp))
 
             Text(
-                text = "Terms & Conditions",
+                text = "Terms & Conditions (Version 3.1)",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold
                 ),
@@ -50,7 +50,7 @@ fun TermsAndConditionsScreen(
             )
 
             Text(
-                text = "Please read carefully before using BIT",
+                text = "Please read carefully before using BIT Local AI Assistant",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 modifier = Modifier.padding(bottom = Standards.SpacingXl)
@@ -66,7 +66,7 @@ fun TermsAndConditionsScreen(
                 TermsSection(
                     title = "1. Acceptance of Terms",
                     content = """
-                        By downloading, installing, or using BIT ("the App"), you agree to be bound by these Terms and Conditions (Version 2.0). If you do not agree to these terms, you must immediately uninstall the App and discontinue its use.
+                        By downloading, installing, accessing, or using BIT ("the App"), you agree to be bound by these Terms and Conditions (Version 3.1). If you do not agree to all of these terms, you must immediately uninstall the App and cease its use.
                     """.trimIndent()
                 )
 

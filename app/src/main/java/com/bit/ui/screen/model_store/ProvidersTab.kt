@@ -138,7 +138,14 @@ private fun ProviderListView(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         val iconRes = com.bit.ui.components.providerIcon(provider)
-                        if (iconRes != 0) {
+                        if (provider.equals("Hugging Face", ignoreCase = true)) {
+                            Icon(
+                                imageVector = TnIcons.HuggingFace,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        } else if (iconRes != 0) {
                             Icon(
                                 painter = androidx.compose.ui.res.painterResource(id = iconRes),
                                 contentDescription = null,
@@ -202,17 +209,20 @@ private fun ProviderDetailView(
     llmModelViewModel: com.bit.viewmodel.LLMModelViewModel,
     onBack: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val installedModels by viewModel.installedModels.collectAsState()
     val cleanName = providerName.lowercase(Locale.US).replace(" ", "-")
     val modelId = "api-$cleanName"
 
-    val existingModel = installedModels.firstOrNull { it.id == modelId }
+    val existingModel = remember(installedModels, modelId) {
+        installedModels.firstOrNull { it.id == modelId }
+    }
 
-    var isEnabled by remember { mutableStateOf(existingModel != null) }
-    var isActiveModel by remember { mutableStateOf(existingModel?.isActive ?: false) }
+    var isEnabled by remember(existingModel) { mutableStateOf(existingModel != null) }
+    var isActiveModel by remember(existingModel) { mutableStateOf(existingModel?.isActive ?: false) }
 
-    var endpointUrl by remember {
+    var endpointUrl by remember(existingModel) {
         mutableStateOf(
             when (providerName) {
                 "Google Gemini" -> "https://generativelanguage.googleapis.com/v1beta"
@@ -227,7 +237,7 @@ private fun ProviderDetailView(
         )
     }
 
-    var modelName by remember {
+    var modelName by remember(existingModel) {
         mutableStateOf(
             when (providerName) {
                 "Google Gemini" -> "gemini-1.5-flash"
@@ -241,7 +251,7 @@ private fun ProviderDetailView(
         )
     }
 
-    var apiKey by remember { mutableStateOf("") }
+    var apiKey by remember(existingModel) { mutableStateOf("") }
     var testStatus by remember { mutableStateOf<String?>(null) }
     var isTesting by remember { mutableStateOf(false) }
 
@@ -255,9 +265,12 @@ private fun ProviderDetailView(
             val config = viewModel.getModelConfig(model.id)
             config?.let { cfg ->
                 val json = JSONObject(cfg.modelLoadingParams ?: "{}")
-                endpointUrl = json.optString("endpoint", endpointUrl)
-                modelName = json.optString("model", modelName)
-                apiKey = json.optString("authHeader", "")
+                val loadedEndpoint = json.optString("endpoint", "")
+                val loadedModel = json.optString("model", "")
+                val loadedKey = json.optString("authHeader", "")
+                if (loadedEndpoint.isNotEmpty()) endpointUrl = loadedEndpoint
+                if (loadedModel.isNotEmpty()) modelName = loadedModel
+                apiKey = loadedKey
             }
         }
     }
@@ -286,14 +299,22 @@ private fun ProviderDetailView(
 
         OutlinedTextField(
             value = endpointUrl,
-            onValueChange = { endpointUrl = it; availableModels = emptyList() },
+            onValueChange = {
+                endpointUrl = it
+                availableModels = emptyList()
+                if (it.isNotBlank()) isEnabled = true
+            },
             label = { Text("Base Endpoint URL") },
             modifier = Modifier.fillMaxWidth()
         )
 
         OutlinedTextField(
             value = apiKey,
-            onValueChange = { apiKey = it; availableModels = emptyList() },
+            onValueChange = {
+                apiKey = it
+                availableModels = emptyList()
+                if (it.isNotBlank()) isEnabled = true
+            },
             label = { Text("API Key / Access Token") },
             modifier = Modifier.fillMaxWidth()
         )
@@ -336,7 +357,10 @@ private fun ProviderDetailView(
         Box(modifier = Modifier.fillMaxWidth()) {
             OutlinedTextField(
                 value = modelName,
-                onValueChange = { modelName = it },
+                onValueChange = {
+                    modelName = it
+                    if (it.isNotBlank()) isEnabled = true
+                },
                 label = { Text("Model ID") },
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
@@ -358,6 +382,7 @@ private fun ProviderDetailView(
                             text = { Text(model, color = MaterialTheme.colorScheme.onSurface) },
                             onClick = {
                                 modelName = model
+                                isEnabled = true
                                 modelDropdownExpanded = false
                             }
                         )
@@ -452,7 +477,8 @@ private fun ProviderDetailView(
             onClick = {
                 coroutineScope.launch {
                     val db = com.bit.di.AppContainer.getModelRepository()
-                    if (isEnabled) {
+                    val shouldSave = isEnabled || (endpointUrl.isNotBlank() && modelName.isNotBlank())
+                    if (shouldSave) {
                         val model = Model(
                             id = modelId,
                             modelName = "$modelName ($providerName)",
@@ -479,6 +505,7 @@ private fun ProviderDetailView(
                         db.insertConfig(config)
 
                         if (isActiveModel) {
+                            com.bit.data.AppSettingsDataStore(context).saveLastModelId(modelId)
                             llmModelViewModel.loadModel(model)
                         }
                     } else {
@@ -486,8 +513,8 @@ private fun ProviderDetailView(
                         db.getConfigByModelId(modelId)?.let { db.deleteConfig(it) }
                     }
 
-                    // Reload models in Store VM list
-                    viewModel.loadModels()
+                    // Reload installed models list in Store VM
+                    viewModel.loadInstalledModels()
                     onBack()
                 }
             },

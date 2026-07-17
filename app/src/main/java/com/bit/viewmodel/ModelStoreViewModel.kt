@@ -215,7 +215,7 @@ class ModelStoreViewModel @Inject constructor(
         }
     }
 
-    private fun loadInstalledModels() {
+    fun loadInstalledModels() {
         viewModelScope.launch {
             try {
                 systemRepo.getAllModels().collect { installedList ->
