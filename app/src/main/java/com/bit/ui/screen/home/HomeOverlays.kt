@@ -64,10 +64,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import com.bit.ui.theme.BitGlassStyle
-import com.bit.ui.theme.glassEdge
 import com.bit.ui.theme.BitColors
 
 
@@ -244,12 +240,8 @@ internal fun FloatingTtsPlayer(
     isSynthesizing: Boolean,
     onPlayPauseToggle: () -> Unit,
     onClose: () -> Unit,
-    modifier: Modifier = Modifier,
-    hazeState: HazeState? = null
+    modifier: Modifier = Modifier
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val useGlass = remember(context) { BitGlassStyle.shouldUseGlass(context) }
-
     // Dynamic timer
     var seconds by remember { mutableIntStateOf(0) }
     LaunchedEffect(isPlaying) {
@@ -275,17 +267,11 @@ internal fun FloatingTtsPlayer(
             .padding(horizontal = Standards.SpacingLg)
             .fillMaxWidth()
             .height(54.dp)
-            .then(
-                if (useGlass && hazeState != null) {
-                    Modifier.hazeEffect(state = hazeState, style = BitGlassStyle.default)
-                        .glassEdge(27.dp)
-                } else {
-                    Modifier.border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(27.dp))
-                }
-            ),
-        color = if (useGlass && hazeState != null) Color.Transparent else Color(0xFF0F0F11),
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), RoundedCornerShape(27.dp)),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(27.dp),
-        tonalElevation = 8.dp
+        tonalElevation = 6.dp
     ) {
         Row(
             modifier = Modifier

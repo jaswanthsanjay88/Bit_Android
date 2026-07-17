@@ -101,7 +101,6 @@ import com.bit.viewmodel.PluginViewModel
 import com.bit.viewmodel.RagViewModel
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
-import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
@@ -117,8 +116,7 @@ internal fun BottomBar(
     memoryViewModel: MemoryViewModel = hiltViewModel(),
     toolCallingEnabled: Boolean = true,
     onModelSelectedNavigate: (Model) -> Unit = {},
-    liquidState: LiquidState? = null,
-    hazeState: HazeState? = null
+    liquidState: LiquidState? = null
 ) {
     val context = LocalContext.current
     var value by remember { mutableStateOf("") }

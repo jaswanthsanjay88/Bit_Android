@@ -94,7 +94,7 @@ fun EndCreditsOverlay(
     audioResIds: List<Int>,
     lines: List<CreditLine>,
     onDismiss: () -> Unit,
-    scrollDurationMs: Int? = null
+    scrollDurationMs: Int = 38000
 ) {
     val context = LocalContext.current
     var visible by remember { mutableStateOf(true) }
@@ -117,58 +117,66 @@ fun EndCreditsOverlay(
         CreditsAudioDeck.getNextAudioResId(context, audioResIds)
     }
 
+    // Track the active MediaPlayer so completion-spawned players are also released on dismiss
+    val activePlayer = remember { mutableStateOf<MediaPlayer?>(null) }
+
     // --- audio playback lifecycle ---
-    val mediaPlayer = remember {
-        MediaPlayer.create(context, selectedAudioResId)?.apply {
+    DisposableEffect(Unit) {
+        val player = MediaPlayer.create(context, selectedAudioResId)?.apply {
             isLooping = false
             setVolume(0f, 0f)
         }
-    }
+        activePlayer.value = player
 
-    // Dynamically synchronize credit roll speed with the actual background song duration
-    val effectiveScrollDurationMs = remember(selectedAudioResId, scrollDurationMs) {
-        scrollDurationMs ?: run {
-            val dur = mediaPlayer?.duration ?: -1
-            if (dur > 3000) dur else 22000
-        }
-    }
-
-    DisposableEffect(Unit) {
-        mediaPlayer?.setOnCompletionListener {
+        player?.setOnCompletionListener { finished ->
+            finished.release()
             try {
                 val nextId = CreditsAudioDeck.getNextAudioResId(context, audioResIds)
-                MediaPlayer.create(context, nextId)?.apply {
+                val next = MediaPlayer.create(context, nextId)?.apply {
                     setVolume(1f, 1f)
-                    start()
+                    setOnCompletionListener { it2 ->
+                        it2.release()
+                        // Continue chain if credits are still visible
+                    }
                 }
-            } catch (e: Exception) {
+                activePlayer.value = next
+                next?.start()
+            } catch (_: Exception) {
                 // Ignore audio transitions on exit
             }
         }
+
         onDispose {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
+            val p = activePlayer.value
+            try {
+                p?.stop()
+            } catch (_: Exception) { }
+            try {
+                p?.release()
+            } catch (_: Exception) { }
+            activePlayer.value = null
         }
     }
 
+    // Unified orchestration: fade-in audio first, then scroll credits in sync
     LaunchedEffect(Unit) {
-        // Start audio fade-in
-        mediaPlayer?.start()
+        val player = activePlayer.value
+
+        // Phase 1: Start audio and fade volume in over ~600ms
+        player?.start()
         for (i in 0..10) {
-            mediaPlayer?.setVolume(i / 10f, i / 10f)
+            player?.setVolume(i / 10f, i / 10f)
             delay(60)
         }
-    }
 
-    LaunchedEffect(effectiveScrollDurationMs) {
-        // Animate credits scroll in lockstep with song duration
+        // Phase 2: Now that music is audible, begin the credits scroll
         animatedScroll.animateTo(
             targetValue = 1f,
-            animationSpec = tween(effectiveScrollDurationMs, easing = LinearEasing)
+            animationSpec = tween(scrollDurationMs, easing = LinearEasing)
         )
 
-        // Once scroll finishes, fade out and dismiss
-        delay(800)
+        // Phase 3: Scroll complete — hold briefly, then dismiss
+        delay(500)
         visible = false
     }
 

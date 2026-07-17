@@ -40,8 +40,6 @@ import com.bit.ui.components.LocalCodeHighlightEnabled
 import com.bit.ui.components.rememberRevealDrawerState
 import com.bit.viewmodel.ChatViewModel
 import com.bit.viewmodel.LLMModelViewModel
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.rememberHazeState
 import io.github.fletchmckee.liquid.rememberLiquidState
 import kotlinx.coroutines.launch
 
@@ -68,7 +66,6 @@ fun HomeScreen(
     val toolCallingEnabled by appSettings.toolCallingEnabled
          .collectAsStateWithLifecycle(initialValue = true)
     val liquidState = rememberLiquidState()
-    val hazeState = rememberHazeState()
 
     val density = LocalDensity.current
     val drawerWidth = 280.dp
@@ -168,8 +165,7 @@ fun HomeScreen(
                             llmModelViewModel = llmModelViewModel,
                             toolCallingEnabled = toolCallingEnabled,
                             onModelSelectedNavigate = onModelSelectedNavigate,
-                            liquidState = liquidState,
-                            hazeState = hazeState
+                            liquidState = liquidState
                         )
                     }) { paddingValues ->
                     Box(modifier = Modifier.fillMaxSize()) {
@@ -178,20 +174,17 @@ fun HomeScreen(
                             chatViewModel = chatViewModel,
                             llmModelViewModel = llmModelViewModel,
                             liquidState = liquidState,
-                            hazeState = hazeState,
                             onModelSelectedNavigate = onModelSelectedNavigate
                         )
 
-                        // Top Blur Scrim: dynamic frosted-glass vertical blur zone
+                        // Top Blur Scrim: scratch progressive vertical blur zone
                         com.bit.ui.components.TopBlurScrim(
-                            hazeState = hazeState,
                             modifier = Modifier.align(Alignment.TopCenter),
-                            height = 100.dp + with(LocalDensity.current) {
+                            height = 140.dp + with(LocalDensity.current) {
                                 WindowInsets.statusBars.getTop(this).toDp()
                             },
-                            blurRadius = 20.dp,
-                            tintColor = MaterialTheme.colorScheme.background,
-                            tintAlpha = 0.6f
+                            maxBlurRadius = 28.dp,
+                            scrimColor = MaterialTheme.colorScheme.background
                         )
 
                         // Top bar floats on top
@@ -201,8 +194,7 @@ fun HomeScreen(
                             onStoreButtonClicked = onStoreButtonClicked,
                             onMenuClick = { drawerState.toggle() },
                             onSettingsClick = onSettingsClick,
-                            showDynamicWindow = { chatViewModel.showDynamicWindow() },
-                            hazeState = hazeState
+                            showDynamicWindow = { chatViewModel.showDynamicWindow() }
                         )
                     }
                 }

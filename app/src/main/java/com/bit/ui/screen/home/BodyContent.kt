@@ -37,9 +37,6 @@ import com.bit.viewmodel.RagState
 import com.bit.viewmodel.ChatConfigState
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
 
 // ── Pre-compiled regex (avoid allocation in composition) ──
 
@@ -196,7 +193,6 @@ fun BodyContent(
     chatViewModel: ChatViewModel,
     llmModelViewModel: LLMModelViewModel,
     liquidState: LiquidState? = null,
-    hazeState: HazeState = rememberHazeState(),
     onModelSelectedNavigate: (Model) -> Unit = {}
 ) {
     val messages = chatViewModel.messages
@@ -234,7 +230,6 @@ fun BodyContent(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .then(if (liquidState != null) Modifier.liquefiable(liquidState) else Modifier)
-            .hazeSource(state = hazeState)
             .padding(
                 bottom = paddingValues.calculateBottomPadding()
             )
