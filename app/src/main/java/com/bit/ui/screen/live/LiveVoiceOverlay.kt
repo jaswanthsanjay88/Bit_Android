@@ -86,6 +86,7 @@ class LiveModeController(
 
     private var silenceStartTime = 0L
     private var hasSpokenInSession = false
+    private var previousMessages = setOf<Messages>()
 
     fun start() {
         if (!audioCaptureService.hasRecordPermission()) {
@@ -97,6 +98,7 @@ class LiveModeController(
             return
         }
 
+        previousMessages = chatViewModel.messages.toSet()
         chatViewModel.isLiveVoiceModeActive.value = true
         _state.value = LiveModeState.Listening
         startListeningLoop()
@@ -122,12 +124,20 @@ class LiveModeController(
         startListeningLoop()
     }
 
+    fun stopAndTranscribe() {
+        if (_state.value is LiveModeState.Listening) {
+            _state.value = LiveModeState.Thinking("Processing speech…")
+            onUserSpeechFinished()
+        }
+    }
+
     fun submitPrompt(prompt: String) {
         if (prompt.isBlank()) return
         TTSManager.stopPlayback()
         captureJob?.cancel()
         audioCaptureService.stopCapture()
 
+        previousMessages = chatViewModel.messages.toSet()
         _state.value = LiveModeState.Thinking(prompt)
         chatViewModel.sendTextMessage(prompt)
 
@@ -150,7 +160,7 @@ class LiveModeController(
                     when (val currentState = _state.value) {
                         is LiveModeState.Listening -> {
                             pcmStream.write(chunk)
-                            if (rms > 0.03f) {
+                            if (rms > 0.015f) {
                                 hasSpokenInSession = true
                                 silenceStartTime = 0L
                             } else if (hasSpokenInSession) {
@@ -158,6 +168,7 @@ class LiveModeController(
                                     silenceStartTime = System.currentTimeMillis()
                                 } else if (System.currentTimeMillis() - silenceStartTime > 650) {
                                     // 650ms silence detected after user speech -> finish speech
+                                    _state.value = LiveModeState.Thinking("Processing speech…")
                                     onUserSpeechFinished()
                                 }
                             }
@@ -256,7 +267,7 @@ class LiveModeController(
             snapshotFlow {
                 Pair(chatViewModel.messages.lastOrNull(), chatViewModel.isGenerating.value)
             }.collect { (lastMsg, isGenerating) ->
-                val isAssistantText = lastMsg != null && lastMsg.role == Role.Assistant &&
+                val isAssistantText = lastMsg != null && lastMsg !in previousMessages && lastMsg.role == Role.Assistant &&
                         (lastMsg.content.contentType == ContentType.Text || lastMsg.content.contentType == ContentType.TextWithImage)
 
                 if (isAssistantText) {
@@ -322,6 +333,80 @@ fun LiveVoiceOverlay(
         }
     }
 
+    val infiniteTransition = rememberInfiniteTransition(label = "glow_visual")
+
+    // Thinking state breathing loop
+    val breathingScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.15f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "thinking_breathing_scale"
+    )
+    val breathingAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "thinking_breathing_alpha"
+    )
+
+    // Idle state breathing loop
+    val idleBreathingScale by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 0.95f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "idle_breathing_scale"
+    )
+    val idleBreathingAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 0.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "idle_breathing_alpha"
+    )
+
+    val playbackLevel by TTSManager.playbackAmplitude.collectAsState()
+
+    val effectiveAmp = when (state) {
+        is LiveModeState.Listening -> audioLevel.coerceIn(0f, 1f)
+        is LiveModeState.Speaking -> playbackLevel.coerceIn(0f, 1f)
+        else -> 0f
+    }
+
+    val targetGlowScale = when (state) {
+        is LiveModeState.Thinking -> breathingScale
+        is LiveModeState.Listening, is LiveModeState.Speaking -> 0.9f + (effectiveAmp * 0.4f)
+        else -> idleBreathingScale
+    }
+
+    val targetGlowAlpha = when (state) {
+        is LiveModeState.Thinking -> breathingAlpha
+        is LiveModeState.Listening, is LiveModeState.Speaking -> (0.4f + (effectiveAmp * 0.4f)).coerceIn(0.4f, 0.8f)
+        else -> idleBreathingAlpha
+    }
+
+    val glowScale by animateFloatAsState(
+        targetValue = targetGlowScale,
+        animationSpec = tween(150, easing = FastOutSlowInEasing),
+        label = "glow_scale"
+    )
+
+    val glowAlpha by animateFloatAsState(
+        targetValue = targetGlowAlpha,
+        animationSpec = tween(150, easing = FastOutSlowInEasing),
+        label = "glow_alpha"
+    )
+
     val suggestions = remember {
         listOf(
             "Italian pasta dishes",
@@ -345,6 +430,27 @@ fun LiveVoiceOverlay(
                 }
             }
     ) {
+        // Bottom reactive glow (behind the control bar)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.6f)
+                .align(Alignment.BottomCenter)
+                .graphicsLayer {
+                    scaleX = glowScale
+                    scaleY = glowScale
+                    alpha = glowAlpha
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1.0f)
+                }
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.35f)
+                        )
+                    )
+                )
+        )
         // Top Blur Scrim
         TopBlurScrim(height = 90.dp)
 
@@ -369,16 +475,12 @@ fun LiveVoiceOverlay(
                 }
             }
 
-            // Center: Live Animated Logo Visual & Spoken Captions
+            // Center: Spoken Captions
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier.weight(1f)
             ) {
-                LiveLogoVisual(state = state, audioLevel = audioLevel)
-
-                Spacer(modifier = Modifier.height(36.dp))
-
                 // Caption text
                 AnimatedContent(
                     targetState = state,
@@ -454,6 +556,8 @@ fun LiveVoiceOverlay(
                             onClick = {
                                 if (state is LiveModeState.Speaking || state is LiveModeState.Thinking) {
                                     controller.interrupt()
+                                } else if (state is LiveModeState.Listening) {
+                                    controller.stopAndTranscribe()
                                 } else if (state is LiveModeState.Idle) {
                                     controller.start()
                                 }
@@ -486,228 +590,4 @@ fun LiveVoiceOverlay(
     }
 }
 
-@Composable
-fun VoiceWaveform(
-    amplitude: Float,
-    isAnimating: Boolean,
-    modifier: Modifier = Modifier,
-    barCount: Int = 7
-) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val currentAmplitude by rememberUpdatedState(amplitude)
-    val amplitudes = remember { mutableStateOf(FloatArray(barCount) { 0.05f }) }
 
-    LaunchedEffect(isAnimating) {
-        if (!isAnimating) {
-            amplitudes.value = FloatArray(barCount) { 0.05f }
-            return@LaunchedEffect
-        }
-        while (true) {
-            val current = amplitudes.value
-            val next = FloatArray(barCount)
-            for (i in 0 until barCount - 1) {
-                next[i] = current[i + 1]
-            }
-            next[barCount - 1] = currentAmplitude.coerceIn(0.02f, 1.0f)
-            amplitudes.value = next
-            delay(80L)
-        }
-    }
-
-    val transition = rememberInfiniteTransition(label = "waveform_breathing")
-    val breathingValues = (0 until barCount).map { i ->
-        transition.animateFloat(
-            initialValue = 0.8f,
-            targetValue = 1.2f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(1200 + i * 150, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "breath_$i"
-        )
-    }
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        val baseRatios = floatArrayOf(0.2f, 0.45f, 0.75f, 1.0f, 0.75f, 0.45f, 0.2f)
-        val currentAmps = amplitudes.value
-
-        for (i in 0 until barCount) {
-            val amp = currentAmps[i]
-            val breath = breathingValues[i].value
-            
-            val multiplier = if (amplitude > 0.01f) {
-                (0.2f + amp * 0.8f)
-            } else {
-                (0.3f + 0.15f * breath)
-            }
-            
-            val targetHeightFraction = (baseRatios[i] * multiplier).coerceIn(0.1f, 1.0f)
-            val animatedHeightFraction by animateFloatAsState(
-                targetValue = targetHeightFraction,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessLow
-                ),
-                label = "bar_height_$i"
-            )
-
-            Spacer(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight(animatedHeightFraction)
-                    .background(
-                        color = Color.White.copy(alpha = 0.4f + animatedHeightFraction * 0.6f),
-                        shape = RoundedCornerShape(2.dp)
-                    )
-            )
-        }
-    }
-}
-
-// ── Live Logo Visual Composable ──────────────────────────────────────────────
-
-@Composable
-fun LiveLogoVisual(
-    state: LiveModeState,
-    audioLevel: Float,
-    modifier: Modifier = Modifier
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "logo_visual")
-
-    // Thinking state breathing loop
-    val breathingScale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "thinking_breathing_scale"
-    )
-    val breathingAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.7f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "thinking_breathing_alpha"
-    )
-
-    // Idle state breathing loop
-    val idleBreathingScale by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 0.95f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "idle_breathing_scale"
-    )
-    val idleBreathingAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.15f,
-        targetValue = 0.25f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "idle_breathing_alpha"
-    )
-
-    // Collect physical playback level from TTS
-    val playbackLevel by TTSManager.playbackAmplitude.collectAsState()
-
-    val effectiveAmp = when (state) {
-        is LiveModeState.Listening -> audioLevel.coerceIn(0f, 1f)
-        is LiveModeState.Speaking -> playbackLevel.coerceIn(0f, 1f)
-        else -> 0f
-    }
-
-    val targetGlowScale = when (state) {
-        is LiveModeState.Thinking -> breathingScale
-        is LiveModeState.Listening, is LiveModeState.Speaking -> 0.9f + (effectiveAmp * 0.4f)
-        else -> idleBreathingScale
-    }
-
-    val targetGlowAlpha = when (state) {
-        is LiveModeState.Thinking -> breathingAlpha
-        is LiveModeState.Listening, is LiveModeState.Speaking -> (0.4f + (effectiveAmp * 0.4f)).coerceIn(0.4f, 0.8f)
-        else -> idleBreathingAlpha
-    }
-
-    val glowScale by animateFloatAsState(
-        targetValue = targetGlowScale,
-        animationSpec = tween(150, easing = FastOutSlowInEasing),
-        label = "glow_scale"
-    )
-
-    val glowAlpha by animateFloatAsState(
-        targetValue = targetGlowAlpha,
-        animationSpec = tween(150, easing = FastOutSlowInEasing),
-        label = "glow_alpha"
-    )
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier.size(280.dp)
-    ) {
-        // Outer pulsing gradient glow (heavy blur)
-        Box(
-            modifier = Modifier
-                .size(240.dp)
-                .graphicsLayer {
-                    scaleX = glowScale
-                    scaleY = glowScale
-                }
-                .blur(40.dp)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = glowAlpha),
-                            Color.White.copy(alpha = glowAlpha * 0.4f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = CircleShape
-                )
-        )
-
-        // Middle ring container (un-blurred, un-scaled)
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .background(Color(0xFF151515), CircleShape)
-                .border(
-                    width = 1.dp,
-                    color = Color.White.copy(alpha = if (state is LiveModeState.Thinking) 0.8f else 0.3f),
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            if (state is LiveModeState.Thinking || state is LiveModeState.Speaking) {
-                Icon(
-                    imageVector = TnIcons.PlayerStop,
-                    contentDescription = "Stop Icon",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .graphicsLayer {
-                            if (state is LiveModeState.Thinking) {
-                                alpha = breathingAlpha
-                            }
-                        }
-                )
-            } else {
-                VoiceWaveform(
-                    amplitude = effectiveAmp,
-                    isAnimating = state is LiveModeState.Listening,
-                    modifier = Modifier.size(48.dp)
-                )
-            }
-        }
-    }
-}
