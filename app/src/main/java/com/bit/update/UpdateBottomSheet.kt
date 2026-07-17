@@ -62,7 +62,8 @@ fun UpdateBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = BitColors.Surface
+        containerColor = BitColors.Surface,
+        contentColor = BitColors.TextPrimary
     ) {
         Column(
             modifier = Modifier

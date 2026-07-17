@@ -116,6 +116,7 @@ internal fun BottomBar(
     memoryViewModel: MemoryViewModel = hiltViewModel(),
     toolCallingEnabled: Boolean = true,
     onModelSelectedNavigate: (Model) -> Unit = {},
+    onLiveVoiceClick: () -> Unit = {},
     liquidState: LiquidState? = null
 ) {
     val context = LocalContext.current
@@ -755,27 +756,54 @@ internal fun BottomBar(
                                         )
                                     )
                                 } else {
-                                    // White/Transparent Mic Button in Black & White
-                                    ActionButton(
-                                        onClickListener = {
-                                            val hasPermission = ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.RECORD_AUDIO
-                                            ) == PackageManager.PERMISSION_GRANTED
-                                            if (hasPermission) {
-                                                chatViewModel.startSttRecording()
-                                            } else {
-                                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                            }
-                                        },
-                                        icon = TnIcons.Microphone,
-                                        contentDescription = "Voice typing",
-                                        modifier = Modifier.size(36.dp),
-                                        colors = IconButtonDefaults.filledIconButtonColors(
-                                            containerColor = Color(0x22FFFFFF),
-                                            contentColor = Color.White
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Voice typing STT button
+                                        ActionButton(
+                                            onClickListener = {
+                                                val hasPermission = ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.RECORD_AUDIO
+                                                ) == PackageManager.PERMISSION_GRANTED
+                                                if (hasPermission) {
+                                                    chatViewModel.startSttRecording()
+                                                } else {
+                                                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                                }
+                                            },
+                                            icon = TnIcons.Microphone,
+                                            contentDescription = "Voice typing",
+                                            modifier = Modifier.size(36.dp),
+                                            colors = IconButtonDefaults.filledIconButtonColors(
+                                                containerColor = Color(0x22FFFFFF),
+                                                contentColor = Color.White
+                                            )
                                         )
-                                    )
+
+                                        // Live Voice Mode button (Black & White waveform pill)
+                                        ActionButton(
+                                            onClickListener = {
+                                                val hasPermission = ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.RECORD_AUDIO
+                                                ) == PackageManager.PERMISSION_GRANTED
+                                                if (hasPermission) {
+                                                    onLiveVoiceClick()
+                                                } else {
+                                                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                                }
+                                            },
+                                            icon = TnIcons.Sparkles,
+                                            contentDescription = "Live Voice Mode",
+                                            modifier = Modifier.size(36.dp),
+                                            colors = IconButtonDefaults.filledIconButtonColors(
+                                                containerColor = Color.White,
+                                                contentColor = Color.Black
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }

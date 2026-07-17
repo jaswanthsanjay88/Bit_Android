@@ -1,6 +1,7 @@
 package com.bit.update
 
-import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -35,13 +36,14 @@ fun MarkdownText(
     color: Color = BitColors.TextPrimary,
     secondaryColor: Color = BitColors.TextSecondary
 ) {
-    val annotated = remember(markdown) {
+    val annotated = remember(markdown, color, secondaryColor) {
         parseMarkdown(markdown, color, secondaryColor)
     }
 
-    BasicText(
+    Text(
         text = annotated,
-        modifier = modifier
+        modifier = modifier,
+        style = MaterialTheme.typography.bodyMedium.copy(color = color)
     )
 }
 
@@ -53,8 +55,9 @@ private fun parseMarkdown(
     baseColor: Color,
     secondaryColor: Color
 ): AnnotatedString = buildAnnotatedString {
-    val lines = raw.lines()
-    var prevBlank = false
+    withStyle(SpanStyle(color = baseColor)) {
+        val lines = raw.lines()
+        var prevBlank = false
 
     for ((index, rawLine) in lines.withIndex()) {
         val line = rawLine.trimEnd()
@@ -124,6 +127,7 @@ private fun parseMarkdown(
             }
         }
     }
+}
 }
 
 /**

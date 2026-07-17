@@ -24,8 +24,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -66,6 +68,7 @@ fun HomeScreen(
     val toolCallingEnabled by appSettings.toolCallingEnabled
          .collectAsStateWithLifecycle(initialValue = true)
     val liquidState = rememberLiquidState()
+    var showLiveVoiceMode by remember { mutableStateOf(false) }
 
     val density = LocalDensity.current
     val drawerWidth = 280.dp
@@ -165,6 +168,7 @@ fun HomeScreen(
                             llmModelViewModel = llmModelViewModel,
                             toolCallingEnabled = toolCallingEnabled,
                             onModelSelectedNavigate = onModelSelectedNavigate,
+                            onLiveVoiceClick = { showLiveVoiceMode = true },
                             liquidState = liquidState
                         )
                     }) { paddingValues ->
@@ -213,9 +217,19 @@ fun HomeScreen(
                             }
                     )
                 }
-            }
 
-            // Floating TTS Player removed by user request
+                // Live Voice Mode Overlay
+                AnimatedVisibility(
+                    visible = showLiveVoiceMode,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    com.bit.ui.screen.live.LiveVoiceOverlay(
+                        chatViewModel = chatViewModel,
+                        onClose = { showLiveVoiceMode = false }
+                    )
+                }
+            }
         }
     } // CompositionLocalProvider
 }
