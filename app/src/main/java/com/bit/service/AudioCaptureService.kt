@@ -36,6 +36,7 @@ class AudioCaptureService(private val context: Context) {
     }
 
     private var audioRecord: AudioRecord? = null
+    private var aec: android.media.audiofx.AcousticEchoCanceler? = null
 
     private val _isRecording = MutableStateFlow(false)
     val isRecordingState: StateFlow<Boolean> = _isRecording.asStateFlow()
@@ -76,6 +77,19 @@ class AudioCaptureService(private val context: Context) {
                 return@callbackFlow
             }
 
+            // Enable Acoustic Echo Cancellation (AEC) if available
+            try {
+                if (android.media.audiofx.AcousticEchoCanceler.isAvailable()) {
+                    aec = android.media.audiofx.AcousticEchoCanceler.create(audioRecord!!.audioSessionId)
+                    aec?.enabled = true
+                    Log.i(TAG, "Acoustic Echo Canceler enabled (session ID: ${audioRecord!!.audioSessionId})")
+                } else {
+                    Log.w(TAG, "Acoustic Echo Canceler is not available on this device")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to enable Acoustic Echo Canceler: ${e.message}", e)
+            }
+
             audioRecord?.startRecording()
             _isRecording.value = true
             Log.i(TAG, "Audio capture started (${SAMPLE_RATE}Hz, chunk=$chunkSize bytes)")
@@ -113,6 +127,14 @@ class AudioCaptureService(private val context: Context) {
     }
 
     private fun stopCaptureInternal() {
+        try {
+            aec?.enabled = false
+            aec?.release()
+            aec = null
+            Log.d(TAG, "Acoustic Echo Canceler released")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error releasing Acoustic Echo Canceler: ${e.message}")
+        }
         try {
             audioRecord?.stop()
             audioRecord?.release()

@@ -437,7 +437,6 @@ fun LiveVoiceOverlay(
                 .fillMaxHeight(0.6f)
                 .align(Alignment.BottomCenter)
                 .graphicsLayer {
-                    scaleX = glowScale
                     scaleY = glowScale
                     alpha = glowAlpha
                     transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1.0f)
