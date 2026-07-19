@@ -63,13 +63,23 @@ class AudioCaptureService(private val context: Context) {
         val chunkSize = (SAMPLE_RATE * 2 * CHUNK_SIZE_MS) / 1000
 
         try {
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
+            var record = AudioRecord(
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,
                 SAMPLE_RATE,
                 CHANNEL_CONFIG,
                 AUDIO_FORMAT,
                 bufferSize.coerceAtLeast(chunkSize * 2)
             )
+            if (record.state != AudioRecord.STATE_INITIALIZED) {
+                record = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    bufferSize.coerceAtLeast(chunkSize * 2)
+                )
+            }
+            audioRecord = record
 
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 Log.e(TAG, "AudioRecord failed to initialize")

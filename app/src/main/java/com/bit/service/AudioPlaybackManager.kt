@@ -131,6 +131,10 @@ class AudioPlaybackManager {
         isPlaying = false
         _playbackAmplitude.value = 0f
         try {
+            if (audioTrack?.playState == AudioTrack.PLAYSTATE_PLAYING) {
+                audioTrack?.pause()
+                audioTrack?.flush()
+            }
             audioTrack?.stop()
             audioTrack?.release()
         } catch (e: Exception) {

@@ -87,6 +87,8 @@ class LiveModeController(
     private var silenceStartTime = 0L
     private var hasSpokenInSession = false
     private var previousMessages = setOf<Messages>()
+    private var bargeInConsecutiveFrames = 0
+    private var lastBargeInTimestamp = 0L
 
     fun start() {
         if (!audioCaptureService.hasRecordPermission()) {
@@ -124,6 +126,16 @@ class LiveModeController(
         startListeningLoop()
     }
 
+    private fun bargeInInterrupt() {
+        TTSManager.stopPlayback()
+        chatViewModel.stop()
+        llmObserveJob?.cancel()
+        llmObserveJob = null
+        hasSpokenInSession = true
+        silenceStartTime = 0L
+        _state.value = LiveModeState.Listening
+    }
+
     fun stopAndTranscribe() {
         if (_state.value is LiveModeState.Listening) {
             _state.value = LiveModeState.Thinking("Processing speech…")
@@ -149,6 +161,7 @@ class LiveModeController(
         pcmStream.reset()
         silenceStartTime = 0L
         hasSpokenInSession = false
+        bargeInConsecutiveFrames = 0
 
         captureJob = scope.launch(Dispatchers.IO) {
             try {
@@ -174,10 +187,21 @@ class LiveModeController(
                             }
                         }
                         is LiveModeState.Speaking -> {
-                            // Voice-triggered Barge-In detection
-                            if (rms > 0.06f) {
-                                withContext(Dispatchers.Main) {
-                                    interrupt()
+                            // Continuous VAD with hysteresis during Speaking state
+                            val now = System.currentTimeMillis()
+                            if (now - lastBargeInTimestamp > 800) { // Cooldown after previous barge-in
+                                if (rms > 0.04f) { // Energy threshold for sustained speech
+                                    bargeInConsecutiveFrames++
+                                    pcmStream.write(chunk) // Retain speech start audio
+                                    if (bargeInConsecutiveFrames >= 3) { // 3 consecutive ~100ms frames
+                                        bargeInConsecutiveFrames = 0
+                                        lastBargeInTimestamp = now
+                                        withContext(Dispatchers.Main) {
+                                            bargeInInterrupt()
+                                        }
+                                    }
+                                } else {
+                                    bargeInConsecutiveFrames = 0
                                 }
                             }
                         }

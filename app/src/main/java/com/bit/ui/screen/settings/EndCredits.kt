@@ -19,6 +19,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -37,6 +40,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 
 /**
  * Ensures fair non-repeating song selection (deck shuffle algorithm).
@@ -89,6 +93,7 @@ sealed class CreditLine {
     data class Space(val heightDp: Int = 48) : CreditLine()
 }
 
+
 @Composable
 fun EndCreditsOverlay(
     audioResIds: List<Int>,
@@ -98,7 +103,8 @@ fun EndCreditsOverlay(
 ) {
     val context = LocalContext.current
     var visible by remember { mutableStateOf(true) }
-    val animatedScroll = remember { Animatable(0f) }
+    var scrollProgress by remember { mutableFloatStateOf(0f) }
+    var accumulatedAudioMs by remember { mutableLongStateOf(0L) }
 
     // Guard to prevent finger release of the trigger long-press from immediately dismissing credits
     var dismissEnabled by remember { mutableStateOf(false) }
@@ -129,14 +135,19 @@ fun EndCreditsOverlay(
         activePlayer.value = player
 
         player?.setOnCompletionListener { finished ->
-            finished.release()
             try {
+                val dur = finished.duration.toLong()
+                finished.release()
+                accumulatedAudioMs += dur
                 val nextId = CreditsAudioDeck.getNextAudioResId(context, audioResIds)
                 val next = MediaPlayer.create(context, nextId)?.apply {
                     setVolume(1f, 1f)
                     setOnCompletionListener { it2 ->
-                        it2.release()
-                        // Continue chain if credits are still visible
+                        try {
+                            val d2 = it2.duration.toLong()
+                            it2.release()
+                            accumulatedAudioMs += d2
+                        } catch (_: Exception) {}
                     }
                 }
                 activePlayer.value = next
@@ -158,7 +169,7 @@ fun EndCreditsOverlay(
         }
     }
 
-    // Unified orchestration: fade-in audio first, then scroll credits in sync
+    // Synchronized orchestration: derive scroll progress directly from MediaPlayer's position every VSYNC frame
     LaunchedEffect(Unit) {
         val player = activePlayer.value
 
@@ -169,15 +180,25 @@ fun EndCreditsOverlay(
             delay(60)
         }
 
-        // Phase 2: Now that music is audible, begin the credits scroll
-        animatedScroll.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(scrollDurationMs, easing = LinearEasing)
-        )
+        // Phase 2: Compute scroll position directly from audio playback position every VSYNC frame
+        while (isActive && visible) {
+            withFrameNanos {
+                val p = activePlayer.value
+                val currentPos = try {
+                    if (p != null && p.isPlaying) p.currentPosition.toLong() else 0L
+                } catch (_: Exception) {
+                    0L
+                }
+                val totalElapsedMs = accumulatedAudioMs + currentPos
+                val currentProgress = (totalElapsedMs.toFloat() / scrollDurationMs.toFloat()).coerceIn(0f, 1f)
 
-        // Phase 3: Scroll complete — hold briefly, then dismiss
-        delay(500)
-        visible = false
+                scrollProgress = currentProgress
+
+                if (currentProgress >= 1f) {
+                    visible = false
+                }
+            }
+        }
     }
 
     LaunchedEffect(visible) {
@@ -205,7 +226,7 @@ fun EndCreditsOverlay(
                     }
                 }
         ) {
-            CreditRoll(lines = lines, progress = animatedScroll.value)
+            CreditRoll(lines = lines, progress = scrollProgress)
 
             Icon(
                 imageVector = Icons.Filled.Close,
