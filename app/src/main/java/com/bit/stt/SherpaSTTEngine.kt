@@ -172,8 +172,8 @@ object SherpaSTTEngine {
      */
     fun cleanTranscribedText(rawText: String): String {
         var text = rawText.trim()
-        text = text.replace(Regex("(?i)\\[(music|noise|laughter|blank_audio|applause|cheering|sigh|snicker|cough|groan|gasp|throat clearing|audio|video|background noise|unintelligible|inaudible)]"), "")
-        text = text.replace(Regex("(?i)\\((music|noise|laughter|blank_audio|applause|cheering|sigh|snicker|cough|groan|gasp|throat clearing|audio|video|background noise|unintelligible|inaudible)\\)"), "")
+        text = text.replace(Regex("(?i)\\[(sound|music|noise|laughter|blank_audio|applause|cheering|sigh|snicker|cough|groan|gasp|throat clearing|audio|video|background noise|unintelligible|inaudible)]"), "")
+        text = text.replace(Regex("(?i)\\((sound|music|noise|laughter|blank_audio|applause|cheering|sigh|snicker|cough|groan|gasp|throat clearing|audio|video|background noise|unintelligible|inaudible)\\)"), "")
         text = text.trim()
 
         val lower = text.lowercase().removeSuffix(".")

@@ -206,11 +206,15 @@ private val LATEX_BEGIN_REGEX = Regex("""\\{1,2}begin\s*\{(equation|align|gather
 private val LATEX_NORM_FIX = Regex("""\\begin\s+\{""")
 private val LATEX_ENV_REGEX = Regex("""\\begin\{(equation|align|gather|multline|displaymath|math)(\*?)\}""")
 
+fun sanitizeForDisplay(raw: String): String =
+    raw.replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+
 // ── Parser ──
 
 internal fun parseMarkdown(text: String): List<MarkdownElement> {
+    val cleanText = sanitizeForDisplay(text)
     val elements = mutableListOf<MarkdownElement>()
-    val lines = text.lines()
+    val lines = cleanText.lines()
     var i = 0
 
     while (i < lines.size) {

@@ -102,7 +102,7 @@ fun EndCreditsOverlay(
     audioResIds: List<Int>,
     lines: List<CreditLine>,
     onDismiss: () -> Unit,
-    scrollSpeedDpPerSec: Float = 40f
+    scrollSpeedDpPerSec: Float = 28f
 ) {
     val context = LocalContext.current
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -207,15 +207,16 @@ fun EndCreditsOverlay(
     // Synchronized orchestration: derive scroll progress directly from MediaPlayer's position every VSYNC frame
     LaunchedEffect(Unit) {
         val player = activePlayer.value
-
-        // Phase 1: Start audio and fade volume in over ~600ms
         player?.start()
-        for (i in 0..10) {
-            player?.setVolume(i / 10f, i / 10f)
-            delay(60)
+
+        // Volume fade-in runs concurrently in parallel so scroll begins at t=0 immediately
+        launch {
+            for (i in 0..10) {
+                player?.setVolume(i / 10f, i / 10f)
+                delay(60)
+            }
         }
 
-        // Phase 2: Compute scroll position directly from audio playback position every VSYNC frame
         while (isActive && visible) {
             withFrameNanos {
                 val p = activePlayer.value

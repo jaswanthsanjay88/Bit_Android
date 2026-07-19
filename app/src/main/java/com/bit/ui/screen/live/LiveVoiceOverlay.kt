@@ -179,8 +179,8 @@ class LiveModeController(
                             } else if (hasSpokenInSession) {
                                 if (silenceStartTime == 0L) {
                                     silenceStartTime = System.currentTimeMillis()
-                                } else if (System.currentTimeMillis() - silenceStartTime > 650) {
-                                    // 650ms silence detected after user speech -> finish speech
+                                } else if (System.currentTimeMillis() - silenceStartTime > 950) {
+                                    // 950ms silence detected after user speech -> finish speech
                                     _state.value = LiveModeState.Thinking("Processing speech…")
                                     onUserSpeechFinished()
                                 }
