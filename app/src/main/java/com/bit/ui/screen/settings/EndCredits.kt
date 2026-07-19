@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontStyle
@@ -102,7 +103,7 @@ fun EndCreditsOverlay(
     audioResIds: List<Int>,
     lines: List<CreditLine>,
     onDismiss: () -> Unit,
-    scrollSpeedDpPerSec: Float = 28f
+    scrollSpeedDpPerSec: Float = 35f
 ) {
     val context = LocalContext.current
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -110,20 +111,9 @@ fun EndCreditsOverlay(
         androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp.toPx()
     }
 
-    val estimatedTotalHeightPx = remember(lines) {
-        lines.sumOf { line ->
-            when (line) {
-                is CreditLine.Heading -> 90
-                is CreditLine.Role -> 50
-                is CreditLine.Name -> 40
-                is CreditLine.AccentText -> 45
-                is CreditLine.Subtext -> 35
-                is CreditLine.Space -> line.heightDp
-            }
-        } * with(density) { 3.2.dp.toPx() }
-    }
+    var measuredContentHeightPx by remember { mutableFloatStateOf(0f) }
 
-    val totalTravelPx = screenHeightPx + estimatedTotalHeightPx
+    val totalTravelPx = screenHeightPx + measuredContentHeightPx
     val scrollSpeedPxPerMs = with(density) { scrollSpeedDpPerSec.dp.toPx() } / 1000f
     val scrollDurationMs = remember(totalTravelPx, scrollSpeedPxPerMs) {
         (totalTravelPx / scrollSpeedPxPerMs).toLong().coerceAtLeast(1000L)
@@ -262,7 +252,11 @@ fun EndCreditsOverlay(
                     }
                 }
         ) {
-            CreditRoll(lines = lines, progress = scrollProgress)
+            CreditRoll(
+                lines = lines,
+                progress = scrollProgress,
+                onHeightMeasured = { h -> measuredContentHeightPx = h }
+            )
 
             Icon(
                 imageVector = Icons.Filled.Close,
@@ -283,38 +277,30 @@ fun EndCreditsOverlay(
 }
 
 @Composable
-private fun CreditRoll(lines: List<CreditLine>, progress: Float) {
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    
+private fun CreditRoll(
+    lines: List<CreditLine>,
+    progress: Float,
+    onHeightMeasured: (Float) -> Unit
+) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val screenHeightPx = constraints.maxHeight.toFloat()
-        
-        val estimatedTotalHeightPx = remember(lines) {
-            lines.sumOf { line ->
-                when (line) {
-                    is CreditLine.Heading -> 90
-                    is CreditLine.Role -> 50
-                    is CreditLine.Name -> 40
-                    is CreditLine.AccentText -> 45
-                    is CreditLine.Subtext -> 35
-                    is CreditLine.Space -> line.heightDp
-                }
-            } * with(density) { 3.2.dp.toPx() }
-        }
+        var actualHeightPx by remember { mutableFloatStateOf(0f) }
 
-        // Top of column starts exactly at the bottom of the screen (screenHeightPx/2 offset from center)
-        val startY = (screenHeightPx + estimatedTotalHeightPx) / 2f
-        // Bottom of column ends exactly at the top of the screen (-screenHeightPx/2 offset from center)
-        val endY = -(screenHeightPx + estimatedTotalHeightPx) / 2f
+        val startY = (screenHeightPx + actualHeightPx) / 2f
+        val endY = -(screenHeightPx + actualHeightPx) / 2f
         val currentY = startY + progress * (endY - startY)
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.Center)
-                .graphicsLayer {
-                    translationY = currentY
-                },
+                .onGloballyPositioned { coords ->
+                    if (actualHeightPx == 0f) {
+                        actualHeightPx = coords.size.height.toFloat()
+                        onHeightMeasured(actualHeightPx)
+                    }
+                }
+                .graphicsLayer { translationY = currentY },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             lines.forEach { line ->

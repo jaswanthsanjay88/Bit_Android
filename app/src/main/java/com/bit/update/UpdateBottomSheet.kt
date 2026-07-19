@@ -50,9 +50,8 @@ fun UpdateBottomSheet(
     LaunchedEffect(stage) {
         if (stage == UpdateStage.DOWNLOADING) {
             while (stage == UpdateStage.DOWNLOADING) {
-                downloader.getDownloadProgress(downloadId)?.let { progress = it }
-                if (progress >= 1f) {
-                    stage = UpdateStage.READY_TO_INSTALL
+                downloader.getDownloadProgress(downloadId)?.let { p ->
+                    progress = p.coerceAtMost(0.99f)
                 }
                 delay(300)
             }
@@ -180,10 +179,10 @@ fun UpdateBottomSheet(
 
                 UpdateStage.READY_TO_INSTALL -> {
                     LaunchedEffect(Unit) {
-                        downloader.installDownloadedApk()
+                        downloader.installDownloadedApk(downloadId)
                     }
                     Button(
-                        onClick = { downloader.installDownloadedApk() },
+                        onClick = { downloader.installDownloadedApk(downloadId) },
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = BitColors.Inverse,

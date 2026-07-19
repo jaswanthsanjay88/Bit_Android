@@ -528,7 +528,7 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = com.bit.ui.icons.TnIcons.Sparkles,
+                            painter = androidx.compose.ui.res.painterResource(id = com.bit.R.drawable.ic_logo),
                             contentDescription = "App logo",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(32.dp)
