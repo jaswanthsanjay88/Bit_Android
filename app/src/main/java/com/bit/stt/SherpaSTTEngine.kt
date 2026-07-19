@@ -151,8 +151,8 @@ object SherpaSTTEngine {
             // Release stream explicitly as memory is managed by C++
             stream.close()
 
-            Log.i(TAG, "Transcription result (threads=$numThreads, lang=$language): '${text.take(100)}'")
-            text.trim()
+            Log.i(TAG, "Raw transcription result (threads=$numThreads, lang=$language): '${text.take(100)}'")
+            cleanTranscribedText(text)
         } catch (e: Exception) {
             Log.e(TAG, "Transcription failed: ${e.message}", e)
             ""
@@ -165,6 +165,31 @@ object SherpaSTTEngine {
             }
             _isProcessing.value = false
         }
+    }
+
+    /**
+     * Clean Whisper STT output by stripping noise/music tags and silence hallucinations.
+     */
+    fun cleanTranscribedText(rawText: String): String {
+        var text = rawText.trim()
+        text = text.replace(Regex("(?i)\\[(music|noise|laughter|blank_audio|applause|cheering|sigh|snicker|cough|groan|gasp|throat clearing|audio|video|background noise|unintelligible|inaudible)]"), "")
+        text = text.replace(Regex("(?i)\\((music|noise|laughter|blank_audio|applause|cheering|sigh|snicker|cough|groan|gasp|throat clearing|audio|video|background noise|unintelligible|inaudible)\\)"), "")
+        text = text.trim()
+
+        val lower = text.lowercase().removeSuffix(".")
+        val silenceHallucinations = setOf(
+            "thank you", "thanks for watching", "subtitles by", "subtitles by amara.org",
+            "amara.org", "mbc", "bye", "subscribe", "like and subscribe"
+        )
+        if (lower in silenceHallucinations) {
+            return ""
+        }
+
+        if (text.length < 2 || !text.any { it.isLetterOrDigit() }) {
+            return ""
+        }
+
+        return text
     }
 
     /**

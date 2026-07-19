@@ -2805,32 +2805,43 @@ class ChatViewModel @Inject constructor(
         metrics: DecodingMetrics?,
         wasUserAdded: Boolean
     ) {
-        // Add messages SYNCHRONOUSLY before resetting streaming state,
-        // so there's no frame where streaming UI is cleared but messages aren't in the list.
-        if (chatId != null && userMsg != null && content.isNotEmpty()) {
-            if (!wasUserAdded) { _messages.add(userMsg) }
-            val assistantMessage = Messages(
-                role = Role.Assistant,
-                content = MessageContent(contentType = ContentType.Text, content = "$content [stopped]"),
-                modelId = currentModelId,
-                decodingMetrics = metrics
-            )
-            _messages.add(assistantMessage)
-            // New content was produced — safe to delete old message from DB
-            regenerationSnapshot?.let { old ->
-                regenerationSnapshot = null
-                viewModelScope.launch { chatManager.deleteMessage(old.msgId) }
+        val cleanContent = content.trim()
+        if (chatId != null && userMsg != null && cleanContent.isNotEmpty()) {
+            if (!wasUserAdded && !_messages.contains(userMsg)) {
+                _messages.add(userMsg)
             }
-            // Persist new message to DB async
-            viewModelScope.launch { chatManager.addMessage(chatId, assistantMessage) }
+
+            val lastMsg = _messages.lastOrNull()
+            if (lastMsg != null && lastMsg.role == Role.Assistant && lastMsg.content.contentType == ContentType.Text) {
+                // Assistant message was already added during generation, update content cleanly
+                if (lastMsg.content.content != cleanContent) {
+                    val updatedMsg = lastMsg.copy(content = lastMsg.content.copy(content = cleanContent))
+                    val idx = _messages.indexOf(lastMsg)
+                    if (idx >= 0) {
+                        _messages[idx] = updatedMsg
+                    }
+                    viewModelScope.launch { chatManager.addMessage(chatId, updatedMsg) }
+                }
+            } else {
+                val assistantMessage = Messages(
+                    role = Role.Assistant,
+                    content = MessageContent(contentType = ContentType.Text, content = cleanContent),
+                    modelId = currentModelId,
+                    decodingMetrics = metrics
+                )
+                _messages.add(assistantMessage)
+                regenerationSnapshot?.let { old ->
+                    regenerationSnapshot = null
+                    viewModelScope.launch { chatManager.deleteMessage(old.msgId) }
+                }
+                viewModelScope.launch { chatManager.addMessage(chatId, assistantMessage) }
+            }
         } else if (regenerationSnapshot != null) {
-            // Regeneration cancelled with no content — restore old message
             restoreRegenerationSnapshot()
-        } else if (userMsg != null && !wasUserAdded) {
+        } else if (userMsg != null && !wasUserAdded && !_messages.contains(userMsg)) {
             _messages.add(userMsg)
         }
 
-        // Restore grammar in case we stopped mid-agent-flow
         try { PluginManager.restoreGrammar() } catch (_: Exception) {}
         resetStreamingState()
     }

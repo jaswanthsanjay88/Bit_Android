@@ -39,8 +39,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Ensures fair non-repeating song selection (deck shuffle algorithm).
@@ -99,9 +102,33 @@ fun EndCreditsOverlay(
     audioResIds: List<Int>,
     lines: List<CreditLine>,
     onDismiss: () -> Unit,
-    scrollDurationMs: Int = 38000
+    scrollSpeedDpPerSec: Float = 40f
 ) {
     val context = LocalContext.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val screenHeightPx = with(density) {
+        androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp.toPx()
+    }
+
+    val estimatedTotalHeightPx = remember(lines) {
+        lines.sumOf { line ->
+            when (line) {
+                is CreditLine.Heading -> 90
+                is CreditLine.Role -> 50
+                is CreditLine.Name -> 40
+                is CreditLine.AccentText -> 45
+                is CreditLine.Subtext -> 35
+                is CreditLine.Space -> line.heightDp
+            }
+        } * with(density) { 3.2.dp.toPx() }
+    }
+
+    val totalTravelPx = screenHeightPx + estimatedTotalHeightPx
+    val scrollSpeedPxPerMs = with(density) { scrollSpeedDpPerSec.dp.toPx() } / 1000f
+    val scrollDurationMs = remember(totalTravelPx, scrollSpeedPxPerMs) {
+        (totalTravelPx / scrollSpeedPxPerMs).toLong().coerceAtLeast(1000L)
+    }
+
     var visible by remember { mutableStateOf(true) }
     var scrollProgress by remember { mutableFloatStateOf(0f) }
     var accumulatedAudioMs by remember { mutableLongStateOf(0L) }
@@ -125,6 +152,7 @@ fun EndCreditsOverlay(
 
     // Track the active MediaPlayer so completion-spawned players are also released on dismiss
     val activePlayer = remember { mutableStateOf<MediaPlayer?>(null) }
+    val scope = rememberCoroutineScope()
 
     // --- audio playback lifecycle ---
     DisposableEffect(Unit) {
@@ -141,7 +169,7 @@ fun EndCreditsOverlay(
                 accumulatedAudioMs += dur
                 val nextId = CreditsAudioDeck.getNextAudioResId(context, audioResIds)
                 val next = MediaPlayer.create(context, nextId)?.apply {
-                    setVolume(1f, 1f)
+                    setVolume(0f, 0f)
                     setOnCompletionListener { it2 ->
                         try {
                             val d2 = it2.duration.toLong()
@@ -152,6 +180,13 @@ fun EndCreditsOverlay(
                 }
                 activePlayer.value = next
                 next?.start()
+                // Fade in chained track smoothly over ~300ms
+                CoroutineScope(Dispatchers.Main).launch {
+                    for (i in 0..5) {
+                        next?.setVolume(i / 5f, i / 5f)
+                        delay(60)
+                    }
+                }
             } catch (_: Exception) {
                 // Ignore audio transitions on exit
             }

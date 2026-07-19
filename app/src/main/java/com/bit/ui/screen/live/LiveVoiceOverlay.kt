@@ -221,8 +221,22 @@ class LiveModeController(
         val audioBytes = pcmStream.toByteArray()
         pcmStream.reset()
 
-        if (audioBytes.isEmpty()) {
-            withContext(Dispatchers.Main) { _state.value = LiveModeState.Idle }
+        // Minimum audio duration check: 16kHz 16-bit mono = 32000 bytes/sec -> 0.45s = 14400 bytes
+        if (audioBytes.size < 14400) {
+            withContext(Dispatchers.Main) {
+                _state.value = LiveModeState.Idle
+                startListeningLoop()
+            }
+            return@launch
+        }
+
+        // Check overall audio RMS energy to filter out ambient room hum/silence
+        val overallRms = audioCaptureService.calculateRMS(audioBytes)
+        if (overallRms < 0.012f) {
+            withContext(Dispatchers.Main) {
+                _state.value = LiveModeState.Idle
+                startListeningLoop()
+            }
             return@launch
         }
 
