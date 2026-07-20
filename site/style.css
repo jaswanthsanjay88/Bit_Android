@@ -1,12 +1,15 @@
 /* ==========================================================================
-   BIT — Landing & Documentation Stylesheet (Technical Monochrome)
+   BIT — Landing & Documentation Stylesheet (Technical Monochrome Liquid Glass)
    ========================================================================== */
 
 :root {
   --bg-black: #000000;
-  --panel-bg: #0A0A0A;
-  --card-bg: #121212;
-  --card-hover: #181818;
+  --panel-bg: rgba(10, 10, 10, 0.75);
+  --card-bg: rgba(18, 18, 18, 0.6);
+  --card-hover: rgba(26, 26, 26, 0.8);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-hover: rgba(255, 255, 255, 0.28);
   --border-subtle: #222222;
   --border-strong: #363636;
   --text-primary: #FFFFFF;
@@ -20,9 +23,9 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
   --container-max: 1200px;
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
   --radius-pill: 9999px;
 
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
@@ -48,6 +51,9 @@ html {
 body {
   overflow-x: hidden;
   background-color: var(--bg-black);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.05) 0%, transparent 60%),
+    radial-gradient(circle at 10% 40%, rgba(255, 255, 255, 0.02) 0%, transparent 40%);
 }
 
 a {
@@ -75,7 +81,7 @@ img.app-shot:hover {
   filter: grayscale(100%) contrast(1.15) brightness(1.02);
 }
 
-/* ── Sticky Header ── */
+/* ── Sticky Liquid Glass Header ── */
 header.navbar {
   position: fixed;
   top: 0;
@@ -83,16 +89,17 @@ header.navbar {
   right: 0;
   z-index: 100;
   padding: 18px 0;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast), padding var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), padding var(--transition-fast), backdrop-filter var(--transition-fast);
   border-bottom: 1px solid transparent;
 }
 
 header.navbar.scrolled {
-  background-color: rgba(10, 10, 10, 0.9);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom-color: var(--border-subtle);
+  background-color: rgba(10, 10, 10, 0.65);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border-bottom-color: var(--glass-border);
   padding: 12px 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .nav-container {
@@ -148,13 +155,14 @@ header.navbar.scrolled {
   font-weight: 600;
   border: 1px solid var(--pill-bg);
   transition: transform var(--transition-fast), opacity var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.15);
   cursor: pointer;
 }
 
 .btn-pill:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.2);
-  opacity: 0.95;
+  transform: translateY(-2px);
+  opacity: 0.94;
+  box-shadow: 0 12px 30px rgba(255, 255, 255, 0.25);
 }
 
 .btn-ghost {
@@ -162,20 +170,23 @@ header.navbar.scrolled {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background-color: transparent;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--text-primary);
   padding: 9px 20px;
   border-radius: var(--radius-pill);
   font-size: 0.85rem;
   font-weight: 500;
-  border: 1px solid var(--border-subtle);
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  border: 1px solid var(--glass-border);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
   cursor: pointer;
 }
 
 .btn-ghost:hover {
-  background-color: var(--card-hover);
-  border-color: var(--border-strong);
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-2px);
 }
 
 /* ── Hero Section ── */
@@ -261,49 +272,65 @@ section.hero {
   filter: brightness(0.95);
 }
 
-/* Google Pixel 6 Pro Device Frame Styling */
+/* ── Ultra-Realistic Google Pixel 6 Pro & Titanium Edge Frame ── */
 .phone-frame {
   width: 100%;
   height: 100%;
-  background: #121212;
-  border-radius: 36px;
-  border: 7px solid #222222;
+  background: #0D0D0D;
+  border-radius: 38px;
+  padding: 7px;
+  /* Titanium metallic edge effect */
+  border: 2px solid rgba(255, 255, 255, 0.15);
   box-shadow: 
-    0 35px 90px rgba(0, 0, 0, 0.95),
-    0 10px 30px rgba(0, 0, 0, 0.8),
-    inset 0 0 12px rgba(0, 0, 0, 0.9),
-    inset 0 4px 0 2px rgba(255, 255, 255, 0.18),
-    inset 0 -4px 0 2px rgba(255, 255, 255, 0.18);
+    0 45px 110px rgba(0, 0, 0, 0.95),
+    0 15px 40px rgba(0, 0, 0, 0.85),
+    inset 0 0 16px rgba(0, 0, 0, 0.95),
+    inset 0 2px 4px rgba(255, 255, 255, 0.25),
+    inset 0 -2px 4px rgba(255, 255, 255, 0.15);
   position: relative;
   overflow: hidden;
+}
+
+/* Pixel Camera Visor Bar Bump Accent */
+.pixel-visor-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  background: linear-gradient(180deg, #1C1C1C 0%, #0D0D0D 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 18;
+  pointer-events: none;
 }
 
 /* Pixel Top Speaker Grill */
 .pixel-speaker {
   position: absolute;
-  top: 3px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  width: 50px;
+  width: 54px;
   height: 3px;
-  background: #2A2A2A;
+  background: #333333;
   border-radius: 2px;
-  z-index: 20;
+  z-index: 22;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.8);
 }
 
 /* Pixel Centered Camera Punchhole Sensor */
 .pixel-camera {
   position: absolute;
-  top: 12px;
+  top: 13px;
   left: 50%;
   transform: translateX(-50%);
   width: 16px;
   height: 16px;
-  background: #0D0D0D;
-  border: 2px solid #262626;
+  background: #080808;
+  border: 2px solid #282828;
   border-radius: 50%;
-  z-index: 20;
-  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.9);
+  z-index: 22;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.95), 0 0 2px rgba(255, 255, 255, 0.1);
 }
 
 .pixel-camera::before {
@@ -314,19 +341,20 @@ section.hero {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #5064A8 0%, #151D38 80%);
+  background: radial-gradient(circle at 30% 30%, #6078C0 0%, #151D38 80%);
 }
 
-/* Pixel Power & Volume Side Hardware Buttons */
+/* Pixel Power & Volume Side Metallic Buttons */
 .pixel-power-btn {
   position: absolute;
   right: -9px;
   top: 95px;
   width: 4px;
   height: 38px;
-  background: #2E2E2E;
+  background: linear-gradient(180deg, #444 0%, #222 100%);
   border-radius: 0 3px 3px 0;
   z-index: 10;
+  box-shadow: 1px 0 2px rgba(0,0,0,0.5);
 }
 
 .pixel-volume-btn {
@@ -335,17 +363,20 @@ section.hero {
   top: 148px;
   width: 4px;
   height: 72px;
-  background: #2E2E2E;
+  background: linear-gradient(180deg, #444 0%, #222 100%);
   border-radius: 0 3px 3px 0;
   z-index: 10;
+  box-shadow: 1px 0 2px rgba(0,0,0,0.5);
 }
 
+/* Liquid Glass Reflection Glare Streak */
 .phone-glare {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 40%, transparent 60%);
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.04) 30%, transparent 65%);
   pointer-events: none;
   z-index: 15;
+  border-radius: 32px;
 }
 
 .phone-screen {
@@ -353,7 +384,8 @@ section.hero {
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 28px;
+  border-radius: 30px;
+  box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.15);
 }
 
 /* Contact Shadow */
@@ -367,17 +399,17 @@ section.hero {
   pointer-events: none;
 }
 
-/* Technical Code Breakout Panels */
+/* Technical Code Breakout Panels (Liquid Glass) */
 .code-panel {
   position: absolute;
-  background: rgba(10, 10, 10, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-strong);
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   padding: 14px 16px;
   z-index: 25;
-  box-shadow: 0 16px 36px rgba(0,0,0,0.85);
+  box-shadow: 0 20px 45px rgba(0,0,0,0.85), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   font-family: var(--font-mono);
   font-size: 0.75rem;
   line-height: 1.4;
@@ -400,7 +432,7 @@ section.hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   padding-bottom: 6px;
   margin-bottom: 8px;
   color: var(--text-secondary);
@@ -418,9 +450,11 @@ section.hero {
 /* ── Section: Technical Specs / Benchmark Row ── */
 section.benchmarks {
   padding: 70px 0;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
   background: var(--panel-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .benchmarks-grid {
@@ -431,9 +465,20 @@ section.benchmarks {
 
 .bench-card {
   background: var(--card-bg);
-  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  padding: 24px 20px;
+  padding: 26px 22px;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.bench-card:hover {
+  transform: translateY(-4px);
+  background-color: var(--card-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .bench-val {
@@ -498,8 +543,10 @@ section.showcase {
 section.architecture {
   padding: 100px 0;
   background: var(--panel-bg);
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .arch-grid {
@@ -517,9 +564,19 @@ section.architecture {
 
 .arch-card {
   background: var(--card-bg);
-  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  padding: 20px 24px;
+  padding: 22px 24px;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.arch-card:hover {
+  transform: translateX(6px);
+  border-color: var(--glass-border-hover);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .arch-card-title {

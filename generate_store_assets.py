@@ -60,27 +60,34 @@ def create_marketing_screenshot(
         app_shot_resized = app_shot.resize((phone_w - 20, phone_h - 20), Image.Resampling.LANCZOS)
 
         # Phone bezel frame
-        bezel = Image.new("RGBA", (phone_w, phone_h), (24, 24, 24, 255))
+        bezel = Image.new("RGBA", (phone_w, phone_h), (13, 13, 13, 255))
         bezel_draw = ImageDraw.Draw(bezel)
         
-        # Rounded corners for phone
+        # Draw metallic edge border
+        bezel_draw.rectangle([0, 0, phone_w, phone_h], outline=(60, 60, 60, 255), width=4)
+        
+        # Rounded corners for phone screen
         bezel.paste(app_shot_resized, (10, 10))
+
+        # Draw Pixel Camera Visor Accent
+        visor_h = int(phone_h * 0.04)
+        bezel_draw.rectangle([10, 10, phone_w - 10, 10 + visor_h], fill=(22, 22, 22, 220))
 
         # Draw Google Pixel 6 Pro Speaker Grill
         speaker_w = int(phone_w * 0.18)
         speaker_h = int(phone_h * 0.005)
         speaker_x = int((phone_w - speaker_w) / 2)
-        bezel_draw.rectangle([speaker_x, 12, speaker_x + speaker_w, 12 + speaker_h], fill=(42, 42, 42, 255))
+        bezel_draw.rectangle([speaker_x, 12, speaker_x + speaker_w, 12 + speaker_h], fill=(50, 50, 50, 255))
 
         # Draw Google Pixel 6 Pro Camera Punchhole Sensor
         camera_r = int(phone_w * 0.024)
         camera_x = int(phone_w / 2)
         camera_y = int(phone_h * 0.032)
-        bezel_draw.ellipse([camera_x - camera_r, camera_y - camera_r, camera_x + camera_r, camera_y + camera_r], fill=(13, 13, 13, 255), outline=(38, 38, 38, 255), width=2)
+        bezel_draw.ellipse([camera_x - camera_r, camera_y - camera_r, camera_x + camera_r, camera_y + camera_r], fill=(8, 8, 8, 255), outline=(40, 40, 40, 255), width=2)
         
         # Camera Lens Glare Dot
         lens_r = int(camera_r * 0.4)
-        bezel_draw.ellipse([camera_x - lens_r, camera_y - lens_r, camera_x + lens_r, camera_y + lens_r], fill=(80, 100, 168, 255))
+        bezel_draw.ellipse([camera_x - lens_r, camera_y - lens_r, camera_x + lens_r, camera_y + lens_r], fill=(96, 120, 192, 255))
 
         # Paste phone mockup onto canvas
         canvas.paste(bezel, (phone_x, phone_y))
