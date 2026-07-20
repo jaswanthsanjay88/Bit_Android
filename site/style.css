@@ -189,10 +189,24 @@ header.navbar.scrolled {
   transform: translateY(-2px);
 }
 
-/* ── Hero Section ── */
+/* ── Hero Section & Particle Canvas ── */
 section.hero {
+  position: relative;
   padding-top: 150px;
   padding-bottom: 60px;
+  overflow: hidden;
+}
+
+.hero-particle-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.9;
+}
   position: relative;
 }
 
