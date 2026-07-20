@@ -261,38 +261,89 @@ section.hero {
   filter: brightness(0.95);
 }
 
-/* Realistic Phone Frame Construction */
+/* Google Pixel 6 Pro Device Frame Styling */
 .phone-frame {
   width: 100%;
   height: 100%;
-  background: #080808;
-  border-radius: 42px;
-  border: 8px solid #1A1A1A;
+  background: #121212;
+  border-radius: 36px;
+  border: 7px solid #222222;
   box-shadow: 
     0 35px 90px rgba(0, 0, 0, 0.95),
     0 10px 30px rgba(0, 0, 0, 0.8),
-    inset 1.5px 1.5px 0px rgba(255, 255, 255, 0.22),
-    inset -1px -1px 0px rgba(255, 255, 255, 0.05);
+    inset 0 0 12px rgba(0, 0, 0, 0.9),
+    inset 0 4px 0 2px rgba(255, 255, 255, 0.18),
+    inset 0 -4px 0 2px rgba(255, 255, 255, 0.18);
   position: relative;
   overflow: hidden;
 }
 
-.phone-notch {
+/* Pixel Top Speaker Grill */
+.pixel-speaker {
   position: absolute;
-  top: 10px;
+  top: 3px;
   left: 50%;
   transform: translateX(-50%);
-  width: 84px;
-  height: 18px;
-  background: #000000;
-  border-radius: 9px;
+  width: 50px;
+  height: 3px;
+  background: #2A2A2A;
+  border-radius: 2px;
+  z-index: 20;
+}
+
+/* Pixel Centered Camera Punchhole Sensor */
+.pixel-camera {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  background: #0D0D0D;
+  border: 2px solid #262626;
+  border-radius: 50%;
+  z-index: 20;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.9);
+}
+
+.pixel-camera::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #5064A8 0%, #151D38 80%);
+}
+
+/* Pixel Power & Volume Side Hardware Buttons */
+.pixel-power-btn {
+  position: absolute;
+  right: -9px;
+  top: 95px;
+  width: 4px;
+  height: 38px;
+  background: #2E2E2E;
+  border-radius: 0 3px 3px 0;
+  z-index: 10;
+}
+
+.pixel-volume-btn {
+  position: absolute;
+  right: -9px;
+  top: 148px;
+  width: 4px;
+  height: 72px;
+  background: #2E2E2E;
+  border-radius: 0 3px 3px 0;
   z-index: 10;
 }
 
 .phone-glare {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 40%, transparent 60%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 40%, transparent 60%);
   pointer-events: none;
   z-index: 15;
 }
@@ -302,6 +353,7 @@ section.hero {
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 28px;
 }
 
 /* Contact Shadow */

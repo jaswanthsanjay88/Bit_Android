@@ -1,4 +1,4 @@
-﻿import os
+import os
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 def create_marketing_screenshot(
@@ -66,11 +66,21 @@ def create_marketing_screenshot(
         # Rounded corners for phone
         bezel.paste(app_shot_resized, (10, 10))
 
-        # Draw Notch
-        notch_w = int(phone_w * 0.3)
-        notch_h = int(phone_h * 0.03)
-        notch_x = int((phone_w - notch_w) / 2)
-        bezel_draw.rectangle([notch_x, 10, notch_x + notch_w, 10 + notch_h], fill=(0, 0, 0, 255))
+        # Draw Google Pixel 6 Pro Speaker Grill
+        speaker_w = int(phone_w * 0.18)
+        speaker_h = int(phone_h * 0.005)
+        speaker_x = int((phone_w - speaker_w) / 2)
+        bezel_draw.rectangle([speaker_x, 12, speaker_x + speaker_w, 12 + speaker_h], fill=(42, 42, 42, 255))
+
+        # Draw Google Pixel 6 Pro Camera Punchhole Sensor
+        camera_r = int(phone_w * 0.024)
+        camera_x = int(phone_w / 2)
+        camera_y = int(phone_h * 0.032)
+        bezel_draw.ellipse([camera_x - camera_r, camera_y - camera_r, camera_x + camera_r, camera_y + camera_r], fill=(13, 13, 13, 255), outline=(38, 38, 38, 255), width=2)
+        
+        # Camera Lens Glare Dot
+        lens_r = int(camera_r * 0.4)
+        bezel_draw.ellipse([camera_x - lens_r, camera_y - lens_r, camera_x + lens_r, camera_y + lens_r], fill=(80, 100, 168, 255))
 
         # Paste phone mockup onto canvas
         canvas.paste(bezel, (phone_x, phone_y))
