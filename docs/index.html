@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BIT — On-Device AI Assistant for Android</title>
+  <meta name="description" content="Privacy-first, 100% on-device AI assistant for Android running GGUF LLMs, vision models, real-time speech synthesis, and RAG locally with zero cloud dependencies.">
+  
+  <!-- OpenGraph / Social Meta Tags -->
+  <meta property="og:title" content="BIT — On-Device AI Assistant for Android">
+  <meta property="og:description" content="Privacy-first, 100% on-device AI assistant for Android running GGUF LLMs, vision, and speech locally.">
+  <meta property="og:image" content="img/BIT_Banner.png">
+  <meta property="og:type" content="website">
+
+  <!-- Favicon & Styles -->
+  <link rel="icon" type="image/png" href="img/bit_chat_interface.jpg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ── 1. Header Navigation ── -->
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="#" class="nav-brand">
+        <div class="nav-logo-orb"></div>
+        <span>BIT AI</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#overview" class="nav-link">Overview</a></li>
+        <li><a href="#showcase" class="nav-link">App Showcase</a></li>
+        <li><a href="#features" class="nav-link">Features</a></li>
+        <li><a href="#technical" class="nav-link">Architecture</a></li>
+        <li><a href="#voice-demo" class="nav-link">Live Voice Mode</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="btn btn-ghost mono" style="font-size: 0.82rem;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          ★ GitHub
+        </a>
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn btn-primary github-download-btn">
+          Download APK
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── 2. Hero Section ── -->
+  <section id="overview" class="hero">
+    <div class="container">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        <span>Version <strong class="github-release-tag">v1.9.3</strong> — 100% On-Device AI</span>
+      </div>
+
+      <h1 class="hero-title gradient-text">An AI assistant that lives on your device.</h1>
+      
+      <p class="hero-subtitle">
+        Privacy-first. Zero Cloud Dependency. Native GGUF inference, vision understanding, document retrieval, and real-time speech — running entirely on Android hardware.
+      </p>
+
+      <div class="hero-actions">
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn btn-primary github-download-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download APK (<span class="github-release-size">84.2 MB</span>)
+        </a>
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="btn btn-secondary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          View Source Code
+        </a>
+      </div>
+
+      <!-- Signature Voice Orb Centerpiece -->
+      <div class="orb-container" id="voiceOrb" title="Click to test Live Voice Mode animation">
+        <div class="orb-wrapper">
+          <div class="orb-core"></div>
+          <div class="orb-ring orb-ring-1"></div>
+          <div class="orb-ring orb-ring-2"></div>
+        </div>
+        <p class="orb-caption mono">Click orb to simulate Live Mode</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 3. Metrics Strip ── -->
+  <div class="metrics-strip">
+    <div class="container">
+      <div class="metrics-grid">
+        <div class="metric-item">
+          <div class="metric-value">0 KB</div>
+          <div class="metric-label">Data Sent to Cloud</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value">100%</div>
+          <div class="metric-label">Offline Inference</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value">&lt; 40ms</div>
+          <div class="metric-label">Speech VAD Latency</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value">Q4_K_M</div>
+          <div class="metric-label">GGUF Quantization</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-value">Vulkan / QNN</div>
+          <div class="metric-label">Hardware Acceleration</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. App Showcase & Interactive 3D Mockup ── -->
+  <section id="showcase" class="showcase-section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Designed for seamless local AI.</h2>
+        <p class="section-desc">Experience fluid conversations, visual reasoning, document search, and speech synthesis right on your Android device.</p>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="showcase-tabs">
+        <button class="showcase-tab active" data-src="img/bit_chat_interface.jpg">Chat Interface</button>
+        <button class="showcase-tab" data-src="img/bit_live_voice_mode.jpg">Live Voice Orb</button>
+        <button class="showcase-tab" data-src="img/bit_model_store.jpg">Model Store</button>
+        <button class="showcase-tab" data-src="img/bit_rag_documents.jpg">Document RAG</button>
+        <button class="showcase-tab" data-src="img/bit_settings.jpg">Settings</button>
+        <button class="showcase-tab" data-src="img/bit_model_editor.jpg">Model Editor</button>
+      </div>
+
+      <!-- 3D Perspective Phone Mockup -->
+      <div class="mockup-viewport">
+        <div class="phone-device">
+          <div class="phone-notch"></div>
+          <img src="img/bit_chat_interface.jpg" id="phoneScreenImg" alt="BIT App Screen" class="phone-screen">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 5. Features Grid ── -->
+  <section id="features" class="features-section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">A complete local AI stack.</h2>
+        <p class="section-desc">Modular native Kotlin engines wrapped around low-level C++ backends for maximum device performance.</p>
+      </div>
+
+      <div class="features-grid">
+        <!-- Feature 1: GGUF Text Generation -->
+        <div class="feature-card">
+          <div class="feature-icon-badge">⚡</div>
+          <h3 class="feature-title">Native GGUF Inference</h3>
+          <p class="feature-desc">Run quantized Llama 3, Qwen 2.5, Gemma 2, and Phi-3 models locally using JNI bindings for llama.cpp. Supports sliding-window context and GBNF grammar constraints.</p>
+          <div class="feature-snippet">
+            <span>engine = "llama.kt"</span><br>
+            <span>quant = "Q4_K_M"</span><br>
+            <span>context = 4096 tokens</span>
+          </div>
+        </div>
+
+        <!-- Feature 2: Real-time Voice & Speech -->
+        <div class="feature-card">
+          <div class="feature-icon-badge">🎙️</div>
+          <h3 class="feature-title">Real-Time Speech (STT / TTS)</h3>
+          <p class="feature-desc">Offline Sherpa-ONNX Whisper speech-to-text combined with VITS and Piper neural speech synthesis for continuous, natural voice conversations.</p>
+          <div class="feature-snippet">
+            <span>stt = "Sherpa-Whisper-Tiny"</span><br>
+            <span>tts = "VITS LJSpeech / Piper Amy"</span><br>
+            <span>vad_silence = "950ms"</span>
+          </div>
+        </div>
+
+        <!-- Feature 3: Document Retrieval (RAG) -->
+        <div class="feature-card">
+          <div class="feature-icon-badge">📄</div>
+          <h3 class="feature-title">On-Device RAG Retrieval</h3>
+          <p class="feature-desc">Query local PDFs, Word documents, Excel sheets, and plain text files with hybrid vector semantic search and BM25 full-text indexing using neuron-packet format.</p>
+          <div class="feature-snippet">
+            <span>module = "neuron-packet"</span><br>
+            <span>ranking = "Vector + BM25"</span><br>
+            <span>index = "Local Keystore Encrypted"</span>
+          </div>
+        </div>
+
+        <!-- Feature 4: Long-Term Memory Vault -->
+        <div class="feature-card">
+          <div class="feature-icon-badge">🧠</div>
+          <h3 class="feature-title">Long-Term Episodic Memory</h3>
+          <p class="feature-desc">Persist user facts, preferences, and context across chat sessions using configurable memory decay curves in the memory-vault engine.</p>
+          <div class="feature-snippet">
+            <span>module = "memory-vault"</span><br>
+            <span>decay = "Exponential Curve"</span><br>
+            <span>recall = "Contextual Query Mapping"</span>
+          </div>
+        </div>
+
+        <!-- Feature 5: Vision Language Models -->
+        <div class="feature-card">
+          <div class="feature-icon-badge">👁️</div>
+          <h3 class="feature-title">Vision Language Multimodal</h3>
+          <p class="feature-desc">Analyze images, charts, and visual documents on-device using CLIP vision projectors paired with quantized GGUF multimodal backends.</p>
+          <div class="feature-snippet">
+            <span>projector = "mmproj-Qwen2-VL"</span><br>
+            <span>pipeline = "On-Device CLIP Tensor"</span>
+          </div>
+        </div>
+
+        <!-- Feature 6: Encrypted Keystore Vault -->
+        <div class="feature-card">
+          <div class="feature-icon-badge">🔒</div>
+          <h3 class="feature-title">Encrypted Local Backups</h3>
+          <p class="feature-desc">Export chat history, custom model parameters, and memory states to encrypted .tnbackup packages backed by Android Keystore System AES-256-GCM.</p>
+          <div class="feature-snippet">
+            <span>cipher = "AES-256-GCM"</span><br>
+            <span>keystore = "Android KeyStore System"</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 6. Technical Architecture & Terminal ── -->
+  <section id="technical" class="terminal-section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">Engine Architecture</h2>
+        <p class="section-desc">Low-latency Android architecture separating UI, native JNI inference engines, and persistent data vaults.</p>
+      </div>
+
+      <div class="terminal-box">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <span class="terminal-dot"></span>
+            <span class="terminal-dot"></span>
+            <span class="terminal-dot"></span>
+          </div>
+          <span class="terminal-title">BIT (app) — llama.kt Engine Stack</span>
+          <span></span>
+        </div>
+        <div class="terminal-body">
+          <div class="terminal-line">
+            <span class="terminal-prompt">$</span>
+            <span>bit-cli inspect --model llama-3.2-1b-instruct.Q4_K_M.gguf</span>
+          </div>
+          <div class="terminal-line terminal-highlight">
+            <span>[INFO] Initializing llama.cpp backend via JNI bindings...</span>
+          </div>
+          <div class="terminal-line">
+            <span>[OK] Hardware Acceleration: Vulkan API / Qualcomm Snapdragon QNN NPU</span>
+          </div>
+          <div class="terminal-line">
+            <span>[OK] Memory Allocation: 842 MB RAM (mmap enabled, mlock disabled)</span>
+          </div>
+          <div class="terminal-line">
+            <span>[OK] Context Size: 4096 tokens | Flash Attention: Active | Threads: 6 Cores</span>
+          </div>
+          <div class="terminal-line terminal-success">
+            <span>[READY] Local STT (Sherpa-Whisper-Tiny) & TTS (Piper Amy) Attached</span>
+          </div>
+          <div class="terminal-line">
+            <span class="terminal-prompt">$</span>
+            <span class="terminal-highlight">BIT AI Engine v1.9.3 Ready — Listening for local commands...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 7. Interactive Live Voice Mode Playground ── -->
+  <section id="voice-demo" class="voice-playground">
+    <div class="container">
+      <div class="playground-card">
+        <h2 class="section-title">Live Voice Mode Playground</h2>
+        <p class="section-desc">Experience how BIT processes live speech with echo cancellation and local continuous VAD.</p>
+
+        <div class="waveform-container">
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+        </div>
+
+        <div class="voice-transcript" id="voiceTranscript">
+          "Tap below to simulate speech recognition"
+        </div>
+
+        <button class="btn btn-primary" id="testVoiceBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          Simulate Live Speech Interaction
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 8. Download CTA & Footer ── -->
+  <footer class="footer-cta">
+    <div class="container">
+      <div class="footer-content">
+        <div class="release-pill">
+          <span>Release <strong class="github-release-tag">v1.9.3</strong></span>
+          <span>·</span>
+          <span>Android 10+ (API 29)</span>
+        </div>
+
+        <h2 class="section-title">Get BIT AI for Android</h2>
+        <p class="section-desc">Free, open source, privacy-first AI on your phone.</p>
+
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn btn-primary github-download-btn" style="font-size: 1.1rem; padding: 16px 36px;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download Latest Release APK (<span class="github-release-size">84.2 MB</span>)
+        </a>
+      </div>
+
+      <div class="footer-links">
+        <div>
+          © 2026 BIT AI Project · Built with <a href="https://github.com/jaswanthsanjay88/Bit_Android" style="text-decoration: underline;">llama.kt SDK</a>
+        </div>
+        <div style="display: flex; gap: 20px;">
+          <a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases" target="_blank" rel="noopener">Releases</a>
+          <a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/LICENSE" target="_blank" rel="noopener">Apache 2.0 License</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
