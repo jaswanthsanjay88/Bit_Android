@@ -1,0 +1,325 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BIT — On-Device Local AI Stack for Android</title>
+  <meta name="description" content="BIT is a privacy-first AI engine running quantized GGUF language models, vision understanding, Whisper STT, Piper TTS, and GBNF tool calling entirely on Android silicon." />
+
+  <!-- OpenGraph Metadata -->
+  <meta property="og:title" content="BIT — On-Device AI Engine for Android" />
+  <meta property="og:description" content="Run GGUF LLMs, Vision Models, Speech, RAG, and Long-Term Memory offline on Android." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://github.com/jaswanthsanjay88/Bit_Android" />
+
+  <!-- Google Fonts: Fraunces (Serif) & Inter (Sans) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Navigation ── -->
+  <header class="navbar" id="navbar">
+    <div class="container nav-container">
+      <a href="#" class="nav-brand" aria-label="BIT Home">
+        <div class="logo-box">B</div>
+        <span>BIT</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#benchmarks" class="nav-link">Specs</a></li>
+        <li><a href="#showcase" class="nav-link">Models</a></li>
+        <li><a href="#architecture" class="nav-link">Architecture</a></li>
+        <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="nav-link">GitHub</a></li>
+      </ul>
+
+      <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn-pill">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Download APK</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- ── Hero Section ── -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <div class="eyebrow-tag">
+          <span>ANDROID ON-DEVICE INFERENCE · APACHE 2.0</span>
+        </div>
+
+        <h1 class="hero-headline">
+          Offline AI Engine for Android. <br />
+          <em class="serif-italic">Quantized GGUF on local silicon.</em>
+        </h1>
+
+        <p class="hero-subhead">
+          A complete mobile AI stack — text generation, visual understanding, speech synthesis, document retrieval, and GBNF-constrained tool calling running 100% on-device with zero network requests.
+        </p>
+
+        <div class="hero-actions">
+          <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn-pill">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span id="githubDownloadSize">Download v1.9.3 APK</span>
+          </a>
+
+          <a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="btn-ghost">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            <span id="githubStarCount">★ Star on GitHub</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 3D Hero Stage (Dual Phone + Technical Code Panels) -->
+      <div class="hero-stage" id="heroStage">
+        <!-- Technical Code Panel 1 (Left) -->
+        <div class="code-panel panel-left">
+          <div class="panel-header">
+            <span>GBNF GRAMMAR ROUTER</span>
+            <span class="panel-tag">STATUS: 200 OK</span>
+          </div>
+          <pre style="margin:0;"><code class="mono"><span class="code-keyword">{"tool"</span>: <span class="code-str">"get_system_info"</span>,
+ <span class="code-keyword">"params"</span>: {
+   <span class="code-keyword">"include_battery"</span>: <span class="code-num">true</span>,
+   <span class="code-keyword">"include_memory"</span>: <span class="code-num">true</span>
+ }}</code></pre>
+        </div>
+
+        <!-- Technical Code Panel 2 (Right) -->
+        <div class="code-panel panel-right">
+          <div class="panel-header">
+            <span>LLAMA.KT NATIVE JNI</span>
+            <span class="panel-tag">ARM64 ARCH</span>
+          </div>
+          <div style="font-size: 0.72rem; color: var(--text-secondary);">
+            <div>&gt; n_ctx: <span class="code-num">8192</span> | n_gpu: <span class="code-num">99</span></div>
+            <div>&gt; flash_attn: <span class="code-num">1</span> (Q8_0 KV)</div>
+            <div>&gt; speed: <span class="code-num">38.4 tokens/sec</span></div>
+          </div>
+        </div>
+
+        <!-- Left Phone: Chat Interface -->
+        <div class="phone-wrapper phone-left" id="phoneLeft">
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <img src="img/bit_chat_interface.jpg" alt="BIT Chat Interface" class="phone-screen app-shot" />
+          </div>
+        </div>
+
+        <!-- Right Phone: Live Voice Mode -->
+        <div class="phone-wrapper phone-right" id="phoneRight">
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <img src="img/bit_live_voice_mode.jpg" alt="BIT Live Voice Mode" class="phone-screen app-shot" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section: Technical Specs / Benchmark Matrix ── -->
+  <section class="benchmarks" id="benchmarks">
+    <div class="container">
+      <div class="benchmarks-grid">
+        <div class="bench-card">
+          <div class="bench-val">38.4 t/s</div>
+          <div class="bench-title">Inference Speed</div>
+          <div class="bench-desc">Average token throughput on Snapdragon 8 Gen 3 ARM64 hardware.</div>
+        </div>
+
+        <div class="bench-card">
+          <div class="bench-val">8,192</div>
+          <div class="bench-title">Context Window</div>
+          <div class="bench-desc">Sliding-window context management with quantized KV cache keys.</div>
+        </div>
+
+        <div class="bench-card">
+          <div class="bench-val">75 MB</div>
+          <div class="bench-title">Whisper STT Footprint</div>
+          <div class="bench-desc">Sherpa ONNX offline speech recognition model running on 16kHz audio.</div>
+        </div>
+
+        <div class="bench-card">
+          <div class="bench-val">&lt; 10ms</div>
+          <div class="bench-title">GBNF Routing Latency</div>
+          <div class="bench-desc">Sampler-level grammar constraint execution for structured tool calls.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section: Tightly Fitted Model Management Showcase ── -->
+  <section class="showcase" id="showcase">
+    <div class="container">
+      <div class="showcase-header">
+        <h2 class="showcase-title">Model Store & Quantized Storage</h2>
+        <p class="showcase-desc">Download, parse, and switch GGUF models directly from HuggingFace repositories or SAF file pickers.</p>
+      </div>
+
+      <div class="showcase-container">
+        <div class="showcase-bar">
+          <span style="color: var(--text-primary); font-weight: 700;">BIT MANAGER</span>
+          <span>·</span>
+          <span>models/table_schema/Model.kt</span>
+        </div>
+        <img src="img/bit_model_store.jpg" alt="BIT Model Management" class="showcase-img app-shot" />
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section: Real Architecture & Subsystem Dataflow Map ── -->
+  <section class="architecture" id="architecture">
+    <div class="container">
+      <div class="arch-grid">
+        <div class="arch-card-stack">
+          <h2 class="showcase-title">On-Device Architecture</h2>
+
+          <div class="arch-card">
+            <div class="arch-card-title">1. GBNF Sampler Tool Router</div>
+            <div class="arch-card-desc">Constrains model logits at token generation time using EBNF grammars, guaranteeing valid JSON parameter output for local tools.</div>
+          </div>
+
+          <div class="arch-card">
+            <div class="arch-card-title">2. Offline Speech Pipeline</div>
+            <div class="arch-card-desc">Sherpa-ONNX offline Whisper recognition paired with VITS Piper speech synthesis running entirely on-device without remote calls.</div>
+          </div>
+
+          <div class="arch-card">
+            <div class="arch-card-title">3. Memory Vault & Hybrid RAG</div>
+            <div class="arch-card-desc">Extracts episodic memory facts across sessions with decay curves and queries local PDF/TXT files using vector + BM25 search.</div>
+          </div>
+        </div>
+
+        <!-- Dataflow SVG Map -->
+        <svg class="dataflow-svg" viewBox="0 0 540 400" fill="none">
+          <!-- Flow Box 1: User Voice / Input -->
+          <rect x="20" y="40" width="140" height="70" rx="8" fill="#141414" stroke="#3A3A3A" stroke-width="1.5"/>
+          <text x="90" y="72" fill="#FFFFFF" font-family="sans-serif" font-size="12" font-weight="700" text-anchor="middle">USER INPUT</text>
+          <text x="90" y="90" fill="#8F8F8F" font-family="monospace" font-size="10" text-anchor="middle">Mic / Text Stream</text>
+
+          <!-- Flow Box 2: Sherpa STT -->
+          <rect x="200" y="40" width="140" height="70" rx="8" fill="#141414" stroke="#3A3A3A" stroke-width="1.5"/>
+          <text x="270" y="72" fill="#FFFFFF" font-family="sans-serif" font-size="12" font-weight="700" text-anchor="middle">SHERPA STT</text>
+          <text x="270" y="90" fill="#8F8F8F" font-family="monospace" font-size="10" text-anchor="middle">Whisper Tiny 16kHz</text>
+
+          <!-- Flow Arrow 1 -->
+          <path d="M 160 75 L 200 75" stroke="#555555" stroke-width="1.5" marker-end="url(#arrow)" />
+
+          <!-- Flow Box 3: GBNF Router -->
+          <rect x="380" y="40" width="140" height="70" rx="8" fill="#141414" stroke="#FFFFFF" stroke-width="1.5"/>
+          <text x="450" y="72" fill="#FFFFFF" font-family="sans-serif" font-size="12" font-weight="700" text-anchor="middle">GBNF ROUTER</text>
+          <text x="450" y="90" fill="#8F8F8F" font-family="monospace" font-size="10" text-anchor="middle">Grammar Sampling</text>
+
+          <!-- Flow Arrow 2 -->
+          <path d="M 340 75 L 380 75" stroke="#555555" stroke-width="1.5" />
+
+          <!-- Downward Connection to Core Engine -->
+          <path d="M 450 110 L 450 180 L 270 180" stroke="#FFFFFF" stroke-width="1.5" fill="none"/>
+
+          <!-- Flow Box 4: llama.kt Core Engine -->
+          <rect x="120" y="180" width="300" height="90" rx="10" fill="#0A0A0A" stroke="#FFFFFF" stroke-width="2"/>
+          <text x="270" y="215" fill="#FFFFFF" font-family="sans-serif" font-size="14" font-weight="800" text-anchor="middle">llama.kt CORE INFERENCE</text>
+          <text x="270" y="235" fill="#8F8F8F" font-family="monospace" font-size="11" text-anchor="middle">Native C++ JNI · GGUF Quantization · FlashAttn</text>
+          <text x="270" y="252" fill="#555555" font-family="monospace" font-size="10" text-anchor="middle">Llama · Mistral · Gemma · Qwen</text>
+
+          <!-- Flow Box 5: Output Speech / RAG -->
+          <rect x="50" y="310" width="200" height="60" rx="8" fill="#141414" stroke="#3A3A3A" stroke-width="1.5"/>
+          <text x="150" y="340" fill="#FFFFFF" font-family="sans-serif" font-size="12" font-weight="700" text-anchor="middle">PIPER TTS VOICE</text>
+          <text x="150" y="356" fill="#8F8F8F" font-family="monospace" font-size="10" text-anchor="middle">On-Device VITS Synthesis</text>
+
+          <rect x="290" y="310" width="200" height="60" rx="8" fill="#141414" stroke="#3A3A3A" stroke-width="1.5"/>
+          <text x="390" y="340" fill="#FFFFFF" font-family="sans-serif" font-size="12" font-weight="700" text-anchor="middle">MEMORY VAULT & RAG</text>
+          <text x="390" y="356" fill="#8F8F8F" font-family="monospace" font-size="10" text-anchor="middle">Episodic Memory & Document Search</text>
+
+          <!-- Connections to Outputs -->
+          <path d="M 200 270 L 150 310" stroke="#555555" stroke-width="1.5" />
+          <path d="M 340 270 L 390 310" stroke="#555555" stroke-width="1.5" />
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section: Dual Visual Model Controls ── -->
+  <section class="controls-section">
+    <div class="container" style="text-align: center;">
+      <h2 class="showcase-title">Per-Model Sampling & Config Controls</h2>
+      <p class="showcase-desc" style="max-width: 540px; margin: 12px auto 0 auto;">
+        Tune temperature, context size, repetition penalty, system prompts, and thread allocation with instant Room DB persistence.
+      </p>
+
+      <div class="controls-stage">
+        <!-- Left Phone: Model Editor -->
+        <div class="phone-wrapper phone-left">
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <img src="img/bit_model_editor.jpg" alt="BIT Model Config Editor" class="phone-screen app-shot" />
+          </div>
+        </div>
+
+        <!-- Right Phone: Settings -->
+        <div class="phone-wrapper phone-right">
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <img src="img/bit_settings.jpg" alt="BIT Settings" class="phone-screen app-shot" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer & Oversized Wordmark ── -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div class="nav-brand">
+            <div class="logo-box">B</div>
+            <span>BIT</span>
+          </div>
+          <p>Privacy-first on-device AI stack for Android. Built with Kotlin, Jetpack Compose, and native C++ llama.cpp JNI bindings.</p>
+        </div>
+
+        <div>
+          <div class="footer-col-title">Architecture</div>
+          <ul class="footer-links">
+            <li><a href="#benchmarks" class="footer-link">Technical Specs</a></li>
+            <li><a href="#showcase" class="footer-link">Model Store</a></li>
+            <li><a href="#architecture" class="footer-link">Subsystems</a></li>
+            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/releases" class="footer-link">Releases</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="footer-col-title">Community</div>
+          <ul class="footer-links">
+            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" class="footer-link">GitHub Repo</a></li>
+            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/issues" class="footer-link">Issues</a></li>
+            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/discussions" class="footer-link">Discussions</a></li>
+            <li><a href="https://github.com/sponsors/jaswanthsanjay88" class="footer-link">Sponsor</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="footer-col-title">License</div>
+          <ul class="footer-links">
+            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/LICENSE" class="footer-link">Apache 2.0</a></li>
+            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/NOTICE" class="footer-link">Notice</a></li>
+            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/CONTRIBUTING.md" class="footer-link">Contributing</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Oversized Logo Crop -->
+    <div class="giant-wordmark-container">
+      <h1 class="giant-wordmark">BIT</h1>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
