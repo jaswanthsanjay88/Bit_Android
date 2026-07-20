@@ -70,7 +70,7 @@ function initGoogleAntigravityParticles() {
   let width = (canvas.width = canvas.offsetWidth || window.innerWidth);
   let height = (canvas.height = canvas.offsetHeight || 650);
 
-  const NUM_PARTICLES = 1100;
+  const NUM_PARTICLES = 2400;
   const particles = [];
   let currentTargetMode = 'idle'; // 'idle', 'brand', 'benchmarks', 'showcase', 'architecture', 'docs'
 
@@ -84,11 +84,11 @@ function initGoogleAntigravityParticles() {
     }
   });
 
-  // Offscreen canvas for pixel sampling
+  // Expanded Offscreen canvas for high-res pixel sampling (no clipping)
   const offscreen = document.createElement('canvas');
   const offCtx = offscreen.getContext('2d');
-  offscreen.width = 320;
-  offscreen.height = 140;
+  offscreen.width = 650;
+  offscreen.height = 240;
 
   // Particle Class Definition
   class Particle {
@@ -99,26 +99,22 @@ function initGoogleAntigravityParticles() {
       this.baseY = y;
       this.targetX = x;
       this.targetY = y;
-      this.vx = (Math.random() - 0.5) * 0.6;
-      this.vy = (Math.random() - 0.5) * 0.6;
-      this.radius = Math.random() * 1.6 + 0.8;
-      this.alpha = Math.random() * 0.6 + 0.3;
+      this.vx = (Math.random() - 0.5) * 0.7;
+      this.vy = (Math.random() - 0.5) * 0.7;
+      this.radius = Math.random() * 1.5 + 0.9;
+      this.alpha = Math.random() * 0.6 + 0.35;
       this.baseAlpha = this.alpha;
-      this.friction = 0.92;
-      this.ease = Math.random() * 0.06 + 0.05;
+      this.ease = Math.random() * 0.07 + 0.06;
     }
 
     update() {
       if (currentTargetMode === 'idle') {
-        // Floating ambient noise physics
         this.x += this.vx;
         this.y += this.vy;
 
-        // Soft bounce boundaries
         if (this.x < 0 || this.x > width) this.vx *= -1;
         if (this.y < 0 || this.y > height) this.vy *= -1;
       } else {
-        // Spring lerp to target shape
         this.x += (this.targetX - this.x) * this.ease;
         this.y += (this.targetY - this.y) * this.ease;
       }
@@ -128,6 +124,12 @@ function initGoogleAntigravityParticles() {
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha})`;
+      if (currentTargetMode !== 'idle') {
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.7)';
+      } else {
+        ctx.shadowBlur = 0;
+      }
       ctx.fill();
     }
   }
@@ -137,12 +139,12 @@ function initGoogleAntigravityParticles() {
     particles.length = 0;
     const centerX = width / 2;
     const centerY = height / 2.2;
-    const radiusX = Math.min(width * 0.42, 480);
-    const radiusY = Math.min(height * 0.38, 220);
+    const radiusX = Math.min(width * 0.44, 520);
+    const radiusY = Math.min(height * 0.4, 250);
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const spread = Math.random() * 60 - 30;
+      const spread = Math.random() * 80 - 40;
       const x = centerX + (radiusX + spread) * Math.cos(angle);
       const y = centerY + (radiusY + spread) * Math.sin(angle);
       particles.push(new Particle(x, y));
@@ -160,13 +162,13 @@ function initGoogleAntigravityParticles() {
     const data = imgData.data;
     const points = [];
 
-    // Step size for sampling density
-    const step = 3;
+    // Step size 2 for dense, ultra-crisp sampling
+    const step = 2;
     for (let y = 0; y < offscreen.height; y += step) {
       for (let x = 0; x < offscreen.width; x += step) {
         const index = (y * offscreen.width + x) * 4;
         const a = data[index + 3];
-        if (a > 128) {
+        if (a > 100) {
           points.push({ x, y });
         }
       }
@@ -185,38 +187,38 @@ function initGoogleAntigravityParticles() {
         ctx.fillStyle = '#FFFFFF';
         // Rounded Square Icon
         ctx.beginPath();
-        ctx.roundRect(15, 25, 80, 80, 18);
+        ctx.roundRect(20, 40, 110, 110, 24);
         ctx.fill();
         // Inner diamond cutout
         ctx.fillStyle = '#000000';
         ctx.beginPath();
-        ctx.moveTo(55, 38);
-        ctx.lineTo(75, 65);
-        ctx.lineTo(55, 92);
-        ctx.lineTo(35, 65);
+        ctx.moveTo(75, 58);
+        ctx.lineTo(102, 95);
+        ctx.lineTo(75, 132);
+        ctx.lineTo(48, 95);
         ctx.closePath();
         ctx.fill();
 
         // Text BIT
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = '900 64px Inter, sans-serif';
-        ctx.fillText('BIT', 115, 85);
-        ctx.font = '700 13px ui-monospace, monospace';
-        ctx.fillText('OFFLINE AI STACK', 118, 105);
+        ctx.font = '900 86px Inter, sans-serif';
+        ctx.fillText('BIT', 160, 120);
+        ctx.font = '700 16px ui-monospace, monospace';
+        ctx.fillText('OFFLINE AI ENGINE FOR ANDROID', 165, 145);
       });
     } else if (mode === 'benchmarks') {
       // Technical Specs / Benchmarks
       sampledPoints = sampleShapePoints((ctx, w, h) => {
         ctx.fillStyle = '#FFFFFF';
         // Speed bar chart icon
-        ctx.fillRect(15, 70, 14, 40);
-        ctx.fillRect(35, 45, 14, 65);
-        ctx.fillRect(55, 25, 14, 85);
+        ctx.fillRect(20, 100, 18, 50);
+        ctx.fillRect(48, 65, 18, 85);
+        ctx.fillRect(76, 35, 18, 115);
         // Text
-        ctx.font = '900 36px Inter, sans-serif';
-        ctx.fillText('BENCHMARKS', 85, 62);
-        ctx.font = '700 13px ui-monospace, monospace';
-        ctx.fillText('38.4 T/S · 8K CTX · <10MS', 87, 85);
+        ctx.font = '900 52px Inter, sans-serif';
+        ctx.fillText('BENCHMARKS', 120, 95);
+        ctx.font = '700 16px ui-monospace, monospace';
+        ctx.fillText('38.4 T/S INFERENCE · 8,192 CTX · <10MS TOOL ROUTING', 122, 130);
       });
     } else if (mode === 'showcase') {
       // Model Store
@@ -224,16 +226,16 @@ function initGoogleAntigravityParticles() {
         ctx.fillStyle = '#FFFFFF';
         // 3D Cube Icon
         ctx.beginPath();
-        ctx.roundRect(15, 30, 65, 65, 12);
+        ctx.roundRect(20, 45, 95, 95, 18);
         ctx.fill();
         ctx.fillStyle = '#000000';
-        ctx.fillRect(25, 40, 45, 45);
+        ctx.fillRect(35, 60, 65, 65);
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = '900 36px Inter, sans-serif';
-        ctx.fillText('MODEL STORE', 95, 62);
-        ctx.font = '700 13px ui-monospace, monospace';
-        ctx.fillText('GGUF QUANTIZED WEIGHTS', 97, 85);
+        ctx.font = '900 52px Inter, sans-serif';
+        ctx.fillText('MODEL STORE', 140, 95);
+        ctx.font = '700 16px ui-monospace, monospace';
+        ctx.fillText('QUANTIZED GGUF WEIGHTS & HF STORE', 142, 130);
       });
     } else if (mode === 'architecture') {
       // Architecture Subsystems
@@ -241,54 +243,54 @@ function initGoogleAntigravityParticles() {
         ctx.fillStyle = '#FFFFFF';
         // Neural Node graph icon
         ctx.beginPath();
-        ctx.arc(30, 40, 10, 0, Math.PI * 2);
-        ctx.arc(65, 70, 10, 0, Math.PI * 2);
-        ctx.arc(30, 95, 10, 0, Math.PI * 2);
+        ctx.arc(35, 55, 14, 0, Math.PI * 2);
+        ctx.arc(85, 95, 14, 0, Math.PI * 2);
+        ctx.arc(35, 135, 14, 0, Math.PI * 2);
         ctx.fill();
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 5;
         ctx.strokeStyle = '#FFFFFF';
         ctx.beginPath();
-        ctx.moveTo(30, 40); ctx.lineTo(65, 70); ctx.lineTo(30, 95);
+        ctx.moveTo(35, 55); ctx.lineTo(85, 95); ctx.lineTo(35, 135);
         ctx.stroke();
 
-        ctx.font = '900 36px Inter, sans-serif';
-        ctx.fillText('ARCHITECTURE', 90, 62);
-        ctx.font = '700 13px ui-monospace, monospace';
-        ctx.fillText('llama.kt · STT · TTS · GBNF', 92, 85);
+        ctx.font = '900 52px Inter, sans-serif';
+        ctx.fillText('ARCHITECTURE', 125, 95);
+        ctx.font = '700 16px ui-monospace, monospace';
+        ctx.fillText('llama.kt CORE · SHERPA STT · PIPER TTS · GBNF ROUTER', 127, 130);
       });
     } else if (mode === 'docs') {
       // Documentation Manual
       sampledPoints = sampleShapePoints((ctx, w, h) => {
         ctx.fillStyle = '#FFFFFF';
         // Stacked page icon
-        ctx.roundRect(20, 25, 50, 70, 8);
+        ctx.roundRect(25, 35, 75, 105, 12);
         ctx.fill();
         ctx.fillStyle = '#000000';
-        ctx.fillRect(30, 40, 30, 6);
-        ctx.fillRect(30, 52, 30, 6);
-        ctx.fillRect(30, 64, 20, 6);
+        ctx.fillRect(40, 60, 45, 8);
+        ctx.fillRect(40, 78, 45, 8);
+        ctx.fillRect(40, 96, 30, 8);
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = '900 36px Inter, sans-serif';
-        ctx.fillText('USER MANUAL', 85, 62);
-        ctx.font = '700 13px ui-monospace, monospace';
-        ctx.fillText('COMPLETE TECH SPEC & FAQ', 87, 85);
+        ctx.font = '900 52px Inter, sans-serif';
+        ctx.fillText('USER MANUAL', 130, 95);
+        ctx.font = '700 16px ui-monospace, monospace';
+        ctx.fillText('COMPLETE 13-CATEGORY TECHNICAL GUIDE & FAQ', 132, 130);
       });
     }
 
     if (sampledPoints.length === 0) return;
 
-    // Map sampled offscreen coordinates to viewport center
-    const scale = Math.min(width / 360, 2.2);
-    const offsetX = (width - 320 * scale) / 2;
-    const offsetY = (height - 140 * scale) / 2.4;
+    // Perfect Scale & Unobscured Center Viewport Positioning
+    const scale = Math.min(width / 680, 1.45);
+    const offsetX = (width - 650 * scale) / 2;
+    const offsetY = (height - 240 * scale) / 3.2;
 
     for (let i = 0; i < particles.length; i++) {
       const p = particles[i];
       const pt = sampledPoints[i % sampledPoints.length];
-      p.targetX = offsetX + pt.x * scale + (Math.random() - 0.5) * 2;
-      p.targetY = offsetY + pt.y * scale + (Math.random() - 0.5) * 2;
-      p.alpha = Math.random() * 0.4 + 0.6;
+      p.targetX = offsetX + pt.x * scale + (Math.random() - 0.5) * 1.5;
+      p.targetY = offsetY + pt.y * scale + (Math.random() - 0.5) * 1.5;
+      p.alpha = Math.random() * 0.35 + 0.65;
     }
   }
 
@@ -309,14 +311,14 @@ function initGoogleAntigravityParticles() {
 
     // Draw connecting lines in idle mode
     if (currentTargetMode === 'idle') {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.lineWidth = 0.8;
-      for (let i = 0; i < particles.length; i += 6) {
-        for (let j = i + 1; j < particles.length; j += 12) {
+      for (let i = 0; i < particles.length; i += 8) {
+        for (let j = i + 1; j < particles.length; j += 16) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 65) {
+          if (dist < 70) {
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
