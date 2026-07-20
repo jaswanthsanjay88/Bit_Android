@@ -59,35 +59,31 @@ def create_marketing_screenshot(
         # Scale app shot to fit inside phone frame
         app_shot_resized = app_shot.resize((phone_w - 20, phone_h - 20), Image.Resampling.LANCZOS)
 
-        # Phone bezel frame
-        bezel = Image.new("RGBA", (phone_w, phone_h), (13, 13, 13, 255))
+        # Phone bezel frame (Samsung Galaxy S24 / S25 Ultra Titanium Frame)
+        bezel = Image.new("RGBA", (phone_w, phone_h), (10, 10, 12, 255))
         bezel_draw = ImageDraw.Draw(bezel)
         
-        # Draw metallic edge border
-        bezel_draw.rectangle([0, 0, phone_w, phone_h], outline=(60, 60, 60, 255), width=4)
+        # Draw Samsung Armor Titanium Edge
+        bezel_draw.rectangle([0, 0, phone_w, phone_h], outline=(50, 52, 58, 255), width=6)
         
         # Rounded corners for phone screen
         bezel.paste(app_shot_resized, (10, 10))
 
-        # Draw Pixel Camera Visor Accent
-        visor_h = int(phone_h * 0.04)
-        bezel_draw.rectangle([10, 10, phone_w - 10, 10 + visor_h], fill=(22, 22, 22, 220))
-
-        # Draw Google Pixel 6 Pro Speaker Grill
-        speaker_w = int(phone_w * 0.18)
-        speaker_h = int(phone_h * 0.005)
+        # Draw Samsung Galaxy S24/S25 Ultra Top Speaker Slit
+        speaker_w = int(phone_w * 0.14)
+        speaker_h = int(phone_h * 0.004)
         speaker_x = int((phone_w - speaker_w) / 2)
-        bezel_draw.rectangle([speaker_x, 12, speaker_x + speaker_w, 12 + speaker_h], fill=(50, 50, 50, 255))
+        bezel_draw.rectangle([speaker_x, 11, speaker_x + speaker_w, 11 + speaker_h], fill=(58, 59, 64, 255))
 
-        # Draw Google Pixel 6 Pro Camera Punchhole Sensor
-        camera_r = int(phone_w * 0.024)
+        # Draw Samsung Galaxy S24/S25 Ultra Infinity-O Centered Camera Punchhole
+        camera_r = int(phone_w * 0.02)
         camera_x = int(phone_w / 2)
-        camera_y = int(phone_h * 0.032)
-        bezel_draw.ellipse([camera_x - camera_r, camera_y - camera_r, camera_x + camera_r, camera_y + camera_r], fill=(8, 8, 8, 255), outline=(40, 40, 40, 255), width=2)
+        camera_y = int(phone_h * 0.028)
+        bezel_draw.ellipse([camera_x - camera_r, camera_y - camera_r, camera_x + camera_r, camera_y + camera_r], fill=(7, 7, 8, 255), outline=(40, 41, 46, 255), width=2)
         
-        # Camera Lens Glare Dot
+        # Camera Lens Reflection
         lens_r = int(camera_r * 0.4)
-        bezel_draw.ellipse([camera_x - lens_r, camera_y - lens_r, camera_x + lens_r, camera_y + lens_r], fill=(96, 120, 192, 255))
+        bezel_draw.ellipse([camera_x - lens_r, camera_y - lens_r, camera_x + lens_r, camera_y + lens_r], fill=(88, 114, 184, 255))
 
         # Paste phone mockup onto canvas
         canvas.paste(bezel, (phone_x, phone_y))

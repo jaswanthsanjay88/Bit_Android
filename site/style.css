@@ -272,111 +272,99 @@ section.hero {
   filter: brightness(0.95);
 }
 
-/* ── Ultra-Realistic Google Pixel 6 Pro & Titanium Edge Frame ── */
+/* ── Latest Samsung Galaxy S24 / S25 Ultra Titanium Device Frame ── */
 .phone-frame {
   width: 100%;
   height: 100%;
-  background: #0D0D0D;
-  border-radius: 38px;
-  padding: 7px;
-  /* Titanium metallic edge effect */
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: #08080A;
+  border-radius: 22px;
+  padding: 6px;
+  /* Armor Titanium Frame with Brushed Metallic Edge */
+  border: 6px solid #1B1C20;
+  outline: 1px solid rgba(255, 255, 255, 0.22);
   box-shadow: 
     0 45px 110px rgba(0, 0, 0, 0.95),
     0 15px 40px rgba(0, 0, 0, 0.85),
-    inset 0 0 16px rgba(0, 0, 0, 0.95),
-    inset 0 2px 4px rgba(255, 255, 255, 0.25),
-    inset 0 -2px 4px rgba(255, 255, 255, 0.15);
+    inset 0 0 12px rgba(0, 0, 0, 0.95),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -1.5px 0 rgba(255, 255, 255, 0.15);
   position: relative;
   overflow: hidden;
 }
 
-/* Pixel Camera Visor Bar Bump Accent */
-.pixel-visor-bar {
+/* Galaxy S24/S25 Ultra Top Speaker Slit */
+.samsung-speaker {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 38px;
-  background: linear-gradient(180deg, #1C1C1C 0%, #0D0D0D 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  z-index: 18;
-  pointer-events: none;
-}
-
-/* Pixel Top Speaker Grill */
-.pixel-speaker {
-  position: absolute;
-  top: 4px;
+  top: 2px;
   left: 50%;
   transform: translateX(-50%);
-  width: 54px;
-  height: 3px;
-  background: #333333;
-  border-radius: 2px;
+  width: 44px;
+  height: 2px;
+  background: #3A3B40;
+  border-radius: 1px;
   z-index: 22;
-  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.8);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.9);
 }
 
-/* Pixel Centered Camera Punchhole Sensor */
-.pixel-camera {
+/* Galaxy S24/S25 Ultra Infinity-O Centered Camera */
+.samsung-camera {
   position: absolute;
-  top: 13px;
+  top: 11px;
   left: 50%;
   transform: translateX(-50%);
-  width: 16px;
-  height: 16px;
-  background: #080808;
-  border: 2px solid #282828;
+  width: 13px;
+  height: 13px;
+  background: #070708;
+  border: 1.5px solid #28292E;
   border-radius: 50%;
   z-index: 22;
-  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.95), 0 0 2px rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.95), 0 0 2px rgba(255, 255, 255, 0.12);
 }
 
-.pixel-camera::before {
+.samsung-camera::before {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 6px;
-  height: 6px;
+  top: 2.5px;
+  left: 2.5px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: radial-gradient(circle at 30% 30%, #6078C0 0%, #151D38 80%);
+  background: radial-gradient(circle at 35% 35%, #5872B8 0%, #10162A 85%);
 }
 
-/* Pixel Power & Volume Side Metallic Buttons */
-.pixel-power-btn {
+/* Galaxy S24/S25 Ultra Right-Side Titanium Buttons */
+.samsung-power-btn {
   position: absolute;
-  right: -9px;
-  top: 95px;
-  width: 4px;
-  height: 38px;
-  background: linear-gradient(180deg, #444 0%, #222 100%);
-  border-radius: 0 3px 3px 0;
+  right: -8px;
+  top: 92px;
+  width: 3.5px;
+  height: 36px;
+  background: linear-gradient(180deg, #4A4C52 0%, #222328 100%);
+  border-radius: 0 2px 2px 0;
   z-index: 10;
-  box-shadow: 1px 0 2px rgba(0,0,0,0.5);
+  box-shadow: 1px 0 3px rgba(0,0,0,0.6);
 }
 
-.pixel-volume-btn {
+.samsung-volume-btn {
   position: absolute;
-  right: -9px;
-  top: 148px;
-  width: 4px;
-  height: 72px;
-  background: linear-gradient(180deg, #444 0%, #222 100%);
-  border-radius: 0 3px 3px 0;
+  right: -8px;
+  top: 142px;
+  width: 3.5px;
+  height: 68px;
+  background: linear-gradient(180deg, #4A4C52 0%, #222328 100%);
+  border-radius: 0 2px 2px 0;
   z-index: 10;
-  box-shadow: 1px 0 2px rgba(0,0,0,0.5);
+  box-shadow: 1px 0 3px rgba(0,0,0,0.6);
 }
 
-/* Liquid Glass Reflection Glare Streak */
+/* Liquid Glass Dynamic Surface Glare */
 .phone-glare {
   position: absolute;
   inset: 0;
-  background: linear-gradient(130deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.04) 30%, transparent 65%);
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.03) 32%, transparent 65%);
   pointer-events: none;
   z-index: 15;
-  border-radius: 32px;
+  border-radius: 16px;
 }
 
 .phone-screen {
@@ -384,7 +372,7 @@ section.hero {
   height: 100%;
   object-fit: cover;
   display: block;
-  border-radius: 30px;
+  border-radius: 16px;
   box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.15);
 }
 
