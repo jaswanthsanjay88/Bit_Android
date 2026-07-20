@@ -42,6 +42,22 @@ All inference is performed locally using quantized GGUF model files. The applica
 
 ---
 
+## Application Screenshots
+
+<p align="center">
+  <img src="docs/img/bit_chat_interface.jpg" width="30%" alt="Chat Interface"/>
+  <img src="docs/img/bit_live_voice_mode.jpg" width="30%" alt="Live Voice Mode"/>
+  <img src="docs/img/bit_model_store.jpg" width="30%" alt="Model Store"/>
+</p>
+
+<p align="center">
+  <img src="docs/img/bit_rag_documents.jpg" width="30%" alt="RAG Documents"/>
+  <img src="docs/img/bit_settings.jpg" width="30%" alt="Settings"/>
+  <img src="docs/img/bit_model_editor.jpg" width="30%" alt="Model Editor"/>
+</p>
+
+---
+
 ## Features
 
 ### Text Generation

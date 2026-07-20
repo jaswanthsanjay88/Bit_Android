@@ -62,12 +62,18 @@ internal val AVAILABLE_TTS_MODELS = listOf(
     ),
     TtsModelInfo(
         id = "vits-piper-en_us-amy-low",
-        name = "Piper US Amy (English)",
+        name = "Piper US Amy (Female)",
         description = "High-quality low-latency English female voice",
         size = "~28 MB",
         url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2"
     ),
-
+    TtsModelInfo(
+        id = "vits-piper-en_us-lessac-low",
+        name = "Piper US Lessac (Female)",
+        description = "Natural sounding US English female voice",
+        size = "~29 MB",
+        url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-low.tar.bz2"
+    )
 )
 
 // ── TTS Settings Section ──

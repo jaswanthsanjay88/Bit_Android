@@ -50,7 +50,7 @@ class LLMModelViewModel @Inject constructor(
             if (ready) repository.getAllModels()
             else flowOf(emptyList())
         }
-        .map { models -> models.filter { it.providerType != ProviderType.TTS && it.providerType != ProviderType.DIFFUSION } }
+        .map { models -> models.filter { it.providerType != ProviderType.TTS && it.providerType != ProviderType.DIFFUSION && it.providerType != ProviderType.STT } }
 
     private val _currentModelID = MutableStateFlow("")
     val currentModelID: StateFlow<String> = _currentModelID.asStateFlow()
@@ -156,6 +156,16 @@ class LLMModelViewModel @Inject constructor(
                 val config = getModelConfig(model.id)
                 if (config == null) {
                     AppStateManager.setError("Model configuration not found")
+                    return@launch
+                }
+
+                val loadingParamsStr = config.modelLoadingParams ?: ""
+                if (model.providerType == ProviderType.STT ||
+                    loadingParamsStr.contains("\"type\":\"whisper\"") ||
+                    loadingParamsStr.contains("\"type\":\"stt\"") ||
+                    loadingParamsStr.contains("\"engine\":\"sherpa-onnx\"")
+                ) {
+                    AppStateManager.setError("STT models are used for speech recognition, not chat LLM inference.")
                     return@launch
                 }
 

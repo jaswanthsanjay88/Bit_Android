@@ -15,6 +15,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.bit.engine.GenerationEvent
+import com.bit.models.enums.ProviderType
 import com.bit.models.table_schema.Model
 import com.bit.models.table_schema.ModelConfig
 import com.bit.service.IDiffusionGenerationCallback
@@ -287,6 +288,17 @@ object LlmModelWorker {
     // ==================== GGUF Methods ====================
 
     suspend fun loadGgufModel(model: Model, modelConfig: ModelConfig): Boolean {
+        val loadingParams = modelConfig.modelLoadingParams ?: ""
+        if (model.providerType == ProviderType.STT ||
+            loadingParams.contains("\"type\":\"whisper\"") ||
+            loadingParams.contains("\"type\":\"stt\"") ||
+            loadingParams.contains("\"engine\":\"sherpa-onnx\"") ||
+            model.modelName.lowercase().contains("whisper")
+        ) {
+            Log.e(TAG, "Prevented crash: STT/Whisper model '${model.modelName}' cannot be loaded into LLMService.")
+            return false
+        }
+
         val svc = ensureServiceBound()
 
         return suspendCancellableCoroutine { continuation ->
@@ -335,6 +347,16 @@ object LlmModelWorker {
         modelName: String,
         modelConfig: ModelConfig
     ): Boolean {
+        val loadingParams = modelConfig.modelLoadingParams ?: ""
+        if (loadingParams.contains("\"type\":\"whisper\"") ||
+            loadingParams.contains("\"type\":\"stt\"") ||
+            loadingParams.contains("\"engine\":\"sherpa-onnx\"") ||
+            modelName.lowercase().contains("whisper")
+        ) {
+            Log.e(TAG, "Prevented crash: STT/Whisper model '$modelName' cannot be loaded into LLMService.")
+            return false
+        }
+
         val svc = ensureServiceBound()
 
         // Open ParcelFileDescriptor from content URI

@@ -320,6 +320,24 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
         }
     }
 
+    fun updateGgufRepeatPenalty(value: Float) {
+        _ggufConfig.update {
+            it.copy(inferenceParams = it.inferenceParams.copy(repeatPenalty = value))
+        }
+    }
+
+    fun updateGgufFlashAttn(value: Boolean) {
+        _ggufConfig.update {
+            it.copy(loadingParams = it.loadingParams.copy(flashAttn = value))
+        }
+    }
+
+    fun updateGgufBatchSize(value: Int) {
+        _ggufConfig.update {
+            it.copy(loadingParams = it.loadingParams.copy(batchSize = value))
+        }
+    }
+
     // ==================== Diffusion Config Updates ====================
 
     fun updateDiffusionEmbeddingSize(value: Int) {

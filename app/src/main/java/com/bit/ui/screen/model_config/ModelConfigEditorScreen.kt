@@ -444,6 +444,23 @@ internal fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
                 enabled = !loadingLocked
             )
 
+            IntField(
+                label = "Batch Size",
+                value = ggufConfig.loadingParams.batchSize,
+                onValueChange = { viewModel.updateGgufBatchSize(it) },
+                range = 128..2048,
+                step = 128,
+                enabled = !loadingLocked
+            )
+
+            SwitchField(
+                label = "Flash Attention",
+                checked = ggufConfig.loadingParams.flashAttn,
+                onCheckedChange = { viewModel.updateGgufFlashAttn(it) },
+                description = "Enable flash attention to reduce memory bandwidth usage",
+                enabled = !loadingLocked
+            )
+
             SwitchField(
                 label = "GPU Acceleration (Vulkan)",
                 checked = ggufConfig.loadingParams.gpuAcceleration,
@@ -468,6 +485,15 @@ internal fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
                 onValueChange = { viewModel.updateGgufTemperature(it) },
                 range = 0f..2f,
                 step = 0.1f
+            )
+
+            FloatField(
+                label = "Repetition Penalty",
+                value = ggufConfig.inferenceParams.repeatPenalty,
+                onValueChange = { viewModel.updateGgufRepeatPenalty(it) },
+                range = 1.0f..2.0f,
+                step = 0.05f,
+                description = "Penalize repetitive tokens (1.0 = disabled, 1.1 = subtle)"
             )
 
             IntField(
@@ -499,6 +525,14 @@ internal fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
                 onValueChange = { viewModel.updateGgufMaxTokens(it) },
                 range = 1..4096,
                 step = 128
+            )
+
+            TextField(
+                label = "Custom System Prompt",
+                value = ggufConfig.inferenceParams.systemPrompt,
+                onValueChange = { viewModel.updateGgufSystemPrompt(it) },
+                multiline = true,
+                minLines = 2
             )
 
             IntField(
