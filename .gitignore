@@ -47,3 +47,7 @@ hs_err_*.log
 # Reference directories
 /.aisystems_ref/
 /.toolneuron_ref/
+
+# Zip archives and skill artifacts
+*.zip
+/material-3-skill*/
