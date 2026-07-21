@@ -1,4 +1,4 @@
-﻿# BIT — F-Droid Publishing & Submission Guide
+# BIT — F-Droid Publishing & Submission Guide
 
 This directory contains everything required to submit **BIT** to **F-Droid** (the official free and open-source Android app repository).
 
@@ -42,16 +42,28 @@ fastlane/metadata/android/en-US/
 
 ---
 
-## 3. How to Submit BIT to F-Droid (Step-by-Step)
+## 3. How to Submit BIT to F-Droid via GitLab (Official Canonical Repo)
 
-### Step 1: Fork `fdroiddata` Repository
-1. Go to [https://github.com/f-droid/fdroiddata](https://github.com/f-droid/fdroiddata)
-2. Click **Fork** to create a copy under your GitHub account (`jaswanthsanjay88/fdroiddata`).
+> [!IMPORTANT]
+> The GitHub repo `f-droid/fdroiddata` is a **read-only mirror**. F-Droid accepts all submissions and Merge Requests on **GitLab**: [https://gitlab.com/fdroid/fdroiddata](https://gitlab.com/fdroid/fdroiddata).
 
-### Step 2: Add `com.bit.yml` Metadata File
-In your `fdroiddata` fork:
-1. Create a file at `metadata/com.bit.yml`.
-2. Paste the exact contents of [`fdroid/com.bit.yml`](file:///e:/BIT/fdroid/com.bit.yml):
+---
+
+### Method A: Submit a Merge Request (MR) on GitLab (Fastest — 1 Click GitHub Login)
+
+1. **Sign in to GitLab**:
+   - Go to [https://gitlab.com/users/sign_in](https://gitlab.com/users/sign_in)
+   - Click **"Sign in with GitHub"** (Log in directly using your GitHub credentials without creating a new password).
+
+2. **Fork `fdroiddata` on GitLab**:
+   - Open F-Droid's canonical repository: [https://gitlab.com/fdroid/fdroiddata](https://gitlab.com/fdroid/fdroiddata)
+   - Click **Fork** (top right) to create your fork (`https://gitlab.com/jaswanthsanjay88/fdroiddata`).
+
+3. **Add `metadata/com.bit.yml`**:
+   - In your GitLab fork, navigate into the `metadata/` directory.
+   - Click **+** → **New file**.
+   - File name: `metadata/com.bit.yml`
+   - Paste the contents of [`fdroid/com.bit.yml`](file:///e:/BIT/fdroid/com.bit.yml):
 
 ```yaml
 Categories:
@@ -96,11 +108,22 @@ CurrentVersion: 1.9.3
 CurrentVersionCode: 62
 ```
 
-### Step 3: Open a Pull Request
-1. Commit the `metadata/com.bit.yml` file to your `fdroiddata` fork.
-2. Open a Pull Request to `f-droid/fdroiddata:master`.
-3. Title: `New App: com.bit (BIT - Offline On-Device AI Engine)`
-4. F-Droid's automated build bot (`fdroid build`) will run a test build against tag `v1.9.3`.
+4. **Open Merge Request (MR)**:
+   - Click **Commit changes**.
+   - Click **Create Merge Request**.
+   - Title: `New App: com.bit (BIT - Offline On-Device AI Engine)`
+   - F-Droid's automated build runner (`fdroid build`) will run a test build against tag `v1.9.3` and merge your recipe!
+
+---
+
+### Method B: Open an RFP (Request For Packaging) Issue on GitLab
+
+If you prefer F-Droid maintainers to submit the recipe for you:
+1. Open a new issue at: [https://gitlab.com/fdroid/rfp/-/issues/new](https://gitlab.com/fdroid/rfp/-/issues/new)
+2. Title: `RFP: BIT (com.bit)`
+3. Under **Type**, select template **Request For Packaging (RFP)**.
+4. Paste your repository link (`https://github.com/jaswanthsanjay88/Bit_Android`) and attach `fdroid/com.bit.yml`.
+5. Submit the issue!
 
 ---
 
