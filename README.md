@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest"><img src="https://img.shields.io/github/v/release/jaswanthsanjay88/Bit_Android?style=flat-square&label=release" alt="Latest Release"></a>
+  <a href="fdroid/com.bit.yml"><img src="https://img.shields.io/badge/F--Droid-Ready-blue?style=flat-square&logo=f-droid&logoColor=white" alt="F-Droid Ready"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/platform-Android-brightgreen?style=flat-square&logo=android&logoColor=white" alt="Platform">
   <img src="https://img.shields.io/badge/API-29%2B-brightgreen?style=flat-square" alt="API Level">
@@ -148,7 +149,7 @@ The llama.kt module is a self-contained Kotlin SDK that bridges Android applicat
 
 ## Downloads
 
-Pre-built APK binaries are available from the [Releases](https://github.com/jaswanthsanjay88/Bit_Android/releases/latest) page. Three variants are provided for each release:
+Pre-built APK binaries are available from the [Releases](https://github.com/jaswanthsanjay88/Bit_Android/releases/latest) page and F-Droid recipe metadata:
 
 | Variant | Description | Recommended |
 |---|---|---|
@@ -157,6 +158,10 @@ Pre-built APK binaries are available from the [Releases](https://github.com/jasw
 | `x86_64` | Build for x86_64 devices and Android emulators. | |
 
 Select the **arm64-v8a** variant unless you have a specific requirement for another architecture.
+
+### F-Droid Package & Metadata
+BIT is configured for automated F-Droid inclusion with Fastlane metadata at [`fastlane/metadata/android/en-US/`](fastlane/metadata/android/en-US/) and F-Droid recipe [`fdroid/com.bit.yml`](fdroid/com.bit.yml).
+See [FDROID_SUBMISSION.md](FDROID_SUBMISSION.md) for full F-Droid repository build and submission instructions.
 
 ---
 

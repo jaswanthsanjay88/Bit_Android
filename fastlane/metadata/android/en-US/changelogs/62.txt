@@ -1,0 +1,5 @@
+v1.9.3 Release:
+- Liquid Glass monochrome UI with Samsung Galaxy S24/S25 Ultra device presentation.
+- Optimized GGUF model selector and HuggingFace store parser.
+- Sherpa-ONNX Whisper STT model load fixes and audio stability enhancements.
+- Per-model sampling controls for temperature, context length, and repetition penalty.

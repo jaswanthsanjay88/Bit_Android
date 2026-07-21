@@ -1,0 +1,1 @@
+Offline Android AI stack with GGUF LLMs, speech recognition, voice synthesis & GBNF tools.

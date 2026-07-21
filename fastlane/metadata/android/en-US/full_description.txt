@@ -1,0 +1,9 @@
+BIT is an offline, privacy-first mobile AI engine engineered specifically for Android silicon.
+
+Features:
+- On-Device GGUF LLMs: Run quantized Llama, Qwen, Gemma, and Mistral models locally via llama.kt native C++ bindings.
+- Offline Speech Pipeline: Sherpa-ONNX Whisper STT for 16kHz audio recognition and Piper VITS neural TTS voice synthesis with VAD barge-in.
+- GBNF Sampler Tool Router: Token-level grammar constraints forcing valid structured JSON tool calls.
+- Memory Vault & Hybrid RAG: Cross-session episodic preference memory with decay curves and local document search (Vector + BM25 keyword matching).
+- HuggingFace Model Store: Browse, download, and switch quantized model weights directly on device storage.
+- 100% Privacy & Zero Network Dependency: All inference, speech processing, and document indexing run entirely offline on local silicon.
