@@ -142,6 +142,7 @@ Builds:
     subdir: app
     gradle:
       - yes
+    output: build/outputs/apk/release/app-universal-release-unsigned.apk
     ndk: r28c
 
 AutoUpdateMode: Version v%v
