@@ -69,9 +69,7 @@ val extractPdfium by tasks.registering(Copy::class) {
     into(file("src/main/jniLibs"))
 }
 
-tasks.configureEach {
-    if (name.contains("externalNativeBuild", ignoreCase = true)) {
-        dependsOn(extractPdfium)
-    }
+tasks.named("preBuild") {
+    dependsOn(extractPdfium)
 }
 
