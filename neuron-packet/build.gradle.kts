@@ -52,6 +52,8 @@ android {
     }
 }
 
+val opensslNatives by configurations.creating
+
 dependencies {
     implementation(libs.lz4.java)
     implementation(libs.androidx.core.ktx)
@@ -60,4 +62,19 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    
+    // OpenSSL native binaries from JitPack dependency
+    opensslNatives("com.github.jaswanthsanjay88.bit-dependencies:openssl_libs:1.0.1@zip")
 }
+
+val extractOpenSsl by tasks.registering(Copy::class) {
+    from(opensslNatives.map { zipTree(it) })
+    into(file("src/main/jniLibs"))
+}
+
+tasks.configureEach {
+    if (name.contains("externalNativeBuild", ignoreCase = true)) {
+        dependsOn(extractOpenSsl)
+    }
+}
+

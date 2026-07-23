@@ -128,10 +128,11 @@ dependencies {
     implementation(libs.retrofit.converter.gson)
 
     // Local Projects & AI Libraries
-    implementation(files("../libs/ai_sherpa-release-v3.aar"))
+    // Resolved from JitPack for F-Droid compliance
+    implementation("com.github.jaswanthsanjay88.bit-dependencies:ai_sherpa_v3:1.0.1@aar")
     implementation(project(":llama-kt"))
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation(files("../libs/ai_sd-release.aar"))
+    implementation("com.github.jaswanthsanjay88.bit-dependencies:ai_sd:1.0.1@aar")
     implementation(project(":memory-vault"))
     implementation(project(":neuron-packet"))
     implementation(project(":system_encryptor"))
