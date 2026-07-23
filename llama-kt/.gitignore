@@ -1,0 +1,32 @@
+# Build outputs
+build/
+.gradle/
+.cxx/
+
+# IDE files
+.idea/
+*.iml
+.DS_Store
+
+# Native build artifacts
+*.so
+/src/main/jniLibs/
+*.a
+*.o
+*.d
+
+# GGUF model files (too large for git)
+*.gguf
+
+# Local configuration
+local.properties
+gradle.properties
+
+# Android
+*.apk
+*.aab
+*.dex
+*.class
+
+# Logs
+*.log

@@ -64,7 +64,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     
     // OpenSSL native binaries from JitPack dependency
-    opensslNatives("com.github.jaswanthsanjay88.bit-dependencies:openssl_libs:1.0.1@zip")
+    opensslNatives("com.github.jaswanthsanjay88.bit-dependencies:openssl_libs:1.1.0@zip")
 }
 
 val extractOpenSsl by tasks.registering(Copy::class) {

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- llama.kt: Local LLM inference library for Android -->
+    <!-- No permissions required — all inference runs on-device -->
+</manifest>
