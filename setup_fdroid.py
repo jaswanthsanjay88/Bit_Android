@@ -1,4 +1,4 @@
-﻿import os
+import os
 import shutil
 from PIL import Image, ImageDraw, ImageFont
 
@@ -141,7 +141,7 @@ Builds:
     commit: v1.9.3
     subdir: app
     gradle:
-      - assembleUniversalRelease
+      - assembleRelease
     ndk: r27c
 
 AutoUpdateMode: Version v%v
