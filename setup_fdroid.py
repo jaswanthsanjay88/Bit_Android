@@ -141,7 +141,7 @@ Builds:
     commit: v1.9.3
     subdir: app
     gradle:
-      - assembleRelease
+      - yes
     ndk: r28c
 
 AutoUpdateMode: Version v%v
