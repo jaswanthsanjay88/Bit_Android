@@ -142,7 +142,7 @@ Builds:
     subdir: app
     gradle:
       - assembleRelease
-    ndk: r27c
+    ndk: r28c
 
 AutoUpdateMode: Version v%v
 UpdateCheckMode: Tags
