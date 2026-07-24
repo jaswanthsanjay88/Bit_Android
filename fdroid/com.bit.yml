@@ -12,23 +12,13 @@ Donate: https://buymeacoffee.com/jaswanthsanjay
 
 AutoName: BIT
 
-Description: |-
-  BIT is a privacy-first mobile AI stack running entirely on-device without remote servers.
-
-  Key Capabilities:
-  - On-Device GGUF LLMs: Execute quantized Llama, Qwen, Gemma, and Mistral models via llama.kt native C++ JNI bindings.
-  - Offline Speech Pipeline: Sherpa-ONNX Whisper STT 16kHz speech recognition paired with Piper VITS neural voice synthesis and VAD barge-in.
-  - GBNF Tool Router: Token-level grammar sampling forcing valid JSON tool invocation.
-  - Memory Vault & Hybrid RAG: Cross-session episodic memory decay and local document indexing (Vector + BM25).
-  - HuggingFace Model Importer: Download and manage GGUF models directly on device storage.
-
 RepoType: git
 Repo: https://github.com/jaswanthsanjay88/Bit_Android.git
 
 Builds:
   - versionName: 1.9.3
     versionCode: 62
-    commit: v1.9.3
+    commit: abf1cc497333cf568a7d51ac28cd3536fa69d316
     subdir: app
     gradle:
       - yes
