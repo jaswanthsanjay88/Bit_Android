@@ -1,1 +1,1 @@
-Offline Android AI engine with GGUF LLMs, speech pipeline & GBNF tools.
+Offline on-device AI engine with GGUF LLMs, speech pipeline & GBNF tools.
