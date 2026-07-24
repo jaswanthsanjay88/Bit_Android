@@ -109,9 +109,9 @@ print(f"Generated Feature Graphic: {fg_path}")
 
 # 5. Create F-Droid Metadata Recipe File (com.bit.yml)
 fdroid_yml = """Categories:
+  - Development
   - Science & Education
   - System
-  - Development
 License: Apache-2.0
 AuthorName: Jaswanthsanjay
 AuthorEmail: jaswanthsanjay88@gmail.com
