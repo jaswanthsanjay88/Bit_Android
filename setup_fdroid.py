@@ -121,7 +121,7 @@ Changelog: https://github.com/jaswanthsanjay88/Bit_Android/releases
 Donate: https://buymeacoffee.com/jaswanthsanjay
 
 AutoName: BIT
-Summary: Offline On-Device AI Engine for Android
+
 Description: |-
   BIT is a privacy-first mobile AI stack running entirely on-device without remote servers.
 
