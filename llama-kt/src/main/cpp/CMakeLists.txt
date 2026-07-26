@@ -5,9 +5,7 @@ project("gguf_lib")
 # is too slow to be usable on-device.
 set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 
-# Use add_compile_options(
-    -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
-) (not CMAKE_CXX_FLAGS_RELEASE) — the NDK toolchain
+# Use add_compile_options() (not CMAKE_CXX_FLAGS_RELEASE) — the NDK toolchain
 # overrides the latter after our CMakeLists.txt runs.
 #
 # -ffp-contract=fast       fuse a*b+c into a single FMA (ARM has native fmla)
@@ -24,6 +22,7 @@ set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 # Do NOT add -fno-exceptions or -fno-rtti — gguf_lib.cpp has try/catch and
 # nlohmann::json needs RTTI.
 add_compile_options(
+    -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
     -ffp-contract=fast
     -fno-math-errno
     -fno-signed-zeros
