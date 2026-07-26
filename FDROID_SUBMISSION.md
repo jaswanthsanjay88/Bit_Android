@@ -75,8 +75,8 @@ AuthorName: Jaswanthsanjay
 AuthorEmail: jaswanthsanjay88@gmail.com
 SourceCode: https://github.com/jaswanthsanjay88/Bit_Android
 IssueTracker: https://github.com/jaswanthsanjay88/Bit_Android/issues
-Changelog: https://github.com/jaswanthsanjay88/Bit_Android/releases
-Donate: https://buymeacoffee.com/jaswanthsanjay
+Binaries: 
+  https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
 AutoName: BIT
 Summary: Offline On-Device AI Engine for Android

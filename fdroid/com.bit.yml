@@ -12,7 +12,7 @@ AutoName: BIT
 
 RepoType: git
 Repo: https://github.com/jaswanthsanjay88/Bit_Android
-Binaries:
+Binaries: 
   https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
 Builds:
