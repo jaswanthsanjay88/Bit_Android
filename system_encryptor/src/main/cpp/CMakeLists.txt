@@ -15,8 +15,6 @@ add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
 add_compile_options($<$<NOT:$<CONFIG:Debug>>:-DNDEBUG>)
 
 add_link_options(
-    -Wl,--build-id=sha1
-
     -Wl,--gc-sections
     -Wl,--icf=safe
     -Wl,-Bsymbolic

@@ -18,7 +18,7 @@ Binaries:
 Builds:
   - versionName: 1.9.3
     versionCode: 62
-    commit: e59fedfbf773c976c16d4f4c13b8ebc1ce0ea23e
+    commit: 6b1a99d67a9f868a1d03df5449482a7109d0a8df
     subdir: app
     gradle:
       - yes
