@@ -29,7 +29,7 @@ fastlane/metadata/android/en-US/
 ├── short_description.txt
 ├── full_description.txt
 ├── changelogs/
-│   └── 62.txt
+│   └── 63.txt
 └── images/
     ├── icon.png                      # 512x512 PNG
     ├── featureGraphic.png            # 1024x500 PNG
@@ -94,18 +94,19 @@ RepoType: git
 Repo: https://github.com/jaswanthsanjay88/Bit_Android.git
 
 Builds:
-  - versionName: 1.9.3
-    versionCode: 62
-    commit: v1.9.3
+  - versionName: 1.9.4
+    versionCode: 63
+    commit: v1.9.4
     subdir: app
     gradle:
-      - assembleUniversalRelease
-    ndk: r27c
+      - yes
+    output: build/outputs/apk/release/app-universal-release-unsigned.apk
+    ndk: r28c
 
-AutoUpdateMode: Version v%v
+AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.9.3
-CurrentVersionCode: 62
+CurrentVersion: 1.9.4
+CurrentVersionCode: 63
 ```
 
 4. **Open Merge Request (MR)**:

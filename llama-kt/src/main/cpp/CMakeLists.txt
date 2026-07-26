@@ -81,6 +81,16 @@ endif()
 set(CMAKE_SHARED_LINKER_FLAGS
     "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--icf=safe -Wl,-z,max-page-size=16384 -Wl,-Bsymbolic -Wl,--exclude-libs,ALL")
 
+# ── Reproducible build: override git-derived values with fixed strings ──
+# llama.cpp's cmake/build-info.cmake and cmake/git-vars.cmake run git commands
+# that embed commit hashes, dates, and counts into the binary. These differ
+# between build environments (F-Droid vs local) and break reproducibility.
+set(BUILD_NUMBER       0         CACHE STRING "" FORCE)
+set(BUILD_COMMIT       "unknown" CACHE STRING "" FORCE)
+set(GIT_SHA1           "unknown" CACHE STRING "" FORCE)
+set(GIT_DATE           ""        CACHE STRING "" FORCE)
+set(GIT_COMMIT_SUBJECT ""        CACHE STRING "" FORCE)
+
 add_subdirectory(${LLAMA_DIR} ${CMAKE_CURRENT_BINARY_DIR}/llama)
 
 set(RAG_INGEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rag_ingest)

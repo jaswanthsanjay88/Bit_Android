@@ -12,13 +12,22 @@ AutoName: BIT
 
 RepoType: git
 Repo: https://github.com/jaswanthsanjay88/Bit_Android
-Binaries: 
+Binaries:
   https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
 Builds:
   - versionName: 1.9.3
     versionCode: 62
-    commit: 6b1a99d67a9f868a1d03df5449482a7109d0a8df
+    commit: 22c7b3e10dc39e2bcb304b956e000e473c8b2752
+    subdir: app
+    gradle:
+      - yes
+    output: build/outputs/apk/release/app-universal-release-unsigned.apk
+    ndk: r28c
+
+  - versionName: 1.9.4
+    versionCode: 63
+    commit: v1.9.4
     subdir: app
     gradle:
       - yes
@@ -29,5 +38,5 @@ AllowedAPKSigningKeys: 54be788e5934c826a1bd10b043072fc04e5e4f206067ce5fc183cb8e0
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.9.3
-CurrentVersionCode: 62
+CurrentVersion: 1.9.4
+CurrentVersionCode: 63

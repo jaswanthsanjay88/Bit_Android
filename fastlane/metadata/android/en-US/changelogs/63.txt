@@ -1,0 +1,5 @@
+v1.9.4 Release:
+- F-Droid reproducible build fixes for verified builds.
+- Add rating/review form and Buy Me a Coffee support link.
+- Animated reviews marquee in Settings.
+- Build system hardening: deterministic native .so outputs, disabled Google dependency metadata injection.
