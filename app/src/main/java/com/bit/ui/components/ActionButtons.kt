@@ -292,10 +292,10 @@ fun ActionTextButton(
 @Composable
 fun ActionTextButton(
     onClickListener: () -> Unit,
-    icon: ImageVector,
     text: String,
-    contentDescription: String = "Action",
     modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    contentDescription: String = "Action",
     colors: ButtonColors = ButtonDefaults.buttonColors(
         containerColor = MaterialTheme.colorScheme.primary.copy(0.06f),
         contentColor = MaterialTheme.colorScheme.primary
@@ -312,11 +312,13 @@ fun ActionTextButton(
         shape = shape,
         colors = colors,
         modifier = modifier.height(Standards.ActionIconSize),
-        contentPadding = PaddingValues(end = 12.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp),
         enabled = enabled
     ) {
-        Icon(icon, contentDescription)
-        Spacer(Modifier.width(6.dp))
+        if (icon != null) {
+            Icon(icon, contentDescription)
+            Spacer(Modifier.width(6.dp))
+        }
         Text(text)
     }
 }

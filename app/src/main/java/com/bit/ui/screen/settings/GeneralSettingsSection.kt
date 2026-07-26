@@ -35,6 +35,15 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import org.json.JSONObject
+
 import com.bit.global.HardwareProfile
 import com.bit.global.PerformanceMode
 import com.bit.global.Standards
@@ -619,6 +628,16 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
         
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AboutLinkRow(
+                title = "Official Website",
+                description = "bit.jaswanthsanjay.me",
+                icon = TnIcons.Sparkles,
+                onClick = {
+                    haptics.selection()
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://bit.jaswanthsanjay.me")))
+                }
+            )
+
+            AboutLinkRow(
                 title = "Developer Website",
                 description = "jaswanthsanjay.me",
                 icon = TnIcons.User,
@@ -657,14 +676,24 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/jaswanthsanjay88/BIT_Android/issues")))
                 }
             )
+
+            AboutLinkRow(
+                title = "Buy Me a Coffee",
+                description = "Support independent open-source AI development",
+                icon = TnIcons.Coffee,
+                onClick = {
+                    haptics.selection()
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://buymeacoffee.com/jaswanthsanjay")))
+                }
+            )
         }
     }
 
-    // ── Rate BIT Section Header ──
+    // ── Rate BIT & Submit Review Section Header ──
     item {
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "Rate BIT",
+            text = "Rate BIT & Submit Review",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Bold,
@@ -672,88 +701,280 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
         )
     }
 
-    // ── Rating Block Card ──
+    // ── Rating & Review Form Card ──
     item {
+        val context = androidx.compose.ui.platform.LocalContext.current
         val haptics = com.bit.ui.theme.LocalBitHaptics.current
-        var localRating by remember { mutableStateOf(0) }
-        
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+        var userName by remember { mutableStateOf("") }
+        var userRole by remember { mutableStateOf("") }
+        var rating by remember { mutableStateOf(5) }
+        var reviewComment by remember { mutableStateOf("") }
+
+        var isSubmitting by remember { mutableStateOf(false) }
+        var isSuccess by remember { mutableStateOf(false) }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
+
         GlassCard(
             onClick = {},
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = Glass.Surface,
             borderColor = Glass.BorderSubtle,
             cornerRadius = Standards.CardCornerRadius,
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 24.dp)
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 20.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
             ) {
-                if (localRating == 0) {
-                    Text(
-                        text = "How is your experience?",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Glass.TextPrimary
-                    )
-                    Text(
-                        text = "Tap the stars to rate this app locally",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Glass.TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(Standards.SpacingXs))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                if (isSuccess) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
                     ) {
-                        for (i in 1..5) {
-                            IconButton(
-                                onClick = {
-                                    haptics.selection()
-                                    localRating = i
-                                },
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(
-                                    imageVector = TnIcons.Star,
-                                    contentDescription = "Star $i",
-                                    tint = if (i <= localRating) MaterialTheme.colorScheme.primary else Glass.TextSecondary.copy(alpha = 0.3f),
-                                    modifier = Modifier.size(32.dp)
+                        Icon(
+                            imageVector = TnIcons.Heart,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Text(
+                            text = "Thank you for your feedback!",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Glass.TextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "Your review has been uploaded to bit.jaswanthsanjay.me and will be featured live on our website!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Glass.TextSecondary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(Standards.SpacingXs))
+                        ActionTextButton(
+                            onClickListener = {
+                                haptics.selection()
+                                isSuccess = false
+                                reviewComment = ""
+                            },
+                            text = "Submit Another Review",
+                            shape = RoundedCornerShape(Standards.CardSmallCornerRadius)
+                        )
+                    }
+                } else {
+                    // Header & Intro
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Share Your Review on the Web",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Glass.TextPrimary
+                        )
+                        Text(
+                            text = "Your review & avatar will be published live to bit.jaswanthsanjay.me",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Glass.TextSecondary
+                        )
+                    }
+
+                    // Avatar Preview & Name / Role inputs
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                    ) {
+                        val avatarUrl = "https://api.dicebear.com/10.x/notionists/svg?seed=" +
+                            URLEncoder.encode(userName.ifBlank { "BitUser" }, "UTF-8")
+
+                        // Notionists Avatar Badge
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(52.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                AsyncImage(
+                                    model = avatarUrl,
+                                    contentDescription = "Notionist Avatar Preview",
+                                    modifier = Modifier.size(44.dp)
                                 )
                             }
                         }
-                    }
-                } else {
-                    Icon(
-                        imageVector = TnIcons.Heart,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Text(
-                        text = "Thank you for rating BIT!",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Glass.TextPrimary
-                    )
-                    Text(
-                        text = "Your feedback is highly valued. You rated: $localRating / 5 stars",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Glass.TextSecondary,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(Standards.SpacingXs))
-                    Text(
-                        text = "Reset Rating",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            haptics.selection()
-                            localRating = 0
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            androidx.compose.material3.OutlinedTextField(
+                                value = userName,
+                                onValueChange = { userName = it },
+                                label = { Text("Your Name") },
+                                placeholder = { Text("e.g. Alex R.") },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = Glass.BorderSubtle,
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent
+                                )
+                            )
+                            androidx.compose.material3.OutlinedTextField(
+                                value = userRole,
+                                onValueChange = { userRole = it },
+                                label = { Text("Occupation / Role (Optional)") },
+                                placeholder = { Text("e.g. Entrepreneur, Designer") },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = Glass.BorderSubtle,
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent
+                                )
+                            )
                         }
+                    }
+
+                    // 5-Star Rating Selector
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = when (rating) {
+                                5 -> "★★★★★ Outstanding!"
+                                4 -> "★★★★☆ Great App"
+                                3 -> "★★★☆☆ Good"
+                                2 -> "★★☆☆☆ Okay"
+                                else -> "★☆☆☆☆ Needs Improvement"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            for (i in 1..5) {
+                                IconButton(
+                                    onClick = {
+                                        haptics.selection()
+                                        rating = i
+                                    },
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = TnIcons.Star,
+                                        contentDescription = "Star $i",
+                                        tint = if (i <= rating) MaterialTheme.colorScheme.primary else Glass.TextSecondary.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Review Text Field
+                    androidx.compose.material3.OutlinedTextField(
+                        value = reviewComment,
+                        onValueChange = { reviewComment = it },
+                        label = { Text("Write your review") },
+                        placeholder = { Text("What do you think of BIT AI?") },
+                        minLines = 3,
+                        maxLines = 5,
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = Glass.BorderSubtle,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        )
+                    )
+
+                    if (errorMessage != null) {
+                        Text(
+                            text = errorMessage!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Glass.StatusError
+                        )
+                    }
+
+                    // Submit Button
+                    ActionTextButton(
+                        onClickListener = {
+                            if (userName.isBlank()) {
+                                errorMessage = "Please enter your name"
+                                return@ActionTextButton
+                            }
+                            if (reviewComment.isBlank()) {
+                                errorMessage = "Please write a review comment"
+                                return@ActionTextButton
+                            }
+                            errorMessage = null
+                            haptics.selection()
+                            isSubmitting = true
+
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    val url = URL("https://api.jaswanthsanjay.me/api/rating")
+                                    val conn = url.openConnection() as HttpURLConnection
+                                    conn.requestMethod = "POST"
+                                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                                    conn.doOutput = true
+                                    conn.connectTimeout = 10000
+                                    conn.readTimeout = 10000
+
+                                    val seed = URLEncoder.encode(userName.trim(), "UTF-8")
+                                    val avatarUrl = "https://api.dicebear.com/10.x/notionists/svg?seed=$seed"
+
+                                    val jsonPayload = JSONObject().apply {
+                                        put("name", userName.trim())
+                                        put("role", userRole.ifBlank { "User" }.trim())
+                                        put("rating", rating)
+                                        put("comment", reviewComment.trim())
+                                        put("review", reviewComment.trim())
+                                        put("feedback", reviewComment.trim())
+                                        put("avatar", avatarUrl)
+                                        put("appVersion", appVersion)
+                                    }
+
+                                    conn.outputStream.use { os ->
+                                        os.write(jsonPayload.toString().toByteArray(Charsets.UTF_8))
+                                    }
+
+                                    val responseCode = conn.responseCode
+                                    if (responseCode in 200..299) {
+                                        withContext(Dispatchers.Main) {
+                                            isSubmitting = false
+                                            isSuccess = true
+                                        }
+                                    } else {
+                                        withContext(Dispatchers.Main) {
+                                            isSubmitting = false
+                                            errorMessage = "Server error ($responseCode). Please try again."
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        isSubmitting = false
+                                        errorMessage = "Failed to upload: ${e.localizedMessage ?: "Network error"}"
+                                    }
+                                }
+                            }
+                        },
+                        text = if (isSubmitting) "Publishing to Website..." else "Submit Review to Website",
+                        icon = if (!isSubmitting) TnIcons.Sparkles else null,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(Standards.CardSmallCornerRadius)
                     )
                 }
             }

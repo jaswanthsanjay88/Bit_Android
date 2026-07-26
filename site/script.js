@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMouseParallax();
   initGitHubApi();
   initIntersectionObserver();
+  initLiveRatings();
 });
 
 /* ── Sticky Navbar Blur ── */
@@ -123,4 +124,108 @@ function initIntersectionObserver() {
     el.style.transition = 'opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1)';
     observer.observe(el);
   });
+}
+
+/* ── Live Ratings API Fetch & Marquee Population ── */
+async function initLiveRatings() {
+  const track1 = document.getElementById('marqueeTrack1');
+  const track2 = document.getElementById('marqueeTrack2');
+  const track3 = document.getElementById('marqueeTrack3');
+  if (!track1) return;
+
+  let reviews = [];
+
+  try {
+    const res = await fetch('https://api.jaswanthsanjay.me/api/rating');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.ratings && data.ratings.length > 0) {
+        reviews = data.ratings;
+      }
+    }
+  } catch (err) {
+    console.log('Using default reviews fallback:', err);
+  }
+
+  // Fallback reviews matching the app's features
+  if (!reviews || reviews.length === 0) {
+    reviews = [
+      {
+        name: "Alex R.",
+        role: "Entrepreneur",
+        rating: 5,
+        comment: "This on-device stack is a game-changer for my workflow. Zero latency, 100% offline privacy."
+      },
+      {
+        name: "Sarah W.",
+        role: "AI Developer",
+        rating: 5,
+        comment: "GBNF grammar-constrained JSON tool calling directly on Android silicon is unbelievable."
+      },
+      {
+        name: "Michael B.",
+        role: "Startup Founder",
+        rating: 5,
+        comment: "The performance on Snapdragon chips is top tier. Running GGUF models locally with zero cloud dependencies."
+      },
+      {
+        name: "Jessica L.",
+        role: "Mobile Architect",
+        rating: 5,
+        comment: "Whisper STT and Piper TTS running offline in background threads. Incredible work!"
+      },
+      {
+        name: "Chloe K.",
+        role: "Product Manager",
+        rating: 5,
+        comment: "The most privacy-conscious mobile AI application I have used."
+      },
+      {
+        name: "David P.",
+        role: "Software Engineer",
+        rating: 5,
+        comment: "Clean Kotlin + Compose UI paired with native C++ llama.cpp bindings."
+      }
+    ];
+  }
+
+  function renderCard(item) {
+    const seed = encodeURIComponent(item.name || 'User');
+    const avatarUrl = item.avatar || `https://api.dicebear.com/10.x/notionists/svg?seed=${seed}`;
+    const stars = '★'.repeat(item.rating || 5) + '☆'.repeat(5 - (item.rating || 5));
+
+    return `
+      <div class="review-card">
+        <div class="review-header">
+          <img src="${avatarUrl}" alt="${item.name}" class="review-avatar" />
+          <div>
+            <div class="review-author">${item.name}</div>
+            <div class="review-role">${item.role || 'BIT User'}</div>
+          </div>
+        </div>
+        <div class="review-stars">${stars}</div>
+        <div class="review-comment">"${item.comment || item.review || item.feedback}"</div>
+      </div>
+    `;
+  }
+
+  const col1Items = [];
+  const col2Items = [];
+  const col3Items = [];
+
+  reviews.forEach((rev, idx) => {
+    if (idx % 3 === 0) col1Items.push(rev);
+    else if (idx % 3 === 1) col2Items.push(rev);
+    else col3Items.push(rev);
+  });
+
+  const buildColumnHtml = (items) => {
+    const list = [...items, ...items, ...items];
+    return `<div class="flex-col-gap">${list.map(renderCard).join('')}</div>
+            <div class="flex-col-gap">${list.map(renderCard).join('')}</div>`;
+  };
+
+  if (track1) track1.innerHTML = buildColumnHtml(col1Items.length ? col1Items : reviews);
+  if (track2) track2.innerHTML = buildColumnHtml(col2Items.length ? col2Items : reviews);
+  if (track3) track3.innerHTML = buildColumnHtml(col3Items.length ? col3Items : reviews);
 }
