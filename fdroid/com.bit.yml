@@ -1,29 +1,31 @@
 Categories:
-  - Development
-  - Science & Education
+  - AI Chat
   - System
-License: Apache-2.0
-AuthorName: Jaswanthsanjay
+License: MIT
+AuthorName: Jaswanth Sanjay
 AuthorEmail: jaswanthsanjay88@gmail.com
 SourceCode: https://github.com/jaswanthsanjay88/Bit_Android
 IssueTracker: https://github.com/jaswanthsanjay88/Bit_Android/issues
-Changelog: https://github.com/jaswanthsanjay88/Bit_Android/releases
-Donate: https://buymeacoffee.com/jaswanthsanjay
 
+Name: Bit
 AutoName: BIT
 
 RepoType: git
-Repo: https://github.com/jaswanthsanjay88/Bit_Android.git
+Repo: https://github.com/jaswanthsanjay88/Bit_Android
+Binaries: 
+  https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
 Builds:
   - versionName: 1.9.3
     versionCode: 62
-    commit: abf1cc497333cf568a7d51ac28cd3536fa69d316
+    commit: e59fedfbf773c976c16d4f4c13b8ebc1ce0ea23e
     subdir: app
     gradle:
       - yes
     output: build/outputs/apk/release/app-universal-release-unsigned.apk
     ndk: r28c
+
+AllowedAPKSigningKeys: 54be788e5934c826a1bd10b043072fc04e5e4f206067ce5fc183cb8e0c5e4b3b
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

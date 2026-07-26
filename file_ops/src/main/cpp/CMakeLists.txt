@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Dead code elimination: compile each function/data into its own section,
 # then let the linker garbage-collect unreferenced sections.
 add_compile_options(
+    -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
+
     -ffunction-sections
     -fdata-sections
 )
@@ -15,6 +17,8 @@ add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
 add_compile_options($<$<NOT:$<CONFIG:Debug>>:-DNDEBUG>)
 
 add_link_options(
+    -Wl,--build-id=sha1
+
     -Wl,--gc-sections              # strip unused sections
     -Wl,--icf=safe                 # merge identical functions
     -Wl,-Bsymbolic

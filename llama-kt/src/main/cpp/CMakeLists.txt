@@ -5,7 +5,9 @@ project("gguf_lib")
 # is too slow to be usable on-device.
 set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 
-# Use add_compile_options() (not CMAKE_CXX_FLAGS_RELEASE) — the NDK toolchain
+# Use add_compile_options(
+    -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
+) (not CMAKE_CXX_FLAGS_RELEASE) — the NDK toolchain
 # overrides the latter after our CMakeLists.txt runs.
 #
 # -ffp-contract=fast       fuse a*b+c into a single FMA (ARM has native fmla)
@@ -77,7 +79,7 @@ endif()
 # --gc-sections          strip unreferenced functions/data
 # --icf=safe             merge identical code (only when addresses aren't taken)
 # -z,max-page-size=16384 16KB page size support for Android 15+
-set(CMAKE_SHARED_LINKER_FLAGS
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=sha1"
     "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--icf=safe -Wl,-z,max-page-size=16384 -Wl,-Bsymbolic -Wl,--exclude-libs,ALL")
 
 add_subdirectory(${LLAMA_DIR} ${CMAKE_CURRENT_BINARY_DIR}/llama)
@@ -90,7 +92,7 @@ set_target_properties(pdfium PROPERTIES
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libpdfium.so)
 
 set(MINIZ_SOURCES ${RAG_INGEST_DIR}/third_party/miniz/miniz.c)
-set_source_files_properties(${MINIZ_SOURCES} PROPERTIES LANGUAGE C)
+set_source_files_properties(${MINIZ_SOURCES} PROPERTIES LANGUAGE C COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -Wno-pragma-messages")
 
 set(RAG_INGEST_SOURCES
     ${RAG_INGEST_DIR}/rag_ingest.cpp
