@@ -48,6 +48,8 @@ jobs:
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: ${{ steps.apk.outputs.path }}
           tag_name: ${{ github.ref_name }}
