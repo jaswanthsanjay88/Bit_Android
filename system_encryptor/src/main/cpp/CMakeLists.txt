@@ -4,14 +4,20 @@ project("system_encryptor")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ── Production optimizations (non-Debug) ──
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffile-prefix-map=${CMAKE_SOURCE_DIR}=. -ffile-prefix-map=${CMAKE_BINARY_DIR}=. -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=. -fmacro-prefix-map=${CMAKE_BINARY_DIR}=. -finput-charset=UTF-8 -fexec-charset=UTF-8")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffile-prefix-map=${CMAKE_SOURCE_DIR}=. -ffile-prefix-map=${CMAKE_BINARY_DIR}=. -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=. -fmacro-prefix-map=${CMAKE_BINARY_DIR}=. -finput-charset=UTF-8 -fexec-charset=UTF-8")
+
 add_compile_options(
     -finput-charset=UTF-8
     -fexec-charset=UTF-8
     -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
     -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
+    -ffile-prefix-map=${CMAKE_BINARY_DIR}=.
     -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
+    -fmacro-prefix-map=${CMAKE_BINARY_DIR}=.
     -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -fdebug-prefix-map=${CMAKE_BINARY_DIR}=.
 
     -ffunction-sections
     -fdata-sections

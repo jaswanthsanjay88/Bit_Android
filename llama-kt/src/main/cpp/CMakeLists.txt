@@ -26,8 +26,12 @@ add_compile_options(
     -fexec-charset=UTF-8
     -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
     -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
+    -ffile-prefix-map=${CMAKE_BINARY_DIR}=.
     -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
+    -fmacro-prefix-map=${CMAKE_BINARY_DIR}=.
     -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -fdebug-prefix-map=${CMAKE_BINARY_DIR}=.
     -ffp-contract=fast
     -fno-math-errno
     -fno-signed-zeros
