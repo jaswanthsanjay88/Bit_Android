@@ -20,8 +20,10 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname.replace(/\/$/, '') || '/';
 
-    // Support binding named either RATINGS_KV or KV
-    const kv = env.RATINGS_KV || env.KV;
+    // Find valid KV binding object that actually has .get() function
+    const kv = (env.RATINGS_KV && typeof env.RATINGS_KV.get === 'function') ? env.RATINGS_KV
+             : (env.KV && typeof env.KV.get === 'function') ? env.KV
+             : null;
 
     // 2. Route: /api/rating
     if (pathname === '/api/rating') {
@@ -57,7 +59,11 @@ export default {
             ];
           }
 
-          return new Response(JSON.stringify({ success: true, ratings, kvBound: Boolean(kv) }), {
+          return new Response(JSON.stringify({
+            success: true,
+            ratings,
+            kvBound: Boolean(kv)
+          }), {
             status: 200,
             headers: corsHeaders,
           });
@@ -93,10 +99,15 @@ export default {
             currentList = currentList.slice(0, 50);
             await kv.put('latest_ratings', JSON.stringify(currentList));
           } else {
-            console.warn('KV Namespace binding (RATINGS_KV or KV) is missing in Cloudflare Worker settings!');
+            console.warn('No valid KV Namespace binding found!');
           }
 
-          return new Response(JSON.stringify({ success: true, message: 'Review saved!', review: newEntry, kvSaved: Boolean(kv) }), {
+          return new Response(JSON.stringify({
+            success: true,
+            message: 'Review saved!',
+            review: newEntry,
+            kvSaved: Boolean(kv)
+          }), {
             status: 200,
             headers: corsHeaders,
           });
