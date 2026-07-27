@@ -20,10 +20,16 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname.replace(/\/$/, '') || '/';
 
-    // Find valid KV binding object that actually has .get() function
-    const kv = (env.RATINGS_KV && typeof env.RATINGS_KV.get === 'function') ? env.RATINGS_KV
-             : (env.KV && typeof env.KV.get === 'function') ? env.KV
-             : null;
+    // Auto-detect ANY bound KV Namespace instance in env (regardless of variable name)
+    let kv = null;
+    let boundKeyName = null;
+    for (const key of Object.keys(env)) {
+      if (env[key] && typeof env[key].get === 'function') {
+        kv = env[key];
+        boundKeyName = key;
+        break;
+      }
+    }
 
     // 2. Route: /api/rating
     if (pathname === '/api/rating') {
@@ -62,7 +68,8 @@ export default {
           return new Response(JSON.stringify({
             success: true,
             ratings,
-            kvBound: Boolean(kv)
+            kvBound: Boolean(kv),
+            boundKeyName: boundKeyName || 'None'
           }), {
             status: 200,
             headers: corsHeaders,
@@ -98,15 +105,18 @@ export default {
             currentList.unshift(newEntry);
             currentList = currentList.slice(0, 50);
             await kv.put('latest_ratings', JSON.stringify(currentList));
+            console.log(`Saved review to KV using binding '${boundKeyName}'`);
           } else {
-            console.warn('No valid KV Namespace binding found!');
+            console.warn(`No valid KV Namespace binding found in env! Available env keys: [${Object.keys(env).join(', ')}]`);
           }
 
           return new Response(JSON.stringify({
             success: true,
-            message: 'Review saved!',
+            message: kv ? 'Review saved to KV!' : 'Review received, but KV binding missing in Cloudflare Dashboard!',
             review: newEntry,
-            kvSaved: Boolean(kv)
+            kvSaved: Boolean(kv),
+            boundKeyName: boundKeyName || 'None',
+            availableEnvKeys: Object.keys(env)
           }), {
             status: 200,
             headers: corsHeaders,
