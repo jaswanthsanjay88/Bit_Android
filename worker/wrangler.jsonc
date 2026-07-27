@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bit-rating-api",
+  "main": "src/index.js",
+  "compatibility_date": "2025-02-04",
+  "observability": {
+    "enabled": true
+  },
+  "kv_namespaces": [
+    {
+      "binding": "RATINGS_KV",
+      "id": "db82a718cbe9475b9156cd6f247b74ee"
+    }
+  ]
+}

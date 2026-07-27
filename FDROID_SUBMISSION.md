@@ -8,14 +8,14 @@ This directory contains everything required to submit **BIT** to **F-Droid** (th
 
 | Requirement | Status | Location / Details |
 | :--- | :---: | :--- |
-| **Open Source License** | ✅ | [Apache License 2.0](file:///e:/BIT/LICENSE) |
+| **Open Source License** | ✅ | [Apache License 2.0 / MIT](file:///e:/BIT/LICENSE) |
 | **No Proprietary Trackers** | ✅ | 100% Offline, no telemetry or analytics |
 | **Fastlane App Metadata** | ✅ | [`fastlane/metadata/android/en-US/`](file:///e:/BIT/fastlane/metadata/android/en-US) |
 | **512x512 PNG Icon** | ✅ | [`fastlane/metadata/android/en-US/images/icon.png`](file:///e:/BIT/fastlane/metadata/android/en-US/images/icon.png) |
 | **1024x500 Feature Graphic** | ✅ | [`fastlane/metadata/android/en-US/images/featureGraphic.png`](file:///e:/BIT/fastlane/metadata/android/en-US/images/featureGraphic.png) |
 | **High-Res Screenshots** | ✅ | [`fastlane/metadata/android/en-US/images/phoneScreenshots/`](file:///e:/BIT/fastlane/metadata/android/en-US/images/phoneScreenshots) |
 | **F-Droid Build Recipe** | ✅ | [`fdroid/com.bit.yml`](file:///e:/BIT/fdroid/com.bit.yml) |
-| **Reproducible Build Target** | ✅ | Gradle `assembleUniversalRelease` |
+| **Reproducible Build Target** | ✅ | `build/outputs/apk/release/app-universal-release-unsigned.apk` |
 
 ---
 
@@ -42,98 +42,40 @@ fastlane/metadata/android/en-US/
 
 ---
 
-## 3. How to Submit BIT to F-Droid via GitLab (Official Canonical Repo)
-
-> [!IMPORTANT]
-> The GitHub repo `f-droid/fdroiddata` is a **read-only mirror**. F-Droid accepts all submissions and Merge Requests on **GitLab**: [https://gitlab.com/fdroid/fdroiddata](https://gitlab.com/fdroid/fdroiddata).
-
----
-
-### Method A: Submit a Merge Request (MR) on GitLab (Fastest — 1 Click GitHub Login)
-
-1. **Sign in to GitLab**:
-   - Go to [https://gitlab.com/users/sign_in](https://gitlab.com/users/sign_in)
-   - Click **"Sign in with GitHub"** (Log in directly using your GitHub credentials without creating a new password).
-
-2. **Fork `fdroiddata` on GitLab**:
-   - Open F-Droid's canonical repository: [https://gitlab.com/fdroid/fdroiddata](https://gitlab.com/fdroid/fdroiddata)
-   - Click **Fork** (top right) to create your fork (`https://gitlab.com/jaswanthsanjay88/fdroiddata`).
-
-3. **Add `metadata/com.bit.yml`**:
-   - In your GitLab fork, navigate into the `metadata/` directory.
-   - Click **+** → **New file**.
-   - File name: `metadata/com.bit.yml`
-   - Paste the contents of [`fdroid/com.bit.yml`](file:///e:/BIT/fdroid/com.bit.yml):
+## 3. F-Droid Metadata Recipe (`metadata/com.bit.yml`)
 
 ```yaml
 Categories:
-  - Science & Education
+  - AI Chat
   - System
-  - Development
-License: Apache-2.0
-AuthorName: Jaswanthsanjay
+License: MIT
+AuthorName: Jaswanth Sanjay
 AuthorEmail: jaswanthsanjay88@gmail.com
 SourceCode: https://github.com/jaswanthsanjay88/Bit_Android
 IssueTracker: https://github.com/jaswanthsanjay88/Bit_Android/issues
-Binaries: 
-  https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
+Name: Bit
 AutoName: BIT
-Summary: Offline On-Device AI Engine for Android
-Description: |-
-  BIT is a privacy-first mobile AI stack running entirely on-device without remote servers.
-
-  Key Capabilities:
-  - On-Device GGUF LLMs: Execute quantized Llama, Qwen, Gemma, and Mistral models via llama.kt native C++ JNI bindings.
-  - Offline Speech Pipeline: Sherpa-ONNX Whisper STT 16kHz speech recognition paired with Piper VITS neural voice synthesis and VAD barge-in.
-  - GBNF Tool Router: Token-level grammar sampling forcing valid JSON tool invocation.
-  - Memory Vault & Hybrid RAG: Cross-session episodic memory decay and local document indexing (Vector + BM25).
-  - HuggingFace Model Importer: Download and manage GGUF models directly on device storage.
 
 RepoType: git
-Repo: https://github.com/jaswanthsanjay88/Bit_Android.git
+Repo: https://github.com/jaswanthsanjay88/Bit_Android
+Binaries: 
+  https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
 Builds:
   - versionName: 1.9.4
     versionCode: 63
-    commit: v1.9.4
+    commit: 4a7de2a6cda72f439455ba8b396ff194608e2286
     subdir: app
     gradle:
       - yes
     output: build/outputs/apk/release/app-universal-release-unsigned.apk
     ndk: r28c
 
+AllowedAPKSigningKeys: 54be788e5934c826a1bd10b043072fc04e5e4f206067ce5fc183cb8e0c5e4b3b
+
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
 CurrentVersion: 1.9.4
 CurrentVersionCode: 63
-```
-
-4. **Open Merge Request (MR)**:
-   - Click **Commit changes**.
-   - Click **Create Merge Request**.
-   - Title: `New App: com.bit (BIT - Offline On-Device AI Engine)`
-   - F-Droid's automated build runner (`fdroid build`) will run a test build against tag `v1.9.3` and merge your recipe!
-
----
-
-### Method B: Open an RFP (Request For Packaging) Issue on GitLab
-
-If you prefer F-Droid maintainers to submit the recipe for you:
-1. Open a new issue at: [https://gitlab.com/fdroid/rfp/-/issues/new](https://gitlab.com/fdroid/rfp/-/issues/new)
-2. Title: `RFP: BIT (com.bit)`
-3. Under **Type**, select template **Request For Packaging (RFP)**.
-4. Paste your repository link (`https://github.com/jaswanthsanjay88/Bit_Android`) and attach `fdroid/com.bit.yml`.
-5. Submit the issue!
-
----
-
-## 4. F-Droid Badge Integration
-
-Add the official F-Droid badge to your [`README.md`](file:///e:/BIT/README.md) and [`site/index.html`](file:///e:/BIT/site/index.html):
-
-```html
-<a href="https://f-droid.org/packages/com.bit">
-  <img src="https://fdroid.gitlab.io/fdroid-website/badge/get-it-on.png" alt="Get it on F-Droid" height="60">
-</a>
 ```

@@ -9,6 +9,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # then let the linker garbage-collect unreferenced sections.
 add_compile_options(
     -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
+    -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
 
     -ffunction-sections
     -fdata-sections
@@ -21,6 +24,7 @@ add_link_options(
     -Wl,--icf=safe                 # merge identical functions
     -Wl,-Bsymbolic
     -Wl,--exclude-libs,ALL         # hide static-lib symbols
+    -Wl,--build-id=sha1
 )
 add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
 

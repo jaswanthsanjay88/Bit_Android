@@ -4,6 +4,7 @@ plugins {
 
 android {
     namespace = "com.neuronpacket"
+    ndkVersion = "28.2.13676358"
     compileSdk {
         version = release(36)
     }

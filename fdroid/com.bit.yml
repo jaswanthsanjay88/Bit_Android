@@ -16,15 +16,6 @@ Binaries:
   https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
 Builds:
-  - versionName: 1.9.3
-    versionCode: 62
-    commit: 22c7b3e10dc39e2bcb304b956e000e473c8b2752
-    subdir: app
-    gradle:
-      - yes
-    output: build/outputs/apk/release/app-universal-release-unsigned.apk
-    ndk: r28c
-
   - versionName: 1.9.4
     versionCode: 63
     commit: v1.9.4

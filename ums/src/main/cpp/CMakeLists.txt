@@ -7,6 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ── Production optimizations (non-Debug) ──
 add_compile_options(
     -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
+    -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/../../../..=.
+    -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
 
     -ffunction-sections
     -fdata-sections
@@ -20,6 +24,7 @@ add_link_options(
     -Wl,-Bsymbolic
     -Wl,--exclude-libs,ALL
     -Wl,-z,max-page-size=16384
+    -Wl,--build-id=sha1
 )
 add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
 

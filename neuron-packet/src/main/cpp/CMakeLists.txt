@@ -7,12 +7,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # ── Production optimizations & reproducibility ──
 add_compile_options(
     -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
+    -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
     -ffunction-sections
     -fdata-sections
 )
 
 # 16KB page size support for Android 15+
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--icf=safe -Wl,-z,max-page-size=16384 -Wl,-Bsymbolic -Wl,--exclude-libs,ALL")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--icf=safe -Wl,-z,max-page-size=16384 -Wl,-Bsymbolic -Wl,--exclude-libs,ALL -Wl,--build-id=sha1")
 
 set(OPENSSL_ROOT_DIR ${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
 set(OPENSSL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/openssl/include)

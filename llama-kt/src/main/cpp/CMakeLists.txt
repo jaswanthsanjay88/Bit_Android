@@ -23,6 +23,9 @@ set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 # nlohmann::json needs RTTI.
 add_compile_options(
     -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
+    -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=.
+    -fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.
     -ffp-contract=fast
     -fno-math-errno
     -fno-signed-zeros
@@ -79,7 +82,7 @@ endif()
 # --icf=safe             merge identical code (only when addresses aren't taken)
 # -z,max-page-size=16384 16KB page size support for Android 15+
 set(CMAKE_SHARED_LINKER_FLAGS
-    "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--icf=safe -Wl,-z,max-page-size=16384 -Wl,-Bsymbolic -Wl,--exclude-libs,ALL")
+    "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--icf=safe -Wl,-z,max-page-size=16384 -Wl,-Bsymbolic -Wl,--exclude-libs,ALL -Wl,--build-id=sha1")
 
 # ── Reproducible build: override git-derived values with fixed strings ──
 # llama.cpp's cmake/build-info.cmake and cmake/git-vars.cmake run git commands
