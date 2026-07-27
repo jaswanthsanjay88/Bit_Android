@@ -26,6 +26,9 @@ jobs:
       - name: Install exact pinned NDK
         run: sdkmanager --install "ndk;28.2.13676358"
 
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
       - name: Clean build (no cache reuse — determinism check)
         run: ./gradlew clean
 
