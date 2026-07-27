@@ -20,14 +20,17 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname.replace(/\/$/, '') || '/';
 
+    // Support binding named either RATINGS_KV or KV
+    const kv = env.RATINGS_KV || env.KV;
+
     // 2. Route: /api/rating
     if (pathname === '/api/rating') {
       // GET /api/rating — Return all reviews
       if (request.method === 'GET') {
         try {
           let ratings = [];
-          if (env.RATINGS_KV) {
-            const stored = await env.RATINGS_KV.get('latest_ratings');
+          if (kv) {
+            const stored = await kv.get('latest_ratings');
             if (stored) ratings = JSON.parse(stored);
           }
 
@@ -54,7 +57,7 @@ export default {
             ];
           }
 
-          return new Response(JSON.stringify({ success: true, ratings }), {
+          return new Response(JSON.stringify({ success: true, ratings, kvBound: Boolean(kv) }), {
             status: 200,
             headers: corsHeaders,
           });
@@ -70,7 +73,7 @@ export default {
       if (request.method === 'POST') {
         try {
           const body = await request.json();
-          const { name, role, rating, comment, review, feedback, avatar, appVersion } = body;
+          const { name, role, rating, comment, review, feedback, avatar, appVersion } = body || {};
 
           const newEntry = {
             id: Date.now().toString(),
@@ -83,15 +86,17 @@ export default {
             timestamp: new Date().toISOString()
           };
 
-          if (env.RATINGS_KV) {
-            const stored = await env.RATINGS_KV.get('latest_ratings');
+          if (kv) {
+            const stored = await kv.get('latest_ratings');
             let currentList = stored ? JSON.parse(stored) : [];
             currentList.unshift(newEntry);
             currentList = currentList.slice(0, 50);
-            await env.RATINGS_KV.put('latest_ratings', JSON.stringify(currentList));
+            await kv.put('latest_ratings', JSON.stringify(currentList));
+          } else {
+            console.warn('KV Namespace binding (RATINGS_KV or KV) is missing in Cloudflare Worker settings!');
           }
 
-          return new Response(JSON.stringify({ success: true, message: 'Review saved!', review: newEntry }), {
+          return new Response(JSON.stringify({ success: true, message: 'Review saved!', review: newEntry, kvSaved: Boolean(kv) }), {
             status: 200,
             headers: corsHeaders,
           });
