@@ -1,0 +1,50 @@
+name: Build & Release APK
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact tagged commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history — avoids shallow-clone git-describe issues in llama.cpp's build-info generation
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install exact pinned NDK
+        run: sdkmanager --install "ndk;28.2.13676358"
+
+      - name: Clean build (no cache reuse — determinism check)
+        run: ./gradlew clean
+
+      - name: Assemble release APK
+        run: ./gradlew assembleRelease --no-build-cache --no-configuration-cache
+
+      - name: Locate output APK
+        id: apk
+        run: |
+          APK_PATH=$(find app/build/outputs/apk/release -name "*universal-release.apk" | head -n 1)
+          echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Verify signing
+        run: |
+          $ANDROID_HOME/build-tools/*/apksigner verify --print-certs "${{ steps.apk.outputs.path }}"
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.path }}
+          tag_name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
