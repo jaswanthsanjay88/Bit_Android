@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ── Production optimizations & reproducibility ──
 add_compile_options(
+    -finput-charset=UTF-8
+    -fexec-charset=UTF-8
     -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
     -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
     -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=.

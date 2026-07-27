@@ -75,6 +75,7 @@ android {
         }
         resources {
             excludes += setOf(
+                "META-INF/version-control-info.textproto",
                 "META-INF/DEPENDENCIES",
                 "META-INF/LICENSE",
                 "META-INF/LICENSE.txt",

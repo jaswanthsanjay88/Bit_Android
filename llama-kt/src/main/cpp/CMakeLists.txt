@@ -22,6 +22,8 @@ set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
 # Do NOT add -fno-exceptions or -fno-rtti — gguf_lib.cpp has try/catch and
 # nlohmann::json needs RTTI.
 add_compile_options(
+    -finput-charset=UTF-8
+    -fexec-charset=UTF-8
     -ffile-prefix-map=${CMAKE_SOURCE_DIR}=.
     -ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.
     -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=.
