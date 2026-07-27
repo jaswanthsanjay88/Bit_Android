@@ -87,8 +87,14 @@ endif()
 # --gc-sections          strip unreferenced functions/data
 # --icf=safe             merge identical code (only when addresses aren't taken)
 # -z,max-page-size=16384 16KB page size support for Android 15+
-set(CMAKE_SHARED_LINKER_FLAGS
-    "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--icf=safe -Wl,-z,max-page-size=16384 -Wl,-Bsymbolic -Wl,--exclude-libs,ALL -Wl,--build-id=sha1")
+add_link_options(
+    -Wl,--gc-sections
+    -Wl,--icf=safe
+    -Wl,-Bsymbolic
+    -Wl,--exclude-libs,ALL
+    -Wl,-z,max-page-size=16384
+    -Wl,--build-id=none
+)
 
 # ── Reproducible build: override git-derived values with fixed strings ──
 # llama.cpp's cmake/build-info.cmake and cmake/git-vars.cmake run git commands

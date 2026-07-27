@@ -4,9 +4,6 @@ project("system_encryptor")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffile-prefix-map=${CMAKE_SOURCE_DIR}=. -ffile-prefix-map=${CMAKE_BINARY_DIR}=. -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=. -fmacro-prefix-map=${CMAKE_BINARY_DIR}=. -finput-charset=UTF-8 -fexec-charset=UTF-8")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffile-prefix-map=${CMAKE_SOURCE_DIR}=. -ffile-prefix-map=${CMAKE_BINARY_DIR}=. -fmacro-prefix-map=${CMAKE_SOURCE_DIR}=. -fmacro-prefix-map=${CMAKE_BINARY_DIR}=. -finput-charset=UTF-8 -fexec-charset=UTF-8")
-
 add_compile_options(
     -finput-charset=UTF-8
     -fexec-charset=UTF-8
@@ -31,7 +28,7 @@ add_link_options(
     -Wl,-Bsymbolic
     -Wl,--exclude-libs,ALL
     -Wl,-z,max-page-size=16384
-    -Wl,--build-id=sha1
+    -Wl,--build-id=none
 )
 add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
 

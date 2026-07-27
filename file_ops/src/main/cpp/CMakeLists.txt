@@ -29,7 +29,7 @@ add_link_options(
     -Wl,--icf=safe                 # merge identical functions
     -Wl,-Bsymbolic
     -Wl,--exclude-libs,ALL         # hide static-lib symbols
-    -Wl,--build-id=sha1
+    -Wl,--build-id=none
 )
 add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
 

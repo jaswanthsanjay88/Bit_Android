@@ -21,7 +21,14 @@ add_compile_options(
 )
 
 # 16KB page size support for Android 15+
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections -Wl,--icf=safe -Wl,-z,max-page-size=16384 -Wl,-Bsymbolic -Wl,--exclude-libs,ALL -Wl,--build-id=sha1")
+add_link_options(
+    -Wl,--gc-sections
+    -Wl,--icf=safe
+    -Wl,-Bsymbolic
+    -Wl,--exclude-libs,ALL
+    -Wl,-z,max-page-size=16384
+    -Wl,--build-id=none
+)
 
 set(OPENSSL_ROOT_DIR ${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
 set(OPENSSL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/openssl/include)
