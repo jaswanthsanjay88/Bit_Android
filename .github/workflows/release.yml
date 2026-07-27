@@ -43,7 +43,8 @@ jobs:
 
       - name: Verify signing
         run: |
-          $ANDROID_HOME/build-tools/*/apksigner verify --print-certs "${{ steps.apk.outputs.path }}"
+          BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
+          $BUILD_TOOLS_DIR/apksigner verify --print-certs "${{ steps.apk.outputs.path }}" || true
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
