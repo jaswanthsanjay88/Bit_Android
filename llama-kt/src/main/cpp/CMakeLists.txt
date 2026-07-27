@@ -41,6 +41,7 @@ add_compile_options(
     -ffunction-sections
     -fdata-sections
 )
+add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 
 # Path to the upstream llama.cpp checkout. Update this if you relocate llama.cpp.
 set(LLAMA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp")
@@ -95,6 +96,7 @@ add_link_options(
     -Wl,-z,max-page-size=16384
     -Wl,--build-id=none
 )
+add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 
 # ── Reproducible build: override git-derived values with fixed strings ──
 # llama.cpp's cmake/build-info.cmake and cmake/git-vars.cmake run git commands

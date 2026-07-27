@@ -21,7 +21,7 @@ add_compile_options(
     -ffunction-sections
     -fdata-sections
 )
-add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
+add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 add_compile_options($<$<NOT:$<CONFIG:Debug>>:-DNDEBUG>)
 
 add_link_options(
@@ -31,7 +31,7 @@ add_link_options(
     -Wl,--exclude-libs,ALL         # hide static-lib symbols
     -Wl,--build-id=none
 )
-add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
+add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 
 add_library(${CMAKE_PROJECT_NAME} SHARED
     path_guard.cpp

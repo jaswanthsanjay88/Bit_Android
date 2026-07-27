@@ -19,7 +19,7 @@ add_compile_options(
     -ffunction-sections
     -fdata-sections
 )
-add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
+add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 add_compile_options($<$<NOT:$<CONFIG:Debug>>:-DNDEBUG>)
 
 add_link_options(
@@ -30,7 +30,7 @@ add_link_options(
     -Wl,-z,max-page-size=16384
     -Wl,--build-id=none
 )
-add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto>)
+add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 
 # BoringSSL via FetchContent - pinned to release 0.20260211.0 (Feb 2026)
 # https://github.com/google/boringssl/releases/tag/0.20260211.0

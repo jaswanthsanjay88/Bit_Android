@@ -19,6 +19,7 @@ add_compile_options(
     -ffunction-sections
     -fdata-sections
 )
+add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 
 # 16KB page size support for Android 15+
 add_link_options(
@@ -29,6 +30,7 @@ add_link_options(
     -Wl,-z,max-page-size=16384
     -Wl,--build-id=none
 )
+add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 
 set(OPENSSL_ROOT_DIR ${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI})
 set(OPENSSL_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/third_party/openssl/include)
