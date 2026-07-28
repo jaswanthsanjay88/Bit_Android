@@ -45,9 +45,9 @@ jobs:
       - name: Assemble release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/release-key.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYSTORE_PASSWORD: Sanjay16$
+          KEY_ALIAS: bit_release
+          KEY_PASSWORD: Sanjay16$
         run: ./gradlew assembleRelease --no-build-cache --no-configuration-cache
 
       - name: Locate output APK
