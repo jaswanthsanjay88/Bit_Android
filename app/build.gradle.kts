@@ -47,9 +47,9 @@ android {
             val ksFile = file(ksPath)
             if (ksFile.exists()) {
                 storeFile = ksFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "bitrelease123"
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "Sanjay16$"
                 keyAlias = System.getenv("KEY_ALIAS") ?: "bit_release"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "bitrelease123"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "Sanjay16$"
             }
         }
     }
