@@ -41,11 +41,25 @@ android {
         ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:.*:<dir>_*:!CVS:!thumbs.db:!picasa.ini:!*~:qnnlibs.tar.xz"
     }
 
+    signingConfigs {
+        create("release") {
+            val ksPath = System.getenv("KEYSTORE_PATH") ?: rootProject.file("release-key.jks").absolutePath
+            val ksFile = file(ksPath)
+            if (ksFile.exists()) {
+                storeFile = ksFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "bitrelease123"
+                keyAlias = System.getenv("KEY_ALIAS") ?: "bit_release"
+                keyPassword = System.getenv("KEY_PASSWORD") ?: "bitrelease123"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            val relConfig = signingConfigs.findByName("release")
+            signingConfig = if (relConfig?.storeFile?.exists() == true) relConfig else signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

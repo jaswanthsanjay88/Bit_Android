@@ -9,6 +9,7 @@ local.properties
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+*.jks
 .DS_Store
 /build
 /app/build
