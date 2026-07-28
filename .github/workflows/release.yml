@@ -36,7 +36,7 @@ jobs:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
           if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            python3 -c "import os, base64; open('release-key.jks', 'wb').write(base64.b64decode(os.environ['RELEASE_KEYSTORE_BASE64']))"
+            python3 -c "import os, base64, re; data = re.sub(r'[^A-Za-z0-9+/=]', '', os.environ['RELEASE_KEYSTORE_BASE64']); open('release-key.jks', 'wb').write(base64.b64decode(data))"
           fi
 
       - name: Clean build (no cache reuse — determinism check)
