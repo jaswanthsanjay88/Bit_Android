@@ -43,13 +43,13 @@ android {
 
     signingConfigs {
         create("release") {
-            val ksPath = System.getenv("KEYSTORE_PATH") ?: rootProject.file("release-key.jks").absolutePath
+            val ksPath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() } ?: rootProject.file("release-key.jks").absolutePath
             val ksFile = file(ksPath)
             if (ksFile.exists()) {
                 storeFile = ksFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "Sanjay16$"
-                keyAlias = System.getenv("KEY_ALIAS") ?: "bit_release"
-                keyPassword = System.getenv("KEY_PASSWORD") ?: "Sanjay16$"
+                storePassword = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: "Sanjay16$"
+                keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "bit_release"
+                keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: "Sanjay16$"
             }
         }
     }
