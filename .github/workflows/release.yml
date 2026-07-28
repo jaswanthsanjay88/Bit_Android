@@ -34,7 +34,7 @@ jobs:
       - name: Setup Release Keystore
         run: |
           if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > release-key.jks
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 -d > release-key.jks
           fi
 
       - name: Clean build (no cache reuse — determinism check)
