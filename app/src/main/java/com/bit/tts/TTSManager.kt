@@ -59,6 +59,19 @@ object TTSManager {
     private val _availableVoices = MutableStateFlow<List<String>>(emptyList())
     val availableVoices: StateFlow<List<String>> = _availableVoices.asStateFlow()
 
+    init {
+        try {
+            System.loadLibrary("onnxruntime")
+        } catch (_: Throwable) {
+            try {
+                System.loadLibrary("onnxruntime4j_jni")
+            } catch (_: Throwable) {}
+        }
+        try {
+            System.loadLibrary("ai_sherpa")
+        } catch (_: Throwable) {}
+    }
+
     fun init(appContext: Context, autoLoad: Boolean = true) {
         context = appContext.applicationContext
         Log.d(TAG, "TTSManager initialized (sherpa-onnx OfflineTts)")

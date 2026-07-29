@@ -34,15 +34,12 @@ jobs:
       - name: Restore signing key
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          WORKSPACE: ${{ github.workspace }}
         run: |
-          if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            python3 -c "import os, base64, re; data = re.sub(r'[^A-Za-z0-9+/=]', '', os.environ['RELEASE_KEYSTORE_BASE64']); open('release-key.jks', 'wb').write(base64.b64decode(data))"
-            python3 -c "import os; open('local.properties', 'a').write(f'storeFile={os.environ[\"WORKSPACE\"]}/release-key.jks\nstorePassword={os.environ[\"KEYSTORE_PASSWORD\"]}\nkeyAlias={os.environ[\"KEY_ALIAS\"]}\nkeyPassword={os.environ[\"KEY_PASSWORD\"]}\n')"
-          fi
+          set -euo pipefail
+          test -n "${RELEASE_KEYSTORE_BASE64:-}" || { echo "::error::Missing RELEASE_KEYSTORE_BASE64 secret"; exit 1; }
+          echo "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > release-key.jks
+          test -s release-key.jks || { echo "::error::Keystore decode produced empty file"; exit 1; }
+          echo "✅ Keystore restored ($(wc -c < release-key.jks) bytes)"
 
       - name: Clean build (no cache reuse — determinism check)
         run: ./gradlew clean
