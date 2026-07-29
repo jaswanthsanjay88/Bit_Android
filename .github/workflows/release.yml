@@ -42,9 +42,9 @@ jobs:
             python3 -c "import os, base64, re; data = re.sub(r'[^A-Za-z0-9+/=]', '', os.environ['RELEASE_KEYSTORE_BASE64']); open('release-key.jks', 'wb').write(base64.b64decode(data))"
             cat >> local.properties <<EOF
 storeFile=${{ github.workspace }}/release-key.jks
-storePassword=${KEYSTORE_PASSWORD:-Sanjay16$}
-keyAlias=${KEY_ALIAS:-bit_release}
-keyPassword=${KEY_PASSWORD:-Sanjay16$}
+storePassword=$KEYSTORE_PASSWORD
+keyAlias=$KEY_ALIAS
+keyPassword=$KEY_PASSWORD
 EOF
           fi
 

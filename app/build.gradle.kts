@@ -46,7 +46,7 @@ android {
             val localProps = java.util.Properties().apply {
                 val propFile = rootProject.file("local.properties")
                 if (propFile.exists()) {
-                    load(propFile.inputStream())
+                    java.io.FileInputStream(propFile).use { load(it) }
                 }
             }
 
@@ -59,13 +59,13 @@ android {
                 storeFile = ksFile
                 storePassword = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
                     ?: localProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
-                    ?: "Sanjay16$"
+                    ?: throw GradleException("Missing KEYSTORE_PASSWORD — set env var or local.properties")
                 keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
                     ?: localProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
                     ?: "bit_release"
                 keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
                     ?: localProps.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
-                    ?: "Sanjay16$"
+                    ?: throw GradleException("Missing KEY_PASSWORD — set env var or local.properties")
             }
         }
     }
