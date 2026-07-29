@@ -31,11 +31,9 @@ object TTSManager {
 
     private const val TAG = "TTSManager"
 
-    init {
-        loadNativeLibraries()
-    }
-
     private val nativeLock = Any()
+    @Volatile
+    private var nativeLoaded = false
     private val supportedChars = HashSet<Char>()
 
     @Volatile
@@ -70,7 +68,12 @@ object TTSManager {
     @JvmStatic
     fun loadNativeLibraries(appContext: Context? = null) {
         val ctx = appContext ?: context
-        if (ctx != null) {
+        if (ctx == null) {
+            Log.w(TAG, "loadNativeLibraries called without Context — deferring until init()")
+            return
+        }
+        synchronized(nativeLock) {
+            if (nativeLoaded) return
             try {
                 System.loadLibrary("file_ops")
                 val nativeDir = ctx.applicationInfo.nativeLibraryDir
@@ -81,17 +84,16 @@ object TTSManager {
             } catch (e: Throwable) {
                 Log.w(TAG, "loadLibraryGlobal failed: ${e.message}")
             }
-        } else {
-            Log.w(TAG, "loadNativeLibraries called without Context")
-        }
-        try { System.loadLibrary("c++_shared") } catch (_: Throwable) {}
-        try { System.loadLibrary("onnxruntime") } catch (_: Throwable) {}
-        try { System.loadLibrary("onnxruntime4j_jni") } catch (_: Throwable) {}
-        try {
-            System.loadLibrary("ai_sherpa")
-            Log.d(TAG, "Loaded libai_sherpa.so")
-        } catch (e: Throwable) {
-            Log.e(TAG, "ai_sherpa load failed: ${e.message}")
+            try { System.loadLibrary("c++_shared") } catch (_: Throwable) {}
+            try { System.loadLibrary("onnxruntime") } catch (_: Throwable) {}
+            try { System.loadLibrary("onnxruntime4j_jni") } catch (_: Throwable) {}
+            try {
+                System.loadLibrary("ai_sherpa")
+                nativeLoaded = true
+                Log.d(TAG, "Loaded libai_sherpa.so successfully")
+            } catch (e: Throwable) {
+                Log.e(TAG, "ai_sherpa load failed: ${e.message}")
+            }
         }
     }
 
