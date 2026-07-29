@@ -325,6 +325,13 @@
 
 # -- Prevent R8 repackaging of JNI-accessed classes (AGP 9.1.0+ default) --
 # Native code uses FindClass() with full package paths — repackaging breaks these lookups
+-keep class com.dark.ai_sherpa.** { *; }
+-keepclassmembers class com.dark.ai_sherpa.** {
+    native <methods>;
+    public <methods>;
+    public <fields>;
+}
+-keeppackagenames com.dark.ai_sherpa.**
 -keeppackagenames com.dark.gguf_lib.**
 -keeppackagenames com.dark.ai_sd.**
 -keeppackagenames com.dark.ums.**

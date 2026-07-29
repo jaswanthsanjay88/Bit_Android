@@ -36,6 +36,7 @@ add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
 add_library(${CMAKE_PROJECT_NAME} SHARED
     path_guard.cpp
     io_engine.cpp
+    global_loader.cpp
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME}

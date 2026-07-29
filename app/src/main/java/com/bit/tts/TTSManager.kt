@@ -59,22 +59,24 @@ object TTSManager {
     private val _availableVoices = MutableStateFlow<List<String>>(emptyList())
     val availableVoices: StateFlow<List<String>> = _availableVoices.asStateFlow()
 
-    init {
-        try {
-            System.loadLibrary("onnxruntime")
-        } catch (_: Throwable) {
-            try {
-                System.loadLibrary("onnxruntime4j_jni")
-            } catch (_: Throwable) {}
-        }
-        try {
-            System.loadLibrary("ai_sherpa")
-        } catch (_: Throwable) {}
-    }
+    @JvmStatic
+    private external fun loadLibraryGlobal(libPath: String): Boolean
 
     fun init(appContext: Context, autoLoad: Boolean = true) {
         context = appContext.applicationContext
         Log.d(TAG, "TTSManager initialized (sherpa-onnx OfflineTts)")
+
+        val nativeDir = appContext.applicationInfo.nativeLibraryDir
+        try {
+            System.loadLibrary("file_ops")
+            loadLibraryGlobal("$nativeDir/libonnxruntime.so")
+            loadLibraryGlobal("$nativeDir/libonnxruntime4j_jni.so")
+            loadLibraryGlobal("$nativeDir/libai_sherpa.so")
+        } catch (e: Throwable) {
+            Log.w(TAG, "Failed to load native libraries with RTLD_GLOBAL: ${e.message}")
+            try { System.loadLibrary("onnxruntime") } catch (_: Throwable) {}
+            try { System.loadLibrary("ai_sherpa") } catch (_: Throwable) {}
+        }
 
         // Populate available voices (e.g. speaker IDs 0..9)
         _availableVoices.value = (0..9).map { it.toString() }
