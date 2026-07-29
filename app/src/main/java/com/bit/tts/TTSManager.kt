@@ -75,8 +75,15 @@ object TTSManager {
         synchronized(nativeLock) {
             if (nativeLoaded) return
             try {
+                System.loadLibrary("c++_shared")
+            } catch (e: Throwable) {
+                Log.w(TAG, "System.loadLibrary(c++_shared) failed: ${e.message}")
+            }
+            try {
                 System.loadLibrary("file_ops")
                 val nativeDir = ctx.applicationInfo.nativeLibraryDir
+                val loadedCpp = loadLibraryGlobal("$nativeDir/libc++_shared.so")
+                Log.d(TAG, "loadLibraryGlobal(libc++_shared.so): $loadedCpp")
                 val loadedOnnx = loadLibraryGlobal("$nativeDir/libonnxruntime.so")
                 Log.d(TAG, "loadLibraryGlobal(libonnxruntime.so): $loadedOnnx")
                 val loadedOnnxJni = loadLibraryGlobal("$nativeDir/libonnxruntime4j_jni.so")
@@ -86,7 +93,6 @@ object TTSManager {
             } catch (e: Throwable) {
                 Log.w(TAG, "loadLibraryGlobal failed: ${e.message}")
             }
-            try { System.loadLibrary("c++_shared") } catch (_: Throwable) {}
             try { System.loadLibrary("onnxruntime") } catch (_: Throwable) {}
             try { System.loadLibrary("onnxruntime4j_jni") } catch (_: Throwable) {}
             try {

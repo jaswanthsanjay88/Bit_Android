@@ -78,6 +78,7 @@ object SherpaSTTEngine {
      * Initialize/verify status of STT model files.
      */
     fun initialize(context: Context): Boolean {
+        com.bit.tts.TTSManager.loadNativeLibraries(context)
         val ready = hasModelFiles(context)
         _isModelLoaded.value = ready
         return ready
@@ -92,6 +93,7 @@ object SherpaSTTEngine {
      * @return Transcribed text, or empty string if error
      */
     suspend fun transcribe(context: Context, audioData: ByteArray): String = withContext(Dispatchers.Default) {
+        com.bit.tts.TTSManager.loadNativeLibraries(context)
         if (!hasModelFiles(context)) {
             Log.w(TAG, "Cannot transcribe: Model files not available")
             return@withContext ""
