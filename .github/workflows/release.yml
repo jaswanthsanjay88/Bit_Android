@@ -37,11 +37,25 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          WORKSPACE: ${{ github.workspace }}
         run: |
           if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
-            python3 -c "import os, base64, re; data = re.sub(r'[^A-Za-z0-9+/=]', '', os.environ['RELEASE_KEYSTORE_BASE64']); open('release-key.jks', 'wb').write(base64.b64decode(data))"
-            python3 -c "import os; open('local.properties', 'a').write(f'storeFile={os.environ[\"WORKSPACE\"]}/release-key.jks\nstorePassword={os.environ[\"KEYSTORE_PASSWORD\"]}\nkeyAlias={os.environ[\"KEY_ALIAS\"]}\nkeyPassword={os.environ[\"KEY_PASSWORD\"]}\n')"
+            python3 - <<'PY'
+            import base64, os, re
+            raw = os.environ["RELEASE_KEYSTORE_BASE64"]
+            clean = re.sub(r"[^A-Za-z0-9+/=_-]", "", raw)
+            pad = "=" * (-len(clean) % 4)
+            try:
+                data = base64.b64decode(clean + pad, validate=True)
+            except Exception:
+                data = base64.urlsafe_b64decode(clean + pad)
+            with open("release-key.jks", "wb") as f:
+                f.write(data)
+            PY
+            if [ ! -s release-key.jks ]; then
+              echo "Decoded keystore is empty"
+              exit 1
+            fi
+            keytool -list -keystore release-key.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
           fi
 
       - name: Clean build (no cache reuse — determinism check)
@@ -58,7 +72,12 @@ jobs:
       - name: Locate output APK
         id: apk
         run: |
-          APK_PATH=$(find app/build/outputs/apk/release -name "*universal-release.apk" | head -n 1)
+          APK_PATH=$(find app/build/outputs/apk/release -type f \( -name "*universal-release.apk" -o -name "*-release.apk" \) | sort | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "No release APK found under app/build/outputs/apk/release"
+            find app/build/outputs/apk -maxdepth 4 -type f -name "*.apk" || true
+            exit 1
+          fi
           echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Verify signing
