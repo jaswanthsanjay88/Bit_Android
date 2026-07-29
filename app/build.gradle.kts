@@ -107,7 +107,9 @@ android {
             pickFirsts += setOf(
                 "lib/arm64-v8a/libc++_shared.so",
                 "lib/x86_64/libc++_shared.so",
-                "**/libonnxruntime.so"
+                "**/libonnxruntime.so",
+                "**/libonnxruntime4j_jni.so",
+                "**/libai_sherpa.so"
             )
         }
         resources {
