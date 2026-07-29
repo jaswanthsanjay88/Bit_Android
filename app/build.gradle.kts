@@ -137,6 +137,9 @@ android {
 
 dependencies {
 
+    // Local AI Libraries (first priority for JNI pickFirsts)
+    implementation("com.github.jaswanthsanjay88.bit-dependencies:ai_sherpa_v3:1.1.0@aar")
+    implementation("com.github.jaswanthsanjay88.bit-dependencies:ai_sd:1.1.0@aar")
     implementation(libs.onnxruntime.android)
 
     // Image Loading
@@ -175,10 +178,8 @@ dependencies {
 
     // Local Projects & AI Libraries
     // Resolved from JitPack for F-Droid compliance
-    implementation("com.github.jaswanthsanjay88.bit-dependencies:ai_sherpa_v3:1.1.0@aar")
     implementation(project(":llama-kt"))
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation("com.github.jaswanthsanjay88.bit-dependencies:ai_sd:1.1.0@aar")
     implementation(project(":memory-vault"))
     implementation(project(":neuron-packet"))
     implementation(project(":system_encryptor"))
