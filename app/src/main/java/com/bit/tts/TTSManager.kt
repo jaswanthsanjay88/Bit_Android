@@ -64,28 +64,37 @@ object TTSManager {
     val availableVoices: StateFlow<List<String>> = _availableVoices.asStateFlow()
 
     @JvmStatic
-    fun loadNativeLibraries() {
+    fun loadNativeLibraries(context: Context? = null) {
+        try {
+            System.loadLibrary("c++_shared")
+            Log.d(TAG, "Loaded libc++_shared.so")
+        } catch (e: Throwable) {
+            Log.w(TAG, "c++_shared load: ${e.message}")
+        }
         try {
             System.loadLibrary("onnxruntime")
-            Log.d(TAG, "Successfully loaded libonnxruntime.so")
+            Log.d(TAG, "Loaded libonnxruntime.so")
         } catch (e: Throwable) {
-            Log.w(TAG, "Failed System.loadLibrary(onnxruntime): ${e.message}")
+            Log.e(TAG, "onnxruntime load failed: ${e.message}")
         }
         try {
             System.loadLibrary("onnxruntime4j_jni")
-        } catch (_: Throwable) {}
+            Log.d(TAG, "Loaded libonnxruntime4j_jni.so")
+        } catch (e: Throwable) {
+            Log.w(TAG, "onnxruntime4j_jni load: ${e.message}")
+        }
         try {
             System.loadLibrary("ai_sherpa")
-            Log.d(TAG, "Successfully loaded libai_sherpa.so")
+            Log.d(TAG, "Loaded libai_sherpa.so")
         } catch (e: Throwable) {
-            Log.w(TAG, "Failed System.loadLibrary(ai_sherpa): ${e.message}")
+            Log.e(TAG, "ai_sherpa load failed: ${e.message}")
         }
     }
 
     fun init(appContext: Context, autoLoad: Boolean = true) {
         context = appContext.applicationContext
         Log.d(TAG, "TTSManager initialized (sherpa-onnx OfflineTts)")
-        loadNativeLibraries()
+        loadNativeLibraries(appContext)
 
         // Populate available voices (e.g. speaker IDs 0..9)
         _availableVoices.value = (0..9).map { it.toString() }
