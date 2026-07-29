@@ -43,10 +43,10 @@ android {
 
     signingConfigs {
         create("release") {
-            val localProps = java.util.Properties().apply {
+            val localProps = Properties().apply {
                 val propFile = rootProject.file("local.properties")
                 if (propFile.exists()) {
-                    java.io.FileInputStream(propFile).use { load(it) }
+                    FileInputStream(propFile).use { load(it) }
                 }
             }
 
