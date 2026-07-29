@@ -3,6 +3,7 @@ package com.bit.tts
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
+import com.bit.di.AppContainer
 import com.bit.global.AppPaths
 import com.bit.service.AudioPlaybackManager
 import com.dark.ai_sherpa.OfflineTts
@@ -64,25 +65,28 @@ object TTSManager {
     val availableVoices: StateFlow<List<String>> = _availableVoices.asStateFlow()
 
     @JvmStatic
-    fun loadNativeLibraries(context: Context? = null) {
-        try {
-            System.loadLibrary("c++_shared")
-            Log.d(TAG, "Loaded libc++_shared.so")
-        } catch (e: Throwable) {
-            Log.w(TAG, "c++_shared load: ${e.message}")
+    private external fun loadLibraryGlobal(libPath: String): Boolean
+
+    @JvmStatic
+    fun loadNativeLibraries(appContext: Context? = null) {
+        val ctx = appContext ?: context
+        if (ctx != null) {
+            try {
+                System.loadLibrary("file_ops")
+                val nativeDir = ctx.applicationInfo.nativeLibraryDir
+                val loadedOnnx = loadLibraryGlobal("$nativeDir/libonnxruntime.so")
+                Log.d(TAG, "loadLibraryGlobal(libonnxruntime.so): $loadedOnnx")
+                val loadedOnnxJni = loadLibraryGlobal("$nativeDir/libonnxruntime4j_jni.so")
+                Log.d(TAG, "loadLibraryGlobal(libonnxruntime4j_jni.so): $loadedOnnxJni")
+            } catch (e: Throwable) {
+                Log.w(TAG, "loadLibraryGlobal failed: ${e.message}")
+            }
+        } else {
+            Log.w(TAG, "loadNativeLibraries called without Context")
         }
-        try {
-            System.loadLibrary("onnxruntime")
-            Log.d(TAG, "Loaded libonnxruntime.so")
-        } catch (e: Throwable) {
-            Log.e(TAG, "onnxruntime load failed: ${e.message}")
-        }
-        try {
-            System.loadLibrary("onnxruntime4j_jni")
-            Log.d(TAG, "Loaded libonnxruntime4j_jni.so")
-        } catch (e: Throwable) {
-            Log.w(TAG, "onnxruntime4j_jni load: ${e.message}")
-        }
+        try { System.loadLibrary("c++_shared") } catch (_: Throwable) {}
+        try { System.loadLibrary("onnxruntime") } catch (_: Throwable) {}
+        try { System.loadLibrary("onnxruntime4j_jni") } catch (_: Throwable) {}
         try {
             System.loadLibrary("ai_sherpa")
             Log.d(TAG, "Loaded libai_sherpa.so")
@@ -109,8 +113,9 @@ object TTSManager {
     }
 
     fun loadModel(modelDir: String, useNNAPI: Boolean = false): Boolean {
-        loadNativeLibraries()
-        val ctx = context ?: return false
+        val ctx = context
+        loadNativeLibraries(ctx)
+        if (ctx == null) return false
 
         stopPlayback()
 
