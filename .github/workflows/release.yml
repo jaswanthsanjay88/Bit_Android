@@ -40,6 +40,8 @@ jobs:
           python3 -c "
           import os, base64, re
           raw = os.environ['RELEASE_KEYSTORE_BASE64']
+          raw = re.sub(r'-----BEGIN [^-]+-----', '', raw)
+          raw = re.sub(r'-----END [^-]+-----', '', raw)
           clean = re.sub(r'[^A-Za-z0-9+/=]', '', raw).replace('-', '+').replace('_', '/')
           pad = len(clean) % 4
           if pad: clean += '=' * (4 - pad)
