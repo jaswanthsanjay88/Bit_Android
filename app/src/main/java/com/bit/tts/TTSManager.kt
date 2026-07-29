@@ -81,6 +81,8 @@ object TTSManager {
                 Log.d(TAG, "loadLibraryGlobal(libonnxruntime.so): $loadedOnnx")
                 val loadedOnnxJni = loadLibraryGlobal("$nativeDir/libonnxruntime4j_jni.so")
                 Log.d(TAG, "loadLibraryGlobal(libonnxruntime4j_jni.so): $loadedOnnxJni")
+                val loadedSherpa = loadLibraryGlobal("$nativeDir/libai_sherpa.so")
+                Log.d(TAG, "loadLibraryGlobal(libai_sherpa.so): $loadedSherpa")
             } catch (e: Throwable) {
                 Log.w(TAG, "loadLibraryGlobal failed: ${e.message}")
             }
@@ -92,7 +94,7 @@ object TTSManager {
                 nativeLoaded = true
                 Log.d(TAG, "Loaded libai_sherpa.so successfully")
             } catch (e: Throwable) {
-                Log.e(TAG, "ai_sherpa load failed: ${e.message}")
+                Log.e(TAG, "ai_sherpa System.loadLibrary failed: ${e.message}")
             }
         }
     }
