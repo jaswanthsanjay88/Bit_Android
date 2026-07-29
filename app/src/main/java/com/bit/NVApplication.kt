@@ -33,13 +33,19 @@ class NVApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "Application onCreate")
+        Log.d(TAG, "Application onCreate (process: ${if (isMainProcess()) "main" else "secondary"})")
 
         // Initialize global Crash Reporter
         com.bit.util.CrashReporter.init(applicationContext)
 
         // Create all notification channels once at startup (API 26+ requirement)
         NotificationChannels.createAllChannels(applicationContext)
+
+        // Secondary processes (e.g. :inference) should not initialize UI, TTS, or plugins
+        if (!isMainProcess()) {
+            Log.d(TAG, "Secondary process — skipping UI/TTS/Plugin initialization")
+            return
+        }
 
         // Initialize app container first
         AppContainer.init(applicationContext, this)

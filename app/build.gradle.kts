@@ -65,9 +65,9 @@ android {
 
                 if (!ksPass.isNullOrBlank() && !alias.isNullOrBlank() && !keyPass.isNullOrBlank()) {
                     storeFile = ksFile
-                    storePassword = ksPass
-                    keyAlias = alias
-                    keyPassword = keyPass
+                    storePassword = ksPass.trim()
+                    keyAlias = alias.trim()
+                    keyPassword = keyPass.trim()
                 }
             }
         }
