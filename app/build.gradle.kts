@@ -55,18 +55,21 @@ android {
                 ?: rootProject.file("release-key.jks").absolutePath
 
             val ksFile = file(ksPath)
-            require(ksFile.exists()) { "Keystore file not found at: $ksPath" }
+            if (ksFile.exists()) {
+                val ksPass = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+                    ?: localProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
+                val alias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+                    ?: localProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
+                val keyPass = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+                    ?: localProps.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
 
-            storeFile = ksFile
-            storePassword = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
-                ?: localProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
-                ?: error("Missing KEYSTORE_PASSWORD — set env var or local.properties")
-            keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
-                ?: localProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
-                ?: error("Missing KEY_ALIAS — set env var or local.properties")
-            keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
-                ?: localProps.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
-                ?: error("Missing KEY_PASSWORD — set env var or local.properties")
+                if (!ksPass.isNullOrBlank() && !alias.isNullOrBlank() && !keyPass.isNullOrBlank()) {
+                    storeFile = ksFile
+                    storePassword = ksPass
+                    keyAlias = alias
+                    keyPassword = keyPass
+                }
+            }
         }
     }
 
@@ -74,7 +77,12 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
+            val relConfig = signingConfigs.findByName("release")
+            if (relConfig?.storeFile != null && !relConfig.storePassword.isNullOrBlank()) {
+                signingConfig = relConfig
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      KEYSTORE_PATH: ${{ github.workspace }}/release-key.jks
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
     steps:
       - name: Checkout exact tagged commit
         uses: actions/checkout@v4
@@ -54,11 +59,6 @@ jobs:
         run: ./gradlew clean
 
       - name: Assemble release APK
-        env:
-          KEYSTORE_PATH: ${{ github.workspace }}/release-key.jks
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-build-cache --no-configuration-cache
 
       - name: Locate output APK
