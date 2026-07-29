@@ -30,6 +30,10 @@ object TTSManager {
 
     private const val TAG = "TTSManager"
 
+    init {
+        loadNativeLibraries()
+    }
+
     private val nativeLock = Any()
     private val supportedChars = HashSet<Char>()
 
@@ -58,10 +62,6 @@ object TTSManager {
 
     private val _availableVoices = MutableStateFlow<List<String>>(emptyList())
     val availableVoices: StateFlow<List<String>> = _availableVoices.asStateFlow()
-
-    init {
-        loadNativeLibraries()
-    }
 
     @JvmStatic
     fun loadNativeLibraries() {
