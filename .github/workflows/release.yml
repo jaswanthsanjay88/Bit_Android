@@ -31,12 +31,21 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Setup Release Keystore
+      - name: Restore signing key
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -n "$RELEASE_KEYSTORE_BASE64" ]; then
             python3 -c "import os, base64, re; data = re.sub(r'[^A-Za-z0-9+/=]', '', os.environ['RELEASE_KEYSTORE_BASE64']); open('release-key.jks', 'wb').write(base64.b64decode(data))"
+            cat >> local.properties <<EOF
+storeFile=${{ github.workspace }}/release-key.jks
+storePassword=${KEYSTORE_PASSWORD:-Sanjay16$}
+keyAlias=${KEY_ALIAS:-bit_release}
+keyPassword=${KEY_PASSWORD:-Sanjay16$}
+EOF
           fi
 
       - name: Clean build (no cache reuse — determinism check)

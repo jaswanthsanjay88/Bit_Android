@@ -43,13 +43,29 @@ android {
 
     signingConfigs {
         create("release") {
-            val ksPath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() } ?: rootProject.file("release-key.jks").absolutePath
+            val localProps = java.util.Properties().apply {
+                val propFile = rootProject.file("local.properties")
+                if (propFile.exists()) {
+                    load(propFile.inputStream())
+                }
+            }
+
+            val ksPath = System.getenv("KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+                ?: localProps.getProperty("storeFile")?.takeIf { it.isNotBlank() }
+                ?: rootProject.file("release-key.jks").absolutePath
+
             val ksFile = file(ksPath)
             if (ksFile.exists()) {
                 storeFile = ksFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() } ?: ""
-                keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "bit_release"
-                keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: ""
+                storePassword = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+                    ?: localProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
+                    ?: "Sanjay16$"
+                keyAlias = System.getenv("KEY_ALIAS")?.takeIf { it.isNotBlank() }
+                    ?: localProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
+                    ?: "bit_release"
+                keyPassword = System.getenv("KEY_PASSWORD")?.takeIf { it.isNotBlank() }
+                    ?: localProps.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
+                    ?: "Sanjay16$"
             }
         }
     }
