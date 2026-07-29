@@ -37,7 +37,14 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${RELEASE_KEYSTORE_BASE64:-}" || { echo "::error::Missing RELEASE_KEYSTORE_BASE64 secret"; exit 1; }
-          echo "$RELEASE_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 -d > release-key.jks
+          python3 -c "
+          import os, base64, re
+          raw = os.environ['RELEASE_KEYSTORE_BASE64']
+          clean = re.sub(r'[^A-Za-z0-9+/=]', '', raw).replace('-', '+').replace('_', '/')
+          pad = len(clean) % 4
+          if pad: clean += '=' * (4 - pad)
+          with open('release-key.jks', 'wb') as f: f.write(base64.b64decode(clean))
+          "
           test -s release-key.jks || { echo "::error::Keystore decode produced empty file"; exit 1; }
           echo "✅ Keystore restored ($(wc -c < release-key.jks) bytes)"
 
