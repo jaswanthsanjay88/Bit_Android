@@ -25,7 +25,7 @@ Builds:
     output: build/outputs/apk/release/app-universal-release-unsigned.apk
     ndk: r28c
 
-AllowedAPKSigningKeys: 30cf7a25ba97e0ebb8100f5b729a7b4303ce494c6a8b51677aea69ddf207ac89
+AllowedAPKSigningKeys: 4625d5471f7815baddbd3710d1a7be8242ab85ee039bbb3d8dd937f56e66c94c
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
