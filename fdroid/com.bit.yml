@@ -1,5 +1,5 @@
 Categories:
-  - AI Chat
+  - Science & Education
   - System
 License: MIT
 AuthorName: Jaswanth Sanjay
@@ -16,18 +16,18 @@ Binaries:
   https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
 Builds:
-  - versionName: 1.9.4
-    versionCode: 63
-    commit: v1.9.4
+  - versionName: 1.9.7
+    versionCode: 66
+    commit: 4afc2d9606fa9fc5f175bbd9cbb8b5504920713c
     subdir: app
     gradle:
       - yes
-    output: build/outputs/apk/release/app-universal-release-unsigned.apk
+    output: build/outputs/apk/release/app-universal-release.apk
     ndk: r28c
 
-AllowedAPKSigningKeys: 54be788e5934c826a1bd10b043072fc04e5e4f206067ce5fc183cb8e0c5e4b3b
+AllowedAPKSigningKeys: 30cf7a25ba97e0ebb8100f5b729a7b4303ce494c6a8b51677aea69ddf207ac89
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.9.4
-CurrentVersionCode: 63
+CurrentVersion: 1.9.7
+CurrentVersionCode: 66
