@@ -22,6 +22,10 @@ Builds:
     subdir: app
     gradle:
       - yes
+    properties:
+      - org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m
+      - org.gradle.workers.max=2
+      - android.r8.maxWorkers=2
     output: build/outputs/apk/release/app-universal-release-unsigned.apk
     ndk: r28c
 
