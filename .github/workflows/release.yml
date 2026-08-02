@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      release_title:
+        description: 'Release Title (optional for manual trigger)'
+        required: false
+        default: 'Manual Release Build'
 
 jobs:
   build-release:
