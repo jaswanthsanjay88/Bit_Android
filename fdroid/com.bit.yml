@@ -22,7 +22,7 @@ Builds:
     subdir: app
     gradle:
       - yes
-    output: build/outputs/apk/release/app-universal-release.apk
+    output: build/outputs/apk/release/app-universal-release-unsigned.apk
     ndk: r28c
 
 AllowedAPKSigningKeys: 30cf7a25ba97e0ebb8100f5b729a7b4303ce494c6a8b51677aea69ddf207ac89
