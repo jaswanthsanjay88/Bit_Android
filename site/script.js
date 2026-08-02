@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initGitHubApi();
   initIntersectionObserver();
   initLiveRatings();
+  initModelStoreCatalog();
 });
 
 /* ── Sticky Navbar Blur ── */
@@ -228,4 +229,66 @@ async function initLiveRatings() {
   if (track1) track1.innerHTML = buildColumnHtml(col1Items.length ? col1Items : reviews);
   if (track2) track2.innerHTML = buildColumnHtml(col2Items.length ? col2Items : reviews);
   if (track3) track3.innerHTML = buildColumnHtml(col3Items.length ? col3Items : reviews);
+}
+
+/* ── Curated Model Catalog Fetch & Populate ── */
+async function initModelStoreCatalog() {
+  const modelsGrid = document.getElementById('modelsGrid');
+  if (!modelsGrid) return;
+
+  try {
+    let models = [];
+    const res = await fetch('./api/models.json');
+    if (res.ok) {
+      const data = await res.json();
+      models = data.models || [];
+    } else {
+      const fallbackRes = await fetch('/api/models');
+      if (fallbackRes.ok) {
+        const data = await fallbackRes.json();
+        models = data.models || data;
+      }
+    }
+
+    if (!models || models.length === 0) return;
+
+    modelsGrid.innerHTML = models.map(model => {
+      const typeLower = (model.type || 'gguf').toLowerCase();
+      const badgeClass = `badge-${typeLower}`;
+      const iconUrl = model.iconUrl || (model.icon ? `https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/${model.icon}.png` : '');
+      const iconHtml = iconUrl ? `<img src="${iconUrl}" alt="${model.name}" class="model-brand-icon" />` : `<div class="model-brand-icon"></div>`;
+
+      const ramHtml = model.minRamGb ? `<span class="meta-chip meta-chip-ram">${model.minRamGb} GB RAM</span>` : '';
+      const tagsHtml = (model.tags || []).slice(0, 2).map(t => `<span class="meta-chip">${t}</span>`).join('');
+
+      return `
+        <div class="model-card-site">
+          <div>
+            <div class="model-header">
+              ${iconHtml}
+              <div class="model-title-box">
+                <div class="model-name">${model.name}</div>
+              </div>
+              <span class="model-type-badge ${badgeClass}">${model.type}</span>
+            </div>
+            <div class="model-desc">${model.description}</div>
+            <div class="model-meta-row">
+              ${ramHtml}
+              ${tagsHtml}
+            </div>
+          </div>
+          <div class="model-card-footer">
+            <span class="model-size">${model.size}</span>
+            <a href="${model.url}" target="_blank" rel="noopener noreferrer" class="btn-download-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download
+            </a>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+  } catch (err) {
+    console.log('Model Catalog fetch error:', err);
+  }
 }

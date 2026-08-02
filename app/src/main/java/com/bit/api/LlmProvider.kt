@@ -39,7 +39,15 @@ data class ProviderConfig(
     val topP: Float? = null,
     val frequencyPenalty: Float? = null,
     val presencePenalty: Float? = null
-)
+) {
+    companion object {
+        fun computeMaxTurns(contextWindowTokens: Int, avgTokensPerTurn: Int = 150): Int {
+            val reserved = 500 // Reserved for system prompt, RAG chunks & tool schemas
+            val available = (contextWindowTokens - reserved).coerceAtLeast(300)
+            return (available / avgTokensPerTurn).coerceIn(4, 50)
+        }
+    }
+}
 
 @Serializable
 data class ToolDefinition(

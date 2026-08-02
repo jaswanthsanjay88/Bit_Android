@@ -14,7 +14,15 @@ class MemoryExtractor(
 ) {
     companion object {
         private const val TAG = "MemoryExtractor"
-        private const val RECENCY_DECAY_RATE = 0.01f
+        private const val DEFAULT_DECAY_RATE = 0.01f
+
+        private val DECAY_RATE_BY_CATEGORY = mapOf(
+            com.bit.models.table_schema.MemoryCategory.PERSONAL   to 0.002f, // ~347-day half-life: identity & personal facts
+            com.bit.models.table_schema.MemoryCategory.PREFERENCE to 0.005f, // ~139-day half-life: preferences
+            com.bit.models.table_schema.MemoryCategory.WORK       to 0.010f, // ~69-day half-life: work/project context
+            com.bit.models.table_schema.MemoryCategory.INTEREST   to 0.015f, // ~46-day half-life: hobbies & interests
+            com.bit.models.table_schema.MemoryCategory.GENERAL    to 0.030f  // ~23-day half-life: transient chat details
+        )
     }
 
     /**
@@ -24,10 +32,20 @@ class MemoryExtractor(
     fun computeStrength(memory: AiMemory): Float {
         val now = System.currentTimeMillis()
         val dayMs = 86_400_000L
-        val daysSinceUpdate = ((now - memory.updatedAt).toFloat() / dayMs).coerceAtLeast(0f)
-        val recencyFactor = exp(-RECENCY_DECAY_RATE * daysSinceUpdate)
-        val accessFactor = min(1f, memory.accessCount / 5f)
-        return recencyFactor * accessFactor.coerceAtLeast(0.1f)
+        val daysSinceAccess = ((now - memory.lastAccessedAt.coerceAtLeast(memory.updatedAt)).toFloat() / dayMs).coerceAtLeast(0f)
+        val daysSinceCreated = ((now - memory.createdAt).toFloat() / dayMs).coerceAtLeast(0f)
+        
+        val lambda = DECAY_RATE_BY_CATEGORY[memory.category] ?: DEFAULT_DECAY_RATE
+        val recencyFactor = exp(-lambda * daysSinceAccess)
+        
+        // Brand new memories (< 7 days) receive a 1.0 access multiplier grace period
+        val accessFactor = if (daysSinceCreated < 7f && memory.accessCount == 0) {
+            1.0f
+        } else {
+            min(1f, memory.accessCount / 5f).coerceAtLeast(0.3f)
+        }
+        
+        return recencyFactor * accessFactor
     }
 
     /**

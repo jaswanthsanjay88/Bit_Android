@@ -21,13 +21,20 @@ import java.util.UUID
             parentColumns = ["id"],
             childColumns = ["object_id"],
             onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = AiMemory::class,
+            parentColumns = ["id"],
+            childColumns = ["source_fact_id"],
+            onDelete = ForeignKey.CASCADE
         )
     ],
     indices = [
         Index(value = ["subject_id"]),
         Index(value = ["object_id"]),
         Index(value = ["predicate"]),
-        Index(value = ["persona_id"])
+        Index(value = ["persona_id"]),
+        Index(value = ["source_fact_id"])
     ]
 )
 data class KnowledgeRelation(

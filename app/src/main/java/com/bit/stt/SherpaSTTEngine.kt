@@ -63,6 +63,9 @@ object SherpaSTTEngine {
     private val _isLibraryAvailable = MutableStateFlow(true)
     val isLibraryAvailable: StateFlow<Boolean> = _isLibraryAvailable.asStateFlow()
 
+    @Volatile
+    private var persistentRecognizer: OfflineRecognizer? = null
+
     /**
      * Check if model files are downloaded and ready.
      */
@@ -85,12 +88,56 @@ object SherpaSTTEngine {
     }
 
     /**
+     * Warm-load the Whisper STT recognizer for a continuous Live Voice session.
+     */
+    suspend fun enterLiveSession(context: Context): Boolean = withContext(Dispatchers.IO) {
+        com.bit.tts.TTSManager.loadNativeLibraries(context)
+        if (!hasModelFiles(context)) return@withContext false
+        try {
+            if (persistentRecognizer != null) return@withContext true
+            val appSettings = AppSettingsDataStore(context)
+            val numThreads = appSettings.sttThreads.first().coerceIn(1, 4)
+            val language = appSettings.sttLanguage.first()
+            val modelDir = AppPaths.sttModel(context).absolutePath
+
+            val config = OfflineRecognizerConfig(
+                modelConfig = OfflineModelConfig(
+                    whisper = OfflineWhisperModelConfig(
+                        encoder = "$modelDir/$ENCODER_FILE",
+                        decoder = "$modelDir/$DECODER_FILE",
+                        language = if (language == "auto") "" else language,
+                        task = "transcribe",
+                        tailPaddings = -1
+                    ),
+                    tokens = "$modelDir/$TOKENS_FILE",
+                    numThreads = numThreads
+                )
+            )
+            persistentRecognizer = OfflineRecognizer.fromFile(config)
+            Log.d(TAG, "SherpaSTTEngine live session entered (model kept warm in RAM)")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to enter STT live session", e)
+            false
+        }
+    }
+
+    /**
+     * Close and reclaim persistent STT recognizer RAM upon exiting Live Voice session.
+     */
+    fun exitLiveSession() {
+        try {
+            persistentRecognizer?.close()
+            persistentRecognizer = null
+            Log.d(TAG, "SherpaSTTEngine live session exited (RAM reclaimed)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Error closing persistent recognizer: ${e.message}")
+        }
+    }
+
+    /**
      * Transcribe PCM 16kHz 16-bit mono audio data to text.
-     * Automatically loads and releases the recognizer to minimize RAM.
-     *
-     * @param context Android context
-     * @param audioData Raw PCM bytes (16kHz, mono, 16-bit little-endian)
-     * @return Transcribed text, or empty string if error
+     * Automatically uses persistent live recognizer if warm, or one-shot load/unload.
      */
     suspend fun transcribe(context: Context, audioData: ByteArray): String = withContext(Dispatchers.Default) {
         com.bit.tts.TTSManager.loadNativeLibraries(context)
@@ -100,70 +147,52 @@ object SherpaSTTEngine {
         }
 
         _isProcessing.value = true
-        var recognizer: OfflineRecognizer? = null
+        var tempRecognizer: OfflineRecognizer? = null
         try {
-            val appSettings = AppSettingsDataStore(context)
-            val numThreads = appSettings.sttThreads.first().coerceIn(1, 4)
-            val language = appSettings.sttLanguage.first()
+            val activeRecognizer = persistentRecognizer ?: run {
+                val appSettings = AppSettingsDataStore(context)
+                val numThreads = appSettings.sttThreads.first().coerceIn(1, 4)
+                val language = appSettings.sttLanguage.first()
+                val modelDir = AppPaths.sttModel(context).absolutePath
 
-            val modelDir = AppPaths.sttModel(context).absolutePath
+                val config = OfflineRecognizerConfig(
+                    modelConfig = OfflineModelConfig(
+                        whisper = OfflineWhisperModelConfig(
+                            encoder = "$modelDir/$ENCODER_FILE",
+                            decoder = "$modelDir/$DECODER_FILE",
+                            language = if (language == "auto") "" else language,
+                            task = "transcribe",
+                            tailPaddings = -1
+                        ),
+                        tokens = "$modelDir/$TOKENS_FILE",
+                        numThreads = numThreads
+                    )
+                )
+                OfflineRecognizer.fromFile(config).also { tempRecognizer = it }
+            }
 
-            val whisperConfig = OfflineWhisperModelConfig(
-                encoder = "$modelDir/$ENCODER_FILE",
-                decoder = "$modelDir/$DECODER_FILE",
-                language = if (language == "auto") "" else language,
-                task = "transcribe",
-                tailPaddings = -1
-            )
-
-            val modelConfig = OfflineModelConfig(
-                whisper = whisperConfig,
-                tokens = "$modelDir/$TOKENS_FILE",
-                numThreads = numThreads
-            )
-
-            val config = OfflineRecognizerConfig(
-                modelConfig = modelConfig
-            )
-
-            // Dynamic load of Whisper model
-            recognizer = OfflineRecognizer.fromFile(config)
-
-            // Convert PCM byte array to float array (normalized to [-1, 1])
             val samples = pcmToFloat(audioData)
-
             if (samples.isEmpty()) {
                 Log.d(TAG, "Empty audio samples")
                 return@withContext ""
             }
 
-            // Create an OfflineStream
-            val stream = recognizer.createStream()
-
-            // Accept waveform
+            val stream = activeRecognizer.createStream()
             stream.acceptWaveform(sampleRate = 16000, samples = samples)
-
-            // Decode
-            recognizer.decode(stream)
-
-            // Get result
-            val result = recognizer.getResult(stream)
+            activeRecognizer.decode(stream)
+            val result = activeRecognizer.getResult(stream)
             val text = result?.text ?: ""
-
-            // Release stream explicitly as memory is managed by C++
             stream.close()
 
-            Log.i(TAG, "Raw transcription result (threads=$numThreads, lang=$language): '${text.take(100)}'")
             cleanTranscribedText(text)
         } catch (e: Exception) {
             Log.e(TAG, "Transcription failed: ${e.message}", e)
             ""
         } finally {
-            // Unload/release recognizer immediately to reclaim ~75MB RAM
             try {
-                recognizer?.close()
+                tempRecognizer?.close()
             } catch (e: Exception) {
-                Log.w(TAG, "Error releasing recognizer: ${e.message}")
+                Log.w(TAG, "Error releasing temp recognizer: ${e.message}")
             }
             _isProcessing.value = false
         }

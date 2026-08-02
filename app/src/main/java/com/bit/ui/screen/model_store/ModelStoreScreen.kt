@@ -197,7 +197,7 @@ fun ModelStoreScreen(
                         onCancelDownload = { modelId -> viewModel.cancelDownload(modelId) },
                         onPauseDownload = { modelId -> viewModel.pauseDownload(modelId) },
                         onResumeDownload = { modelId, modelName -> viewModel.resumeDownload(modelId, modelName) },
-                        onRetry = { viewModel.loadModels() })
+                        onRetry = { viewModel.refreshModels() })
 
                     StoreTab.INSTALLED -> InstalledModelsTab(
                         models = installedModels,

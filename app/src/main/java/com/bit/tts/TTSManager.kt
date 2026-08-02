@@ -280,11 +280,36 @@ object TTSManager {
 
         val cleaned = sanitize(text)
 
-        // Chunk text at sentence boundaries (./?!/…/;/\n)
-        val regex = Regex("(?<=[.?!\\n…;])\\s*|(?<=/)\\s*")
-        val rawSentences = cleaned.split(regex)
+        // Chunk text at sentence boundaries while protecting decimals & common abbreviations
+        val SENTENCE_BOUNDARY = Regex("(?<=[.?!\\n…;])(?=\\s+[A-Z\"'\\(]|\\s*$)")
+        val ABBREVIATION_SUFFIXES = setOf(
+            "mr.", "mrs.", "ms.", "dr.", "prof.", "sr.", "jr.", "vs.", "etc.", "e.g.", "i.e.", "st.", "approx.",
+            "jan.", "feb.", "mar.", "apr.", "aug.", "sept.", "oct.", "nov.", "dec."
+        )
+
+        val splitParts = cleaned.split(SENTENCE_BOUNDARY)
             .map { it.trim() }
             .filter { it.isNotEmpty() && it.any { char -> char.isLetterOrDigit() } }
+
+        // Rejoin fragments if the split occurred after a known abbreviation suffix
+        val rawSentences = mutableListOf<String>()
+        var currentAcc = StringBuilder()
+        for (part in splitParts) {
+            if (currentAcc.isNotEmpty()) {
+                currentAcc.append(" ").append(part)
+            } else {
+                currentAcc.append(part)
+            }
+            val lower = currentAcc.toString().lowercase()
+            val isAbbreviation = ABBREVIATION_SUFFIXES.any { lower.endsWith(it) }
+            if (!isAbbreviation) {
+                rawSentences.add(currentAcc.toString())
+                currentAcc = StringBuilder()
+            }
+        }
+        if (currentAcc.isNotEmpty()) {
+            rawSentences.add(currentAcc.toString())
+        }
 
         val sentences = mutableListOf<String>()
         for (s in rawSentences) {

@@ -73,18 +73,29 @@ fun TermsAndConditionsScreen(
                 TermsSection(
                     title = "2. Nature of Service",
                     content = """
-                        BIT is a privacy-first AI assistant that runs AI models locally on your Android device. The App enables you to:
-                        • Run Large Language Models (LLMs) in GGUF format for text generation
-                        • Generate images using Stable Diffusion 1.5 (censored and uncensored variants)
-                        • Generate speech using on-device Text-to-Speech (10 voices, 5 languages)
+                        BIT is a privacy-first AI assistant that runs AI models locally on your Android device. The App supports the following provider types and capabilities:
+
+                        LOCAL PROVIDERS (on-device, fully offline):
+                        • GGUF — Run Large Language Models for text generation
+                        • Diffusion — Generate images using Stable Diffusion 1.5 (censored and uncensored variants)
+                        • TTS — Generate speech using on-device Text-to-Speech (10 voices, 5 languages)
+                        • STT — On-device Speech-to-Text transcription
+                        • VLM — Vision Language Models for image understanding
+
+                        CLOUD PROVIDER (requires internet):
+                        • API — Connect to external cloud-based LLM services (e.g., OpenAI, Anthropic, or other compatible APIs). When using API providers, your prompts and conversations ARE transmitted to the external service. See Section 5 for details.
+
+                        ADDITIONAL FEATURES:
                         • Create and use AI Character Cards (TavernAI v2 compatible personas)
                         • Maintain persistent AI Memory across conversations
                         • Use built-in plugins including web search, file manager, calculator, and more
                         • Inject documents (PDF, Word, Excel, EPUB) via RAG for AI-augmented responses
                         • Download models from Hugging Face (one-time download)
-                        • Load custom GGUF and SD 1.5 models from local storage
+                        • Load custom models from local storage
 
-                        ALL AI PROCESSING OCCURS ENTIRELY ON YOUR DEVICE. Your conversations, generated content, character cards, AI memories, and documents are stored securely on-device using MemoryVault encrypted storage (AES-256-GCM) and NEVER leave your device, with the exceptions noted in Section 5 (Network Usage).
+                        FOR LOCAL PROVIDERS: All AI processing occurs entirely on your device. Your conversations, generated content, character cards, AI memories, and documents are stored securely on-device using MemoryVault encrypted storage (AES-256-GCM) and NEVER leave your device, with the exceptions noted in Section 5 (Network Usage).
+
+                        FOR API PROVIDERS: Your prompts and model responses are transmitted to the third-party API service you configure. BIT does not control, log, or store this data on any BIT-operated server, but the third-party service's own privacy policy applies.
                     """.trimIndent()
                 )
 
@@ -135,13 +146,21 @@ fun TermsAndConditionsScreen(
                         • Network and storage costs are your responsibility
                         • Downloaded models are stored locally and never uploaded anywhere
 
+                        API PROVIDER CONNECTIONS:
+                        • When using the API provider type, BIT connects to the external LLM service endpoint you configure (e.g., OpenAI, Anthropic, or compatible APIs)
+                        • Your prompts, conversation history, and system prompts are transmitted to the third-party API
+                        • Responses from the API are received and stored locally on your device
+                        • BIT does NOT operate or control these external services
+                        • You are responsible for reviewing the privacy policy of any API provider you use
+                        • Your API keys are stored locally on your device
+
                         WEB SEARCH PLUGIN:
                         • When the Web Search plugin is enabled, the App connects to DuckDuckGo to perform searches requested by the AI or user
                         • Web scraping may fetch content from URLs returned in search results
                         • You are responsible for the content you search for and retrieve
                         • The Web Search plugin can be disabled in Settings
 
-                        NO OTHER DATA IS TRANSMITTED. Your prompts, conversations, AI memories, character cards, generated content, and all other user data remain entirely on your device. We do not operate servers that receive your data. No analytics, telemetry, or tracking of any kind.
+                        EXCEPT FOR API PROVIDER USAGE AND WEB SEARCH, no other data is transmitted. When using local providers (GGUF, Diffusion, TTS, STT, VLM), your prompts, conversations, AI memories, character cards, generated content, and all other user data remain entirely on your device. We do not operate servers that receive your data. No analytics, telemetry, or tracking of any kind.
                     """.trimIndent()
                 )
 
@@ -165,11 +184,17 @@ fun TermsAndConditionsScreen(
                     content = """
                         BIT is designed with privacy as a core principle:
 
-                        COMPLETE OFFLINE OPERATION:
+                        LOCAL PROVIDERS (GGUF, Diffusion, TTS, STT, VLM):
                         • All AI inference occurs locally on your device
                         • Your prompts, conversations, and generated content are NEVER transmitted anywhere
                         • We do NOT log, collect, or analyze your usage data
                         • No telemetry, analytics, or tracking of any kind
+
+                        API PROVIDER:
+                        • When using cloud-based API providers, your prompts and conversations are sent to the external service you configure
+                        • BIT does not log or store this data on any BIT-operated server
+                        • The third-party API service's privacy policy governs how your data is handled
+                        • You are responsible for choosing a trustworthy API provider
 
                         ENCRYPTED LOCAL STORAGE:
                         • All chat data stored using MemoryVault with AES-256-GCM encryption
@@ -191,8 +216,9 @@ fun TermsAndConditionsScreen(
 
                         NETWORK USAGE:
                         • Model downloads from Hugging Face
+                        • API provider connections (when configured)
                         • Web Search plugin queries (DuckDuckGo) when enabled
-                        • No user data is ever uploaded or transmitted
+                        • No user data is uploaded to BIT-operated servers
 
                         YOUR RESPONSIBILITY:
                         • You are responsible for securing your device and backups
@@ -387,8 +413,8 @@ fun TermsAndConditionsScreen(
 
                         Email: jaswanthsanjay88@gmail.com
                         GitHub: https://github.com/jaswanthsanjay88/BIT_Android
-                        Terms Version: 2.0
-                        Last Updated: February 2026
+                        Terms Version: 3.1
+                        Last Updated: August 2026
                     """.trimIndent()
                 )
 

@@ -75,18 +75,41 @@ object TwoStageToolRouter {
         val stage2Grammar = GbnfGenerator.generateStage2(chosenTool.name, propertiesObj)
         
         // Build Stage 2 prompt messages context
-        val stage2Messages = messages.toMutableList().apply {
+        var stage2Messages = messages.toMutableList().apply {
             add(JSONObject().apply {
                 put("role", "system")
                 put("content", "You have decided to call the tool '${chosenTool.name}'. Now, generate the exact arguments required for '${chosenTool.name}' to address the user's request. Output ONLY the tool call tag: <tool_call>{\"name\":\"${chosenTool.name}\",\"arguments\":{...}}</tool_call>")
             })
         }
 
-        // Enforce Stage 2 grammar constraint
+        var argumentsObj = runStage2Pass(stage2Messages, stage2Grammar)
+        if (argumentsObj == null) {
+            Log.w(TAG, "Stage 2 pass 1 failed; retrying with error feedback for tool '${chosenTool.name}'")
+            stage2Messages = stage2Messages.toMutableList().apply {
+                add(JSONObject().apply {
+                    put("role", "system")
+                    put("content", "Your previous arguments for ${chosenTool.name} were invalid JSON for this schema. Reformat strictly.")
+                })
+            }
+            argumentsObj = runStage2Pass(stage2Messages, stage2Grammar)
+        }
+
+        if (argumentsObj == null) {
+            Log.e(TAG, "Stage 2: Failed to extract arguments after retry for tool '$selectedToolName'")
+            return null
+        }
+
+        val argumentsStr = argumentsObj.toString()
+        Log.i(TAG, "2-stage routing success: tool=$selectedToolName, args=$argumentsStr")
+        return Pair(chosenTool.name, argumentsStr)
+    }
+
+    private suspend fun runStage2Pass(
+        stage2Messages: List<JSONObject>,
+        stage2Grammar: String
+    ): JSONObject? {
         LlmModelWorker.setCustomGrammarGguf(stage2Grammar)
-        
         val stage2ResultBuilder = StringBuilder()
-        
         try {
             LlmModelWorker.ggufGenerateMultiTurnStreaming(
                 JSONArray(stage2Messages).toString(),
@@ -99,19 +122,9 @@ object TwoStageToolRouter {
         } finally {
             LlmModelWorker.clearCustomGrammarGguf()
         }
-
         val stage2Output = stage2ResultBuilder.toString().trim()
-        Log.d(TAG, "Stage 2 output: $stage2Output")
-
-        val argumentsObj = extractArguments(stage2Output)
-        if (argumentsObj == null) {
-            Log.e(TAG, "Stage 2: Failed to extract arguments from output: $stage2Output")
-            return null
-        }
-
-        val argumentsStr = argumentsObj.toString()
-        Log.i(TAG, "2-stage routing success: tool=$selectedToolName, args=$argumentsStr")
-        return Pair(chosenTool.name, argumentsStr)
+        Log.d(TAG, "Stage 2 pass output: $stage2Output")
+        return extractArguments(stage2Output)
     }
 
     private fun extractToolName(text: String): String? {

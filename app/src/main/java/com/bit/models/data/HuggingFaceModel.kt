@@ -16,7 +16,11 @@ data class HuggingFaceModel(
     val textEmbeddingSize: Int = 768,
     val tags: List<String> = emptyList(),
     val requiresNPU: Boolean = false,
-    val repositoryUrl: String = ""
+    val repositoryUrl: String = "",
+    val minRamGb: Int = 0,
+    val sizeBytes: Long = 0L,
+    val icon: String? = null,
+    val iconUrl: String? = null
 )
 @Serializable
 data class HFModelRepository(

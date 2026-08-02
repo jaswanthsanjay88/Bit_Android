@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.data.AppSettingsDataStore
+import kotlinx.coroutines.isActive
 import com.bit.models.table_schema.Model
 import com.bit.ui.components.LocalCodeHighlightEnabled
 import com.bit.ui.components.rememberRevealDrawerState
@@ -198,7 +199,6 @@ fun HomeScreen(
                             animatedVisibilityScope = animatedVisibilityScope,
                             onStoreButtonClicked = onStoreButtonClicked,
                             onMenuClick = { drawerState.toggle() },
-                            onSettingsClick = onSettingsClick,
                             showDynamicWindow = { chatViewModel.showDynamicWindow() }
                         )
                     }

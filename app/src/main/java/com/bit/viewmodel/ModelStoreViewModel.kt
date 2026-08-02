@@ -69,6 +69,10 @@ class ModelStoreViewModel @Inject constructor(
     private val _models = MutableStateFlow<List<HuggingFaceModel>>(emptyList())
     val models: StateFlow<List<HuggingFaceModel>> = _models
 
+    // Curated models from bit.jaswanthsanjay.me/api/models (flat list, no repo navigation)
+    private val _curatedModels = MutableStateFlow<List<HuggingFaceModel>>(emptyList())
+    val curatedModels: StateFlow<List<HuggingFaceModel>> = _curatedModels
+
     private val _filteredModels = MutableStateFlow<List<HuggingFaceModel>>(emptyList())
     val filteredModels: StateFlow<List<HuggingFaceModel>> = _filteredModels
 
@@ -151,7 +155,7 @@ class ModelStoreViewModel @Inject constructor(
 
     init {
         loadDeviceInfo()
-        loadModels()
+        loadCuratedModels()
         loadInstalledModels()
 
         // Read optional tab param and set initial state
@@ -172,14 +176,17 @@ class ModelStoreViewModel @Inject constructor(
     }
 
     fun refreshModels() {
+        loadCuratedModels(forceRefresh = true)
+    }
+
+    private fun loadCuratedModels(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 
             try {
-                val repos = repositories.first()
-                cachedRepos = repos
-                repository.refreshModels(repos).onSuccess { modelsList ->
+                repository.fetchCuratedModels(forceRefresh).onSuccess { modelsList ->
+                    _curatedModels.value = modelsList
                     _models.value = modelsList
                     applyAllFilters()
                 }.onFailure { exception ->
@@ -193,6 +200,7 @@ class ModelStoreViewModel @Inject constructor(
         }
     }
 
+    // Legacy repo-based loading for Advanced tab
     fun loadModels() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -232,8 +240,8 @@ class ModelStoreViewModel @Inject constructor(
     private fun applyAllFilters() {
         viewModelScope.launch {
             var filtered = if (_selectedModelType.value == null) {
-                // By default, only show general LLM (GGUF) models
-                _models.value.filter { it.modelType == ModelType.GGUF }
+                // Show all types from curated list (it's already curated/small)
+                _models.value.toList()
             } else {
                 _models.value.filter { it.modelType == _selectedModelType.value }
             }

@@ -22,11 +22,12 @@ import com.bit.models.table_schema.KnowledgeRelation
 import com.bit.models.table_schema.Model
 import com.bit.models.table_schema.ModelConfig
 import com.bit.models.table_schema.Persona
+
 import java.util.UUID
 
 @Database(
     entities = [Model::class, ModelConfig::class, InstalledRag::class, Persona::class, AiMemory::class, KnowledgeEntity::class, KnowledgeRelation::class],
-    version = 12,
+    version = 22,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -38,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun aiMemoryDao(): AiMemoryDao
     abstract fun knowledgeEntityDao(): KnowledgeEntityDao
     abstract fun knowledgeRelationDao(): KnowledgeRelationDao
+
 
     companion object {
         @Volatile
@@ -503,6 +505,160 @@ abstract class AppDatabase : RoomDatabase() {
             seedNewPersonas(db)
         }
 
+        private val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tasks (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        name TEXT NOT NULL,
+                        prompt TEXT NOT NULL,
+                        modelId TEXT,
+                        systemPrompt TEXT,
+                        cronExpr TEXT NOT NULL DEFAULT '',
+                        runAt INTEGER,
+                        enabled INTEGER NOT NULL DEFAULT 1,
+                        nextRunAt INTEGER NOT NULL DEFAULT 0,
+                        lastRunAt INTEGER NOT NULL DEFAULT 0,
+                        createdAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS loops (
+                        conversationId TEXT PRIMARY KEY NOT NULL,
+                        intervalMs INTEGER NOT NULL,
+                        prompt TEXT,
+                        nextFireAt INTEGER NOT NULL DEFAULT 0,
+                        cycleCount INTEGER NOT NULL DEFAULT 0,
+                        maxCycles INTEGER,
+                        active INTEGER NOT NULL DEFAULT 1,
+                        revision INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+            }
+        }
+
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS task_runs (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        taskId TEXT NOT NULL,
+                        iteration INTEGER NOT NULL,
+                        action TEXT NOT NULL,
+                        result TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
+        private val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Clean up any existing orphaned knowledge_relations pointing to deleted ai_memories
+                db.execSQL("""
+                    DELETE FROM knowledge_relations 
+                    WHERE source_fact_id IS NOT NULL 
+                    AND source_fact_id NOT IN (SELECT id FROM ai_memories)
+                """.trimIndent())
+                
+                // Recreate knowledge_relations with CASCADE foreign key on source_fact_id
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS knowledge_relations_new (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        subject_id TEXT NOT NULL,
+                        predicate TEXT NOT NULL,
+                        object_id TEXT NOT NULL,
+                        confidence REAL NOT NULL,
+                        source_fact_id TEXT,
+                        created_at INTEGER NOT NULL,
+                        persona_id TEXT,
+                        FOREIGN KEY (subject_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+                        FOREIGN KEY (object_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE,
+                        FOREIGN KEY (source_fact_id) REFERENCES ai_memories(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                
+                db.execSQL("INSERT INTO knowledge_relations_new SELECT * FROM knowledge_relations")
+                db.execSQL("DROP TABLE knowledge_relations")
+                db.execSQL("ALTER TABLE knowledge_relations_new RENAME TO knowledge_relations")
+                
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_relations_subject_id ON knowledge_relations (subject_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_relations_object_id ON knowledge_relations (object_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_relations_predicate ON knowledge_relations (predicate)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_relations_persona_id ON knowledge_relations (persona_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_knowledge_relations_source_fact_id ON knowledge_relations (source_fact_id)")
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE task_runs ADD COLUMN deltaSummary TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE task_runs ADD COLUMN hadChange INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN taskType TEXT NOT NULL DEFAULT 'DELTA_TRIGGERED'")
+            }
+        }
+
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_task_runs_taskId ON task_runs (taskId)")
+            }
+        }
+
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Room metadata alignment for @ColumnInfo default values
+            }
+        }
+
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS task_runs_new (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        taskId TEXT NOT NULL,
+                        iteration INTEGER NOT NULL,
+                        action TEXT NOT NULL,
+                        result TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        deltaSummary TEXT DEFAULT NULL,
+                        hadChange INTEGER NOT NULL DEFAULT 0,
+                        timestamp INTEGER NOT NULL,
+                        FOREIGN KEY (taskId) REFERENCES tasks(id) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+
+                db.execSQL("""
+                    INSERT INTO task_runs_new (id, taskId, iteration, action, result, status, deltaSummary, hadChange, timestamp)
+                    SELECT id, taskId, iteration, action, result, status, deltaSummary, hadChange, timestamp FROM task_runs
+                """.trimIndent())
+
+                db.execSQL("DROP TABLE task_runs")
+                db.execSQL("ALTER TABLE task_runs_new RENAME TO task_runs")
+
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_task_runs_taskId ON task_runs (taskId)")
+            }
+        }
+
+        private val MIGRATION_20_21 = object : Migration(20, 21) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE task_runs ADD COLUMN rawToolOutput TEXT DEFAULT NULL")
+            }
+        }
+
+        private val MIGRATION_21_22 = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS task_runs")
+                db.execSQL("DROP TABLE IF EXISTS tasks")
+                db.execSQL("DROP TABLE IF EXISTS loops")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -510,7 +666,11 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "llm_models_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                    .addMigrations(
+                        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22
+                    )
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

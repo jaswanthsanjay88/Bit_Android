@@ -135,6 +135,124 @@ class ModelStoreRepository(private val context: Context) {
         return fetchAndCache(repositories)
     }
 
+    private val curatedCacheFile = File(cacheDir, "curated_models_cache.json")
+
+    companion object {
+        private const val CURATED_API_URL = "https://bit.jaswanthsanjay.me/api/models"
+    }
+
+    suspend fun fetchCuratedModels(forceRefresh: Boolean = false): Result<List<HuggingFaceModel>> {
+        // Return disk cache if not forcing refresh
+        if (!forceRefresh) {
+            loadCuratedDiskCache()?.let { cached ->
+                return Result.success(cached)
+            }
+        }
+
+        return try {
+            val client = okhttp3.OkHttpClient.Builder()
+                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+
+            val request = okhttp3.Request.Builder()
+                .url(CURATED_API_URL)
+                .get()
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.e("ModelStoreRepository", "Curated API failed: ${response.code}")
+                // Fall back to disk cache
+                loadCuratedDiskCache()?.let { return Result.success(it) }
+                return Result.failure(Exception("Curated API returned ${response.code}"))
+            }
+
+            val body = response.body.string().ifBlank { null } ?: return Result.failure(Exception("Empty response"))
+            val models = parseCuratedJson(body)
+
+            // Cache to disk
+            curatedCacheFile.writeText(body)
+
+            Result.success(models)
+        } catch (e: Exception) {
+            Log.e("ModelStoreRepository", "Error fetching curated models", e)
+            // Fall back to disk cache
+            loadCuratedDiskCache()?.let { return Result.success(it) }
+            Result.failure(e)
+        }
+    }
+
+    private fun parseCuratedJson(jsonString: String): List<HuggingFaceModel> {
+        val models = mutableListOf<HuggingFaceModel>()
+        try {
+            val root = com.google.gson.JsonParser.parseString(jsonString).asJsonObject
+            val array = root.getAsJsonArray("models") ?: return models
+
+            array.forEach { element ->
+                if (!element.isJsonObject) return@forEach
+                val item = element.asJsonObject
+
+                val id = item.get("id")?.asString ?: return@forEach
+                val name = item.get("name")?.asString ?: return@forEach
+                val description = item.get("description")?.asString ?: ""
+                val url = item.get("url")?.asString ?: return@forEach
+                val size = item.get("size")?.asString ?: "Unknown"
+                val typeStr = item.get("type")?.asString ?: "GGUF"
+
+                val modelType = when (typeStr.uppercase(Locale.US)) {
+                    "GGUF", "LLM" -> ModelType.GGUF
+                    "SD", "DIFFUSION" -> ModelType.SD
+                    "TTS" -> ModelType.TTS
+                    "STT" -> ModelType.STT
+                    else -> ModelType.GGUF
+                }
+
+                val tags = mutableListOf<String>()
+                item.getAsJsonArray("tags")?.forEach { t ->
+                    if (t.isJsonPrimitive) t.asString.takeIf { it.isNotBlank() }?.let { tags.add(it) }
+                }
+
+                models.add(
+                    HuggingFaceModel(
+                        id = id,
+                        name = name,
+                        description = description,
+                        fileUri = url,
+                        approximateSize = size,
+                        modelType = modelType,
+                        isZip = item.get("isZip")?.asBoolean ?: false,
+                        runOnCpu = item.get("runOnCpu")?.asBoolean ?: false,
+                        textEmbeddingSize = item.get("textEmbeddingSize")?.asInt ?: 768,
+                        tags = tags,
+                        requiresNPU = item.get("requiresNPU")?.asBoolean ?: false,
+                        chipsetSuffix = item.get("chipsetSuffix")?.asString,
+                        repositoryUrl = "",
+                        minRamGb = item.get("minRamGb")?.asInt ?: 0,
+                        sizeBytes = item.get("sizeBytes")?.asLong ?: 0L,
+                        icon = item.get("icon")?.asString,
+                        iconUrl = item.get("iconUrl")?.asString
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("ModelStoreRepository", "Error parsing curated JSON", e)
+        }
+        return models
+    }
+
+    private fun loadCuratedDiskCache(): List<HuggingFaceModel>? {
+        return try {
+            if (!curatedCacheFile.exists()) return null
+            val body = curatedCacheFile.readText()
+            val models = parseCuratedJson(body)
+            models.ifEmpty { null }
+        } catch (e: Exception) {
+            Log.e("ModelStoreRepository", "Failed to load curated cache", e)
+            null
+        }
+    }
+
     private suspend fun fetchAndCache(
         repositories: List<HFModelRepository>
     ): Result<List<HuggingFaceModel>> {

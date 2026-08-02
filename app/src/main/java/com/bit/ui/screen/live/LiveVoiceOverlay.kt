@@ -103,6 +103,7 @@ class LiveModeController(
         previousMessages = chatViewModel.messages.toSet()
         chatViewModel.isLiveVoiceModeActive.value = true
         _state.value = LiveModeState.Listening
+        scope.launch { SherpaSTTEngine.enterLiveSession(context) }
         startListeningLoop()
     }
 
@@ -113,6 +114,7 @@ class LiveModeController(
         llmObserveJob = null
         audioCaptureService.stopCapture()
         TTSManager.stopPlayback()
+        SherpaSTTEngine.exitLiveSession()
         chatViewModel.isLiveVoiceModeActive.value = false
         _state.value = LiveModeState.Idle
     }

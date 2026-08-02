@@ -32,7 +32,6 @@ internal fun TopBar(
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
     onMenuClick: () -> Unit,
-    onSettingsClick: () -> Unit,
     showDynamicWindow: () -> Unit,
     onStoreButtonClicked: (String?) -> Unit
 ) {

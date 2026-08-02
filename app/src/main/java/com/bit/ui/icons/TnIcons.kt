@@ -58,6 +58,9 @@ object TnIcons {
     val Refresh by lazy { tabler("M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4", "M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4") }
 
     // ── Media ──
+    val TrendingUp by lazy { tabler("M3 17l6 -6l4 4l8 -8", "M14 7l7 0l0 7") }
+    val News by lazy { tabler("M16 6h3a1 1 0 0 1 1 1v11a2 2 0 0 1 -4 0v-13a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1v12a3 3 0 0 0 3 3h11", "M8 8l4 0", "M8 12l4 0", "M8 16l4 0") }
+
     val PlayerStop by lazy { tabler("M5 7a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -10") }
     val PlayerPlay by lazy { tabler("M7 4v16l13 -8z") }
     val PlayerPause by lazy { tabler("M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z", "M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z") }
