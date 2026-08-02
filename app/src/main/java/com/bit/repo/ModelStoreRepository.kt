@@ -138,7 +138,8 @@ class ModelStoreRepository(private val context: Context) {
     private val curatedCacheFile = File(cacheDir, "curated_models_cache.json")
 
     companion object {
-        private const val CURATED_API_URL = "https://bit.jaswanthsanjay.me/api/models"
+        private const val CURATED_API_URL = "https://bit.jaswanthsanjay.me/api/models.json"
+        private const val CURATED_API_ALT_URL = "https://bit.jaswanthsanjay.me/api/models"
     }
 
     suspend fun fetchCuratedModels(forceRefresh: Boolean = false): Result<List<HuggingFaceModel>> {
@@ -149,38 +150,38 @@ class ModelStoreRepository(private val context: Context) {
             }
         }
 
-        return try {
-            val client = okhttp3.OkHttpClient.Builder()
-                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                .build()
+        val client = okhttp3.OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
 
-            val request = okhttp3.Request.Builder()
-                .url(CURATED_API_URL)
-                .get()
-                .build()
+        val urlsToTry = listOf(CURATED_API_URL, CURATED_API_ALT_URL)
+        for (url in urlsToTry) {
+            try {
+                val request = okhttp3.Request.Builder()
+                    .url(url)
+                    .get()
+                    .build()
 
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                Log.e("ModelStoreRepository", "Curated API failed: ${response.code}")
-                // Fall back to disk cache
-                loadCuratedDiskCache()?.let { return Result.success(it) }
-                return Result.failure(Exception("Curated API returned ${response.code}"))
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val body = response.body.string().ifBlank { null }
+                    if (body != null) {
+                        val models = parseCuratedJson(body)
+                        if (models.isNotEmpty()) {
+                            curatedCacheFile.writeText(body)
+                            return Result.success(models)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ModelStoreRepository", "Failed to fetch from $url: ${e.message}")
             }
-
-            val body = response.body.string().ifBlank { null } ?: return Result.failure(Exception("Empty response"))
-            val models = parseCuratedJson(body)
-
-            // Cache to disk
-            curatedCacheFile.writeText(body)
-
-            Result.success(models)
-        } catch (e: Exception) {
-            Log.e("ModelStoreRepository", "Error fetching curated models", e)
-            // Fall back to disk cache
-            loadCuratedDiskCache()?.let { return Result.success(it) }
-            Result.failure(e)
         }
+
+        // Fall back to disk cache if available
+        loadCuratedDiskCache()?.let { return Result.success(it) }
+        return Result.failure(Exception("Failed to fetch curated models from API"))
     }
 
     private fun parseCuratedJson(jsonString: String): List<HuggingFaceModel> {
