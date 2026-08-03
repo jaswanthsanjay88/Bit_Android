@@ -18,7 +18,7 @@ Binaries:
 Builds:
   - versionName: 1.9.9
     versionCode: 68
-    commit: v1.9.9
+    commit: 55aff13ee1d096b620d329382edba57982969b6d
     subdir: app
     gradle:
       - yes
