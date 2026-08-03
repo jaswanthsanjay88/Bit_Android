@@ -40,6 +40,7 @@ junit = "4.13.2"
 haze = { group = "dev.chrisbanes.haze", name = "haze", version.ref = "haze" }
 backdrop = { group = "io.github.kyant0", name = "backdrop", version.ref = "backdrop" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 liquid = { module = "io.github.fletchmckee.liquid:liquid", version.ref = "liquid" }
 onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime-android" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidx-activity-compose" }

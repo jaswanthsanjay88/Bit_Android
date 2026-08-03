@@ -121,7 +121,7 @@ fun ModelCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val targetIconUrl = model.iconUrl ?: model.icon?.let { "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/$it.png" }
+                    val targetIconUrl = model.iconUrl ?: model.icon?.let { "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/$it.png" }
                     if (!targetIconUrl.isNullOrBlank()) {
                         coil3.compose.AsyncImage(
                             model = targetIconUrl,
