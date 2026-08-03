@@ -139,23 +139,24 @@ class ModelStoreRepository(private val context: Context) {
 
     companion object {
         private const val CURATED_API_URL = "https://bit.jaswanthsanjay.me/api/models.json"
+        private const val CURATED_API_RAW_URL = "https://raw.githubusercontent.com/jaswanthsanjay88/Bit_Android/master/site/api/models.json"
         private const val CURATED_API_ALT_URL = "https://bit.jaswanthsanjay.me/api/models"
     }
 
-    suspend fun fetchCuratedModels(forceRefresh: Boolean = false): Result<List<HuggingFaceModel>> {
+    suspend fun fetchCuratedModels(forceRefresh: Boolean = false): Result<List<HuggingFaceModel>> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         // Return disk cache if not forcing refresh
         if (!forceRefresh) {
             loadCuratedDiskCache()?.let { cached ->
-                return Result.success(cached)
+                return@withContext Result.success(cached)
             }
         }
 
         val client = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
             .build()
 
-        val urlsToTry = listOf(CURATED_API_URL, CURATED_API_ALT_URL)
+        val urlsToTry = listOf(CURATED_API_URL, CURATED_API_RAW_URL, CURATED_API_ALT_URL)
         for (url in urlsToTry) {
             try {
                 val request = okhttp3.Request.Builder()
@@ -169,8 +170,8 @@ class ModelStoreRepository(private val context: Context) {
                     if (body != null) {
                         val models = parseCuratedJson(body)
                         if (models.isNotEmpty()) {
-                            curatedCacheFile.writeText(body)
-                            return Result.success(models)
+                            try { curatedCacheFile.writeText(body) } catch (e: Exception) { Log.w("ModelStoreRepository", "Failed to cache curated models", e) }
+                            return@withContext Result.success(models)
                         }
                     }
                 }
@@ -180,8 +181,171 @@ class ModelStoreRepository(private val context: Context) {
         }
 
         // Fall back to disk cache if available
-        loadCuratedDiskCache()?.let { return Result.success(it) }
-        return Result.failure(Exception("Failed to fetch curated models from API"))
+        loadCuratedDiskCache()?.let { return@withContext Result.success(it) }
+
+        // Ultimate fallback: built-in curated models so the store NEVER fails
+        val fallbackModels = getBuiltInCuratedModels()
+        if (fallbackModels.isNotEmpty()) {
+            return@withContext Result.success(fallbackModels)
+        }
+
+        Result.failure(Exception("Failed to fetch curated models from API"))
+    }
+
+    private fun getBuiltInCuratedModels(): List<HuggingFaceModel> {
+        return listOf(
+            HuggingFaceModel(
+                id = "qwen3.5-0.8b-q4km",
+                name = "Qwen 3.5 0.8B",
+                description = "Ultra-lightweight chat model with tool calling support. Perfect for low-RAM devices.",
+                fileUri = "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
+                approximateSize = "600 MB",
+                modelType = ModelType.GGUF,
+                isZip = false,
+                runOnCpu = false,
+                minRamGb = 4,
+                sizeBytes = 629145600L,
+                icon = "qwen",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                tags = listOf("Chat", "Tool Calling", "Tested")
+            ),
+            HuggingFaceModel(
+                id = "qwen3.5-0.8b-q8",
+                name = "Qwen 3.5 0.8B (Q8)",
+                description = "Higher precision variant of Qwen 3.5 0.8B. Better quality, slightly larger.",
+                fileUri = "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q8_0.gguf",
+                approximateSize = "900 MB",
+                modelType = ModelType.GGUF,
+                isZip = false,
+                runOnCpu = false,
+                minRamGb = 4,
+                sizeBytes = 943718400L,
+                icon = "qwen",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                tags = listOf("Chat", "Tool Calling", "Tested", "High Quality")
+            ),
+            HuggingFaceModel(
+                id = "qwen3.5-4b-q4km",
+                name = "Qwen 3.5 4B",
+                description = "Balanced chat model with strong reasoning and tool calling. Good for mid-range devices.",
+                fileUri = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+                approximateSize = "2.7 GB",
+                modelType = ModelType.GGUF,
+                isZip = false,
+                runOnCpu = false,
+                minRamGb = 6,
+                sizeBytes = 2899102720L,
+                icon = "qwen",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                tags = listOf("Chat", "Tool Calling", "Tested")
+            ),
+            HuggingFaceModel(
+                id = "qwen3.5-4b-q8",
+                name = "Qwen 3.5 4B (Q8)",
+                description = "High precision Qwen 3.5 4B. Best quality for 8GB+ RAM devices.",
+                fileUri = "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q8_0.gguf",
+                approximateSize = "4.5 GB",
+                modelType = ModelType.GGUF,
+                isZip = false,
+                runOnCpu = false,
+                minRamGb = 8,
+                sizeBytes = 4831838208L,
+                icon = "qwen",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                tags = listOf("Chat", "Tool Calling", "Tested", "High Quality")
+            ),
+            HuggingFaceModel(
+                id = "qwen3.5-9b-q4km",
+                name = "Qwen 3.5 9B",
+                description = "Powerful reasoning model with tool calling. Requires 8GB+ RAM.",
+                fileUri = "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf",
+                approximateSize = "5.5 GB",
+                modelType = ModelType.GGUF,
+                isZip = false,
+                runOnCpu = false,
+                minRamGb = 8,
+                sizeBytes = 5905580032L,
+                icon = "qwen",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                tags = listOf("Chat", "Tool Calling", "Tested")
+            ),
+            HuggingFaceModel(
+                id = "lfm2-350m-q8",
+                name = "LFM2 350M",
+                description = "Ultra-fast tiny model from Liquid AI. Instant responses, runs on any device.",
+                fileUri = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                approximateSize = "400 MB",
+                modelType = ModelType.GGUF,
+                isZip = false,
+                runOnCpu = false,
+                minRamGb = 3,
+                sizeBytes = 419430400L,
+                icon = "liquid",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/liquid.png",
+                tags = listOf("Chat", "Tested", "Ultra Fast")
+            ),
+            HuggingFaceModel(
+                id = "sd-cpu-sd15",
+                name = "Stable Diffusion 1.5 (CPU)",
+                description = "Image generation that works on all devices. Uses CPU for inference.",
+                fileUri = "https://huggingface.co/xororz/sd-mnn/resolve/main/sd1.5.zip",
+                approximateSize = "1.5 GB",
+                modelType = ModelType.SD,
+                isZip = true,
+                runOnCpu = true,
+                textEmbeddingSize = 768,
+                minRamGb = 4,
+                sizeBytes = 1610612736L,
+                icon = "stability",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/stability.png",
+                tags = listOf("Image", "CPU", "Tested")
+            ),
+            HuggingFaceModel(
+                id = "piper-amy-tts",
+                name = "Piper US Amy (English TTS)",
+                description = "High-quality offline English text-to-speech. Natural-sounding voice synthesis.",
+                fileUri = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2",
+                approximateSize = "28 MB",
+                modelType = ModelType.TTS,
+                isZip = false,
+                runOnCpu = true,
+                minRamGb = 2,
+                sizeBytes = 29360128L,
+                icon = "tts",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/huggingface.png",
+                tags = listOf("TTS", "English", "Piper", "Tested")
+            ),
+            HuggingFaceModel(
+                id = "vits-ljs-tts",
+                name = "VITS LJSpeech (English TTS)",
+                description = "On-device VITS TTS engine. English voice, 22.05kHz, high-quality offline synthesis.",
+                fileUri = "https://huggingface.co/csukuangfj/vits-ljs/resolve/main/vits-ljs.onnx",
+                approximateSize = "40 MB",
+                modelType = ModelType.TTS,
+                isZip = false,
+                runOnCpu = true,
+                minRamGb = 2,
+                sizeBytes = 41943040L,
+                icon = "tts",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/huggingface.png",
+                tags = listOf("TTS", "English", "VITS", "Tested")
+            ),
+            HuggingFaceModel(
+                id = "whisper-tiny-stt",
+                name = "Whisper Tiny (English STT)",
+                description = "On-device speech recognition using Whisper. Fast and accurate English transcription.",
+                fileUri = "https://huggingface.co/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main",
+                approximateSize = "75 MB",
+                modelType = ModelType.STT,
+                isZip = false,
+                runOnCpu = true,
+                minRamGb = 2,
+                sizeBytes = 78643200L,
+                icon = "openai",
+                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/openai.png",
+                tags = listOf("STT", "English", "Whisper", "Tested")
+            )
+        )
     }
 
     private fun parseCuratedJson(jsonString: String): List<HuggingFaceModel> {
