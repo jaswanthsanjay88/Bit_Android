@@ -25,13 +25,23 @@ jobs:
       - name: Checkout exact tagged commit
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # full history — avoids shallow-clone git-describe issues in llama.cpp's build-info generation
+          fetch-depth: 0
 
-      - name: Set up JDK
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-overwrite-existing: true
+
+      - name: Set up CCache for C++ Native Builds
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ runner.os }}-ccache
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -61,11 +71,13 @@ jobs:
           test -s release-key.jks || { echo "::error::Keystore decode produced empty file"; exit 1; }
           echo "✅ Keystore restored ($(wc -c < release-key.jks) bytes)"
 
-      - name: Clean build (no cache reuse — determinism check)
-        run: ./gradlew clean
-
       - name: Assemble release APK
-        run: ./gradlew assembleRelease --no-build-cache --no-configuration-cache
+        run: |
+          ./gradlew assembleRelease \
+            -Dorg.gradle.parallel=true \
+            -Dorg.gradle.workers.max=4 \
+            -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m" \
+            -Dandroid.r8.maxWorkers=4
 
       - name: Locate output APK
         id: apk

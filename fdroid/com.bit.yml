@@ -16,9 +16,9 @@ Binaries:
   https://github.com/jaswanthsanjay88/Bit_Android/releases/download/v%v/app-universal-release.apk
 
 Builds:
-  - versionName: 1.9.8
-    versionCode: 67
-    commit: v1.9.8
+  - versionName: 1.9.9
+    versionCode: 68
+    commit: v1.9.9
     subdir: app
     gradle:
       - yes
@@ -29,5 +29,5 @@ AllowedAPKSigningKeys: 4625d5471f7815baddbd3710d1a7be8242ab85ee039bbb3d8dd937f56
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 1.9.8
-CurrentVersionCode: 67
+CurrentVersion: 1.9.9
+CurrentVersionCode: 68
