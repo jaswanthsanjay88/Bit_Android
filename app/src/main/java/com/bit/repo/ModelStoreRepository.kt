@@ -206,7 +206,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 4,
                 sizeBytes = 629145600L,
                 icon = "qwen",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
                 tags = listOf("Chat", "Tool Calling", "Tested")
             ),
             HuggingFaceModel(
@@ -221,7 +221,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 4,
                 sizeBytes = 943718400L,
                 icon = "qwen",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
                 tags = listOf("Chat", "Tool Calling", "Tested", "High Quality")
             ),
             HuggingFaceModel(
@@ -236,7 +236,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 6,
                 sizeBytes = 2899102720L,
                 icon = "qwen",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
                 tags = listOf("Chat", "Tool Calling", "Tested")
             ),
             HuggingFaceModel(
@@ -251,7 +251,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 8,
                 sizeBytes = 4831838208L,
                 icon = "qwen",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
                 tags = listOf("Chat", "Tool Calling", "Tested", "High Quality")
             ),
             HuggingFaceModel(
@@ -266,7 +266,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 8,
                 sizeBytes = 5905580032L,
                 icon = "qwen",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
                 tags = listOf("Chat", "Tool Calling", "Tested")
             ),
             HuggingFaceModel(
@@ -281,7 +281,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 3,
                 sizeBytes = 419430400L,
                 icon = "liquid",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/liquid.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/liquid.png",
                 tags = listOf("Chat", "Tested", "Ultra Fast")
             ),
             HuggingFaceModel(
@@ -297,7 +297,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 4,
                 sizeBytes = 1610612736L,
                 icon = "stability",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/stability.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/stability.png",
                 tags = listOf("Image", "CPU", "Tested")
             ),
             HuggingFaceModel(
@@ -312,7 +312,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 2,
                 sizeBytes = 29360128L,
                 icon = "tts",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/huggingface.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/huggingface.png",
                 tags = listOf("TTS", "English", "Piper", "Tested")
             ),
             HuggingFaceModel(
@@ -327,7 +327,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 2,
                 sizeBytes = 41943040L,
                 icon = "tts",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/huggingface.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/huggingface.png",
                 tags = listOf("TTS", "English", "VITS", "Tested")
             ),
             HuggingFaceModel(
@@ -342,7 +342,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 2,
                 sizeBytes = 78643200L,
                 icon = "openai",
-                iconUrl = "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/openai.png",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/openai.png",
                 tags = listOf("STT", "English", "Whisper", "Tested")
             )
         )

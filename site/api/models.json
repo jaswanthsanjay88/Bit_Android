@@ -11,7 +11,7 @@
       "sizeBytes": 629145600,
       "minRamGb": 4,
       "icon": "qwen",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
       "tags": ["Chat", "Tool Calling", "Tested"],
       "isZip": false,
       "runOnCpu": false
@@ -26,7 +26,7 @@
       "sizeBytes": 943718400,
       "minRamGb": 4,
       "icon": "qwen",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
       "tags": ["Chat", "Tool Calling", "Tested", "High Quality"],
       "isZip": false,
       "runOnCpu": false
@@ -41,7 +41,7 @@
       "sizeBytes": 2899102720,
       "minRamGb": 6,
       "icon": "qwen",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
       "tags": ["Chat", "Tool Calling", "Tested"],
       "isZip": false,
       "runOnCpu": false
@@ -56,7 +56,7 @@
       "sizeBytes": 4831838208,
       "minRamGb": 8,
       "icon": "qwen",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
       "tags": ["Chat", "Tool Calling", "Tested", "High Quality"],
       "isZip": false,
       "runOnCpu": false
@@ -71,7 +71,7 @@
       "sizeBytes": 5905580032,
       "minRamGb": 8,
       "icon": "qwen",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/qwen.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/qwen.png",
       "tags": ["Chat", "Tool Calling", "Tested"],
       "isZip": false,
       "runOnCpu": false
@@ -86,7 +86,7 @@
       "sizeBytes": 419430400,
       "minRamGb": 3,
       "icon": "liquid",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/liquid.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/liquid.png",
       "tags": ["Chat", "Tested", "Ultra Fast"],
       "isZip": false,
       "runOnCpu": false
@@ -101,7 +101,7 @@
       "sizeBytes": 1610612736,
       "minRamGb": 4,
       "icon": "stability",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/stability.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/stability.png",
       "tags": ["Image", "CPU", "Tested"],
       "isZip": true,
       "runOnCpu": true,
@@ -117,7 +117,7 @@
       "sizeBytes": 29360128,
       "minRamGb": 2,
       "icon": "tts",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/huggingface.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/huggingface.png",
       "tags": ["TTS", "English", "Piper", "Tested"],
       "isZip": false,
       "runOnCpu": true
@@ -132,7 +132,7 @@
       "sizeBytes": 41943040,
       "minRamGb": 2,
       "icon": "tts",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/huggingface.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/huggingface.png",
       "tags": ["TTS", "English", "VITS", "Tested"],
       "isZip": false,
       "runOnCpu": true
@@ -147,7 +147,7 @@
       "sizeBytes": 78643200,
       "minRamGb": 2,
       "icon": "openai",
-      "iconUrl": "https://raw.githubusercontent.com/lobehub/lobe-icons/main/packages/static-png/light/openai.png",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/openai.png",
       "tags": ["STT", "English", "Whisper", "Tested"],
       "isZip": false,
       "runOnCpu": true
