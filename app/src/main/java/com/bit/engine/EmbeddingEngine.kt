@@ -99,6 +99,23 @@ class EmbeddingEngine {
         }
     }
 
+    suspend fun ensureInitialized(context: Context): Boolean {
+        if (isInitialized()) return true
+        val modelFile = getModelPath(context)
+        if (isModelFileValid(modelFile)) {
+            val result = initialize(EmbeddingConfig(modelPath = modelFile.absolutePath))
+            if (result.isSuccess) {
+                Log.d(TAG, "Auto-initialized EmbeddingEngine from model path: ${modelFile.absolutePath}")
+                return true
+            } else {
+                Log.e(TAG, "Auto-initialization failed: ${result.exceptionOrNull()?.message}")
+            }
+        } else {
+            Log.w(TAG, "Embedding model file missing or invalid at ${modelFile.absolutePath}")
+        }
+        return false
+    }
+
     suspend fun initialize(config: EmbeddingConfig): Result<Unit> = initMutex.withLock {
         withContext(Dispatchers.IO) {
             try {

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -550,7 +551,7 @@ private fun FileDropZone(
         )
     ) {
         if (fileUri == null) {
-            // Empty state — pick file prompt
+            // Empty state — pick file prompt with format chips
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -558,94 +559,140 @@ private fun FileDropZone(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
             ) {
-                Icon(
-                    TnIcons.FileUpload,
-                    contentDescription = null,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-                )
-                Text(
-                    "Pick a file",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    "PDF, Word, Excel, EPUB, or plain text",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                )
-            }
-        } else {
-            // File selected state
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(Standards.SpacingMd),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // File type icon
                 Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     shape = RoundedCornerShape(Standards.RadiusMd)
                 ) {
                     Icon(
-                        documentType.icon,
+                        TnIcons.FileUpload,
                         contentDescription = null,
                         modifier = Modifier
                             .padding(Standards.SpacingSm)
-                            .size(22.dp),
+                            .size(28.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
+                Text(
+                    "Add PDF or Document",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "Select a file to parse and ingest into local RAG vector graph",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
 
-                // File info
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = fileUri.lastPathSegment ?: "Selected file",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    val mimeType = context.contentResolver.getType(fileUri)
-                    Text(
-                        text = DocumentParser.getFileTypeName(mimeType),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf("PDF", "Word", "Excel", "EPUB", "Text").forEach { fmt ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = fmt,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            // File selected state — enriched preview with explicit Remove button
+            val isPdf = documentType == DocumentType.PDF
+            val accentColor = if (isPdf) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+            val badgeBg = if (isPdf) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Standards.SpacingMd),
+                verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // File type icon badge
+                    Surface(
+                        color = badgeBg,
+                        shape = RoundedCornerShape(Standards.RadiusMd)
+                    ) {
+                        Icon(
+                            documentType.icon,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .padding(10.dp)
+                                .size(24.dp),
+                            tint = accentColor
+                        )
+                    }
+
+                    // File info
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = fileUri.lastPathSegment ?: "Selected file",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val mimeType = context.contentResolver.getType(fileUri)
+                        Text(
+                            text = "${DocumentParser.getFileTypeName(mimeType)} • Ready for RAG Ingestion",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
-                // Change file button
-                FilledTonalIconButton(
-                    onClick = onPickFile,
-                    modifier = Modifier.size(32.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    )
+                // Action Bar: Replace & Remove PDF/File
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        TnIcons.ArrowsExchange,
-                        contentDescription = "Change file",
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+                    OutlinedButton(
+                        onClick = onPickFile,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(Standards.RadiusMd)
+                    ) {
+                        Icon(
+                            TnIcons.ArrowsExchange,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isPdf) "Swap PDF" else "Swap File", style = MaterialTheme.typography.labelMedium)
+                    }
 
-                // Remove file button
-                FilledTonalIconButton(
-                    onClick = onClearFile,
-                    modifier = Modifier.size(32.dp),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(
-                        TnIcons.X,
-                        contentDescription = "Remove file",
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Button(
+                        onClick = onClearFile,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(Standards.RadiusMd),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    ) {
+                        Icon(
+                            TnIcons.X,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (isPdf) "Remove PDF" else "Remove File", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
         }

@@ -52,7 +52,8 @@ import com.bit.ui.components.buildInlineFormatted
 internal fun UserMessageBubble(
     message: Messages,
     editable: Boolean = false,
-    onEditRequest: ((Messages) -> Unit)? = null
+    onEditRequest: ((Messages) -> Unit)? = null,
+    onSaveToMemory: ((String) -> Unit)? = null
 ) {
     var menuExpanded by remember(message.msgId) { mutableStateOf(false) }
     val imageBitmap = remember(message.content.imageData) {
@@ -95,9 +96,7 @@ internal fun UserMessageBubble(
                         indication = null,
                         onClick = {},
                         onLongClick = {
-                            if (editable && onEditRequest != null) {
-                                menuExpanded = true
-                            }
+                            menuExpanded = true
                         }
                     )
             ) {
@@ -150,6 +149,22 @@ internal fun UserMessageBubble(
                         }
                     )
                 }
+                if (onSaveToMemory != null) {
+                    DropdownMenuItem(
+                        text = { Text("Save to Memory Vault") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = TnIcons.Brain,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onSaveToMemory.invoke(message.content.content)
+                        }
+                    )
+                }
             }
         }
     }
@@ -159,8 +174,6 @@ internal fun UserMessageBubble(
 
 @Composable
 internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = false) {
-    // ── Typewriter effect ──
-    // Smoothly reveals text 2-4 chars per tick instead of chunky batch updates
     var revealedLen by remember { mutableIntStateOf(0) }
     val latestText by rememberUpdatedState(text)
 
@@ -183,21 +196,13 @@ internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = f
     }
 
     val displayed = if (revealedLen < text.length) text.substring(0, revealedLen) else text
-
-    // Always parse thinking tags if they exist to prevent raw tag leaking
     val parsedMessage = remember(displayed) { parseThinkingTags(displayed) }
 
-    // Pulsing cursor animation for typing effect
-    val infiniteTransition = rememberInfiniteTransition(label = "cursorPulse")
-    val cursorAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(400, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "cursorPulseAlpha"
-    )
+    val streamingState = remember { com.bit.ui.components.markdown.StreamingMarkdownRenderState() }
+
+    LaunchedEffect(parsedMessage.actualContent, revealedLen < text.length) {
+        streamingState.offer(parsedMessage.actualContent, isStreaming = revealedLen < text.length)
+    }
 
     Column(
         modifier = Modifier
@@ -216,33 +221,14 @@ internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = f
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = Standards.SpacingMd) // Matches completed assistant message padding perfectly!
+                    .padding(horizontal = Standards.SpacingMd)
             ) {
-                val scheme = MaterialTheme.colorScheme
-                val inlineColors = remember(scheme) {
-                    InlineColors(
-                        codeBg = scheme.surfaceVariant.copy(alpha = 0.5f),
-                        highlightBg = scheme.primary.copy(alpha = 0.3f),
-                        mathColor = scheme.primary
-                    )
-                }
-
-                val formattedText = remember(parsedMessage.actualContent, inlineColors, cursorAlpha) {
-                    buildAnnotatedString {
-                        append(buildInlineFormatted(parsedMessage.actualContent, inlineColors))
-                        withStyle(SpanStyle(color = Glass.AccentPrimary.copy(alpha = cursorAlpha), fontWeight = FontWeight.Bold)) {
-                            append(" ▊") // Sleek modern typing terminal vertical cursor block
-                        }
-                    }
-                }
-
-                Text(
-                    text = formattedText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Glass.TextPrimary,
-                    lineHeight = 20.sp,
+                com.bit.ui.components.markdown.IncrementalStreamingMarkdownView(
+                    state = streamingState,
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) { blockText ->
+                    MarkdownText(text = blockText)
+                }
             }
         }
     }

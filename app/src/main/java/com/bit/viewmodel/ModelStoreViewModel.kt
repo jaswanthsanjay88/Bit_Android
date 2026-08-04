@@ -703,13 +703,29 @@ class ModelStoreViewModel @Inject constructor(
                 return@launch
             }
 
+            val lowerId = explorerRepo.id.lowercase()
+            val lowerTags = explorerRepo.tags.map { it.lowercase() }
+
+            val modelType = when {
+                lowerTags.any { tag -> tag in listOf("stable-diffusion", "diffusion", "sd", "diffusers", "text-to-image", "image-to-image") } ||
+                        lowerId.contains("diffusion") || lowerId.contains("stable-diffusion") || lowerId.contains("sd-") -> ModelType.SD
+
+                lowerTags.any { tag -> tag in listOf("text-to-speech", "tts") } || lowerId.contains("tts") -> ModelType.TTS
+
+                lowerTags.any { tag -> tag in listOf("automatic-speech-recognition", "stt", "speech-recognition", "whisper") } || lowerId.contains("whisper") -> ModelType.STT
+
+                else -> ModelType.GGUF
+            }
+
+            val category = ModelCategory.GENERAL
+
             val repo = HFModelRepository(
                 id = "hf-${explorerRepo.id.replace("/", "-").lowercase()}",
                 name = explorerRepo.id.substringAfter("/"),
                 repoPath = explorerRepo.id,
-                modelType = ModelType.GGUF,
+                modelType = modelType,
                 isEnabled = true,
-                category = ModelCategory.GENERAL
+                category = category
             )
 
             repoDataStore.addRepository(repo)

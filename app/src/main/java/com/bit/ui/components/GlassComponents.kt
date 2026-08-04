@@ -112,7 +112,7 @@ fun GlassSectionCard(
     title: String,
     icon: ImageVector? = null,
     iconRes: Int? = null,
-    iconTint: Color = Color.White,
+    iconTint: Color? = null,
     description: String? = null,
     backgroundColor: Color = Glass.Surface,
     borderColor: Color = Glass.BorderSubtle,
@@ -145,14 +145,14 @@ fun GlassSectionCard(
                                 imageVector = icon,
                                 contentDescription = null,
                                 modifier = Modifier.size(Standards.IconMd),
-                                tint = MaterialTheme.colorScheme.onSurface
+                                tint = iconTint ?: MaterialTheme.colorScheme.onSurface
                             )
                         } else if (iconRes != null) {
                             Icon(
                                 painter = painterResource(id = iconRes),
                                 contentDescription = null,
                                 modifier = Modifier.size(Standards.IconMd),
-                                tint = MaterialTheme.colorScheme.onSurface
+                                tint = iconTint ?: Color.Unspecified
                             )
                         }
                     }

@@ -274,7 +274,8 @@ fun BodyContent(
                                 UserMessageBubble(
                                     message = message,
                                     editable = !chatState.isGenerating,
-                                    onEditRequest = { chatViewModel.startEditingPrompt(it) }
+                                    onEditRequest = { chatViewModel.startEditingPrompt(it) },
+                                    onSaveToMemory = { chatViewModel.saveMessageToMemoryVault(it) }
                                 )
                             }
                         }

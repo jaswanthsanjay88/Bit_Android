@@ -10,6 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.bit.database.dao.AiMemoryDao
 import com.bit.database.dao.KnowledgeEntityDao
 import com.bit.database.dao.KnowledgeRelationDao
+import com.bit.database.dao.MemoryNoteDao
 import com.bit.database.dao.ModelConfigDao
 import com.bit.database.dao.ModelDao
 import com.bit.database.dao.PersonaDao
@@ -19,6 +20,7 @@ import com.bit.models.table_schema.AiMemory
 import com.bit.models.table_schema.InstalledRag
 import com.bit.models.table_schema.KnowledgeEntity
 import com.bit.models.table_schema.KnowledgeRelation
+import com.bit.models.table_schema.MemoryNote
 import com.bit.models.table_schema.Model
 import com.bit.models.table_schema.ModelConfig
 import com.bit.models.table_schema.Persona
@@ -26,8 +28,8 @@ import com.bit.models.table_schema.Persona
 import java.util.UUID
 
 @Database(
-    entities = [Model::class, ModelConfig::class, InstalledRag::class, Persona::class, AiMemory::class, KnowledgeEntity::class, KnowledgeRelation::class],
-    version = 22,
+    entities = [Model::class, ModelConfig::class, InstalledRag::class, Persona::class, AiMemory::class, KnowledgeEntity::class, KnowledgeRelation::class, MemoryNote::class],
+    version = 25,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -37,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun ragDao(): RagDao
     abstract fun personaDao(): PersonaDao
     abstract fun aiMemoryDao(): AiMemoryDao
+    abstract fun memoryNoteDao(): MemoryNoteDao
     abstract fun knowledgeEntityDao(): KnowledgeEntityDao
     abstract fun knowledgeRelationDao(): KnowledgeRelationDao
 
@@ -659,6 +662,84 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_22_23 = object : Migration(22, 23) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS memory_notes (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        tags TEXT NOT NULL DEFAULT '',
+                        note_type TEXT NOT NULL DEFAULT 'note',
+                        status TEXT NOT NULL DEFAULT 'todo',
+                        file_path TEXT NOT NULL DEFAULT '',
+                        is_ai_memory_enabled INTEGER NOT NULL DEFAULT 1,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_is_ai_memory_enabled ON memory_notes (is_ai_memory_enabled)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_note_type ON memory_notes (note_type)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_updated_at ON memory_notes (updated_at)")
+            }
+        }
+
+        private val MIGRATION_23_24 = object : Migration(23, 24) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS memory_notes")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS memory_notes (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        tags TEXT NOT NULL DEFAULT '',
+                        note_type TEXT NOT NULL DEFAULT 'note',
+                        status TEXT NOT NULL DEFAULT 'todo',
+                        file_path TEXT NOT NULL DEFAULT '',
+                        is_ai_memory_enabled INTEGER NOT NULL DEFAULT 1,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_is_ai_memory_enabled ON memory_notes (is_ai_memory_enabled)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_note_type ON memory_notes (note_type)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_updated_at ON memory_notes (updated_at)")
+            }
+        }
+
+        private val MIGRATION_24_25 = object : Migration(24, 25) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS memory_notes")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS memory_notes (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        tags TEXT NOT NULL DEFAULT '',
+                        note_type TEXT NOT NULL DEFAULT 'note',
+                        folder TEXT NOT NULL DEFAULT 'notes',
+                        status TEXT NOT NULL DEFAULT 'todo',
+                        due_date INTEGER,
+                        completed_at INTEGER,
+                        file_path TEXT NOT NULL DEFAULT '',
+                        conflict_with_fact_id TEXT,
+                        last_backed_up_at INTEGER NOT NULL DEFAULT 0,
+                        is_pinned INTEGER NOT NULL DEFAULT 0,
+                        access_count INTEGER NOT NULL DEFAULT 1,
+                        is_ai_memory_enabled INTEGER NOT NULL DEFAULT 1,
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_is_ai_memory_enabled ON memory_notes (is_ai_memory_enabled)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_note_type ON memory_notes (note_type)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_folder ON memory_notes (folder)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_status ON memory_notes (status)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_conflict_with_fact_id ON memory_notes (conflict_with_fact_id)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_memory_notes_updated_at ON memory_notes (updated_at)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -669,8 +750,9 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22
+                        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25
                     )
+                    .fallbackToDestructiveMigrationOnDowngrade()
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)

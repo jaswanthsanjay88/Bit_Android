@@ -73,7 +73,8 @@ data class PromptEditState(
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     @ApplicationContext context: Context,
-    private val chatManager: ChatManager
+    private val chatManager: ChatManager,
+    private val globalRagOrchestrator: com.bit.worker.GlobalRagOrchestrator
 ) : ViewModel() {
 
     private val appContext = context
@@ -313,6 +314,25 @@ class ChatViewModel @Inject constructor(
 
     private val _contextUsagePercent = MutableStateFlow(0f)
     val contextUsagePercent: StateFlow<Float> = _contextUsagePercent.asStateFlow()
+
+    // ── Attached Chat Document RAG ──
+    private val _attachedFileName = MutableStateFlow<String?>(null)
+    val attachedFileName: StateFlow<String?> = _attachedFileName.asStateFlow()
+    val isRagProcessing: StateFlow<Boolean> = globalRagOrchestrator.isProcessing
+
+    fun attachDocument(uri: android.net.Uri) {
+        viewModelScope.launch {
+            globalRagOrchestrator.attachDocument(uri).onSuccess {
+                _attachedFileName.value = "Document Added to Vault"
+            }.onFailure { e ->
+                reportError("Failed to attach document: ${e.message}")
+            }
+        }
+    }
+
+    fun clearAttachedDocument() {
+        _attachedFileName.value = null
+    }
 
     // ── Grouped State Flows (for optimized recomposition) ──
 
@@ -566,7 +586,19 @@ class ChatViewModel @Inject constructor(
                 val hasTools = PluginManager.hasEnabledTools()
                         && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
                 LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value && !hasTools)
-                val ragContext = _currentRagContext.value
+                
+                // Query both the global RAG vault AND the chat-specific attached document
+                var ragContext = _currentRagContext.value
+                val attachedResult = globalRagOrchestrator.queryGlobalKnowledge(prompt, topK = 5)
+                
+                if (attachedResult != null && attachedResult.results.isNotEmpty()) {
+                    Log.d(TAG, "Global RAG returned ${attachedResult.results.size} chunks")
+                    val attachedContextStr = attachedResult.results.joinToString("\n\n") {
+                        "<chunk id=\"${it.node.id.takeLast(4)}\">\n${it.node.content}\n</chunk>"
+                    }
+                    val instruction = "\n[SYSTEM INSTRUCTION: You are provided with retrieved document chunks above. You MUST cite your sources using the chunk id when answering, in the format [id].]"
+                    ragContext = if (ragContext != null) ragContext + "\n\n" + attachedContextStr + instruction else attachedContextStr + instruction
+                }
 
                 val chatId = if (isNewChat) {
                     var createdId: String? = null
@@ -2010,12 +2042,42 @@ class ChatViewModel @Inject constructor(
         val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
         val dateSdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
 
+        // ponytail: read memory from vault disk files (source of truth), not Room DB
+        val vaultRoot = com.bit.global.AppPaths.vaultRoot(appContext)
+        val enabledNotes = try {
+            vaultRoot.walkTopDown()
+                .filter { it.isFile && it.extension.lowercase() == "md" }
+                .mapNotNull { file ->
+                    try {
+                        val raw = file.readText()
+                        // Quick frontmatter check — skip files with is_ai_memory_enabled: false
+                        if (raw.contains("is_ai_memory_enabled: false")) return@mapNotNull null
+                        val bodyStart = raw.indexOf("---", 3)
+                        if (bodyStart < 0) return@mapNotNull null
+                        val body = raw.substring(bodyStart + 3).trimStart('\n')
+                        // Extract title from frontmatter
+                        val titleLine = raw.lines().find { it.trim().startsWith("title:") }
+                        val title = titleLine?.substringAfter("title:")?.trim() ?: file.nameWithoutExtension
+                        title to body
+                    } catch (_: Exception) { null }
+                }
+                .toList()
+        } catch (_: Exception) { emptyList() }
+
+        val activeMemoryText = if (enabledNotes.isNotEmpty()) {
+            enabledNotes.joinToString("\n\n") { (title, body) ->
+                "### Note: $title\n$body"
+            }
+        } else {
+            ""
+        }
+
         val runtimeValues = mapOf(
             "{${com.bit.data.PredefinedVariables.TIME}}" to sdf.format(currentDateTime),
             "{${com.bit.data.PredefinedVariables.DATE}}" to dateSdf.format(currentDateTime),
             "{${com.bit.data.PredefinedVariables.SENT_TIME}}" to sdf.format(currentDateTime),
             "{${com.bit.data.PredefinedVariables.SENT_DATE}}" to dateSdf.format(currentDateTime),
-            "{${com.bit.data.PredefinedVariables.ACTIVE_MEMORY}}" to ""
+            "{${com.bit.data.PredefinedVariables.ACTIVE_MEMORY}}" to activeMemoryText
         )
 
         // For string replacement on the user's base prompt
@@ -3174,6 +3236,32 @@ class ChatViewModel @Inject constructor(
 
             val actualLen = bytes.size - i
             return if (actualLen >= expectedLen) bytes.size else i
+        }
+    }
+
+    fun saveMessageToMemoryVault(messageText: String, title: String? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val noteTitle = title ?: if (messageText.length > 40) messageText.take(40).trim() + "…" else messageText.trim()
+                val note = MemoryNote(
+                    title = noteTitle,
+                    content = messageText,
+                    folder = "ai_memory",
+                    noteType = "fact"
+                )
+
+                val savedNote = vaultStore.writeNote(note)
+                memoryNoteDao.insertNote(savedNote)
+                globalRagOrchestrator.reloadNoteIntoGraph(savedNote)
+
+                Log.d("ChatViewModel", "Saved AI memory to: ${savedNote.filePath}")
+
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(appContext, "Saved to AI memory", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Log.e("ChatViewModel", "Failed to save message to Memory Vault", e)
+            }
         }
     }
 

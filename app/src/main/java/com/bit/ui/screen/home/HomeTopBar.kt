@@ -33,7 +33,8 @@ internal fun TopBar(
     animatedVisibilityScope: AnimatedVisibilityScope,
     onMenuClick: () -> Unit,
     showDynamicWindow: () -> Unit,
-    onStoreButtonClicked: (String?) -> Unit
+    onStoreButtonClicked: (String?) -> Unit,
+    onMemoryClick: () -> Unit = {}
 ) {
     CenterAlignedTopAppBar(
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -89,6 +90,32 @@ internal fun TopBar(
                     Icon(
                         imageVector = TnIcons.Menu,
                         contentDescription = "Menu",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        },
+        actions = {
+            Surface(
+                onClick = onMemoryClick,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                tonalElevation = 3.dp,
+                shadowElevation = 2.dp,
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                ),
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .size(42.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = TnIcons.Brain,
+                        contentDescription = "Memory Vault",
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(20.dp)
                     )

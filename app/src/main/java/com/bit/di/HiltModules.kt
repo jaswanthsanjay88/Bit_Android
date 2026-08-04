@@ -33,6 +33,24 @@
         fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
             return AppDatabase.getDatabase(context)
         }
+
+        @Provides
+        @Singleton
+        fun provideMemoryNoteDao(database: AppDatabase): com.bit.database.dao.MemoryNoteDao {
+            return database.memoryNoteDao()
+        }
+
+        @Provides
+        @Singleton
+        fun provideKnowledgeEntityDao(database: AppDatabase): com.bit.database.dao.KnowledgeEntityDao {
+            return database.knowledgeEntityDao()
+        }
+
+        @Provides
+        @Singleton
+        fun provideKnowledgeRelationDao(database: AppDatabase): com.bit.database.dao.KnowledgeRelationDao {
+            return database.knowledgeRelationDao()
+        }
     }
 
     @Module
@@ -81,7 +99,7 @@
 
         @Provides
         @Singleton
-        fun provideEmbeddingEngine(): EmbeddingEngine {
+        fun provideEmbeddingEngine(@ApplicationContext context: Context): EmbeddingEngine {
             return EmbeddingEngine()
         }
     }

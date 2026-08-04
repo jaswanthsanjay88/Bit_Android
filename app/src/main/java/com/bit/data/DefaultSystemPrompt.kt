@@ -44,7 +44,14 @@ object DefaultSystemPrompt {
             "\n" + """
             </active_memory_context>
 
-            Use the active memory context as relevant background for the current conversation. It may be incomplete or stale. If it conflicts with the current user message, the current user message wins. If it is empty, treat it as unavailable.
+            Use the active memory context as relevant background for the current conversation. If it conflicts with the current user message or instructions, ALWAYS BELIEVE THE USER (the user's statement wins). If it is empty, treat it as unavailable.
+
+            <memory_vault_rules>
+            - You have access to personal notes, tasks, documents, and memories retrieved from the user's local Memory Vault.
+            - Actively utilize retrieved memory entries, notes, and knowledge graphs to provide personalized responses.
+            - When the user asks you to "remember" or save a preference, fact, task, or instruction, acknowledge clearly, confirm what was noted, and save it to the Memory Vault.
+            - If there is any contradiction between stored memories and what the user states in conversation, ALWAYS BELIEVE THE USER.
+            </memory_vault_rules>
             """.trimIndent()
         )
     )

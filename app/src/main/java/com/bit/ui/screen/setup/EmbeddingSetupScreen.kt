@@ -17,6 +17,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -46,6 +47,8 @@ import java.util.zip.ZipInputStream
 
 private const val DEFAULT_EMBEDDING_MODEL_URL =
     "https://huggingface.co/spaces/Void2377/neurov/resolve/main/all-MiniLM-L6-v2-Q5_K_M.gguf?download=true"
+private const val JASWANTH_LORA_EMBEDDING_URL =
+    "https://huggingface.co/jaswanthsanjay88/mini_embedding_lora/resolve/main/all-MiniLM-L6-v2-Q5_K_M.gguf?download=true"
 private const val FALLBACK_EMBEDDING_MODEL_URL =
     "https://huggingface.co/spaces/Void2377/neurov/resolve/main/all-MiniLM-L6-v2-Q5_K_M.gguf?download=true"
 private const val EMBEDDING_MODEL_SUGGESTIONS =
@@ -74,7 +77,7 @@ fun EmbeddingSetupScreen(onSetupComplete: () -> Unit) {
     var statusMessage by remember { mutableStateOf("Checking embedding model...") }
     var isDownloading by remember { mutableStateOf(false) }
     var hasExistingModel by remember { mutableStateOf(false) }
-    var customUrl by remember { mutableStateOf(DEFAULT_EMBEDDING_MODEL_URL) }
+    var customUrl by remember { mutableStateOf("") }
     var isReadyToChooseModel by remember { mutableStateOf(false) }
     var downloadRequestUrl by remember { mutableStateOf<String?>(null) }
     var importRequestUri by remember { mutableStateOf<Uri?>(null) }
@@ -99,16 +102,25 @@ fun EmbeddingSetupScreen(onSetupComplete: () -> Unit) {
         val modelPath = EmbeddingEngine.getModelPath(context)
         if (EmbeddingEngine.isModelFileValid(modelPath)) {
             hasExistingModel = true
-            statusMessage = "Embedding model already installed. You can keep it or replace it below."
+            statusMessage = "An embedding model is currently installed. You can keep it or select a new model below."
             isReadyToChooseModel = true
         } else {
-            statusMessage = "Choose a model to download"
+            statusMessage = "Select an embedding model to power local document search and RAG."
             isReadyToChooseModel = true
         }
     }
 
     LaunchedEffect(downloadRequestUrl) {
-        val requestUrl = downloadRequestUrl ?: return@LaunchedEffect
+        val rawUrl = downloadRequestUrl ?: return@LaunchedEffect
+        // Normalize Hugging Face repo URLs to direct file download links
+        val requestUrl = when {
+            rawUrl.contains("huggingface.co/jaswanthsanjay88/mini_embedding_lora") && !rawUrl.contains("/resolve/") ->
+                JASWANTH_LORA_EMBEDDING_URL
+            rawUrl.startsWith("https://huggingface.co/") && !rawUrl.contains("/resolve/") && !rawUrl.endsWith(".gguf") ->
+                "${rawUrl.removeSuffix("/")}/resolve/main/model.gguf?download=true"
+            else -> rawUrl
+        }
+
         isDownloading = true
         isReadyToChooseModel = false
         downloadProgress = 0f
@@ -170,32 +182,32 @@ fun EmbeddingSetupScreen(onSetupComplete: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(Standards.SpacingXxl),
+                .padding(Standards.SpacingLg),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
         ) {
             if (isDownloading) {
                 LoadingIndicator(
-                    modifier = Modifier.size(64.dp),
+                    modifier = Modifier.size(56.dp),
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                Spacer(modifier = Modifier.height(Standards.SpacingXl))
+                Spacer(modifier = Modifier.height(Standards.SpacingMd))
 
                 Text(
-                    text = "Setting up BIT",
+                    text = "Configuring Embedding Engine",
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                Spacer(modifier = Modifier.height(Standards.SpacingLg))
+                Spacer(modifier = Modifier.height(Standards.SpacingSm))
 
                 LinearProgressIndicator(
                     progress = { downloadProgress },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(modifier = Modifier.height(Standards.SpacingSm))
+                Spacer(modifier = Modifier.height(Standards.SpacingXs))
 
                 Text(
                     text = statusMessage,
@@ -206,12 +218,10 @@ fun EmbeddingSetupScreen(onSetupComplete: () -> Unit) {
             } else if (isReadyToChooseModel) {
                 Text(
                     text = "Embedding Model Setup",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onBackground,
                     textAlign = TextAlign.Center
                 )
-
-                Spacer(modifier = Modifier.height(Standards.SpacingMd))
 
                 Text(
                     text = statusMessage,
@@ -220,65 +230,113 @@ fun EmbeddingSetupScreen(onSetupComplete: () -> Unit) {
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(Standards.SpacingLg))
+                Spacer(modifier = Modifier.height(Standards.SpacingSm))
 
-                Button(
-                    onClick = {
-                        downloadRequestUrl = DEFAULT_EMBEDDING_MODEL_URL
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Download Default Model")
-                }
-
-                Spacer(modifier = Modifier.height(Standards.SpacingMd))
-
-                Button(
-                    onClick = {
-                        localModelPickerLauncher.launch(arrayOf("application/octet-stream", "*/*"))
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Select Local GGUF Model")
-                }
-
-                Spacer(modifier = Modifier.height(Standards.SpacingMd))
-
-                OutlinedTextField(
-                    value = customUrl,
-                    onValueChange = { customUrl = it },
-                    label = { Text("Custom GGUF URL") },
-                    placeholder = { Text("https://huggingface.co/.../model.gguf") },
+                // Model Presets Card
+                Card(
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.height(Standards.SpacingSm))
-
-                TextButton(
-                    onClick = {
-                        val trimmed = customUrl.trim()
-                        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-                            downloadRequestUrl = trimmed
-                        } else {
-                            statusMessage = "Please enter a valid URL (http/https)."
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(Standards.RadiusLg),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                    )
                 ) {
-                    Text("Download Custom Model")
+                    Column(
+                        modifier = Modifier.padding(Standards.SpacingMd),
+                        verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                    ) {
+                        Text(
+                            text = "Recommended Presets",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        // Default MiniLM Option
+                        Button(
+                            onClick = { downloadRequestUrl = DEFAULT_EMBEDDING_MODEL_URL },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("all-MiniLM-L6-v2 (Default)", style = MaterialTheme.typography.titleSmall)
+                                Text("Lightweight 384D GGUF • ~23 MB", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+
+                        // Jaswanth Sanjay Mini Embedding LoRA Option
+                        Button(
+                            onClick = { downloadRequestUrl = JASWANTH_LORA_EMBEDDING_URL },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Mini Embedding LoRA", style = MaterialTheme.typography.titleSmall)
+                                Text("jaswanthsanjay88/mini_embedding_lora", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(Standards.SpacingSm))
-                Text(
-                    text = "Supported presets: all-MiniLM-L6-v2-Q5_K_M.gguf",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
-                    textAlign = TextAlign.Center
-                )
+                // Import / Custom URL Options
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(Standards.RadiusLg),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(Standards.SpacingMd),
+                        verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                    ) {
+                        Text(
+                            text = "Custom & Local Model",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Button(
+                            onClick = {
+                                localModelPickerLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Select Local GGUF Model")
+                        }
+
+                        OutlinedTextField(
+                            value = customUrl,
+                            onValueChange = { customUrl = it },
+                            label = { Text("Custom GGUF / HF URL") },
+                            placeholder = { Text("https://huggingface.co/jaswanthsanjay88/mini_embedding_lora") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        if (customUrl.isNotBlank()) {
+                            Button(
+                                onClick = {
+                                    val trimmed = customUrl.trim()
+                                    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                                        downloadRequestUrl = trimmed
+                                    } else {
+                                        statusMessage = "Please enter a valid URL (http/https)."
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Download Custom Model")
+                            }
+                        }
+                    }
+                }
 
                 if (hasExistingModel) {
-                    Spacer(modifier = Modifier.height(Standards.SpacingSm))
                     TextButton(
                         onClick = onSetupComplete,
                         modifier = Modifier.fillMaxWidth()

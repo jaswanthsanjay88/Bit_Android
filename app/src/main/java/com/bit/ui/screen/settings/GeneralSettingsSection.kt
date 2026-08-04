@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,6 +37,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.clip
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -718,7 +721,9 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
 
         GlassCard(
             onClick = {},
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding(),
             backgroundColor = Glass.Surface,
             borderColor = Glass.BorderSubtle,
             cornerRadius = Standards.CardCornerRadius,
@@ -786,20 +791,28 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
                     ) {
-                        val avatarUrl = "https://api.dicebear.com/10.x/notionists/svg?seed=" +
+                        val avatarUrl = "https://api.dicebear.com/7.x/notionists/png?seed=" +
                             URLEncoder.encode(userName.ifBlank { "BitUser" }, "UTF-8")
 
-                        // Notionists Avatar Badge
+                        // Notionists Avatar Badge with initial fallback
                         Surface(
                             shape = CircleShape,
                             color = MaterialTheme.colorScheme.primaryContainer,
                             modifier = Modifier.size(52.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = (userName.trim().firstOrNull() ?: 'B').uppercase(),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
                                 AsyncImage(
                                     model = avatarUrl,
                                     contentDescription = "Notionist Avatar Preview",
-                                    modifier = Modifier.size(44.dp)
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape)
                                 )
                             }
                         }
@@ -934,7 +947,7 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                                     conn.readTimeout = 10000
 
                                     val seed = URLEncoder.encode(userName.trim(), "UTF-8")
-                                    val avatarUrl = "https://api.dicebear.com/10.x/notionists/svg?seed=$seed"
+                                    val avatarUrl = "https://api.dicebear.com/7.x/notionists/png?seed=$seed"
 
                                     val jsonPayload = JSONObject().apply {
                                         put("name", userName.trim())

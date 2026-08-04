@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.bit.global.Standards
 import com.bit.ui.components.CaptionText
 import com.bit.ui.components.PasswordTextField
@@ -59,7 +60,8 @@ fun LazyListScope.huggingFaceTokenSection(
     item {
         GlassSectionCard(
             title = "HuggingFace Access",
-            iconRes = R.drawable.provider_huggingface,
+            icon = TnIcons.HuggingFace,
+            iconTint = Color.Unspecified,
             description = "Authenticate to download gated model resources (e.g. Llama, Gemma)"
         ) {
             HuggingFaceTokenContent(

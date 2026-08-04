@@ -50,7 +50,7 @@ object PluginManager {
     @Volatile private var _cachedEnabledToolDefs: List<ToolDefinitionBuilder>? = null
 
     // Set of enabled plugin names
-    private val _enabledPluginNames = MutableStateFlow<Set<String>>(setOf(WEB_SEARCH_PLUGIN_NAME))
+    private val _enabledPluginNames = MutableStateFlow<Set<String>>(setOf(WEB_SEARCH_PLUGIN_NAME, "Memory Vault"))
     val enabledPluginNames: StateFlow<Set<String>> = _enabledPluginNames.asStateFlow()
 
     // Web Search enabled state (independent toggle)

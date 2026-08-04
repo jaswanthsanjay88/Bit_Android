@@ -335,6 +335,7 @@ internal fun ConfigEditorPanel(
         // Config content based on model type
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
         ) {
             item {

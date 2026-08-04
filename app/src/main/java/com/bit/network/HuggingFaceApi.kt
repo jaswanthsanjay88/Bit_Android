@@ -18,7 +18,7 @@ interface HuggingFaceApi {
 
     @GET("api/models")
     suspend fun searchModels(
-        @Query("filter") filter: String = "gguf",
+        @Query("filter") filter: String? = null,
         @Query("search") search: String? = null,
         @Query("sort") sort: String = "downloads",
         @Query("direction") direction: Int = -1,

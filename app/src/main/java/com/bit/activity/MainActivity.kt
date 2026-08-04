@@ -40,6 +40,7 @@ import com.bit.ui.screen.guide.GuideScreen
 import com.bit.ui.screen.guide.TermsAndConditionsScreen
 import com.bit.ui.screen.home.HomeScreen
 import com.bit.ui.screen.memory.AiMemoryScreen
+import com.bit.ui.screen.memory.MemoryVaultScreen
 import com.bit.ui.screen.model_config.ModelConfigEditorScreen
 import com.bit.ui.screen.model_store.ModelStoreScreen
 import com.bit.ui.screen.settings.SettingsScreen
@@ -212,6 +213,17 @@ sealed class Screen(val route: String) {
     object AiMemory : Screen("ai_memory")
     object ImageGenSetup : Screen("image_gen_setup")
     object EmbeddingSetup : Screen("embedding_setup")
+    object MemoryVault : Screen("memory_vault")
+    object NoteDetail : Screen("note_detail?noteId={noteId}&defaultType={defaultType}") {
+        fun createRoute(noteId: String? = null, defaultType: String = "note") =
+            "note_detail?noteId=${noteId ?: ""}&defaultType=$defaultType"
+    }
+    object NotesList : Screen("notes_list")
+    object AiMemoryList : Screen("ai_memory_list")
+    object DocumentsRag : Screen("documents_rag")
+    object TaskList : Screen("task_list")
+    object ConflictReview : Screen("conflict_review")
+    object BackupSettings : Screen("backup_settings")
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -347,7 +359,9 @@ fun AppNavigation(
                         val route = if (tab != null) "store?tab=$tab" else "store"
                         navController.navigate(route)
                     },
-                onVaultManagerClick = {},
+                    onVaultManagerClick = {
+                        navController.navigate(Screen.MemoryVault.route)
+                    },
                 onImageGenSetupNeeded = {
                     navController.navigate(Screen.ImageGenSetup.route)
                 },
@@ -425,6 +439,82 @@ fun AppNavigation(
                 onSetupComplete = {
                     navController.popBackStack()
                 }
+            )
+        }
+        composable(Screen.MemoryVault.route) {
+            MemoryVaultScreen(
+                onBackClick = {
+                    navController.popBackStack()
+                },
+                onNoteClick = { noteId, defaultType ->
+                    navController.navigate(Screen.NoteDetail.createRoute(noteId, defaultType))
+                },
+                onNotesListClick = { navController.navigate(Screen.NotesList.route) },
+                onAiMemoryListClick = { navController.navigate(Screen.AiMemoryList.route) },
+                onDocumentsClick = { navController.navigate(Screen.DocumentsRag.route) },
+                onBackupSettingsClick = { navController.navigate(Screen.BackupSettings.route) }
+            )
+        }
+        composable(
+            route = "note_detail?noteId={noteId}&defaultType={defaultType}",
+            arguments = listOf(
+                androidx.navigation.navArgument("noteId") {
+                    type = androidx.navigation.NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                androidx.navigation.navArgument("defaultType") {
+                    type = androidx.navigation.NavType.StringType
+                    defaultValue = "note"
+                }
+            )
+        ) { backStackEntry ->
+            val noteId = backStackEntry.arguments?.getString("noteId")
+            val defaultType = backStackEntry.arguments?.getString("defaultType") ?: "note"
+            com.bit.ui.screen.memory.NoteDetailScreen(
+                noteId = noteId,
+                defaultType = defaultType,
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.NotesList.route) {
+            com.bit.ui.screen.memory.NotesListScreen(
+                onBackClick = { navController.popBackStack() },
+                onNoteClick = { noteId, defaultType ->
+                    navController.navigate(Screen.NoteDetail.createRoute(noteId, defaultType))
+                }
+            )
+        }
+        composable(Screen.AiMemoryList.route) {
+            com.bit.ui.screen.memory.AiMemoryListScreen(
+                onBackClick = { navController.popBackStack() },
+                onConflictBannerClick = { navController.navigate(Screen.ConflictReview.route) },
+                onNoteClick = { noteId, defaultType ->
+                    navController.navigate(Screen.NoteDetail.createRoute(noteId, defaultType))
+                }
+            )
+        }
+        composable(Screen.DocumentsRag.route) {
+            com.bit.ui.screen.memory.DocumentsRagScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.TaskList.route) {
+            com.bit.ui.screen.memory.TaskListView(
+                onBackClick = { navController.popBackStack() },
+                onNoteClick = { noteId, defaultType ->
+                    navController.navigate(Screen.NoteDetail.createRoute(noteId, defaultType))
+                }
+            )
+        }
+        composable(Screen.ConflictReview.route) {
+            com.bit.ui.screen.memory.ConflictReviewScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.BackupSettings.route) {
+            com.bit.ui.screen.memory.BackupSettingsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

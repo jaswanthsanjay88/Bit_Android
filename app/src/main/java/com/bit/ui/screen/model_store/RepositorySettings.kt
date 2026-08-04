@@ -176,7 +176,7 @@ internal fun ExplorerRepositoriesCard(
     var expanded by remember { mutableStateOf(true) }
 
     StandardCard(
-        title = "HuggingFace GGUF Explorer",
+        title = "HuggingFace Model Explorer",
         icon = TnIcons.Search,
         trailing = {
             ActionButton(
@@ -196,8 +196,8 @@ internal fun ExplorerRepositoriesCard(
                     value = query,
                     onValueChange = onQueryChange,
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Search GGUF repositories") },
-                    placeholder = { Text("e.g. qwen, mistral, coder") },
+                    label = { Text("Search HuggingFace models") },
+                    placeholder = { Text("e.g. qwen, stable-diffusion, mistral, whisper") },
                     singleLine = true,
                     trailingIcon = {
                         ActionButton(

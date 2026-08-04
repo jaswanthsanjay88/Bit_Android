@@ -25,7 +25,7 @@ class HuggingFaceExplorerRepository @Inject constructor(
     override suspend fun searchGgufRepositories(query: String, limit: Int): Result<List<HuggingFaceExplorerRepo>> = withContext(Dispatchers.IO) {
         try {
             val response = api.searchModels(
-                filter = "gguf",
+                filter = null,
                 search = query.trim(),
                 sort = "downloads",
                 direction = -1,

@@ -84,7 +84,10 @@ data class InlineColors(
  */
 @Composable
 fun MarkdownText(text: String, modifier: Modifier = Modifier) {
-    val parsedContent = remember(text) { parseMarkdown(text) }
+    val processedText = remember(text) { 
+        com.bit.ui.components.markdown.MarkdownPreprocessor.toRenderableMarkdownText(text) 
+    }
+    val parsedContent = remember(processedText) { parseMarkdown(processedText) }
     val colors = InlineColors(
         codeBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         highlightBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
@@ -498,6 +501,25 @@ internal fun buildInlineFormatted(text: String, colors: InlineColors): Annotated
                     withStyle(SpanStyle(fontFamily = MapleMonoFontFamily, fontStyle = FontStyle.Italic, color = colors.mathColor)) { append(rendered) }
                     i = end + 1
                 } else { append(chars[i]); i++ }
+            }
+            // Citation `[id]`
+            chars[i] == '[' && i + 5 < chars.size && chars[i + 5] == ']' -> {
+                val citation = text.substring(i + 1, i + 5)
+                if (citation.all { it.isLetterOrDigit() }) {
+                    withStyle(SpanStyle(
+                        fontSize = 10.sp,
+                        color = colors.mathColor,
+                        background = colors.codeBg,
+                        baselineShift = androidx.compose.ui.text.style.BaselineShift.Superscript,
+                        fontWeight = FontWeight.Bold
+                    )) {
+                        append("[$citation]")
+                    }
+                    i += 6
+                } else {
+                    append(chars[i])
+                    i++
+                }
             }
             // Default — handle surrogates
             else -> {

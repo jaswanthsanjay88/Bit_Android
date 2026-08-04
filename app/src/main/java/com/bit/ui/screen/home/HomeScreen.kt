@@ -199,7 +199,8 @@ fun HomeScreen(
                             animatedVisibilityScope = animatedVisibilityScope,
                             onStoreButtonClicked = onStoreButtonClicked,
                             onMenuClick = { drawerState.toggle() },
-                            showDynamicWindow = { chatViewModel.showDynamicWindow() }
+                            showDynamicWindow = { chatViewModel.showDynamicWindow() },
+                            onMemoryClick = onVaultManagerClick
                         )
                     }
                 }

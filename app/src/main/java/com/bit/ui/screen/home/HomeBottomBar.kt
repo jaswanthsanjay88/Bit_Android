@@ -162,11 +162,14 @@ internal fun BottomBar(
         }
     }
 
+    val isRagProcessing by chatViewModel.isRagProcessing.collectAsStateWithLifecycle()
+    
     val fileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
             attachedFiles = attachedFiles + it
+            chatViewModel.attachDocument(it)
             showAttachmentSheet = false
         }
     }
@@ -578,14 +581,25 @@ internal fun BottomBar(
                                                 overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.widthIn(max = 100.dp)
                                             )
-                                            Icon(
-                                                imageVector = TnIcons.X,
-                                                contentDescription = "Remove",
-                                                modifier = Modifier
-                                                    .size(14.dp)
-                                                    .clickable { attachedFiles = attachedFiles - uri },
-                                                tint = Glass.TextSecondary
-                                            )
+                                            if (isRagProcessing) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(14.dp),
+                                                    strokeWidth = 2.dp,
+                                                    color = Glass.AccentPrimary
+                                                )
+                                            } else {
+                                                Icon(
+                                                    imageVector = TnIcons.X,
+                                                    contentDescription = "Remove",
+                                                    modifier = Modifier
+                                                        .size(14.dp)
+                                                        .clickable { 
+                                                            attachedFiles = attachedFiles - uri
+                                                            chatViewModel.clearAttachedDocument()
+                                                        },
+                                                    tint = Glass.TextSecondary
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -670,25 +684,7 @@ internal fun BottomBar(
                                             chatViewModel.sendImageRequest(cleanPrompt)
                                             value = ""
                                         } else {
-                                            val fileTextContent = attachedFiles.mapNotNull { uri ->
-                                                try {
-                                                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                                                        stream.bufferedReader().use { it.readText() }
-                                                    }
-                                                } catch (e: Exception) {
-                                                    null
-                                                }
-                                            }.joinToString("\n\n")
-
-                                            val finalPrompt = if (fileTextContent.isNotEmpty()) {
-                                                if (trimmedValue.isNotEmpty()) {
-                                                    "$trimmedValue\n\n[Attached File Content]:\n$fileTextContent"
-                                                } else {
-                                                    "[Attached File Content]:\n$fileTextContent"
-                                                }
-                                            } else {
-                                                trimmedValue
-                                            }
+                                            val finalPrompt = trimmedValue
 
                                             val imageBytesList = attachedImages.mapNotNull { uri ->
                                                 try {

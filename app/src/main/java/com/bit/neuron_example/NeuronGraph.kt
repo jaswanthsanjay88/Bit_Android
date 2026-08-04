@@ -1,5 +1,7 @@
 package com.bit.neuron_example
 
+import android.util.Log
+import com.bit.data.EmbeddingCache
 import com.bit.engine.EmbeddingEngine
 import com.bit.models.messages.Messages
 import com.bit.models.messages.Role
@@ -361,12 +363,12 @@ object SemanticChunker {
 }
 
 // ============================================================================
-// Neuron Graph
 // ============================================================================
 
 class NeuronGraph(
     private val embeddingEngine: EmbeddingEngine,
-    var settings: GraphSettings = GraphSettings.DEFAULT
+    var settings: GraphSettings = GraphSettings.DEFAULT,
+    private val embeddingCache: EmbeddingCache? = null
 ) {
     private val nodes = mutableMapOf<String, NeuronNode>()
     private val mutex = Mutex()
@@ -417,6 +419,38 @@ class NeuronGraph(
     fun close() {
         searchIndex?.close()
         searchIndex = null
+    }
+
+    /**
+     * Remove all nodes and edges, keeping the FTS5 index in sync.
+     * Used when rebuilding the graph from disk (e.g. after a backup restore).
+     */
+    suspend fun clear() = mutex.withLock {
+        nodes.clear()
+        rebuildSearchIndex()
+    }
+
+    /**
+     * Remove all nodes and edges belonging to a specific source ID.
+     */
+    suspend fun removeSource(sourceId: String) = mutex.withLock {
+        val removedNodeIds = nodes.values
+            .filter { it.metadata.sourceId == sourceId }
+            .map { it.id }
+            .toSet()
+
+        if (removedNodeIds.isEmpty()) return@withLock
+
+        // Remove node entries
+        removedNodeIds.forEach { id -> nodes.remove(id) }
+
+        // Remove dangling edges in remaining nodes
+        for (remainingNode in nodes.values) {
+            remainingNode.edges.removeAll { edge -> edge.targetId in removedNodeIds }
+        }
+
+        // Keep FTS5 index in sync
+        rebuildSearchIndex()
     }
 
     // ========================================================================
@@ -506,7 +540,16 @@ class NeuronGraph(
             }
 
             val nodeWithEmbedding = if (node.embedding == null) {
-                node.copy().also { it.embedding = embeddingEngine.embed(node.content) }
+                val cached = embeddingCache?.getEmbedding(node.content)
+                if (cached != null) {
+                    node.copy().also { it.embedding = cached }
+                } else {
+                    val emb = embeddingEngine.embed(node.content)
+                    if (emb != null) {
+                        embeddingCache?.putEmbedding(node.content, emb)
+                    }
+                    node.copy().also { it.embedding = emb }
+                }
             } else {
                 node
             }
@@ -524,12 +567,28 @@ class NeuronGraph(
     }
 
     private suspend fun addNodesWithEmbeddings(newNodes: List<NeuronNode>): List<NeuronNode> {
-        // Generate embeddings for all nodes
-        val embeddings = embeddingEngine.embedBatch(newNodes.map { it.content })
-
-        val nodesWithEmbeddings = newNodes.mapIndexed { index, node ->
-            node.also { it.embedding = embeddings[index] }
+        val nodesToEmbed = mutableListOf<NeuronNode>()
+        for (node in newNodes) {
+            val cached = embeddingCache?.getEmbedding(node.content)
+            if (cached != null) {
+                node.embedding = cached
+            } else {
+                nodesToEmbed.add(node)
+            }
         }
+
+        if (nodesToEmbed.isNotEmpty()) {
+            val embeddings = embeddingEngine.embedBatch(nodesToEmbed.map { it.content })
+            nodesToEmbed.forEachIndexed { index, node ->
+                val emb = embeddings[index]
+                if (emb != null) {
+                    node.embedding = emb
+                    embeddingCache?.putEmbedding(node.content, emb)
+                }
+            }
+        }
+
+        val nodesWithEmbeddings = newNodes
 
         mutex.withLock {
             // Add nodes and build edges

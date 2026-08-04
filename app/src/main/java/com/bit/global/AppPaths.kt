@@ -92,4 +92,30 @@ object AppPaths {
 
     fun agentProjectDir(context: Context, projectId: String): File =
         File(agentProjects(context), projectId).also { it.mkdirs() }
+
+    // ── Obsidian & Notion Vault Directories (File-Based Storage) ──
+
+    /** Root Vault directory */
+    fun vaultRoot(context: Context): File =
+        File(context.filesDir, "vault").also { it.mkdirs() }
+
+    /** User Notes folder */
+    fun notesVault(context: Context): File =
+        File(vaultRoot(context), "notes").also { it.mkdirs() }
+
+    /** AI Memories folder */
+    fun aiMemoriesVault(context: Context): File =
+        File(vaultRoot(context), "ai_memory").also { it.mkdirs() }
+
+    /** Tasks folder */
+    fun tasksVault(context: Context): File =
+        File(vaultRoot(context), "tasks").also { it.mkdirs() }
+
+    /** RAG Documents folder */
+    fun documentsVault(context: Context): File =
+        File(vaultRoot(context), "documents").also { it.mkdirs() }
+
+    /** Vault Index Cache File */
+    fun vaultIndexFile(context: Context): File =
+        File(vaultRoot(context), ".vault-index.json")
 }

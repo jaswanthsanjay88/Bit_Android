@@ -2,6 +2,7 @@ package com.bit.util
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.util.Log
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -9,9 +10,12 @@ import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
+import java.io.ByteArrayInputStream
 import java.io.InputStream
-import java.util.zip.ZipInputStream
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 import java.util.regex.Pattern
+import java.util.zip.ZipInputStream
 
 /**
  * Utility class for parsing various document formats into plain text.
@@ -38,6 +42,31 @@ object DocumentParser {
     }
 
     /**
+     * Get display file name from Content URI or last path segment.
+     */
+    private fun getFileName(context: Context, uri: Uri): String {
+        var name = ""
+        if (uri.scheme == "content") {
+            try {
+                context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val columnIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (columnIndex != -1) {
+                            name = cursor.getString(columnIndex) ?: ""
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not resolve display name from URI", e)
+            }
+        }
+        if (name.isBlank()) {
+            name = uri.lastPathSegment ?: ""
+        }
+        return name
+    }
+
+    /**
      * Parse a document from a URI into plain text.
      */
     suspend fun parseDocument(
@@ -48,44 +77,38 @@ object DocumentParser {
         try {
             val contentResolver = context.contentResolver
             val detectedMimeType = mimeType ?: contentResolver.getType(uri)
+            val fileName = getFileName(context, uri)
 
-            Log.d(TAG, "Parsing document: $uri, MIME type: $detectedMimeType")
+            Log.d(TAG, "Parsing document: $uri, Display Name: $fileName, MIME type: $detectedMimeType")
 
-            contentResolver.openInputStream(uri)?.use { inputStream ->
-                val text = when (detectedMimeType) {
-                    MimeTypes.PDF -> parsePdf(inputStream, context)
-                    MimeTypes.EPUB -> parseEpub(inputStream)
-                    MimeTypes.XLSX -> parseXlsx(inputStream)
-                    MimeTypes.DOCX -> parseDocx(inputStream)
-                    MimeTypes.PPTX -> parsePptx(inputStream)
-                    MimeTypes.ODT -> parseOdt(inputStream)
-                    MimeTypes.DOC -> parseDoc(inputStream)
-                    MimeTypes.XLS -> parseXls(inputStream)
-                    "text/plain" -> parsePlainText(inputStream)
-                    else -> {
-                        // Try to infer from file extension
-                        val fileName = uri.lastPathSegment ?: ""
-                        when {
-                            fileName.endsWith(".pdf", ignoreCase = true) -> parsePdf(inputStream, context)
-                            fileName.endsWith(".epub", ignoreCase = true) -> parseEpub(inputStream)
-                            fileName.endsWith(".xlsx", ignoreCase = true) -> parseXlsx(inputStream)
-                            fileName.endsWith(".docx", ignoreCase = true) -> parseDocx(inputStream)
-                            fileName.endsWith(".pptx", ignoreCase = true) -> parsePptx(inputStream)
-                            fileName.endsWith(".odt", ignoreCase = true) -> parseOdt(inputStream)
-                            fileName.endsWith(".doc", ignoreCase = true) -> parseDoc(inputStream)
-                            fileName.endsWith(".xls", ignoreCase = true) -> parseXls(inputStream)
-                            fileName.endsWith(".txt", ignoreCase = true) -> parsePlainText(inputStream)
-                            else -> {
-                                Log.w(TAG, "Unknown file type: $detectedMimeType / $fileName, treating as plain text")
-                                parsePlainText(inputStream)
-                            }
-                        }
-                    }
-                }
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: return@withContext Result.failure(Exception("Failed to read bytes from URI: $uri"))
 
-                Log.d(TAG, "Successfully parsed document, extracted ${text.length} characters")
-                Result.success(text)
-            } ?: Result.failure(Exception("Failed to open input stream for URI: $uri"))
+            // 1. Magic Bytes Check for PDF (%PDF)
+            val isPdfMagic = bytes.size >= 4 &&
+                bytes[0] == 0x25.toByte() && // '%'
+                bytes[1] == 0x50.toByte() && // 'P'
+                bytes[2] == 0x44.toByte() && // 'D'
+                bytes[3] == 0x46.toByte()    // 'F'
+
+            val isPdfMimeOrExt = detectedMimeType == MimeTypes.PDF ||
+                detectedMimeType?.contains("pdf", ignoreCase = true) == true ||
+                fileName.endsWith(".pdf", ignoreCase = true)
+
+            val text = when {
+                isPdfMagic || isPdfMimeOrExt -> parsePdf(bytes, context)
+                detectedMimeType == MimeTypes.EPUB || fileName.endsWith(".epub", ignoreCase = true) -> parseEpub(ByteArrayInputStream(bytes))
+                detectedMimeType == MimeTypes.XLSX || fileName.endsWith(".xlsx", ignoreCase = true) -> parseXlsx(ByteArrayInputStream(bytes))
+                detectedMimeType == MimeTypes.DOCX || fileName.endsWith(".docx", ignoreCase = true) -> parseDocx(ByteArrayInputStream(bytes))
+                detectedMimeType == MimeTypes.PPTX || fileName.endsWith(".pptx", ignoreCase = true) -> parsePptx(ByteArrayInputStream(bytes))
+                detectedMimeType == MimeTypes.ODT || fileName.endsWith(".odt", ignoreCase = true) -> parseOdt(ByteArrayInputStream(bytes))
+                detectedMimeType == MimeTypes.DOC || fileName.endsWith(".doc", ignoreCase = true) -> parseDoc()
+                detectedMimeType == MimeTypes.XLS || fileName.endsWith(".xls", ignoreCase = true) -> parseXls()
+                else -> parsePlainText(bytes)
+            }
+
+            Log.d(TAG, "Successfully parsed document, extracted ${text.length} characters")
+            Result.success(text)
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing document: ${e.message}", e)
             Result.failure(Exception("Failed to parse document: ${e.message}", e))
@@ -93,7 +116,7 @@ object DocumentParser {
     }
 
     /**
-     * Unescape XML entity characters (e.g. &amp;, &lt;, &gt;, &quot;, &apos;).
+     * Unescape XML entity characters.
      */
     private fun unescapeXml(text: String): String {
         return text
@@ -112,9 +135,9 @@ object DocumentParser {
     }
 
     /**
-     * Parse a PDF document using PDFBox-Android
+     * Parse a PDF document using PDFBox-Android safely from byte array.
      */
-    private fun parsePdf(inputStream: InputStream, context: Context): String {
+    private fun parsePdf(bytes: ByteArray, context: Context): String {
         return try {
             if (!pdfBoxInitialized) {
                 synchronized(this) {
@@ -125,13 +148,15 @@ object DocumentParser {
                 }
             }
 
-            PDDocument.load(inputStream).use { document ->
-                val stripper = PDFTextStripper()
-                stripper.getText(document) ?: ""
+            ByteArrayInputStream(bytes).use { inputStream ->
+                PDDocument.load(inputStream).use { document ->
+                    val stripper = PDFTextStripper()
+                    stripper.getText(document) ?: ""
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing PDF: ${e.message}", e)
-            throw Exception("Failed to parse PDF: ${e.message}", e)
+            Log.e(TAG, "Error parsing PDF with PDFBox: ${e.message}", e)
+            "[PDF Document: Unable to extract text. The PDF may contain scanned images or encrypted formatting.]"
         }
     }
 
@@ -336,29 +361,26 @@ object DocumentParser {
         }
     }
 
-    /**
-     * Legacy Word format (.doc) placeholder
-     */
-    private fun parseDoc(inputStream: InputStream): String {
+    private fun parseDoc(): String {
         throw Exception("Legacy binary word format (.doc) is not supported offline. Please save as .docx and re-import.")
     }
 
-    /**
-     * Legacy Excel format (.xls) placeholder
-     */
-    private fun parseXls(inputStream: InputStream): String {
+    private fun parseXls(): String {
         throw Exception("Legacy binary excel format (.xls) is not supported offline. Please save as .xlsx and re-import.")
     }
 
     /**
-     * Parse a plain text file
+     * Parse a plain text file safely replacing invalid UTF-8 sequences.
      */
-    private fun parsePlainText(inputStream: InputStream): String {
+    private fun parsePlainText(bytes: ByteArray): String {
         return try {
-            inputStream.bufferedReader().use { it.readText() }
+            val decoder = Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPLACE)
+                .onUnmappableCharacter(CodingErrorAction.REPLACE)
+            decoder.decode(ByteBuffer.wrap(bytes)).toString()
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing plain text: ${e.message}", e)
-            throw Exception("Failed to parse plain text: ${e.message}", e)
+            Log.w(TAG, "UTF-8 safe decoding failed, falling back to ISO-8859-1", e)
+            String(bytes, Charsets.ISO_8859_1)
         }
     }
 
@@ -367,14 +389,14 @@ object DocumentParser {
      */
     fun getFileTypeName(mimeType: String?): String {
         val mime = mimeType ?: ""
-        return when (mime) {
-            MimeTypes.PDF -> "PDF"
-            MimeTypes.EPUB -> "EPUB"
-            MimeTypes.XLSX, MimeTypes.XLS -> "Excel"
-            MimeTypes.DOCX, MimeTypes.DOC -> "Word"
-            MimeTypes.PPTX, MimeTypes.PPT -> "PowerPoint"
-            MimeTypes.ODT -> "OpenDocument"
-            "text/plain" -> "Text"
+        return when {
+            mime == MimeTypes.PDF || mime.contains("pdf", ignoreCase = true) -> "PDF"
+            mime == MimeTypes.EPUB -> "EPUB"
+            mime == MimeTypes.XLSX || mime == MimeTypes.XLS -> "Excel"
+            mime == MimeTypes.DOCX || mime == MimeTypes.DOC -> "Word"
+            mime == MimeTypes.PPTX || mime == MimeTypes.PPT -> "PowerPoint"
+            mime == MimeTypes.ODT -> "OpenDocument"
+            mime == "text/plain" -> "Text"
             else -> "Document"
         }
     }

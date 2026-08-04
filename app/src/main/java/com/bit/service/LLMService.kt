@@ -341,7 +341,31 @@ class LLMService : Service() {
             safetyMode: Boolean,
             callback: IModelLoadCallback
         ) {
-            callback.onError("Diffusion support disabled")
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val result = diffusionEngine.loadModel(
+                        name = name,
+                        modelDir = modelDir,
+                        height = height,
+                        width = width,
+                        textEmbeddingSize = textEmbeddingSize,
+                        runOnCpu = runOnCpu,
+                        useCpuClip = useCpuClip,
+                        isPony = isPony,
+                        httpPort = httpPort,
+                        safetyMode = safetyMode
+                    )
+                    if (result.isSuccess) {
+                        callback.onSuccess()
+                    } else {
+                        val error = result.exceptionOrNull()?.message ?: "Failed to load model: $name"
+                        callback.onError(error)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error in loadDiffusionModel AIDL", e)
+                    callback.onError(e.message ?: "Unknown error")
+                }
+            }
         }
 
         override fun generateDiffusionImage(
@@ -361,23 +385,80 @@ class LLMService : Service() {
             showDiffusionStride: Int,
             callback: IDiffusionGenerationCallback
         ) {
-            callback.onError("Diffusion support disabled")
+            scope.launch(Dispatchers.IO) {
+                try {
+                    diffusionEngine.observeGenerationState(
+                        onProgress = { progress, currentStep, totalSteps, intermediateBitmap ->
+                            val base64 = intermediateBitmap?.let { diffusionEngine.bitmapToBase64(it) }
+                            try {
+                                callback.onProgress(progress, currentStep, totalSteps, base64)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error invoking onProgress callback", e)
+                            }
+                        },
+                        onComplete = { bitmap, completedSeed, resWidth, resHeight ->
+                            val base64 = diffusionEngine.bitmapToBase64(bitmap)
+                            try {
+                                callback.onComplete(base64, completedSeed ?: seed, resWidth, resHeight)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error invoking onComplete callback", e)
+                            }
+                        },
+                        onError = { message ->
+                            try {
+                                callback.onError(message)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Error invoking onError callback", e)
+                            }
+                        }
+                    )
+
+                    diffusionEngine.generateImage(
+                        prompt = prompt,
+                        negativePrompt = negativePrompt,
+                        steps = steps,
+                        cfgScale = cfgScale,
+                        seed = if (seed < 0) null else seed,
+                        width = width,
+                        height = height,
+                        scheduler = scheduler,
+                        useOpenCL = useOpenCL,
+                        inputImage = inputImage,
+                        mask = mask,
+                        denoiseStrength = denoiseStrength,
+                        showDiffusionProcess = showDiffusionProcess,
+                        showDiffusionStride = showDiffusionStride
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error starting diffusion generation", e)
+                    try {
+                        callback.onError(e.message ?: "Generation failed to start")
+                    } catch (_: Exception) {}
+                }
+            }
         }
 
         override fun stopGenerationDiffusion() {
-            // No-op
+            diffusionEngine.cancelGeneration()
         }
 
         override fun restartDiffusionBackend(callback: IModelLoadCallback) {
-            callback.onError("Diffusion support disabled")
+            scope.launch(Dispatchers.IO) {
+                val success = diffusionEngine.restartBackend()
+                if (success) {
+                    callback.onSuccess()
+                } else {
+                    callback.onError("Failed to restart diffusion backend")
+                }
+            }
         }
 
         override fun stopDiffusionBackend() {
-            // No-op
+            diffusionEngine.stopBackend()
         }
 
-        override fun getDiffusionBackendState(): String = "DISABLED"
-        override fun getCurrentDiffusionModel(): String? = null
+        override fun getDiffusionBackendState(): String = diffusionEngine.getBackendStateString()
+        override fun getCurrentDiffusionModel(): String? = diffusionEngine.getCurrentModel()?.name
 
         override fun simulateProcessCrash() {
             Log.w(TAG, "Simulating native engine crash. Killing process...")
@@ -402,14 +483,14 @@ class LLMService : Service() {
             // Old AAR without initBackendDir — dladdr() fallback handles it
         }
 
-        // scope.launch(Dispatchers.IO) {
-        //     try {
-        //         diffusionEngine.init(applicationContext, safetyCheckerEnabled = true)
-        //         Log.i(TAG, "DiffusionEngine initialized in LLMService")
-        //     } catch (e: Exception) {
-        //         Log.e(TAG, "Failed to initialize diffusion engine", e)
-        //     }
-        // }
+        scope.launch(Dispatchers.IO) {
+            try {
+                diffusionEngine.init(applicationContext, safetyCheckerEnabled = true)
+                Log.i(TAG, "DiffusionEngine initialized in LLMService")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize diffusion engine", e)
+            }
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceCompat.startForeground(
@@ -427,7 +508,7 @@ class LLMService : Service() {
         instance = null
         runBlocking(Dispatchers.IO) {
             ggufEngine.unload()
-            // diffusionEngine.cleanup()
+            diffusionEngine.cleanup()
         }
         scope.cancel()
         super.onDestroy()

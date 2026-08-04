@@ -61,6 +61,7 @@ class NVApplication : Application() {
         PluginManager.registerPlugin(WebSearchPlugin(applicationContext))
         PluginManager.registerPlugin(FileManagerPlugin(applicationContext))
         PluginManager.registerPlugin(SystemInfoPlugin(applicationContext))
+        PluginManager.registerPlugin(com.bit.plugins.MemoryPlugin(applicationContext))
         Log.d(TAG, "Plugins registered: ${PluginManager.registeredPlugins.value.size} plugins")
 
         // Initialize TTS Manager without auto-loading (loading controlled by settings)

@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -455,58 +457,60 @@ fun ModelLoadingScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color.White.copy(alpha = 0.3f))
+                        .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
                 )
             }
 
             AnimatedVisibility(
                 visible = isProcessing,
                 modifier = Modifier.align(Alignment.Center),
-                enter = fadeIn(animationSpec = tween(500)) + scaleIn(
-                    initialScale = 0.6f,
-                    animationSpec = tween(500, easing = FastOutSlowInEasing)
+                enter = fadeIn(animationSpec = tween(400)) + scaleIn(
+                    initialScale = 0.85f,
+                    animationSpec = tween(400, easing = FastOutSlowInEasing)
                 ),
-                exit = fadeOut(animationSpec = tween(300)) + scaleOut(
-                    targetScale = 0.6f,
-                    animationSpec = tween(300)
+                exit = fadeOut(animationSpec = tween(250)) + scaleOut(
+                    targetScale = 0.85f,
+                    animationSpec = tween(250)
                 )
             ) {
-                Column(
-                    modifier = Modifier.size(280.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .widthIn(min = 260.dp, max = 320.dp)
+                        .padding(24.dp)
                 ) {
-                    // Advanced Obsidian Core Animation
-                    val transition = rememberInfiniteTransition(label = "core")
-                    val rotation1 by transition.animateFloat(
-                        initialValue = 0f, targetValue = 360f,
-                        animationSpec = infiniteRepeatable(tween(3000, easing = LinearEasing)), label = "rot1"
-                    )
-                    val rotation2 by transition.animateFloat(
-                        initialValue = 360f, targetValue = 0f,
-                        animationSpec = infiniteRepeatable(tween(4000, easing = LinearEasing)), label = "rot2"
-                    )
-                    val rotation3 by transition.animateFloat(
-                        initialValue = 0f, targetValue = 360f,
-                        animationSpec = infiniteRepeatable(tween(5000, easing = LinearEasing)), label = "rot3"
-                    )
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 4.dp
+                        )
 
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(100.dp)) {
-                        // Outer ring
-                        Box(modifier = Modifier.fillMaxSize().rotate(rotation1).border(2.dp, MaterialTheme.colorScheme.primary.copy(0.2f), CircleShape))
-                        // Middle structural ring
-                        Box(modifier = Modifier.size(76.dp).rotate(rotation2).border(4.dp, MaterialTheme.colorScheme.primary.copy(0.5f), RoundedCornerShape(16.dp)))
-                        // Inner pulsing core
-                        Box(modifier = Modifier.size(36.dp).rotate(rotation3).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)))
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Loading AI Model",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Initializing weights & native engine memory...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
-
-                    Spacer(Modifier.height(32.dp))
-                    Text(
-                        "Obsidian Kernel is Syncing...", 
-                        fontFamily = maple, 
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
                 }
             }
         }
@@ -933,86 +937,91 @@ private fun DiffusionConfigDialog(
     var textEmbeddingSize by remember { mutableStateOf(config.textEmbeddingSize) }
 
     AlertDialog(
-        onDismissRequest = onDismiss, title = {
-        Text(
-            "Diffusion Model Settings",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
-    }, text = {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.verticalScroll(rememberScrollState())
-        ) {
-            // Backend Section
+        onDismissRequest = onDismiss,
+        title = {
             Text(
-                "Backend Configuration",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+                "Diffusion Model Settings",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
             )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 4.dp)
+            ) {
+                // Backend Section
+                Text(
+                    "Backend Configuration",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-            SettingRow(
-                label = "Run on CPU",
-                description = "Use CPU instead of NPU/GPU",
-                checked = runOnCpu,
-                onCheckedChange = { runOnCpu = it })
+                SettingRow(
+                    label = "Run on CPU",
+                    description = "Use CPU instead of NPU/GPU",
+                    checked = runOnCpu,
+                    onCheckedChange = { runOnCpu = it })
 
-            SettingRow(
-                label = "CPU CLIP",
-                description = "Use CPU for CLIP model",
-                checked = useCpuClip,
-                onCheckedChange = { useCpuClip = it })
+                SettingRow(
+                    label = "CPU CLIP",
+                    description = "Use CPU for CLIP model",
+                    checked = useCpuClip,
+                    onCheckedChange = { useCpuClip = it })
 
-            HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            // Model Variant Section
-            Text(
-                "Model Variant",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+                // Model Variant Section
+                Text(
+                    "Model Variant",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-            SettingRow(
-                label = "Pony Diffusion",
-                description = "Enable Pony v6 specific optimizations",
-                checked = isPony,
-                onCheckedChange = { isPony = it })
+                SettingRow(
+                    label = "Pony Diffusion",
+                    description = "Enable Pony v6 specific optimizations",
+                    checked = isPony,
+                    onCheckedChange = { isPony = it })
 
-            HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            // Safety Section
-            Text(
-                "Safety & Filtering",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+                // Safety Section
+                Text(
+                    "Safety & Filtering",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-            SettingRow(
-                label = "Safety Filter",
-                description = "Enable content safety checker",
-                checked = safetyMode,
-                onCheckedChange = { safetyMode = it })
+                SettingRow(
+                    label = "Safety Filter",
+                    description = "Enable content safety checker",
+                    checked = safetyMode,
+                    onCheckedChange = { safetyMode = it })
 
-            HorizontalDivider()
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            // Text Embedding Size
-            Text(
-                "Advanced",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+                // Text Embedding Size
+                Text(
+                    "Advanced",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-            Column {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column {
                         Text(
                             "Text Embedding Size",
                             style = MaterialTheme.typography.bodyMedium,
@@ -1025,7 +1034,7 @@ private fun DiffusionConfigDialog(
                         )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = textEmbeddingSize == 768,
                             onClick = { textEmbeddingSize = 768 },
@@ -1037,27 +1046,32 @@ private fun DiffusionConfigDialog(
                     }
                 }
             }
-        }
-    }, confirmButton = {
-        Button(
-            onClick = {
-                onSave(
-                    config.copy(
-                        runOnCpu = runOnCpu,
-                        useCpuClip = useCpuClip,
-                        safetyMode = safetyMode,
-                        isPony = isPony,
-                        textEmbeddingSize = textEmbeddingSize
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onSave(
+                        config.copy(
+                            runOnCpu = runOnCpu,
+                            useCpuClip = useCpuClip,
+                            safetyMode = safetyMode,
+                            isPony = isPony,
+                            textEmbeddingSize = textEmbeddingSize
+                        )
                     )
-                )
-            }) {
-            Text("Save Changes")
-        }
-    }, dismissButton = {
-        TextButton(onClick = onDismiss) {
-            Text("Cancel")
-        }
-    }, shape = RoundedCornerShape(20.dp)
+                }
+            ) {
+                Text("Save Changes")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(28.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp
     )
 }
 

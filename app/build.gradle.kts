@@ -20,8 +20,8 @@ android {
         applicationId = "com.bit"
         minSdk = 29
         targetSdk = 36
-        versionCode = 68
-        versionName = "1.9.9"
+        versionCode = 69
+        versionName = "2.0.0"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
@@ -164,6 +164,16 @@ dependencies {
         exclude(group = "org.bouncycastle")
     }
     implementation(libs.slf4j.android)
+
+    // Markdown AST Parser & Renderer
+    implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.41.0")
+    implementation("org.jetbrains:markdown-jvm:0.7.7")
+
+    // Markwon Editor (Live syntax-highlighted EditText)
+    implementation("io.noties.markwon:core:4.6.2")
+    implementation("io.noties.markwon:editor:4.6.2")
+    implementation("io.noties.markwon:ext-strikethrough:4.6.2")
+    implementation("io.noties.markwon:ext-tasklist:4.6.2")
 
     // Database & Storage
     implementation(libs.androidx.room.ktx)
