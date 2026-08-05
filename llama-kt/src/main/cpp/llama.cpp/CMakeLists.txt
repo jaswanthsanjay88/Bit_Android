@@ -112,7 +112,7 @@ foreach(FILE_PATH ${EXTRA_LICENSES})
 endforeach()
 
 if (LLAMA_BUILD_COMMON)
-    license_generate(common)
+    license_generate(llama-common)
 endif()
 
 # install

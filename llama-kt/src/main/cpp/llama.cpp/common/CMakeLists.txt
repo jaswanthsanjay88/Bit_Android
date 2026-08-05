@@ -1,8 +1,10 @@
-# common
-
 find_package(Threads REQUIRED)
 
 llama_add_compile_flags()
+
+#
+# llama-common-base
+#
 
 # Build info header
 
@@ -33,43 +35,77 @@ endif()
 
 set(TEMPLATE_FILE "${CMAKE_CURRENT_SOURCE_DIR}/build-info.cpp.in")
 set(OUTPUT_FILE   "${CMAKE_CURRENT_BINARY_DIR}/build-info.cpp")
+
 configure_file(${TEMPLATE_FILE} ${OUTPUT_FILE})
 
-set(TARGET build_info)
-add_library(${TARGET} OBJECT ${OUTPUT_FILE})
+set(TARGET llama-common-base)
+add_library(${TARGET} STATIC ${OUTPUT_FILE})
+
+target_include_directories(${TARGET} PUBLIC .)
+
 if (BUILD_SHARED_LIBS)
     set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
-set(TARGET common)
+#
+# llama-common
+#
 
-add_library(${TARGET} STATIC
-    chat-parser.cpp
-    chat-parser.h
-    chat-parser-xml-toolcall.h
-    chat-parser-xml-toolcall.cpp
+set(TARGET llama-common)
+
+add_library(${TARGET}
+    arg.cpp
+    arg.h
+    base64.hpp
+    chat-auto-parser-generator.cpp
+    chat-auto-parser-helpers.cpp
+    chat-auto-parser.h
+    chat-diff-analyzer.cpp
     chat-peg-parser.cpp
     chat-peg-parser.h
     chat.cpp
     chat.h
     common.cpp
     common.h
-    json-partial.cpp
-    json-partial.h
+    console.cpp
+    console.h
+    debug.cpp
+    debug.h
+    download.cpp
+    download.h
+    fit.cpp
+    fit.h
+    hf-cache.cpp
+    hf-cache.h
+    http.h
+    imatrix-loader.cpp
+    imatrix-loader.h
     json-schema-to-grammar.cpp
     llguidance.cpp
     log.cpp
     log.h
+    ngram-cache.cpp
+    ngram-cache.h
+    ngram-map.cpp
+    ngram-map.h
+    ngram-mod.cpp
+    ngram-mod.h
     peg-parser.cpp
     peg-parser.h
-    regex-partial.cpp
-    regex-partial.h
+    preset.cpp
+    preset.h
+    reasoning-budget.cpp
+    reasoning-budget.h
     sampling.cpp
     sampling.h
+    speculative.cpp
+    speculative.h
+    subproc.cpp
+    subproc.h
+    trie.cpp
+    trie.h
     unicode.cpp
     unicode.h
-    universal-toolcall.cpp
-    universal-toolcall.h
     jinja/lexer.cpp
     jinja/lexer.h
     jinja/parser.cpp
@@ -84,16 +120,28 @@ add_library(${TARGET} STATIC
     jinja/caps.h
     )
 
+set_target_properties(${TARGET} PROPERTIES
+    VERSION ${LLAMA_INSTALL_VERSION}
+    SOVERSION 0
+    MACHO_CURRENT_VERSION 0 # keep macOS linker from seeing oversized version number
+)
+
 target_include_directories(${TARGET} PUBLIC . ../vendor)
 target_compile_features   (${TARGET} PUBLIC cxx_std_17)
 
-if (BUILD_SHARED_LIBS)
-    set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if (LLAMA_SUBPROCESS)
+    target_compile_definitions(${TARGET} PUBLIC LLAMA_SUBPROCESS)
 endif()
 
-target_link_libraries(${TARGET} PRIVATE
-    build_info
-)
+if (BUILD_SHARED_LIBS)
+    set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+    # TODO: make fine-grained exports in the future
+    set_target_properties(${TARGET} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
+target_link_libraries(${TARGET} PUBLIC  llama-common-base)
+target_link_libraries(${TARGET} PRIVATE cpp-httplib)
 
 if (LLAMA_LLGUIDANCE)
     include(ExternalProject)

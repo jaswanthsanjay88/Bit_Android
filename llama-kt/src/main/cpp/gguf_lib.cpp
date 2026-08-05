@@ -1133,10 +1133,12 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadModel(
          path_s.c_str(), nCtx, nThreads, nBatch, flashAttn, useMmap, useMlock);
 
     auto mparams = llama_model_default_params();
-    mparams.use_mmap  = (bool)useMmap;
-    mparams.use_mlock = (bool)useMlock;
-    g_state.use_mmap  = mparams.use_mmap;
-    g_state.use_mlock = mparams.use_mlock;
+    if ((bool)useMmap && (bool)useMlock) mparams.load_mode = LLAMA_LOAD_MODE_MMAP_MLOCK;
+    else if ((bool)useMmap) mparams.load_mode = LLAMA_LOAD_MODE_MMAP;
+    else if ((bool)useMlock) mparams.load_mode = LLAMA_LOAD_MODE_MLOCK;
+    else mparams.load_mode = LLAMA_LOAD_MODE_NONE;
+    g_state.use_mmap  = (bool)useMmap;
+    g_state.use_mlock = (bool)useMlock;
 
     // Default n_gpu_layers is -1 (= all layers offloaded). On a UMA SoC like
     // Adreno 810 that's the wrong trade-off: weight-on-GPU forces every op
@@ -2165,10 +2167,10 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeSetGrammar(
         JNIEnv * env, jobject, jstring jgrammar) {
     std::lock_guard<std::mutex> lock(g_state.gen_mutex);
     if (!jgrammar) {
-        g_state.sampling_params.grammar.clear();
+        g_state.sampling_params.grammar = common_grammar();
     } else {
         const char * grammar_cstr = env->GetStringUTFChars(jgrammar, nullptr);
-        g_state.sampling_params.grammar = grammar_cstr;
+        g_state.sampling_params.grammar = common_grammar(COMMON_GRAMMAR_TYPE_USER, grammar_cstr);
         env->ReleaseStringUTFChars(jgrammar, grammar_cstr);
     }
     g_sampler_needs_rebuild = true;
@@ -2178,7 +2180,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_dark_gguf_1lib_GGUFNativeLib_nativeClearGrammar(
         JNIEnv * env, jobject) {
     std::lock_guard<std::mutex> lock(g_state.gen_mutex);
-    g_state.sampling_params.grammar.clear();
+    g_state.sampling_params.grammar = common_grammar();
     g_sampler_needs_rebuild = true;
 }
 
@@ -2256,7 +2258,7 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadEmbeddingModel(
     const char * path = env->GetStringUTFChars(jpath, nullptr);
 
     auto mparams = llama_model_default_params();
-    mparams.use_mmap = true;
+    mparams.load_mode = LLAMA_LOAD_MODE_MMAP;
 
     g_embed.model = llama_model_load_from_file(path, mparams);
     env->ReleaseStringUTFChars(jpath, path);
@@ -3228,6 +3230,7 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeListBackendsJson(JNIEnv * env, jobje
             case GGML_BACKEND_DEVICE_TYPE_GPU:   type_str = "gpu";   break;
             case GGML_BACKEND_DEVICE_TYPE_IGPU:  type_str = "igpu";  break;
             case GGML_BACKEND_DEVICE_TYPE_ACCEL: type_str = "accel"; break;
+            case GGML_BACKEND_DEVICE_TYPE_META:  type_str = "meta";  break;
         }
 
         devs.push_back({

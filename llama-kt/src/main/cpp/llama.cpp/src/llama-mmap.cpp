@@ -40,6 +40,14 @@
 #include <TargetConditionals.h>
 #endif
 
+#ifdef _WIN32
+#    define llama_mmap_ftell _ftelli64
+#    define llama_mmap_fseek _fseeki64
+#else
+#    define llama_mmap_ftell ftello
+#    define llama_mmap_fseek fseeko
+#endif
+
 // TODO: consider moving to llama-impl.h if needed in more places
 #if defined(_WIN32)
 static std::string llama_format_win_err(DWORD err) {
@@ -80,6 +88,14 @@ struct llama_file::impl {
         if (fp == NULL) {
             throw std::runtime_error(format("failed to open %s: %s", fname, strerror(errno)));
         }
+        fp_win32 = (HANDLE) _get_osfhandle(_fileno(fp));
+        seek(0, SEEK_END);
+        size = tell();
+        seek(0, SEEK_SET);
+    }
+
+    impl(FILE * file) : owns_fp(false) {
+        fp = file;
         fp_win32 = (HANDLE) _get_osfhandle(_fileno(fp));
         seek(0, SEEK_END);
         size = tell();
@@ -159,7 +175,7 @@ struct llama_file::impl {
     }
 
     ~impl() {
-        if (fp) {
+        if (fp && owns_fp) {
             std::fclose(fp);
         }
     }
@@ -180,23 +196,6 @@ struct llama_file::impl {
 
 #ifdef __linux__
     bool init_fd() {
-#ifdef __ANDROID__
-        // Android SAF: /proc/self/fd/N can't be opened via open() due to SELinux.
-        // Extract the fd number and dup() it directly.
-        {
-            int saf_fd = -1;
-            if (sscanf(fname.c_str(), "/proc/self/fd/%d", &saf_fd) == 1 && saf_fd >= 0) {
-                fd = dup(saf_fd);
-                if (fd == -1) return false;
-                struct stat file_stats{};
-                fstat(fd, &file_stats);
-                size = file_stats.st_size;
-                alignment = file_stats.st_blksize;
-                lseek(fd, 0, SEEK_SET);
-                return true;
-            }
-        }
-#endif
         fd = open(fname.c_str(), O_RDONLY | O_DIRECT);
 
         if (fd != -1) {
@@ -226,9 +225,16 @@ struct llama_file::impl {
         seek(0, SEEK_SET);
     }
 
+    impl(FILE * file) : fname("(file*)"), owns_fp(false) {
+        fp = file;
+        seek(0, SEEK_END);
+        size = tell();
+        seek(0, SEEK_SET);
+    }
+
     size_t tell() const {
         if (fd == -1) {
-            long ret = std::ftell(fp);
+            off_t ret = llama_mmap_ftell(fp);
             if (ret == -1) {
                 throw std::runtime_error(format("ftell error: %s", strerror(errno)));
             }
@@ -246,7 +252,7 @@ struct llama_file::impl {
     void seek(size_t offset, int whence) const {
         off_t ret = 0;
         if (fd == -1) {
-            ret = std::fseek(fp, (long) offset, whence);
+            ret = llama_mmap_fseek(fp, offset, whence);
         } else {
             ret = lseek(fd, offset, whence);
         }
@@ -370,7 +376,7 @@ struct llama_file::impl {
     ~impl() {
         if (fd != -1) {
             close(fd);
-        } else {
+        } else if (owns_fp) {
             std::fclose(fp);
         }
     }
@@ -386,10 +392,14 @@ struct llama_file::impl {
 
     FILE * fp{};
     size_t size{};
+    bool owns_fp = true;
 };
 
 llama_file::llama_file(const char * fname, const char * mode, const bool use_direct_io) :
     pimpl(std::make_unique<impl>(fname, mode, use_direct_io)) {}
+
+llama_file::llama_file(FILE * file) : pimpl(std::make_unique<impl>(file)) {}
+
 llama_file::~llama_file() = default;
 
 size_t llama_file::tell() const { return pimpl->tell(); }

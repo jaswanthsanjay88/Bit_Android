@@ -44,13 +44,13 @@ add_library(tn-engine STATIC ${ENGINE_SOURCES})
 target_include_directories(tn-engine PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/vlm
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/common
-    ${CMAKE_SOURCE_DIR}/ggml/include
-    ${CMAKE_SOURCE_DIR}/vendor
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common
+    ${CMAKE_CURRENT_SOURCE_DIR}/../ggml/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../vendor
 )
 
-target_link_libraries(tn-engine PUBLIC llama common ggml)
+target_link_libraries(tn-engine PUBLIC llama llama-common ggml)
 target_compile_features(tn-engine PRIVATE cxx_std_17)
 
 target_compile_options(tn-engine PRIVATE -Wno-cast-qual)

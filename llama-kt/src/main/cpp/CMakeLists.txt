@@ -41,7 +41,7 @@ add_compile_options(
     -ffunction-sections
     -fdata-sections
 )
-add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
+add_compile_options($<$<NOT:$<CONFIG:Debug>>:-flto=thin>)
 
 # Path to the upstream llama.cpp checkout. Update this if you relocate llama.cpp.
 set(LLAMA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp")
@@ -96,7 +96,7 @@ add_link_options(
     -Wl,-z,max-page-size=16384
     -Wl,--build-id=none
 )
-add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto=full>)
+add_link_options($<$<NOT:$<CONFIG:Debug>>:-flto=thin>)
 
 # ── Reproducible build: override git-derived values with fixed strings ──
 # llama.cpp's cmake/build-info.cmake and cmake/git-vars.cmake run git commands
@@ -109,6 +109,7 @@ set(GIT_DATE           ""        CACHE STRING "" FORCE)
 set(GIT_COMMIT_SUBJECT ""        CACHE STRING "" FORCE)
 
 add_subdirectory(${LLAMA_DIR} ${CMAKE_CURRENT_BINARY_DIR}/llama)
+add_subdirectory(${LLAMA_DIR}/vendor/cpp-httplib ${CMAKE_CURRENT_BINARY_DIR}/cpp-httplib)
 
 set(RAG_INGEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rag_ingest)
 set(PDFIUM_DIR     ${RAG_INGEST_DIR}/third_party/pdfium)
@@ -118,7 +119,7 @@ set_target_properties(pdfium PROPERTIES
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libpdfium.so)
 
 set(MINIZ_SOURCES ${RAG_INGEST_DIR}/third_party/miniz/miniz.c)
-set_source_files_properties(${MINIZ_SOURCES} PROPERTIES LANGUAGE C COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -Wno-pragma-messages")
+set_source_files_properties(${MINIZ_SOURCES} PROPERTIES LANGUAGE C COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -Wno-\\#pragma-messages")
 
 set(RAG_INGEST_SOURCES
     ${RAG_INGEST_DIR}/rag_ingest.cpp
@@ -182,11 +183,12 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # -Wno-cast-qual silences vendored stb_image / miniaudio warnings used by VLM.
-target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -O3 -DNDEBUG -Wno-cast-qual)
+# -Wno-format silences the size_t/int64_t printf warnings in clip.cpp.
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -O3 -DNDEBUG -Wno-cast-qual -Wno-format)
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
     llama
-    common
+    llama-common
     pdfium
     android
     log)

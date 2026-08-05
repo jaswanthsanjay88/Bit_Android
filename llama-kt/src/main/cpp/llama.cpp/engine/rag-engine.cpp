@@ -158,7 +158,7 @@ static int32_t rag_load_model_impl(rag_engine_t * engine, llama_model * model) {
 //       and discard, so the repack tax never pays back, and removing it
 //       eliminates one more source of unsupported-quant aborts.
 static void rag_apply_embedding_model_params(llama_model_params & p) {
-    p.use_mmap        = true;
+    p.load_mode       = LLAMA_LOAD_MODE_MMAP;
     p.use_extra_bufts = false;
 }
 

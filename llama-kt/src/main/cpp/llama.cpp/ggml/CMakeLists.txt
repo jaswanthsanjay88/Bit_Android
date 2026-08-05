@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.14...3.28) # for add_link_options and implicit target directories.
+
 project("ggml" C CXX ASM)
 
 ### GGML Version
 set(GGML_VERSION_MAJOR 0)
-set(GGML_VERSION_MINOR 9)
-set(GGML_VERSION_PATCH 7)
+set(GGML_VERSION_MINOR 18)
+set(GGML_VERSION_PATCH 1)
 set(GGML_VERSION_BASE "${GGML_VERSION_MAJOR}.${GGML_VERSION_MINOR}.${GGML_VERSION_PATCH}")
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
 find_program(GIT_EXE NAMES git git.exe NO_CMAKE_FIND_ROOT_PATH)
 if(GIT_EXE)
@@ -166,15 +169,16 @@ if (NOT MSVC)
     option(GGML_AMX_INT8     "ggml: enable AMX-INT8"         OFF)
     option(GGML_AMX_BF16     "ggml: enable AMX-BF16"         OFF)
 endif()
-option(GGML_LASX             "ggml: enable lasx"             ON)
-option(GGML_LSX              "ggml: enable lsx"              ON)
-option(GGML_RVV              "ggml: enable rvv"              ON)
-option(GGML_RV_ZFH           "ggml: enable riscv zfh"        ON)
-option(GGML_RV_ZVFH          "ggml: enable riscv zvfh"       ON)
-option(GGML_RV_ZICBOP        "ggml: enable riscv zicbop"     ON)
-option(GGML_RV_ZIHINTPAUSE   "ggml: enable riscv zihintpause "  ON)
-option(GGML_XTHEADVECTOR     "ggml: enable xtheadvector"     OFF)
-option(GGML_VXE              "ggml: enable vxe"              ${GGML_NATIVE})
+option(GGML_LASX             "ggml: enable lasx"              ON)
+option(GGML_LSX              "ggml: enable lsx"               ON)
+option(GGML_RVV              "ggml: enable rvv"               ON)
+option(GGML_RV_ZFH           "ggml: enable riscv zfh"         ON)
+option(GGML_RV_ZVFH          "ggml: enable riscv zvfh"        ON)
+option(GGML_RV_ZICBOP        "ggml: enable riscv zicbop"      ON)
+option(GGML_RV_ZIHINTPAUSE   "ggml: enable riscv zihintpause" ON)
+option(GGML_RV_ZVFBFWMA      "ggml: enable riscv zvfbfwma"    OFF)
+option(GGML_XTHEADVECTOR     "ggml: enable xtheadvector"      OFF)
+option(GGML_VXE              "ggml: enable vxe"               ${GGML_NATIVE})
 
 option(GGML_CPU_ALL_VARIANTS "ggml: build all variants of the CPU backend (requires GGML_BACKEND_DL)" OFF)
 set(GGML_CPU_ARM_ARCH        "" CACHE STRING "ggml: CPU architecture for ARM")
@@ -192,8 +196,83 @@ set(GGML_BLAS_VENDOR ${GGML_BLAS_VENDOR_DEFAULT} CACHE STRING
                                             "ggml: BLAS library vendor")
 option(GGML_LLAMAFILE                       "ggml: use LLAMAFILE"                             ${GGML_LLAMAFILE_DEFAULT})
 
-# CPU-only build for Android - all GPU/accelerator backends removed
+option(GGML_CUDA                            "ggml: use CUDA"                                  OFF)
+option(GGML_MUSA                            "ggml: use MUSA"                                  OFF)
+option(GGML_CUDA_FORCE_MMQ                  "ggml: use mmq kernels instead of cuBLAS"         OFF)
+option(GGML_CUDA_FORCE_CUBLAS               "ggml: always use cuBLAS instead of mmq kernels"  OFF)
+set   (GGML_CUDA_PEER_MAX_BATCH_SIZE "128" CACHE STRING
+                                            "ggml: max. batch size for using peer access")
+option(GGML_CUDA_NO_PEER_COPY               "ggml: do not use peer to peer copies"            OFF)
+option(GGML_CUDA_NO_VMM                     "ggml: do not try to use CUDA VMM"                OFF)
+option(GGML_CUDA_FA                         "ggml: compile ggml FlashAttention CUDA kernels"  ON)
+option(GGML_CUDA_FA_ALL_QUANTS              "ggml: compile all quants for FlashAttention"     OFF)
+option(GGML_CUDA_GRAPHS                     "ggml: use CUDA graphs (llama.cpp only)"          ${GGML_CUDA_GRAPHS_DEFAULT})
+option(GGML_CUDA_NCCL                       "ggml: use NVIDIA Collective Comm. Library"       ON)
+set   (GGML_CUDA_COMPRESSION_MODE "size" CACHE STRING
+                                            "ggml: cuda link binary compression mode; requires cuda 12.8+")
+set_property(CACHE GGML_CUDA_COMPRESSION_MODE PROPERTY STRINGS "none;speed;balance;size")
+
+option(GGML_HIP                             "ggml: use HIP"                                   OFF)
+option(GGML_HIP_GRAPHS                      "ggml: use HIP graph"                              ON)
+option(GGML_HIP_RCCL                        "ggml: use ROCm Collective Comm. Library"         OFF)
+option(GGML_HIP_NO_VMM                      "ggml: do not try to use HIP VMM"                 ON)
+option(GGML_HIP_MMQ_MFMA                    "ggml: enable MFMA MMA for CDNA in MMQ"           ON)
+option(GGML_HIP_EXPORT_METRICS              "ggml: enable kernel perf metrics output"         OFF)
+option(GGML_MUSA_GRAPHS                     "ggml: use MUSA graph, experimental, unstable"    OFF)
+option(GGML_MUSA_MUDNN_COPY                 "ggml: enable muDNN for accelerated copy"         OFF)
+option(GGML_VULKAN                          "ggml: use Vulkan"                                OFF)
+option(GGML_VULKAN_CHECK_RESULTS            "ggml: run Vulkan op checks"                      OFF)
+option(GGML_VULKAN_DEBUG                    "ggml: enable Vulkan debug output"                OFF)
+option(GGML_VULKAN_MEMORY_DEBUG             "ggml: enable Vulkan memory debug output"         OFF)
+option(GGML_VULKAN_SHADER_DEBUG_INFO        "ggml: enable Vulkan shader debug info"           OFF)
+option(GGML_VULKAN_VALIDATE                 "ggml: enable Vulkan validation"                  OFF)
+option(GGML_VULKAN_RUN_TESTS                "ggml: run Vulkan tests"                          OFF)
+option(GGML_WEBGPU                          "ggml: use WebGPU"                                OFF)
+option(GGML_WEBGPU_DEBUG                    "ggml: enable WebGPU debug output"                OFF)
+option(GGML_WEBGPU_CPU_PROFILE              "ggml: enable WebGPU profiling (CPU)"             OFF)
+option(GGML_WEBGPU_GPU_PROFILE              "ggml: enable WebGPU profiling (GPU)"             OFF)
+option(GGML_WEBGPU_JSPI                     "ggml: use JSPI for WebGPU"                       ON)
+option(GGML_ZDNN                            "ggml: use zDNN"                                  OFF)
+option(GGML_VIRTGPU                         "ggml: use the VirtGPU/Virglrenderer API Remoting frontend"     OFF)
+option(GGML_VIRTGPU_BACKEND                 "ggml: build the VirtGPU/Virglrenderer API Remoting backend"    OFF)
+option(GGML_METAL                           "ggml: use Metal"                                 ${GGML_METAL_DEFAULT})
+option(GGML_METAL_NDEBUG                    "ggml: disable Metal debugging"                   OFF)
+option(GGML_METAL_SHADER_DEBUG              "ggml: compile Metal with -fno-fast-math"         OFF)
+option(GGML_METAL_EMBED_LIBRARY             "ggml: embed Metal library"                       ${GGML_METAL})
+set   (GGML_METAL_MACOSX_VERSION_MIN "" CACHE STRING
+                                            "ggml: metal minimum macOS version")
+set   (GGML_METAL_STD "" CACHE STRING       "ggml: metal standard version (-std flag)")
 option(GGML_OPENMP                          "ggml: use OpenMP"                                ON)
+option(GGML_RPC                             "ggml: use RPC"                                   OFF)
+option(GGML_SYCL                            "ggml: use SYCL"                                  OFF)
+option(GGML_SYCL_F16                        "ggml: use 16 bit floats for sycl calculations"   OFF)
+option(GGML_SYCL_GRAPH                      "ggml: enable graphs in the SYCL backend"         ON)
+option(GGML_SYCL_HOST_MEM_FALLBACK          "ggml: allow host memory fallback in SYCL reorder (requires kernel 6.8+)" ON)
+option(GGML_SYCL_SUPPORT_LEVEL_ZERO_API     "ggml: use Level Zero API in SYCL backend"  ON)
+option(GGML_SYCL_DNN                        "ggml: enable oneDNN in the SYCL backend"         ON)
+set   (GGML_SYCL_TARGET "INTEL" CACHE STRING
+                                            "ggml: sycl target device")
+set   (GGML_SYCL_DEVICE_ARCH "" CACHE STRING
+                                            "ggml: sycl device architecture")
+
+option(GGML_OPENVINO                        "ggml: use OPENVINO"                              OFF)
+option(GGML_ET                              "ggml: use ET backend"                            OFF)
+option(GGML_ET_SYSEMU                       "ggml: use ET backend via sysemu"                 OFF)
+
+option(GGML_OPENCL                          "ggml: use OpenCL"                                OFF)
+option(GGML_OPENCL_PROFILING                "ggml: use OpenCL profiling (increases overhead)" OFF)
+option(GGML_OPENCL_EMBED_KERNELS            "ggml: embed kernels"                             ON)
+option(GGML_OPENCL_USE_ADRENO_KERNELS       "ggml: use optimized kernels for Adreno"          ON)
+set   (GGML_OPENCL_TARGET_VERSION "300" CACHE STRING
+                                            "ggml: OpenCL API version to target")
+
+option(GGML_HEXAGON                         "ggml: enable Hexagon backend"                    OFF)
+
+# toolchain for vulkan-shaders-gen
+set   (GGML_VULKAN_SHADERS_GEN_TOOLCHAIN "" CACHE FILEPATH "ggml: toolchain file for vulkan-shaders-gen")
+
+option(GGML_ZENDNN                          "ggml: use ZenDNN"                                OFF)
+option(ZENDNN_ROOT                          "ggml: path to ZenDNN installation"               "")
 
 # extra artifacts
 option(GGML_BUILD_TESTS    "ggml: build tests"    ${GGML_STANDALONE})
@@ -246,8 +325,19 @@ set(GGML_PUBLIC_HEADERS
     include/ggml-cpu.h
     include/ggml-alloc.h
     include/ggml-backend.h
+    include/ggml-blas.h
+    include/ggml-cann.h
     include/ggml-cpp.h
+    include/ggml-cuda.h
     include/ggml-opt.h
+    include/ggml-metal.h
+    include/ggml-rpc.h
+    include/ggml-virtgpu.h
+    include/ggml-sycl.h
+    include/ggml-vulkan.h
+    include/ggml-webgpu.h
+    include/ggml-zendnn.h
+    include/ggml-openvino.h
     include/gguf.h)
 
 set_target_properties(ggml PROPERTIES PUBLIC_HEADER "${GGML_PUBLIC_HEADERS}")
@@ -263,7 +353,7 @@ if (GGML_STANDALONE)
         @ONLY)
 
     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ggml.pc
-        DESTINATION share/pkgconfig)
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 endif()
 
 #

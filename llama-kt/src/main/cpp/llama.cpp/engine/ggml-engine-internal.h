@@ -62,8 +62,10 @@ static inline ggml_engine_status ggml_engine_generate_loop(
     struct llama_sampler * smpl = llama_sampler_chain_init(sparams);
 
     if (sampling.repeat_penalty != 1.0f || sampling.frequency_penalty != 0.0f || sampling.presence_penalty != 0.0f) {
+        int32_t n_vocab = llama_vocab_n_tokens(llama_model_get_vocab(llama_get_model(engine->ctx)));
         llama_sampler_chain_add(smpl,
             llama_sampler_init_penalties(
+                n_vocab,
                 sampling.repeat_last_n,
                 sampling.repeat_penalty,
                 sampling.frequency_penalty,

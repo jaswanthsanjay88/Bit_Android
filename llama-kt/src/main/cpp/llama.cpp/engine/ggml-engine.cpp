@@ -94,8 +94,15 @@ ggml_engine_status ggml_engine_load_model(ggml_engine_t * engine, const char * p
     ggml_engine_unload_model(engine);
 
     auto mparams = llama_model_default_params();
-    mparams.use_mmap  = engine->params.use_mmap;
-    mparams.use_mlock = engine->params.use_mlock;
+    if (engine->params.use_mmap && engine->params.use_mlock) {
+        mparams.load_mode = LLAMA_LOAD_MODE_MMAP_MLOCK;
+    } else if (engine->params.use_mmap) {
+        mparams.load_mode = LLAMA_LOAD_MODE_MMAP;
+    } else if (engine->params.use_mlock) {
+        mparams.load_mode = LLAMA_LOAD_MODE_MLOCK;
+    } else {
+        mparams.load_mode = LLAMA_LOAD_MODE_NONE;
+    }
 
     engine->model = llama_model_load_from_file(path, mparams);
     if (!engine->model) {
