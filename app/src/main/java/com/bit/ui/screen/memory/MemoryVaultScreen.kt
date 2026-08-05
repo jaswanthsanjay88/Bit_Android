@@ -1,5 +1,7 @@
 package com.bit.ui.screen.memory
 
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -75,7 +77,7 @@ fun MemoryVaultScreen(
     onAiMemoryListClick: () -> Unit = {},
     onDocumentsClick: () -> Unit = {},
     onBackupSettingsClick: () -> Unit = {},
-    viewModel: MemoryVaultViewModel = hiltViewModel()
+    viewModel: MemoryVaultViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
 ) {
     val context = LocalContext.current
     val notes by viewModel.filteredNotes.collectAsStateWithLifecycle()
@@ -352,3 +354,5 @@ private fun RecentItemCard(
         }
     }
 }
+
+

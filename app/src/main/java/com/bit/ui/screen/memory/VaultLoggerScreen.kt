@@ -68,3 +68,4 @@ object VaultLogger {
         _logs.value = emptyList()
     }
 }
+

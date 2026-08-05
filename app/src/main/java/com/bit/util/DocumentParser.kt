@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
@@ -112,6 +113,51 @@ object DocumentParser {
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing document: ${e.message}", e)
             Result.failure(Exception("Failed to parse document: ${e.message}", e))
+        }
+    }
+
+    /**
+     * Parse a document from a File into plain text.
+     */
+    suspend fun parseDocument(
+        file: File,
+        context: Context
+    ): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            if (!file.exists() || !file.isFile) {
+                return@withContext Result.failure(Exception("File does not exist: ${file.absolutePath}"))
+            }
+
+            val fileName = file.name
+            Log.d(TAG, "Parsing document file: ${file.absolutePath}")
+
+            val bytes = file.readBytes()
+
+            val isPdfMagic = bytes.size >= 4 &&
+                bytes[0] == 0x25.toByte() &&
+                bytes[1] == 0x50.toByte() &&
+                bytes[2] == 0x44.toByte() &&
+                bytes[3] == 0x46.toByte()
+
+            val isPdfMimeOrExt = fileName.endsWith(".pdf", ignoreCase = true)
+
+            val text = when {
+                isPdfMagic || isPdfMimeOrExt -> parsePdf(bytes, context)
+                fileName.endsWith(".epub", ignoreCase = true) -> parseEpub(ByteArrayInputStream(bytes))
+                fileName.endsWith(".xlsx", ignoreCase = true) -> parseXlsx(ByteArrayInputStream(bytes))
+                fileName.endsWith(".docx", ignoreCase = true) -> parseDocx(ByteArrayInputStream(bytes))
+                fileName.endsWith(".pptx", ignoreCase = true) -> parsePptx(ByteArrayInputStream(bytes))
+                fileName.endsWith(".odt", ignoreCase = true) -> parseOdt(ByteArrayInputStream(bytes))
+                fileName.endsWith(".doc", ignoreCase = true) -> parseDoc()
+                fileName.endsWith(".xls", ignoreCase = true) -> parseXls()
+                else -> parsePlainText(bytes)
+            }
+
+            Log.d(TAG, "Successfully parsed file, extracted ${text.length} characters")
+            Result.success(text)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing file: ${e.message}", e)
+            Result.failure(Exception("Failed to parse file: ${e.message}", e))
         }
     }
 

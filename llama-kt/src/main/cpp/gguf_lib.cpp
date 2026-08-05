@@ -2317,6 +2317,11 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeEncodeText(
     }
     tokens.resize(std::max(0, n));
 
+    // Clamp tokens to prevent SIGABRT in llama_decode (n_batch is hardcoded to 512 in load)
+    if (tokens.size() > 512) {
+        tokens.resize(512);
+    }
+
     if (tokens.empty()) {
         jstring jerr = env->NewStringUTF("Failed to tokenize text");
         env->CallVoidMethod(callback, g_embed_onError, jerr);

@@ -16,8 +16,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
@@ -677,52 +680,64 @@ private fun InlineCodeView(text: String) {
 
 // ── Code block (collapsed by default) ──
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CodeBlockView(code: String, language: String) {
-    var isExpanded by remember { mutableStateOf(false) }
+    var isExpanded by remember(code) {
+        val lineCount = code.count { it == '\n' } + 1
+        mutableStateOf(lineCount <= 12)
+    }
     val context = LocalContext.current
-    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val headerBg = remember(isDark) { if (isDark) Color(0xFF282C34) else Color(0xFFF5F5F5) }
-    val headerFg = remember(isDark) { if (isDark) Color(0xFFABB2BF) else Color(0xFF383A42) }
+
+    val containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val headerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val contentColor = MaterialTheme.colorScheme.onSurface
+    val mutedColor = contentColor.copy(alpha = 0.6f)
+    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+    val shape = RoundedCornerShape(14.dp)
+    val lineCount = remember(code) { code.count { it == '\n' } + 1 }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
-            .background(headerBg.copy(alpha = 0.85f))
+            .padding(vertical = Standards.SpacingXs)
+            .clip(shape)
+            .background(containerColor)
+            .border(1.dp, borderColor, shape)
     ) {
-        // Header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .background(headerColor)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ActionButton(
-                    onClickListener = {},
-                    icon = TnIcons.Code,
-                    colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = headerFg.copy(0.1f),
-                        contentColor = headerFg.copy(0.7f)
-                    )
-                )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (language.isNotEmpty()) {
-                    Text(
-                        text = language.uppercase(),
-                        fontFamily = MapleMonoFontFamily,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = headerFg.copy(alpha = 0.5f)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(contentColor.copy(alpha = 0.08f))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = language.uppercase(),
+                            fontFamily = MapleMonoFontFamily,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.5.sp,
+                            color = mutedColor
+                        )
+                    }
                 }
+                Text(
+                    text = "$lineCount ${if (lineCount == 1) "line" else "lines"}",
+                    fontSize = 10.sp,
+                    color = contentColor.copy(alpha = 0.4f)
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs)) {
+
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 ActionButton(
                     onClickListener = {
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -731,43 +746,62 @@ private fun CodeBlockView(code: String, language: String) {
                     },
                     icon = TnIcons.Copy,
                     colors = IconButtonDefaults.filledIconButtonColors(
-                        containerColor = headerFg.copy(0.1f),
-                        contentColor = headerFg.copy(0.7f)
+                        containerColor = Color.Transparent,
+                        contentColor = mutedColor
                     )
                 )
-                ActionToggleButton(
-                    checked = isExpanded,
-                    onCheckedChange = { isExpanded = !isExpanded },
-                    icon = if (isExpanded) TnIcons.ChevronUp else TnIcons.ChevronDown,
-                    colors = IconButtonDefaults.filledIconToggleButtonColors(
-                        containerColor = headerFg.copy(0.1f),
-                        contentColor = headerFg.copy(0.7f),
-                        checkedContainerColor = headerFg.copy(0.15f),
-                        checkedContentColor = headerFg.copy(0.8f)
+                if (lineCount > 12) {
+                    ActionToggleButton(
+                        checked = isExpanded,
+                        onCheckedChange = { isExpanded = !isExpanded },
+                        icon = if (isExpanded) TnIcons.ChevronUp else TnIcons.ChevronDown,
+                        colors = IconButtonDefaults.filledIconToggleButtonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = mutedColor,
+                            checkedContainerColor = contentColor.copy(alpha = 0.08f),
+                            checkedContentColor = contentColor.copy(alpha = 0.8f)
+                        )
                     )
-                )
+                }
             }
         }
 
-        if (isExpanded) {
-            val syntaxTheme = resolveSyntaxTheme()
-            val highlighted = remember(code, language) {
-                if (language.isNotBlank()) highlightCode(code, language, syntaxTheme) else null
+        AnimatedVisibility(visible = isExpanded) {
+            Column {
+                HorizontalDivider(color = borderColor)
+                val syntaxTheme = resolveSyntaxTheme()
+                val highlighted = remember(code, language) {
+                    if (language.isNotBlank()) highlightCode(code, language, syntaxTheme) else null
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Text(
+                        text = highlighted ?: AnnotatedString(code),
+                        fontFamily = MapleMonoFontFamily,
+                        fontSize = 12.5.sp,
+                        lineHeight = 19.sp,
+                        color = contentColor.copy(alpha = 0.92f)
+                    )
+                }
             }
-            HorizontalDivider(color = headerFg.copy(alpha = 0.1f))
-            Box(
+        }
+
+        if (!isExpanded) {
+            Text(
+                text = code.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: "",
+                fontFamily = MapleMonoFontFamily,
+                fontSize = 12.sp,
+                color = contentColor.copy(alpha = 0.4f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 10.dp, vertical = Standards.SpacingSm)
-            ) {
-                Text(
-                    text = highlighted ?: AnnotatedString(code),
-                    fontFamily = MapleMonoFontFamily,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp
-                )
-            }
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            )
         }
     }
 }
@@ -787,9 +821,8 @@ private fun TableView(
             .padding(vertical = Standards.SpacingSm)
     ) {
         val colCount = headers.size.coerceAtLeast(1)
-        
-        // Mobile optimization for 2-column tables
-        if (colCount == 2 && maxWidth < 400.dp) {
+
+        if (colCount == 2 && maxWidth < 360.dp) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -797,119 +830,177 @@ private fun TableView(
                 rows.forEach { rowCells ->
                     val topic = rowCells.getOrNull(0) ?: ""
                     val keyPoint = rowCells.getOrNull(1) ?: ""
-                    
-                    ElevatedCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        ),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = cachedInlineFormatting(topic, colors),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = cachedInlineFormatting(keyPoint, colors),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
+                        Text(
+                            text = cachedInlineFormatting(topic, colors),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = cachedInlineFormatting(keyPoint, colors),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
+            return@BoxWithConstraints
+        }
+
+        val outlineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        val headerBg = MaterialTheme.colorScheme.surfaceContainerHighest
+        val bodyBg = MaterialTheme.colorScheme.surfaceContainerHigh
+        val altRowBg = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)
+        val textColor = MaterialTheme.colorScheme.onSurface
+        val cellTextColor = textColor.copy(alpha = 0.85f)
+        val density = LocalDensity.current
+
+        val cellPadH = with(density) { 12.dp.toPx() }
+        val cellPadV = with(density) { 10.dp.toPx() }
+        val rowDividerWidth = with(density) { 1.dp.toPx() }
+        val minColWidth = with(density) { 72.dp.toPx() }
+        val maxColWidth = with(density) { 240.dp.toPx() }
+        val textMeasurer = rememberTextMeasurer()
+
+        val headerStyle = MaterialTheme.typography.bodySmall.copy(
+            fontSize = 12.sp, fontWeight = FontWeight.Bold, color = textColor,
+            lineHeight = 17.sp, letterSpacing = 0.2.sp
+        )
+        val cellStyle = MaterialTheme.typography.bodySmall.copy(
+            fontSize = 12.sp, color = cellTextColor, lineHeight = 17.sp
+        )
+
+        val naturalWidths = remember(headers, rows) {
+            List(colCount) { colIndex ->
+                val headerW = textMeasurer.measure(
+                    buildInlineFormatted(headers.getOrElse(colIndex) { "" }, colors), style = headerStyle
+                ).size.width
+                val cellsW = rows.maxOfOrNull { row ->
+                    textMeasurer.measure(
+                        buildInlineFormatted(row.getOrElse(colIndex) { "" }, colors), style = cellStyle
+                    ).size.width
+                } ?: 0
+                (maxOf(headerW, cellsW) + cellPadH * 2).coerceIn(minColWidth, maxColWidth)
+            }
+        }
+
+        val availableWidth = constraints.maxWidth.toFloat()
+        val naturalTotal = naturalWidths.sum()
+
+        val colWidths = if (naturalTotal <= availableWidth) {
+            val extra = availableWidth - naturalTotal
+            val stretchIndex = naturalWidths.indices.maxByOrNull { naturalWidths[it] } ?: 0
+            naturalWidths.mapIndexed { i, w -> if (i == stretchIndex) w + extra else w }
         } else {
-            // Standard Canvas Table Drawing
-            val outlineColor = MaterialTheme.colorScheme.outlineVariant
-            val headerBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-            val altRowBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.10f)
-            val textColor = LocalContentColor.current
-            val dimTextColor = textColor.copy(alpha = 0.87f)
-            val density = LocalDensity.current
-            val cellPadH = with(density) { 8.dp.toPx() }
-            val cellPadV = with(density) { 6.dp.toPx() }
-            val dividerWidth = with(density) { 1.dp.toPx() }
-            val cornerRadius = with(density) { 8.dp.toPx() }
-            val textMeasurer = rememberTextMeasurer()
+            naturalWidths
+        }
+        val tableWidth = colWidths.sum()
 
-            val baseTypo = MaterialTheme.typography.bodySmall
-            val headerStyle = baseTypo.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = textColor, lineHeight = 17.sp)
-            val cellStyle = baseTypo.copy(fontSize = 12.sp, color = dimTextColor, lineHeight = 17.sp)
-
-            val totalWidth = constraints.maxWidth.toFloat()
-            val colWidth = (totalWidth - dividerWidth * (colCount - 1)) / colCount
-
-            val headerMeasured = remember(headers, colWidth) {
-                headers.map { textMeasurer.measure(buildInlineFormatted(it, colors), style = headerStyle, constraints = androidx.compose.ui.unit.Constraints(maxWidth = (colWidth - cellPadH * 2).coerceAtLeast(0f).toInt())) }
+        val headerMeasured = remember(headers, colWidths) {
+            headers.mapIndexed { i, h ->
+                textMeasurer.measure(
+                    buildInlineFormatted(h, colors), style = headerStyle,
+                    constraints = androidx.compose.ui.unit.Constraints(
+                        maxWidth = (colWidths[i] - cellPadH * 2).coerceAtLeast(0f).toInt()
+                    )
+                )
             }
-            val headerRowHeight = headerMeasured.maxOfOrNull { it.size.height }?.plus(cellPadV * 2) ?: 0f
+        }
+        val headerRowHeight = (headerMeasured.maxOfOrNull { it.size.height } ?: 0) + cellPadV * 2
 
-            val rowsMeasured = remember(rows, colWidth) {
-                rows.map { row ->
-                    row.map { cell ->
-                        textMeasurer.measure(buildInlineFormatted(cell, colors), style = cellStyle, constraints = androidx.compose.ui.unit.Constraints(maxWidth = (colWidth - cellPadH * 2).coerceAtLeast(0f).toInt()))
-                    }
+        val rowsMeasured = remember(rows, colWidths) {
+            rows.map { row ->
+                row.mapIndexed { i, cell ->
+                    textMeasurer.measure(
+                        buildInlineFormatted(cell, colors), style = cellStyle,
+                        constraints = androidx.compose.ui.unit.Constraints(
+                            maxWidth = (colWidths.getOrElse(i) { colWidths.last() } - cellPadH * 2).coerceAtLeast(0f).toInt()
+                        )
+                    )
                 }
             }
-            val rowHeights = rowsMeasured.map { row -> row.maxOfOrNull { it.size.height }?.plus(cellPadV * 2) ?: 0f }
-            val totalHeight = headerRowHeight + dividerWidth * rows.size + rowHeights.sum()
+        }
+        val rowHeights = rowsMeasured.map { row -> (row.maxOfOrNull { it.size.height } ?: 0) + cellPadV * 2 }
+        val totalHeight = headerRowHeight + rowDividerWidth * rows.size + rowHeights.sum()
+        val tableShape = RoundedCornerShape(14.dp)
 
+        val canvasContent: @Composable () -> Unit = {
             androidx.compose.foundation.Canvas(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .width(with(density) { tableWidth.toDp() })
                     .height(with(density) { totalHeight.toDp() })
-                    .border(dividerWidth.dp, outlineColor.copy(alpha = 0.4f), androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius.dp))
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(cornerRadius.dp))
+                    .clip(tableShape)
+                    .border(1.dp, outlineColor, tableShape)
                     .drawBehind {
-                        var y = 0f
+                        drawRect(color = bodyBg, size = Size(tableWidth, totalHeight))
+                        drawRect(color = headerBg, size = Size(tableWidth, headerRowHeight))
+                        drawMultiColumnRow(headerMeasured, colWidths, cellPadH, 0f, headerRowHeight, alignments)
 
-                        drawRect(color = headerBg, topLeft = Offset(0f, 0f), size = Size(totalWidth, headerRowHeight))
-                        drawTableRow(headerMeasured, colCount, colWidth, cellPadH, cellPadV, dividerWidth, y, headerRowHeight, alignments, outlineColor)
-                        y += headerRowHeight
+                        drawLine(
+                            color = outlineColor,
+                            start = Offset(0f, headerRowHeight),
+                            end = Offset(tableWidth, headerRowHeight),
+                            strokeWidth = rowDividerWidth
+                        )
 
+                        var y = headerRowHeight + rowDividerWidth
                         rowsMeasured.forEachIndexed { rowIndex, cells ->
-                            drawRect(color = outlineColor.copy(alpha = 0.4f), topLeft = Offset(0f, y), size = Size(totalWidth, dividerWidth))
-                            y += dividerWidth
                             val rh = rowHeights[rowIndex]
-                            if (rowIndex % 2 == 1) drawRect(color = altRowBg, topLeft = Offset(0f, y), size = Size(totalWidth, rh))
-                            drawTableRow(cells, colCount, colWidth, cellPadH, cellPadV, dividerWidth, y, rh, alignments, outlineColor)
+                            if (rowIndex % 2 == 1) {
+                                drawRect(color = altRowBg, topLeft = Offset(0f, y), size = Size(tableWidth, rh))
+                            }
+                            drawMultiColumnRow(cells, colWidths, cellPadH, y, rh, alignments)
                             y += rh
+                            if (rowIndex != rowsMeasured.lastIndex) {
+                                drawLine(
+                                    color = outlineColor,
+                                    start = Offset(0f, y),
+                                    end = Offset(tableWidth, y),
+                                    strokeWidth = rowDividerWidth
+                                )
+                                y += rowDividerWidth
+                            }
                         }
                     }
             ) {}
         }
+
+        if (naturalTotal > availableWidth) {
+            Box(modifier = Modifier.horizontalScroll(rememberScrollState())) { canvasContent() }
+        } else {
+            canvasContent()
+        }
     }
 }
 
-private fun DrawScope.drawTableRow(
+private fun DrawScope.drawMultiColumnRow(
     measuredCells: List<androidx.compose.ui.text.TextLayoutResult>,
-    colCount: Int, colWidth: Float, cellPadH: Float, cellPadV: Float,
-    dividerWidth: Float, rowY: Float, rowHeight: Float,
-    alignments: List<MarkdownElement.Table.Alignment>, outlineColor: Color
+    colWidths: List<Float>,
+    padH: Float,
+    top: Float,
+    rowHeight: Float,
+    alignments: List<MarkdownElement.Table.Alignment>
 ) {
-    for (ci in 0 until colCount) {
-        val cellX = ci * (colWidth + dividerWidth)
-        if (ci > 0) drawRect(color = outlineColor.copy(alpha = 0.3f), topLeft = Offset(cellX - dividerWidth, rowY), size = Size(dividerWidth, rowHeight))
-        if (ci < measuredCells.size) {
-            val measured = measuredCells[ci]
-            val align = alignments.getOrNull(ci) ?: MarkdownElement.Table.Alignment.LEFT
-            val tw = measured.size.width.toFloat()
-            val avail = colWidth - cellPadH * 2
-            val ox = when (align) {
-                MarkdownElement.Table.Alignment.CENTER -> cellX + cellPadH + (avail - tw).coerceAtLeast(0f) / 2
-                MarkdownElement.Table.Alignment.RIGHT -> cellX + cellPadH + (avail - tw).coerceAtLeast(0f)
-                else -> cellX + cellPadH
-            }
-            drawText(textLayoutResult = measured, topLeft = Offset(ox, rowY + cellPadV))
+    var x = 0f
+    measuredCells.forEachIndexed { i, layout ->
+        val colWidth = colWidths.getOrElse(i) { colWidths.last() }
+        val align = alignments.getOrElse(i) { MarkdownElement.Table.Alignment.LEFT }
+        val textX = when (align) {
+            MarkdownElement.Table.Alignment.CENTER -> x + (colWidth - layout.size.width) / 2f
+            MarkdownElement.Table.Alignment.RIGHT -> x + colWidth - layout.size.width - padH
+            else -> x + padH
         }
+        val textY = top + (rowHeight - layout.size.height) / 2f
+        drawText(layout, topLeft = Offset(textX.coerceAtLeast(x), textY))
+        x += colWidth
     }
 }
 

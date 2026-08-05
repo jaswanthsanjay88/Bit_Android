@@ -1,5 +1,7 @@
 package com.bit.ui.screen.memory
 
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,7 +48,7 @@ import com.bit.viewmodel.MemoryVaultViewModel
 @Composable
 fun ConflictReviewScreen(
     onBackClick: () -> Unit,
-    viewModel: MemoryVaultViewModel = hiltViewModel()
+    viewModel: MemoryVaultViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
 ) {
     val conflicts by viewModel.conflicts.collectAsStateWithLifecycle()
 
@@ -188,3 +191,5 @@ fun ConflictReviewScreen(
         }
     }
 }
+
+

@@ -565,3 +565,4 @@ fun getLevelColor(level: LogLevel): Color {
     return getCleanLevelColor(level)
 }
 
+

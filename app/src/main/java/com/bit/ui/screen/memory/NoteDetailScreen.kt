@@ -5,6 +5,8 @@ import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -53,9 +56,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.core.widget.doAfterTextChanged
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bit.models.table_schema.MemoryNote
 import com.bit.ui.components.MarkdownText
 import com.bit.ui.icons.TnIcons
 import com.bit.viewmodel.MemoryVaultViewModel
@@ -82,7 +89,7 @@ fun NoteDetailScreen(
     noteId: String?,
     defaultType: String = "note",
     onBackClick: () -> Unit,
-    viewModel: MemoryVaultViewModel = hiltViewModel()
+    viewModel: MemoryVaultViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
 ) {
     val context = LocalContext.current
     val allNotes by viewModel.notes.collectAsStateWithLifecycle()
@@ -100,10 +107,12 @@ fun NoteDetailScreen(
 
     var isPreviewMode by remember { mutableStateOf(false) }
     var showSlashMenu by remember { mutableStateOf(false) }
+    var slashQuery by remember { mutableStateOf("") }
+    var isDeleted by remember { mutableStateOf(false) }
 
     // When existingNote updates/loads, sync content & title
     LaunchedEffect(existingNote) {
-        if (existingNote != null) {
+        if (existingNote != null && !isDeleted) {
             markdownContent = existingNote.content
             title = existingNote.title
             currentFilePath = existingNote.filePath
@@ -117,6 +126,7 @@ fun NoteDetailScreen(
     }
 
     fun performSave() {
+        if (isDeleted) return
         val content = markdownContent
         if (title.isNotBlank() || content.isNotBlank()) {
             val idToUse = currentNoteId ?: UUID.randomUUID().toString().also { currentNoteId = it }
@@ -127,17 +137,23 @@ fun NoteDetailScreen(
                 existingId = idToUse,
                 filePath = currentFilePath,
                 onSaved = { saved ->
-                    currentFilePath = saved.filePath
-                    currentNoteId = saved.id
+                    if (!isDeleted) {
+                        currentFilePath = saved.filePath
+                        currentNoteId = saved.id
+                    }
                 }
             )
         } else {
-            if (currentFilePath.isNotBlank()) {
-                val file = File(currentFilePath)
-                if (file.exists()) {
-                    file.delete()
-                    existingNote?.let { viewModel.deleteNote(it) }
-                }
+            val targetId = currentNoteId ?: existingNote?.id
+            if (targetId != null) {
+                isDeleted = true
+                val noteToDelete = existingNote ?: MemoryNote(
+                    id = targetId,
+                    title = title,
+                    content = content,
+                    filePath = currentFilePath
+                )
+                viewModel.deleteNote(noteToDelete)
             }
         }
     }
@@ -145,24 +161,50 @@ fun NoteDetailScreen(
     fun insertSnippet(snippet: String, cursorOffset: Int = snippet.length) {
         val view = editTextRef
         if (view != null) {
-            val start = view.selectionStart.coerceAtLeast(0)
-            val end = view.selectionEnd.coerceAtLeast(0)
-            view.text.replace(Math.min(start, end), Math.max(start, end), snippet)
-            view.setSelection((Math.min(start, end) + cursorOffset).coerceAtMost(view.text.length))
+            val cursor = view.selectionStart.coerceAtLeast(0)
+            val textBeforeCursor = view.text.substring(0, cursor.coerceAtMost(view.text.length))
+            val lastSlash = textBeforeCursor.lastIndexOf('/')
+            if (lastSlash >= 0) {
+                view.text.delete(lastSlash, cursor)
+            }
+            val insertPos = view.selectionStart.coerceAtLeast(0)
+            view.text.insert(insertPos, snippet)
+            view.setSelection((insertPos + cursorOffset).coerceAtMost(view.text.length))
         } else {
             markdownContent += snippet
         }
         showSlashMenu = false
+        slashQuery = ""
         performSave()
     }
 
-    fun handleTextChanged(newText: String) {
+    fun handleTextChanged(newText: String, selectionStart: Int) {
         markdownContent = newText
-        if (newText.endsWith("/") && !showSlashMenu) {
-            showSlashMenu = true
-        } else if (!newText.endsWith("/") && showSlashMenu) {
+
+        // Check slash trigger at cursor position
+        val cursor = selectionStart.coerceIn(0, newText.length)
+        val textBeforeCursor = newText.substring(0, cursor)
+
+        val lastSlash = textBeforeCursor.lastIndexOf('/')
+        if (lastSlash >= 0) {
+            val wordAfterSlash = textBeforeCursor.substring(lastSlash + 1)
+            val isAtStartOrAfterSpace = lastSlash == 0 ||
+                    textBeforeCursor[lastSlash - 1] == ' ' ||
+                    textBeforeCursor[lastSlash - 1] == '\n' ||
+                    textBeforeCursor[lastSlash - 1] == '\r'
+
+            if (isAtStartOrAfterSpace && !wordAfterSlash.contains(" ") && !wordAfterSlash.contains("\n")) {
+                slashQuery = wordAfterSlash
+                showSlashMenu = true
+            } else {
+                showSlashMenu = false
+                slashQuery = ""
+            }
+        } else {
             showSlashMenu = false
+            slashQuery = ""
         }
+
         performSave()
     }
 
@@ -175,7 +217,7 @@ fun NoteDetailScreen(
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { performSave(); onBackClick() }) {
+                    IconButton(onClick = { if (!isDeleted) performSave(); onBackClick() }) {
                         Icon(TnIcons.ArrowLeft, contentDescription = "Back", tint = textPrimary)
                     }
                 },
@@ -211,9 +253,17 @@ fun NoteDetailScreen(
                         Icon(TnIcons.Download, contentDescription = "Save", tint = textSecondary, modifier = Modifier.size(20.dp))
                     }
                     // Delete Action
-                    if (existingNote != null) {
+                    val activeNoteId = currentNoteId ?: existingNote?.id
+                    if (activeNoteId != null) {
                         IconButton(onClick = {
-                            viewModel.deleteNote(existingNote)
+                            isDeleted = true
+                            val noteToDelete = existingNote ?: MemoryNote(
+                                id = activeNoteId,
+                                title = title,
+                                content = markdownContent,
+                                filePath = currentFilePath
+                            )
+                            viewModel.deleteNote(noteToDelete)
                             onBackClick()
                         }) {
                             Icon(TnIcons.Trash, contentDescription = "Delete", tint = textSecondary, modifier = Modifier.size(20.dp))
@@ -272,33 +322,31 @@ fun NoteDetailScreen(
                 }
             } else {
                 // Markwon Live Syntax-Highlighted Editor
-                Column(modifier = Modifier.weight(1f)) {
+                Box(modifier = Modifier.weight(1f)) {
                     MarkwonNoteEditor(
                         initialMarkdown = markdownContent,
-                        onTextChanged = { handleTextChanged(it) },
+                        onTextChanged = { text, selection -> handleTextChanged(text, selection) },
                         onViewCreated = { editTextRef = it },
                         textColor = textPrimary,
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // Material 3 Slash Command Menu Overlay (/ command)
-                    AnimatedVisibility(
-                        visible = showSlashMenu,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
-                        SlashCommandMenu(
-                            onSelect = { snippet ->
-                                val view = editTextRef
-                                if (view != null && view.text.endsWith("/")) {
-                                    val len = view.text.length
-                                    view.text.delete(len - 1, len)
-                                }
-                                insertSnippet(snippet)
-                            },
-                            textColor = textPrimary,
-                            hintColor = textSecondary
-                        )
+                    // Floating Menu above soft keyboard (window adjustResize handles pushing it up)
+                    if (showSlashMenu) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+                        ) {
+                            SlashCommandMenu(
+                                filterQuery = slashQuery,
+                                onSelect = { snippet ->
+                                    insertSnippet(snippet)
+                                },
+                                textColor = textPrimary,
+                                hintColor = textSecondary
+                            )
+                        }
                     }
                 }
             }
@@ -312,7 +360,7 @@ fun NoteDetailScreen(
 @Composable
 fun MarkwonNoteEditor(
     initialMarkdown: String,
-    onTextChanged: (String) -> Unit,
+    onTextChanged: (text: String, selectionStart: Int) -> Unit,
     onViewCreated: (EditText) -> Unit,
     textColor: Color,
     modifier: Modifier = Modifier
@@ -345,7 +393,9 @@ fun MarkwonNoteEditor(
                 setText(initialMarkdown)
                 addTextChangedListener(MarkwonEditorTextWatcher.withProcess(editor))
                 doAfterTextChanged { editable ->
-                    onTextChanged(editable?.toString() ?: "")
+                    val text = editable?.toString() ?: ""
+                    val sel = selectionStart
+                    onTextChanged(text, sel)
                 }
                 onViewCreated(this)
             }
@@ -358,54 +408,75 @@ fun MarkwonNoteEditor(
     )
 }
 
+private data class SlashItem(val title: String, val subtitle: String, val snippet: String)
+
 /**
  * Material 3 Expressive Slash Command Menu (/ command picker)
  */
 @Composable
 private fun SlashCommandMenu(
+    filterQuery: String,
     onSelect: (String) -> Unit,
     textColor: Color,
     hintColor: Color
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(
+    val allItems = remember {
+        listOf(
+            SlashItem("Heading 1", "# Large section title", "# "),
+            SlashItem("Heading 2", "## Medium section title", "## "),
+            SlashItem("Heading 3", "### Small section title", "### "),
+            SlashItem("To-do list", "- [ ] Checklist item", "- [ ] "),
+            SlashItem("Bulleted list", "- Bulleted point", "- "),
+            SlashItem("Numbered list", "1. Numbered item", "1. "),
+            SlashItem("Quote", "> Block quote", "> "),
+            SlashItem("Callout", "> [!NOTE] Highlight callout box", "> [!NOTE] "),
+            SlashItem("Code Block", "``` Code snippet block", "```\n\n```"),
+            SlashItem("LaTeX Math Block", "$$ Display equation block", "$$\n\n$$"),
+            SlashItem("Divider", "--- Horizontal divider line", "\n---\n")
+        )
+    }
+
+    val filteredItems = remember(filterQuery) {
+        if (filterQuery.isBlank()) {
+            allItems
+        } else {
+            val queryLower = filterQuery.lowercase()
+            allItems.filter {
+                it.title.lowercase().contains(queryLower) ||
+                it.subtitle.lowercase().contains(queryLower) ||
+                it.snippet.lowercase().contains(queryLower)
+            }
+        }
+    }
+
+    if (filteredItems.isNotEmpty()) {
+        Card(
             modifier = Modifier
-                .padding(8.dp)
-                .verticalScroll(rememberScrollState())
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp)
+                .heightIn(max = 240.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 8.dp)
         ) {
-            Text(
-                text = "MARKDOWN BLOCKS",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-            )
+            Column(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "COMMANDS (${filteredItems.size})",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
 
-            SlashOption("Heading 1", "# Large section title") { onSelect("# ") }
-            SlashOption("Heading 2", "## Medium section title") { onSelect("## ") }
-            SlashOption("Heading 3", "### Small section title") { onSelect("### ") }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(vertical = 4.dp))
-
-            SlashOption("To-do list", "- [ ] Checklist item") { onSelect("- [ ] ") }
-            SlashOption("Bulleted list", "- Bulleted point") { onSelect("- ") }
-            SlashOption("Numbered list", "1. Numbered item") { onSelect("1. ") }
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), modifier = Modifier.padding(vertical = 4.dp))
-
-            SlashOption("Quote", "> Block quote") { onSelect("> ") }
-            SlashOption("Callout", "> [!NOTE] Highlight callout box") { onSelect("> [!NOTE] ") }
-            SlashOption("Code Block", "``` Code snippet block") { onSelect("```\n\n```") }
-            SlashOption("LaTeX Math Block", "$$ Display equation block") { onSelect("$$\n\n$$") }
-            SlashOption("Divider", "--- Horizontal divider line") { onSelect("\n---\n") }
+                filteredItems.forEach { item ->
+                    SlashOption(item.title, item.subtitle) { onSelect(item.snippet) }
+                }
+            }
         }
     }
 }
@@ -439,3 +510,4 @@ private fun SlashOption(title: String, subtitle: String, onClick: () -> Unit) {
         }
     }
 }
+

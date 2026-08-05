@@ -400,3 +400,4 @@ private fun categoryLabel(category: MemoryCategory): String {
         MemoryCategory.GENERAL -> "General"
     }
 }
+

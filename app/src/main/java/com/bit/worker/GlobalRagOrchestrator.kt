@@ -114,22 +114,11 @@ class GlobalRagOrchestrator @Inject constructor(
                 }
             }
             
-            // Save to Vault as a document note
-            val note = MemoryNote(
-                title = name.removeSuffix(".pdf").removeSuffix(".txt"),
-                content = content,
-                folder = "documents",
-                noteType = "document"
-            )
-            val savedNote = vaultStore.writeNote(note)
-
-            // Keep Room in sync with the file on disk (single write path)
-            try { memoryNoteDao.insertNote(savedNote) } catch (e: Exception) {
-                Log.e(TAG, "Failed to insert attached document into Room", e)
-            }
-
-            // Add to global graph
-            reloadNoteIntoGraph(savedNote)
+            // Add extracted document text directly to the RAG graph (skipping vault note creation)
+            val graph = graphDeferred.await()
+            embeddingEngine.ensureInitialized(context)
+            val docId = java.util.UUID.randomUUID().toString()
+            graph.addText(text = content, sourceName = name, sourceId = docId)
             
             Result.success(Unit)
         } catch (e: Exception) {

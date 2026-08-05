@@ -1,5 +1,7 @@
 package com.bit.ui.screen.memory
 
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,7 +58,7 @@ fun AiMemoryListScreen(
     onBackClick: () -> Unit,
     onConflictBannerClick: () -> Unit,
     onNoteClick: (noteId: String?, defaultType: String) -> Unit,
-    viewModel: MemoryVaultViewModel = hiltViewModel()
+    viewModel: MemoryVaultViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
 ) {
     val allNotes by viewModel.notes.collectAsStateWithLifecycle()
     val conflicts by viewModel.conflicts.collectAsStateWithLifecycle()
@@ -293,3 +295,5 @@ private fun AiFactCard(
         }
     }
 }
+
+

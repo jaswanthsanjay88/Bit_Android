@@ -3,20 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BIT Documentation — User Manual & Architecture Guide</title>
-  <meta name="description" content="Official technical documentation for BIT — Privacy-first Android AI assistant. Learn how to install, configure GGUF models, use offline voice, set up GBNF tools, and manage long-term memory." />
+  <title>BIT Developer & User Documentation — developer.android.com style</title>
+  <meta name="description" content="Official developer and user documentation for BIT — Privacy-first Android AI assistant. Task-oriented guides, architecture references, and tester manuals." />
 
-  <!-- Google Fonts: Fraunces (Serif) & Inter (Sans) -->
+  <!-- Google Fonts: Fraunces & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
-  <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- ── Navigation ── -->
+  <!-- ── Header Navigation ── -->
   <header class="navbar" id="navbar">
     <div class="container nav-container">
       <a href="index.html" class="nav-brand" aria-label="BIT Home">
@@ -42,341 +41,476 @@
   <!-- ── Documentation Header ── -->
   <section class="docs-header">
     <div class="container">
-      <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">DOCUMENTATION &amp; USER MANUAL</div>
-      <h1 class="docs-h2" style="border: none; padding: 0; margin-bottom: 8px;">BIT Engineering Guide</h1>
-      <p style="color: var(--text-secondary); max-width: 620px; font-size: 0.95rem;">
-        Complete technical guide to installing, configuring, and operating BIT's on-device AI engine on Android hardware.
+      <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">DEVELOPER &amp; USER DOCUMENTATION</div>
+      <h1 class="docs-h2" style="border: none; padding: 0; margin-bottom: 8px;">BIT Documentation Center</h1>
+      <div class="docs-metadata">
+        <span>Last updated: August 2026</span>
+        <span>•</span>
+        <span>Version: BIT v1.9.3</span>
+        <span>•</span>
+        <span>Platform: Android (ARM64 / x86_64)</span>
+      </div>
+      <p style="color: var(--text-secondary); max-width: 680px; font-size: 0.98rem; line-height: 1.6;">
+        Task-oriented technical guides, subsystem concepts, exact code references, and tester verification protocols for BIT's on-device AI stack.
       </p>
     </div>
   </section>
 
-  <!-- ── Documentation Layout ── -->
+  <!-- ── Main Documentation Layout ── -->
   <div class="container">
     <div class="docs-layout">
-      <!-- Sidebar Navigation (Matching exact Manual Tree) -->
+
+      <!-- Left Navigation Sidebar (Google Developer Hierarchy) -->
       <aside class="docs-sidebar">
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Getting Started</div>
+          <div class="docs-sidebar-title">Get Started</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#home" class="docs-sidebar-link active">Home &amp; Overview</a></li>
-            <li><a href="#getting-started" class="docs-sidebar-link">Installation &amp; Setup</a></li>
+            <li><a href="#overview" class="docs-sidebar-link active">Overview &amp; Quickstart</a></li>
+            <li><a href="#install-bit" class="docs-sidebar-link">Install BIT on Android</a></li>
+            <li><a href="#load-first-model" class="docs-sidebar-link">Load your first GGUF model</a></li>
           </ul>
         </div>
 
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Models</div>
+          <div class="docs-sidebar-title">Concepts</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#model-store" class="docs-sidebar-link">Model Store</a></li>
-            <li><a href="#supported-formats" class="docs-sidebar-link">Supported Formats</a></li>
-            <li><a href="#per-model-config" class="docs-sidebar-link">Per-Model Config</a></li>
+            <li><a href="#privacy-architecture" class="docs-sidebar-link">On-device privacy architecture</a></li>
+            <li><a href="#gguf-quantization" class="docs-sidebar-link">GGUF quantization &amp; silicon offload</a></li>
+            <li><a href="#hybrid-rag-concept" class="docs-sidebar-link">Hybrid RAG &amp; memory decay model</a></li>
           </ul>
         </div>
 
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Voice</div>
+          <div class="docs-sidebar-title">Guides</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#speech-to-text" class="docs-sidebar-link">Speech-to-Text</a></li>
-            <li><a href="#text-to-speech" class="docs-sidebar-link">Text-to-Speech</a></li>
-            <li><a href="#live-voice-mode" class="docs-sidebar-link">Live Voice Mode</a></li>
+            <li><a href="#setup-local-inference" class="docs-sidebar-link">Set up local inference</a></li>
+            <li><a href="#configure-model-params" class="docs-sidebar-link">Configure per-model parameters</a></li>
+            <li><a href="#enable-voice-mode" class="docs-sidebar-link">Enable hands-free voice mode</a></li>
+            <li><a href="#constrain-gbnf-tools" class="docs-sidebar-link">Constrain tool calls with GBNF</a></li>
+            <li><a href="#tester-qa-guide" class="docs-sidebar-link">Test BIT on device (QA &amp; Tester Guide)</a></li>
           </ul>
         </div>
 
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Agentic Tools</div>
+          <div class="docs-sidebar-title">Reference</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#tool-calling-works" class="docs-sidebar-link">How Tool Calling Works</a></li>
-            <li><a href="#builtin-tools" class="docs-sidebar-link">Built-in Tools</a></li>
-            <li><a href="#tool-transparency" class="docs-sidebar-link">Tool Transparency UI</a></li>
+            <li><a href="#model-store-api" class="docs-sidebar-link">Model Store REST API</a></li>
+            <li><a href="#engine-pipeline-spec" class="docs-sidebar-link">Llama.kt &amp; JNI pipeline spec</a></li>
+            <li><a href="#database-schemas" class="docs-sidebar-link">Memory Note &amp; Room DB schemas</a></li>
+            <li><a href="#gbnf-tool-definitions" class="docs-sidebar-link">Built-in GBNF tool definitions</a></li>
           </ul>
         </div>
 
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Memory &amp; Knowledge</div>
+          <div class="docs-sidebar-title">Release Notes</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#memory-vault" class="docs-sidebar-link">Memory Vault</a></li>
-            <li><a href="#hybrid-rag" class="docs-sidebar-link">Hybrid RAG</a></li>
-            <li><a href="#document-search" class="docs-sidebar-link">Local Document Search</a></li>
-          </ul>
-        </div>
-
-        <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Architecture</div>
-          <ul class="docs-sidebar-links">
-            <li><a href="#engine-overview" class="docs-sidebar-link">Engine Overview (Llama.kt)</a></li>
-            <li><a href="#subsystem-map" class="docs-sidebar-link">Subsystem Map</a></li>
-            <li><a href="#hardware-reqs" class="docs-sidebar-link">Hardware Requirements</a></li>
-          </ul>
-        </div>
-
-        <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Customization &amp; Data</div>
-          <ul class="docs-sidebar-links">
-            <li><a href="#appearance" class="docs-sidebar-link">Appearance &amp; Glass Haze</a></li>
-            <li><a href="#nav-layout" class="docs-sidebar-link">Navigation &amp; Motion</a></li>
-            <li><a href="#updates-data" class="docs-sidebar-link">Updates &amp; Local Storage</a></li>
-            <li><a href="#faq" class="docs-sidebar-link">FAQ</a></li>
-            <li><a href="#about" class="docs-sidebar-link">About &amp; License</a></li>
+            <li><a href="#release-notes" class="docs-sidebar-link">Version changelog</a></li>
+            <li><a href="#fdroid-spec" class="docs-sidebar-link">F-Droid build &amp; verification</a></li>
           </ul>
         </div>
       </aside>
 
-      <!-- Main Content Article -->
+      <!-- Main Article Body -->
       <main class="docs-article">
 
-        <!-- 1. Home -->
-        <section id="home" class="docs-section">
-          <h2 class="docs-h2">Home</h2>
+        <!-- ==================== GET STARTED ==================== -->
+
+        <section id="overview" class="docs-section">
+          <h2 class="docs-h2">Overview &amp; Quickstart</h2>
+          <p class="docs-summary">Summary: BIT is a 100% offline, privacy-first AI assistant for Android that runs language models, speech recognition, voice synthesis, and vector memory on local device hardware.</p>
+
           <p class="docs-p">
-            BIT is an offline AI engine for Android. It runs quantized GGUF language models, speech recognition, speech synthesis, document retrieval, and long-term memory entirely on-device — no network requests, no cloud inference, no subscriptions.
+            BIT eliminates cloud latency and subscription costs by packaging high-performance C++ inference engines into an Android application. Every user query, audio recording, document index, and long-term memory fact remains sealed on your physical phone storage.
           </p>
           <p class="docs-p">
-            This manual covers everything from installing your first model to understanding how BIT routes a single message through its speech, reasoning, tool-calling, and memory subsystems.
+            The platform combines a Kotlin Jetpack Compose interface with native C++ llama.cpp JNI bindings, Sherpa-ONNX speech-to-text, Piper neural voice synthesis, and an FTS5 vector memory graph.
           </p>
+
+          <div class="doc-callout doc-callout-note">
+            <div class="doc-callout-title">Note</div>
+            BIT requires zero network permissions during normal operation. Internet access is only utilized if you choose to download GGUF models directly from HuggingFace or connect external cloud API fallbacks.
+          </div>
+
+          <a href="#install-bit" class="docs-next-step">Next step: Install BIT on Android →</a>
         </section>
 
-        <!-- 2. Getting Started -->
-        <section id="getting-started" class="docs-section">
-          <h2 class="docs-h2">Getting Started</h2>
-          
-          <h3 class="docs-h3">Installing BIT</h3>
+        <section id="install-bit" class="docs-section">
+          <h2 class="docs-h2">Install BIT on Android</h2>
+          <p class="docs-summary">Summary: Download and sideload the release APK directly on ARM64 or x86_64 Android devices running Android 8.0 (API level 26) or higher.</p>
+
           <p class="docs-p">
-            BIT ships as a direct APK download from GitHub Releases — it isn't distributed through the Play Store. Download the latest release (<code class="mono">app-universal-release.apk</code> or <code class="mono">app-arm64-v8a-release.apk</code>), allow installation from unknown sources if prompted, and install as you would any sideloaded Android app.
+            BIT is distributed directly through GitHub Releases and F-Droid rather than proprietary app stores. This enables unconstrained native C++ binary distribution and immediate open-source release cadences.
+          </p>
+          <p class="docs-p">
+            To install via Android Debug Bridge (ADB), connect your device via USB with Developer Options enabled and execute:
           </p>
 
-          <h3 class="docs-h3">First Launch</h3>
-          <p class="docs-p">On first open, BIT walks you through a short setup:</p>
-          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 16px;">
-            <li><strong style="color: #FFFFFF;">Splash &amp; Initialization</strong> — Engine initializes and verifies device hardware compatibility (chipset, available RAM, SIMD capabilities).</li>
-            <li><strong style="color: #FFFFFF;">Orientation</strong> — A brief overview of BIT's on-device privacy model and zero cloud dependency.</li>
-            <li><strong style="color: #FFFFFF;">Model Selection</strong> — Choose your first model to download. BIT recommends a model sized to your device's RAM and NPU/GPU capability automatically; you can override this and pick manually from the Model Store.</li>
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>BASH</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('adb install -r app-arm64-v8a-release.apk')">Copy</button>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;">adb install -r app-arm64-v8a-release.apk</pre>
+          </div>
+
+          <div class="doc-callout doc-callout-tip">
+            <div class="doc-callout-title">Tip</div>
+            For modern flagship devices (Snapdragon 8 Gen 2/3/4 or MediaTek Dimensity 9200/9300), use the <code class="mono">arm64-v8a</code> APK slice for maximum SIMD vector performance.
+          </div>
+
+          <a href="#load-first-model" class="docs-next-step">Next step: Load your first GGUF model →</a>
+        </section>
+
+        <section id="load-first-model" class="docs-section">
+          <h2 class="docs-h2">Load your first GGUF model</h2>
+          <p class="docs-summary">Summary: Download a recommended GGUF model from the curated Model Store or import an existing `.gguf` file using the system file picker.</p>
+
+          <p class="docs-p">
+            On first launch, BIT analyzes available system RAM and chipset capabilities to suggest an optimal model. Select a recommended entry like <code class="mono">all-MiniLM-L6-v2-Q5_K_M.gguf</code> for embeddings or <code class="mono">Qwen2.5-1.5B-Instruct-Q4_K_M.gguf</code> for general chat.
+          </p>
+          <p class="docs-p">
+            Alternatively, if you already have `.gguf` files on your device, tap <strong>Import Local Model</strong> in the Model Store and choose the file via the Storage Access Framework (SAF) picker.
+          </p>
+
+          <a href="#privacy-architecture" class="docs-next-step">Next step: On-device privacy architecture →</a>
+        </section>
+
+        <!-- ==================== CONCEPTS ==================== -->
+
+        <section id="privacy-architecture" class="docs-section">
+          <h2 class="docs-h2">On-device privacy architecture</h2>
+          <p class="docs-summary">Summary: BIT processes all prompts, audio streams, and memory indices in-process on local silicon without external network calls.</p>
+
+          <p class="docs-p">
+            Unlike cloud-based AI applications that transmit user audio and prompts to remote server farms, BIT executes the complete inference pipeline inside the app process space.
+          </p>
+          <p class="docs-p">
+            Memory notes and vector embeddings are stored in a local SQLite Room database (<code class="mono">bit_db</code>) and encrypted filesystem directories (<code class="mono">AppPaths.aiMemoriesVault</code>).
+          </p>
+
+          <div class="doc-callout doc-callout-warning">
+            <div class="doc-callout-title">Warning</div>
+            If you enable optional API provider fallbacks (e.g. OpenAI or Anthropic), queries routed to those providers will travel over HTTPS to third-party servers. On-device GGUF execution never connects to third-party servers.
+          </div>
+
+          <a href="#gguf-quantization" class="docs-next-step">Next step: GGUF quantization &amp; silicon offload →</a>
+        </section>
+
+        <section id="gguf-quantization" class="docs-section">
+          <h2 class="docs-h2">GGUF quantization &amp; silicon offload</h2>
+          <p class="docs-summary">Summary: GGUF quantization shrinks model weights by 4x–8x while preserving reasoning quality, enabling fast execution on mobile CPU and GPU cores.</p>
+
+          <p class="docs-p">
+            Full-precision 16-bit models require excessive RAM and memory bandwidth. GGUF quantization compresses weight matrices into 4-bit (`Q4_K_M`) or 5-bit (`Q5_K_M`) integer representations.
+          </p>
+          <p class="docs-p">
+            BIT's native C++ engine utilizes ARM NEON SIMD instructions, MediaTek APU extensions, and Qualcomm Hexagon DSP offloading to maximize tokens per second while minimizing battery drain.
+          </p>
+
+          <a href="#hybrid-rag-concept" class="docs-next-step">Next step: Hybrid RAG &amp; memory decay model →</a>
+        </section>
+
+        <section id="hybrid-rag-concept" class="docs-section">
+          <h2 class="docs-h2">Hybrid RAG &amp; memory decay model</h2>
+          <p class="docs-summary">Summary: BIT pairs FTS5 keyword indexing with vector cosine similarity to retrieve relevant historical memories and documents for every prompt.</p>
+
+          <p class="docs-p">
+            Traditional vector search can miss exact code symbols or proper nouns, while keyword search misses semantic context. BIT uses Reciprocal Rank Fusion (RRF) to merge results from both SQLite FTS5 keyword queries and 384-dimensional vector embeddings into a unified score.
+          </p>
+          <p class="docs-p">
+            Memory entries undergo automated decay: facts lose weight over time unless reinforced by user interaction, keeping context windows lean and relevant.
+          </p>
+
+          <a href="#setup-local-inference" class="docs-next-step">Next step: Set up local inference →</a>
+        </section>
+
+        <!-- ==================== GUIDES ==================== -->
+
+        <section id="setup-local-inference" class="docs-section">
+          <h2 class="docs-h2">Set up local inference</h2>
+          <p class="docs-summary">Summary: Initialize and configure the `EmbeddingEngine` and `GlobalRagOrchestrator` programmatically in Kotlin.</p>
+
+          <p class="docs-p">
+            `EmbeddingEngine` automatically detects valid `.gguf` model files at `AppPaths.embeddingModel(context)` and loads native handles cleanly.
+          </p>
+          <p class="docs-p">
+            Here is the exact initialization sequence executed on app startup:
+          </p>
+
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>KOTLIN</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('val engine = EmbeddingEngine()\nval isReady = engine.ensureInitialized(context)')">Copy</button>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;"><code class="language-kotlin">// Initialize EmbeddingEngine from downloaded model file
+val embeddingEngine = EmbeddingEngine()
+val isReady = embeddingEngine.ensureInitialized(context)
+
+if (isReady) {
+    Log.d("Inference", "Embedding dimension: ${embeddingEngine.getDimension()}")
+}</code></pre>
+          </div>
+
+          <a href="#configure-model-params" class="docs-next-step">Next step: Configure per-model parameters →</a>
+        </section>
+
+        <section id="configure-model-params" class="docs-section">
+          <h2 class="docs-h2">Configure per-model parameters</h2>
+          <p class="docs-summary">Summary: Adjust context window size, sampling temperature, thread allocation, and Flash Attention in the Model Config Editor.</p>
+
+          <p class="docs-p">
+            Each GGUF model registered in BIT maintains an independent parameter profile stored in Room DB (`model_configs` table).
+          </p>
+
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>KOTLIN</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('val config = GgufInferenceParams(\n    temperature = 0.7f,\n    contextSize = 2048,\n    threads = 4,\n    flashAttention = true\n)')">Copy</button>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;"><code class="language-kotlin">data class GgufInferenceParams(
+    val temperature: Float = 0.7f,
+    val topP: Float = 0.9f,
+    val contextSize: Int = 2048,
+    val threads: Int = 4,
+    val flashAttention: Boolean = true,
+    val repetitionPenalty: Float = 1.1f
+)</code></pre>
+          </div>
+
+          <a href="#enable-voice-mode" class="docs-next-step">Next step: Enable hands-free voice mode →</a>
+        </section>
+
+        <section id="enable-voice-mode" class="docs-section">
+          <h2 class="docs-h2">Enable hands-free voice mode</h2>
+          <p class="docs-summary">Summary: Configure Sherpa-ONNX speech recognition, Piper TTS synthesis, and Silero VAD barge-in for continuous voice interaction.</p>
+
+          <p class="docs-p">
+            Tap the microphone orb on the main screen to start Live Voice Mode. Speech input is captured via `AudioCaptureService` at 16kHz mono.
+          </p>
+          <p class="docs-p">
+            Silero Voice Activity Detection (VAD) monitors incoming audio continuously. If you speak while BIT is reading a response aloud, VAD detects barge-in, immediately cancels TTS output, and begins transcribing your new prompt.
+          </p>
+
+          <a href="#constrain-gbnf-tools" class="docs-next-step">Next step: Constrain tool calls with GBNF →</a>
+        </section>
+
+        <section id="constrain-gbnf-tools" class="docs-section">
+          <h2 class="docs-h2">Constrain tool calls with GBNF</h2>
+          <p class="docs-summary">Summary: Apply Grammar-Based Next-Token Filtering (GBNF) to force model outputs into syntactically valid JSON tool calls.</p>
+
+          <p class="docs-p">
+            Standard language models can produce malformed JSON when attempting tool calls. BIT injects a strict GBNF grammar into the native sampler loop, forcing every generated token to follow the expected JSON schema.
+          </p>
+
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>GBNF</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('root ::= tool-call\ntool-call ::= \"{\\\"tool\\\": \\\"\" name \"\\\", \\\"args\\\": \" object \"}\"')">Copy</button>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;">root ::= tool-call
+tool-call ::= "{" space "\"tool\":" space string "," space "\"args\":" space object "}"
+string ::= "\"" [a-zA-Z0-9_-]+ "\""
+object ::= "{" space "}" | "{" space string ":" space string "}"
+space ::= [ \t\n]*</pre>
+          </div>
+
+          <a href="#tester-qa-guide" class="docs-next-step">Next step: Test BIT on device (QA &amp; Tester Guide) →</a>
+        </section>
+
+        <section id="tester-qa-guide" class="docs-section">
+          <h2 class="docs-h2">Test BIT on device (QA &amp; Tester Guide)</h2>
+          <p class="docs-summary">Summary: Complete verification protocol for QA engineers and manual testers validating APK installations, GGUF loading, RAG memory sync, and voice mode.</p>
+
+          <p class="docs-p">
+            This test suite provides a comprehensive step-by-step procedure to confirm that a release build functions correctly on physical Android hardware before deployment.
+          </p>
+
+          <h3 class="docs-h3">Test Case 1: Clean APK Installation &amp; Diagnostics</h3>
+          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 20px;">
+            <li>Install release APK using <code class="mono">adb install -r app-arm64-v8a-release.apk</code>.</li>
+            <li>Launch BIT. Confirm splash screen opens cleanly without crash loops.</li>
+            <li>Navigate to <strong>Settings → Diagnostics</strong> and verify CPU architecture, detected RAM, and NPU features display accurately.</li>
           </ol>
 
-          <h3 class="docs-h3">Sending Your First Message</h3>
-          <p class="docs-p">
-            Once a model finishes downloading, you land in the main chat screen. Type into "Ask me anything" or tap the microphone to speak. BIT loads the model into memory on first use — this takes a few seconds depending on model size — and stays loaded for the session to keep responses fast.
-          </p>
+          <h3 class="docs-h3">Test Case 2: Model Store Download &amp; Local GGUF Load</h3>
+          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 20px;">
+            <li>Open <strong>Model Store</strong>. Tap <strong>Download</strong> on <code class="mono">all-MiniLM-L6-v2-Q5_K_M.gguf</code>. Confirm progress bar advances to 100%.</li>
+            <li>Tap <strong>Import Local Model</strong> and choose a local GGUF file via SAF file picker. Verify model displays in installed list.</li>
+            <li>Send a prompt: "Hello, summarize your capabilities in 2 sentences." Confirm response generates smoothly.</li>
+          </ol>
 
-          <h3 class="docs-h3">Choosing Between On-Device and API Models</h3>
-          <p class="docs-p">BIT supports two inference paths behind one unified interface:</p>
-          <ul style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7;">
-            <li><strong style="color: #FFFFFF;">On-device</strong>, via BIT's own Kotlin-native engine (Llama.kt), running GGUF models fully locally.</li>
-            <li><strong style="color: #FFFFFF;">API-based</strong>, if you choose to connect an external provider (OpenAI, Anthropic, Ollama, DeepSeek) for models too large to run on your hardware.</li>
-          </ul>
-          <p class="docs-p" style="margin-top: 12px;">
-            The two paths are interchangeable from the model picker — switching between them doesn't change how you use the app.
-          </p>
-        </section>
+          <h3 class="docs-h3">Test Case 3: Memory Vault Single Write-Path &amp; Node Eviction</h3>
+          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 20px;">
+            <li>Send prompt: "Remember that my favorite programming language is Kotlin."</li>
+            <li>Open <strong>Memory Vault</strong> tab. Confirm a new entry appears in the <code class="mono">ai_memory</code> folder.</li>
+            <li>Verify the file <code class="mono">ai_memory/*.md</code> exists on disk and is present in Room DB table <code class="mono">memory_notes</code>.</li>
+            <li>Delete the memory entry from UI. Verify the corresponding `.md` file is deleted from disk and purged from `NeuronGraph`.</li>
+          </ol>
 
-        <!-- 3. Models -->
-        <section id="model-store" class="docs-section">
-          <h2 class="docs-h2">Models</h2>
+          <h3 class="docs-h3">Test Case 4: Live Voice Mode &amp; VAD Barge-in</h3>
+          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 20px;">
+            <li>Tap the microphone orb to initiate Live Voice Mode. Grant microphone permissions when prompted.</li>
+            <li>Speak: "Tell me a story about space exploration." Confirm real-time STT transcription displays in UI.</li>
+            <li>While Piper TTS is reading the response aloud, start speaking mid-sentence. Confirm TTS stops instantly (VAD barge-in) and enters listening state.</li>
+          </ol>
 
-          <h3 class="docs-h3">Model Store</h3>
-          <p class="docs-p">
-            The Model Store is where you browse, download, and manage the GGUF models BIT can run. Models can be pulled directly from HuggingFace repositories or imported from local device storage via the Storage Access Framework (SAF) system file picker.
-          </p>
-          <p class="docs-p">
-            Each model entry shows its quantization level, file size, and estimated memory footprint for your device before you download it, so you can judge the size/speed/quality tradeoff up front.
-          </p>
-          <p class="docs-p">
-            BIT features a curated tested model catalog served live at <code class="mono">/api/models</code> (JSON format) enriched with brand icons from <code class="mono">@lobehub/icons</code> for Qwen, Liquid AI, Stable Diffusion, and OpenAI Whisper models.
-          </p>
-
-          <h3 class="docs-h3" id="supported-formats">Supported Formats</h3>
-          <p class="docs-p">
-            BIT runs <strong style="color: #FFFFFF;">GGUF</strong>-format models exclusively for on-device inference — the format used by llama.cpp and compatible engines, supporting quantization levels from highly compressed (Q4_K_M) to near-full precision (Q8_0, FP16). BIT has been tested with model families including Llama 3, Qwen 2.5, Gemma 2, Mistral, and LFM2; most GGUF-quantized instruction-tuned models in a compatible architecture will load cleanly.
-          </p>
-
-          <h3 class="docs-h3" id="per-model-config">Per-Model Configuration</h3>
-          <p class="docs-p">Every model has its own settings panel, accessible from the model editor screen:</p>
-          
-          <div class="code-block">
-Temperature        · 0.0 to 2.0 (Controls output randomness / creativity; default 0.7)
-Context Window     · 512 to 32,768 tokens (Managed with a sliding-window KV cache)
-Repetition Penalty · 1.0 to 2.0 (Discourages the model from repeating phrases; default 1.1)
-Batch Size         · 128 to 2,048 tokens (Prompt evaluation speed)
-Flash Attention    · Toggle ON/OFF (Reduces KV cache memory bandwidth usage)
-System Prompt      · Per-model custom system prompt override
-Thread Allocation  · How many CPU threads the engine uses (balances speed vs thermals)
-          </div>
-          <p class="docs-p">
-            Settings are saved instantly to local Room database storage — no need to manually tap a save button.
-          </p>
-        </section>
-
-        <!-- 4. Voice -->
-        <section id="speech-to-text" class="docs-section">
-          <h2 class="docs-h2">Voice Subsystem</h2>
-
-          <h3 class="docs-h3">Speech-to-Text (STT)</h3>
-          <p class="docs-p">
-            BIT transcribes speech using an offline Whisper model running through the Sherpa-ONNX runtime, entirely on-device. No audio ever leaves your phone. Recognition begins as soon as you start speaking on 16kHz audio streams and is designed to keep pace with normal conversational speech.
-          </p>
-
-          <h3 class="docs-h3" id="text-to-speech">Text-to-Speech (TTS)</h3>
-          <p class="docs-p">
-            Responses can be spoken back using Piper TTS, an offline neural voice synthesizer (<code class="mono">vits-piper-en_US-amy-low</code>, <code class="mono">vits-piper-en_US-lessac-low</code>, <code class="mono">vits-ljs-tts</code>). Speech is generated sentence-by-sentence as the model produces output — you start hearing a response before the model has finished generating the rest of it, rather than waiting for the full reply.
-          </p>
-
-          <h3 class="docs-h3" id="live-voice-mode">Live Voice Mode &amp; VAD Barge-in</h3>
-          <p class="docs-p">
-            Live Voice Mode turns BIT into a hands-free conversational assistant, modeled on a simple state machine:
-          </p>
-          <div class="code-block" style="text-align: center;">
-Idle  ──►  Listening  ──►  Thinking  ──►  Speaking
-          </div>
-          <ul style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7;">
-            <li><strong style="color: #FFFFFF;">Idle</strong> — Waiting for audio input.</li>
-            <li><strong style="color: #FFFFFF;">Listening</strong> — Actively capturing and transcribing your speech, shown by the orb animation responding to audio input in real time.</li>
-            <li><strong style="color: #FFFFFF;">Thinking</strong> — The local model is generating a response.</li>
-            <li><strong style="color: #FFFFFF;">Speaking</strong> — The response is being read aloud via Piper TTS.</li>
-          </ul>
-          <p class="docs-p" style="margin-top: 12px;">
-            <strong style="color: #FFFFFF;">Barge-in</strong>: You can interrupt BIT mid-response by simply starting to talk. This is detected using Silero VAD (voice activity detection) running continuously in the background, so BIT immediately stops speaking and returns to listening — no wake word or button press needed.
-          </p>
-        </section>
-
-        <!-- 5. Agentic Tools -->
-        <section id="tool-calling-works" class="docs-section">
-          <h2 class="docs-h2">Agentic Tools</h2>
-
-          <h3 class="docs-h3">How Tool Calling Works</h3>
-          <p class="docs-p">
-            When a task requires more than generating text — searching the web, running a calculation, fetching structured device diagnostics — BIT routes the request through a tool-calling layer constrained by GBNF (grammar-based next-token filtering). This guarantees the model's tool call output is always valid, correctly structured JSON, rather than hoping the model happens to format it correctly.
-          </p>
-          <p class="docs-p">
-            For models with native tool-call tokens, BIT uses those tokens directly; for other models, it falls back to a two-stage selection process that first decides <em>whether</em> a tool is needed, then constrains generation to produce a valid call for the chosen tool.
-          </p>
-
-          <h3 class="docs-h3" id="builtin-tools">Built-in Tools</h3>
-          <p class="docs-p">
-            BIT ships with built-in tools that a model can invoke mid-conversation, such as web search, page fetching, and system diagnostic inspection. Each tool call is executed locally or via requested endpoints, and its result is fed back into the model's context so it can incorporate real, current information into its answer.
-          </p>
-
-          <h3 class="docs-h3" id="tool-transparency">Tool Call Transparency UI</h3>
-          <p class="docs-p">
-            Rather than hiding tool use behind a generic spinner, BIT displays a "Thinking process" panel listing each step as it happens — which tool was called, what parameters were passed, and how long execution took (e.g. <code class="mono">web_search — 922ms</code>). This panel is collapsible, so you can watch the reasoning happen live or fold it away once you have your answer.
-          </p>
-        </section>
-
-        <!-- 6. Memory & Knowledge -->
-        <section id="memory-vault" class="docs-section">
-          <h2 class="docs-h2">Memory &amp; Knowledge</h2>
-
-          <h3 class="docs-h3">Memory Vault</h3>
-          <p class="docs-p">
-            BIT can retain facts across separate conversations, not just within a single chat session. The <strong style="color: #FFFFFF;">Memory Vault</strong> automatically distills relevant details from your conversations into standalone memory entries, which are then available to inform future chats — without you having to repeat context every time.
-          </p>
-          <p class="docs-p">
-            Memories are configured with a decay model: older or less-reinforced facts naturally lose priority over time, keeping the memory set relevant rather than growing indefinitely.
-          </p>
-
-          <h3 class="docs-h3" id="hybrid-rag">Hybrid RAG</h3>
-          <p class="docs-p">
-            For document-grounded questions, BIT combines vector similarity search with traditional keyword search (BM25) — a hybrid approach that catches both semantic matches ("what did I say about deployment?") and exact-term matches ("find the line with <code class="mono">MAX_RETRIES</code>") in the same query.
-          </p>
-
-          <h3 class="docs-h3" id="document-search">Local Document Search</h3>
-          <p class="docs-p">
-            BIT can index local files — PDF, TXT, and Markdown — directly on-device, making them searchable and retrievable within a conversation without ever uploading them to an external server.
-          </p>
-        </section>
-
-        <!-- 7. Architecture -->
-        <section id="engine-overview" class="docs-section">
-          <h2 class="docs-h2">Architecture</h2>
-
-          <h3 class="docs-h3">Engine Overview (Llama.kt)</h3>
-          <p class="docs-p">
-            At the core of BIT is <strong style="color: #FFFFFF;">Llama.kt</strong>, a custom Kotlin-native inference engine built directly on native C++ <code class="mono">llama.cpp</code> JNI bindings, rather than a wrapper around a separate runtime process. This keeps model loading, inference, and the Android application in the same process space, eliminating IPC overhead.
-          </p>
-
-          <h3 class="docs-h3" id="subsystem-map">Subsystem Pipeline Map</h3>
-          <div class="code-block">
-User Input (Mic / Text)
-   │
-   ▼
-Sherpa STT (16kHz Whisper)
-   │
-   ▼
-GBNF Router ──► Direct response / Tool call / Memory RAG lookup
-   │
-   ▼
-Llama.kt Core Inference (Native JNI)
-   │
-   ├──► Piper TTS Voice (Synthesis)
-   └──► Memory Vault & Hybrid RAG (Context enrichment)
+          <div class="doc-callout doc-callout-tip">
+            <div class="doc-callout-title">Tip</div>
+            Save execution logs during QA testing via ADB: <code class="mono">adb logcat -s "EmbeddingEngine:V" "GlobalRagOrchestrator:V" "MemoryPlugin:V"</code>.
           </div>
 
-          <h3 class="docs-h3" id="hardware-reqs">Hardware Requirements &amp; Edge Silicon</h3>
-          <p class="docs-p">BIT is engineered and tailored specifically for modern mobile edge silicon and APU/NPU accelerators:</p>
+          <a href="#model-store-api" class="docs-next-step">Next step: Model Store REST API →</a>
+        </section>
+
+        <!-- ==================== REFERENCE ==================== -->
+
+        <section id="model-store-api" class="docs-section">
+          <h2 class="docs-h2">Model Store REST API</h2>
+          <p class="docs-summary">Summary: REST specification for BIT's curated model catalog endpoint hosted at `/api/models`.</p>
+
+          <p class="docs-p">
+            The Model Store fetches curated GGUF models dynamically from `/api/models`. The response contains metadata, quantization ratings, direct download URLs, and brand icons.
+          </p>
+
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>JSON</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('{\n  \"id\": \"qwen-2.5-1.5b\",\n  \"name\": \"Qwen 2.5 1.5B Instruct\",\n  \"providerType\": \"GGUF\",\n  \"sizeBytes\": 1120000000\n}')">Copy</button>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;"><code class="language-json">[
+  {
+    "id": "qwen-2.5-1.5b-instruct-q4",
+    "name": "Qwen 2.5 1.5B Instruct",
+    "filename": "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
+    "providerType": "GGUF",
+    "sizeBytes": 1120000000,
+    "recommendedRamGb": 4,
+    "downloadUrl": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+    "icon": "qwen"
+  }
+]</code></pre>
+          </div>
+
+          <a href="#engine-pipeline-spec" class="docs-next-step">Next step: Llama.kt &amp; JNI pipeline spec →</a>
+        </section>
+
+        <section id="engine-pipeline-spec" class="docs-section">
+          <h2 class="docs-h2">Llama.kt &amp; JNI pipeline spec</h2>
+          <p class="docs-summary">Summary: Architecture specification of Llama.kt in-process JNI bindings connecting Kotlin to C++ llama.cpp.</p>
+
+          <p class="docs-p">
+            Llama.kt executes native C++ inference in-process via JNI (`com.dark.gguf_lib.EmbeddingEngine` and `LibLlamaEngine`). This avoids Android Inter-Process Communication (IPC) overhead.
+          </p>
+
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>PIPELINE DIAGRAM</span>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;">User Prompt ──► ChatViewModel ──► LlmModelWorker ──► JNI (libllama.so)
+                                                         │
+                                                         ▼
+                                                C++ llama_eval()
+                                                         │
+                                                         ▼
+                                             Stream Tokens via Flow</pre>
+          </div>
+
+          <a href="#database-schemas" class="docs-next-step">Next step: Memory Note &amp; Room DB schemas →</a>
+        </section>
+
+        <section id="database-schemas" class="docs-section">
+          <h2 class="docs-h2">Memory Note &amp; Room DB schemas</h2>
+          <p class="docs-summary">Summary: Table structure and frontmatter schema for `MemoryNote` objects stored in Room SQLite (`memory_notes`).</p>
+
+          <p class="docs-p">
+            All notes are persisted as Markdown files with YAML frontmatter in `AppPaths.vaultRoot(context)` and mirrored in Room DB (`memory_notes` table).
+          </p>
+
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>KOTLIN</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('@Entity(tableName = \"memory_notes\")\ndata class MemoryNote(\n    @PrimaryKey val id: String = UUID.randomUUID().toString(),\n    val title: String,\n    val content: String\n)')">Copy</button>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;"><code class="language-kotlin">@Entity(tableName = "memory_notes")
+data class MemoryNote(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val content: String,
+    val folder: String = "notes",
+    val noteType: String = "note",
+    val filePath: String = "",
+    val isAiMemoryEnabled: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)</code></pre>
+          </div>
+
+          <a href="#gbnf-tool-definitions" class="docs-next-step">Next step: Built-in GBNF tool definitions →</a>
+        </section>
+
+        <section id="gbnf-tool-definitions" class="docs-section">
+          <h2 class="docs-h2">Built-in GBNF tool definitions</h2>
+          <p class="docs-summary">Summary: Definitions for builtin memory tools (`create_memory_file`, `edit_memory_file`, `delete_memory_file`, `read_memory_file`).</p>
+
+          <p class="docs-p">
+            `MemoryPlugin` registers standard tools that enable the LLM to manage vault files. Every write goes through `VaultFileStore.writeNote()` -> `MemoryNoteDao.insertNote()` -> `GlobalRagOrchestrator.reloadNoteIntoGraph()`.
+          </p>
+
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>KOTLIN</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('const val TOOL_CREATE_MEMORY = \"create_memory_file\"\nconst val TOOL_EDIT_MEMORY = \"edit_memory_file\"\nconst val TOOL_DELETE_MEMORY = \"delete_memory_file\"')">Copy</button>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;"><code class="language-kotlin">const val TOOL_LIST_MEMORY = "list_memory_files"
+const val TOOL_READ_MEMORY = "read_memory_file"
+const val TOOL_CREATE_MEMORY = "create_memory_file"
+const val TOOL_EDIT_MEMORY = "edit_memory_file"
+const val TOOL_DELETE_MEMORY = "delete_memory_file"</code></pre>
+          </div>
+
+          <a href="#release-notes" class="docs-next-step">Next step: Version changelog →</a>
+        </section>
+
+        <!-- ==================== RELEASE NOTES ==================== -->
+
+        <section id="release-notes" class="docs-section">
+          <h2 class="docs-h2">Version changelog</h2>
+          <p class="docs-summary">Summary: Official release notes and architectural changelog for BIT releases.</p>
+
+          <h3 class="docs-h3">v1.9.3 (August 2026)</h3>
           <ul style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7;">
-            <li><strong style="color: #FFFFFF;">MediaTek Silicon</strong> — Native APU hardware acceleration and memory bandwidth optimizations.</li>
-            <li><strong style="color: #FFFFFF;">Qualcomm Snapdragon</strong> — Hexagon QNN NPU offloading and Adreno Vulkan compute pipelines.</li>
-            <li><strong style="color: #FFFFFF;">ARM &amp; Edge Silicon</strong> — 64-bit ARM architectures with NEON SIMD vector instructions.</li>
+            <li><strong style="color: #FFFFFF;">Single Write-Path Consolidation</strong> — Unified vault storage, Room DB, and RAG Graph reloads across MemoryPlugin, AiMemoryWriter, and ChatViewModel.</li>
+            <li><strong style="color: #FFFFFF;">EmbeddingEngine Auto-Init</strong> — Added `ensureInitialized(context)` to automatically load downloaded embedding GGUF models on startup without requiring manual setup tab navigation.</li>
+            <li><strong style="color: #FFFFFF;">Node Eviction on Edit &amp; Delete</strong> — Implemented `removeSource(sourceId)` in `NeuronGraph` to purge stale nodes and dangling edges when notes are edited or deleted.</li>
+            <li><strong style="color: #FFFFFF;">Graph Initialization Sync</strong> — Protected `GlobalRagOrchestrator` methods with `CompletableDeferred<NeuronGraph>()` to prevent premature queries before graph population.</li>
           </ul>
+
+          <a href="#fdroid-spec" class="docs-next-step">Next step: F-Droid build &amp; verification →</a>
         </section>
 
-        <!-- 8. Customization & Data -->
-        <section id="appearance" class="docs-section">
-          <h2 class="docs-h2">Customization &amp; Data</h2>
+        <section id="fdroid-spec" class="docs-section">
+          <h2 class="docs-h2">F-Droid build &amp; verification</h2>
+          <p class="docs-summary">Summary: F-Droid build recipe spec and reproducible build verification instructions.</p>
 
-          <h3 class="docs-h3">Appearance &amp; Glass Haze</h3>
           <p class="docs-p">
-            BIT uses a dark, monochrome interface built with Jetpack Compose and Material Design 3 guidelines. A frosted-glass "Haze" blur effect is applied to surfaces like the navigation drawer and toolbars for visual depth without introducing distracting colors.
+            BIT includes a complete F-Droid build spec at `fdroid/com.bit.yml`. To verify reproducible builds locally:
           </p>
 
-          <h3 class="docs-h3" id="nav-layout">Navigation &amp; Layout</h3>
-          <p class="docs-p">
-            A single restrained motion curve is used throughout the app rather than bouncy or spring animations, matching the website's dark aesthetic.
-          </p>
+          <div class="code-wrapper">
+            <div class="code-header">
+              <span>BASH</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('python3 setup_fdroid.py\nfdroid build --verbose com.bit')">Copy</button>
+            </div>
+            <pre class="code-block" style="border:none; margin:0;">python3 setup_fdroid.py
+fdroid build --verbose com.bit</pre>
+          </div>
 
-          <h3 class="docs-h3" id="updates-data">Updates &amp; Local Data Storage</h3>
-          <p class="docs-p">
-            BIT checks for new releases via the GitHub API and can notify you when an update is available. All model files, conversation history, and memory vault data are stored locally in Room SQLite database files; nothing is synced to remote servers unless you explicitly connect an external API provider.
-          </p>
-        </section>
+          <div class="doc-callout doc-callout-tip">
+            <div class="doc-callout-title">Tip</div>
+            Read the complete <a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/FDROID_SUBMISSION.md" style="color:#38BDF8; text-decoration:underline;" target="_blank" rel="noopener">F-Droid Submission Guide</a> for anti-feature audits and reproducible build metadata details.
+          </div>
 
-        <!-- 9. FAQ -->
-        <section id="faq" class="docs-section">
-          <h2 class="docs-h2">Frequently Asked Questions</h2>
-
-          <h3 class="docs-h3">Does BIT require an internet connection?</h3>
-          <p class="docs-p">
-            No — core functionality (chat, speech recognition, speech synthesis, GBNF tool calling, long-term memory, and local document search) runs 100% offline once your model is downloaded. Internet access is only needed to download models initially from HuggingFace, use the web search tool, or connect external API providers.
-          </p>
-
-          <h3 class="docs-h3">Can I use my own GGUF models?</h3>
-          <p class="docs-p">
-            Yes — import any compatible <code class="mono">.gguf</code> model file directly using the system file picker (SAF) in the Model Store.
-          </p>
-
-          <h3 class="docs-h3">Is my data sent anywhere?</h3>
-          <p class="docs-p">
-            No. Everything — models, chat logs, memory vault entries, and audio recordings — stays strictly on your Android device.
-          </p>
-
-          <h3 class="docs-h3">Is BIT available on F-Droid?</h3>
-          <p class="docs-p">
-            Yes — BIT includes a complete F-Droid build configuration, Fastlane metadata suite, and recipe spec (<code class="mono">fdroid/com.bit.yml</code>). Check the <a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/FDROID_SUBMISSION.md" style="text-decoration: underline; color: #FFFFFF;" target="_blank" rel="noopener">F-Droid Submission Guide</a> for submission status and build instructions.
-          </p>
-
-          <h3 class="docs-h3">Why isn't BIT on the Play Store?</h3>
-          <p class="docs-p">
-            BIT is distributed directly on GitHub Releases and F-Droid to allow fast release cadences, unconstrained native C++ JNI binary distribution, and direct open-source community iteration without proprietary store restrictions.
-          </p>
-        </section>
-
-        <!-- 10. About -->
-        <section id="about" class="docs-section">
-          <h2 class="docs-h2">About &amp; Copyright</h2>
-          <p class="docs-p">
-            BIT — Offline Android Engine with Plugin System<br />
-            Copyright 2025-2026 Jaswanthsanjay and BIT Contributors.
-          </p>
-          <p class="docs-p">
-            Licensed under the Apache License, Version 2.0. Full licensing terms, release assets, and source code are available on the <a href="https://github.com/jaswanthsanjay88/Bit_Android" style="text-decoration: underline; color: #FFFFFF;" target="_blank" rel="noopener">GitHub repository</a>.
-          </p>
+          <a href="#overview" class="docs-next-step">Back to top: Overview &amp; Quickstart ↑</a>
         </section>
 
       </main>
@@ -411,7 +545,6 @@ Llama.kt Core Inference (Native JNI)
             <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" class="footer-link">GitHub Repo</a></li>
             <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/issues" class="footer-link">Issues</a></li>
             <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/discussions" class="footer-link">Discussions</a></li>
-            <li><a href="https://github.com/sponsors/jaswanthsanjay88" class="footer-link">Sponsor</a></li>
           </ul>
         </div>
 
@@ -420,7 +553,6 @@ Llama.kt Core Inference (Native JNI)
           <ul class="footer-links">
             <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/LICENSE" class="footer-link">Apache 2.0</a></li>
             <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/NOTICE" class="footer-link">Notice</a></li>
-            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/CONTRIBUTING.md" class="footer-link">Contributing</a></li>
           </ul>
         </div>
       </div>

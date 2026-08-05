@@ -38,6 +38,7 @@ class MemoryVaultViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val TAG = "MemoryVaultVM"
+    private val deletedNoteIds = mutableSetOf<String>()
 
     private val _notes = MutableStateFlow<List<MemoryNote>>(emptyList())
     val notes: StateFlow<List<MemoryNote>> = _notes.asStateFlow()
@@ -113,7 +114,9 @@ class MemoryVaultViewModel @Inject constructor(
         filePath: String = "",
         onSaved: ((MemoryNote) -> Unit)? = null
     ) {
+        if (existingId != null && deletedNoteIds.contains(existingId)) return
         viewModelScope.launch(Dispatchers.IO) {
+            if (existingId != null && deletedNoteIds.contains(existingId)) return@launch
             val now = System.currentTimeMillis()
             val existing = if (!existingId.isNullOrBlank()) {
                 _notes.value.find { it.id == existingId }
@@ -250,14 +253,16 @@ class MemoryVaultViewModel @Inject constructor(
     }
 
     fun deleteNote(note: MemoryNote) {
-        // Optimistically remove from in-memory list immediately so UI updates instantly
+        deletedNoteIds.add(note.id)
+        // Optimistically remove from in-memory state immediately so UI updates instantly
         _notes.value = _notes.value.filter { it.id != note.id }
         // Then perform actual disk/DB/graph deletion in background
         viewModelScope.launch(Dispatchers.IO) {
             vaultFileStore.deleteNote(note)
+            try { memoryNoteDao.deleteNoteById(note.id) } catch (_: Exception) {}
             try { memoryNoteDao.deleteNote(note) } catch (_: Exception) {}
             globalRagOrchestrator.removeNoteFromGraph(note.id)
-            // Refresh from disk to stay fully in sync
+            // Refresh from disk to confirm sync
             refreshNotesFromDisk()
         }
     }

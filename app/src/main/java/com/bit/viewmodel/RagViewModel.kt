@@ -349,7 +349,17 @@ class RagViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            val result = ragRepository.installRagFromUri(uri, name)
+            // Auto-initialize embedding engine if needed for document parsing
+            if (!embeddingEngine.isInitialized()) {
+                val modelFile = EmbeddingEngine.getModelPath(context)
+                if (EmbeddingEngine.isModelFileValid(modelFile)) {
+                    val config = com.bit.engine.EmbeddingConfig(modelPath = modelFile.absolutePath)
+                    embeddingEngine.initialize(config)
+                }
+            }
+
+            val graph = if (embeddingEngine.isInitialized()) NeuronGraph(embeddingEngine, GraphSettings.DEFAULT) else null
+            val result = ragRepository.installRagFromUri(uri, name, graph)
             if (result.isFailure) {
                 _error.value = result.exceptionOrNull()?.message ?: "Failed to install RAG"
             } else {

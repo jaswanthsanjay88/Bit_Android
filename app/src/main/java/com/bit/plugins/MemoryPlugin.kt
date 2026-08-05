@@ -141,7 +141,12 @@ class MemoryPlugin(private val context: Context) : SuperPlugin {
                     if (file == null || !file.exists()) {
                         Result.success("Error: File '$name' not found in vault.")
                     } else {
-                        Result.success(String(file.readBytes(), Charsets.UTF_8))
+                        val parsed = com.bit.util.DocumentParser.parseDocument(file, context)
+                        if (parsed.isSuccess) {
+                            Result.success(parsed.getOrThrow())
+                        } else {
+                            Result.success("Error reading file '$name': ${parsed.exceptionOrNull()?.message}")
+                        }
                     }
                 }
                 TOOL_CREATE_MEMORY -> {
@@ -174,7 +179,9 @@ class MemoryPlugin(private val context: Context) : SuperPlugin {
                         val existingNote = entryPoint.vaultFileStore().readNote(file)
                         val updatedContent = when {
                             oldString.isNotEmpty() && newString.isNotEmpty() -> {
-                                val currentText = existingNote?.content ?: String(file.readBytes(), Charsets.UTF_8)
+                                val currentText = existingNote?.content
+                                    ?: if (file.extension.lowercase() == "md") String(file.readBytes(), Charsets.UTF_8)
+                                    else return@withContext Result.success("Error: Cannot edit non-text file '${file.name}'.")
                                 if (currentText.contains(oldString)) {
                                     currentText.replace(oldString, newString)
                                 } else {

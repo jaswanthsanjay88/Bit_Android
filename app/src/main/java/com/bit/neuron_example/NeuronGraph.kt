@@ -897,16 +897,37 @@ class NeuronGraph(
     // Serialization
     // ========================================================================
 
+    private companion object {
+        private val MAGIC_NGR2 = byteArrayOf('N'.code.toByte(), 'G'.code.toByte(), 'R'.code.toByte(), 2.toByte())
+    }
+
+    private fun DataOutputStream.writeLargeString(str: String) {
+        val bytes = str.toByteArray(Charsets.UTF_8)
+        writeInt(bytes.size)
+        write(bytes)
+    }
+
+    private fun DataInputStream.readLargeString(): String {
+        val length = readInt()
+        if (length < 0) return ""
+        val bytes = ByteArray(length)
+        readFully(bytes)
+        return String(bytes, Charsets.UTF_8)
+    }
+
     fun serialize(): ByteArray {
         val bos = ByteArrayOutputStream()
         val dos = DataOutputStream(bos)
 
+        // Write magic header
+        dos.write(MAGIC_NGR2)
+
         // Write settings
         val settingsJson = Json.encodeToString(settings)
-        dos.writeUTF(settingsJson)
+        dos.writeLargeString(settingsJson)
 
         // Write embedding info
-        dos.writeUTF(embeddingEngine.getModelName())
+        dos.writeLargeString(embeddingEngine.getModelName())
         dos.writeInt(embeddingEngine.getDimension())
 
         // Write nodes
@@ -919,19 +940,19 @@ class NeuronGraph(
     }
 
     private fun writeNode(dos: DataOutputStream, node: NeuronNode) {
-        dos.writeUTF(node.id)
-        dos.writeUTF(node.content)
-        dos.writeUTF(node.sourceType.name)
+        dos.writeLargeString(node.id)
+        dos.writeLargeString(node.content)
+        dos.writeLargeString(node.sourceType.name)
 
         // Metadata
-        dos.writeUTF(node.metadata.sourceId)
-        dos.writeUTF(node.metadata.sourceName)
+        dos.writeLargeString(node.metadata.sourceId)
+        dos.writeLargeString(node.metadata.sourceName)
         dos.writeInt(node.metadata.position)
         dos.writeLong(node.metadata.timestamp)
         dos.writeInt(node.metadata.extras.size)
         for ((key, value) in node.metadata.extras) {
-            dos.writeUTF(key)
-            dos.writeUTF(value)
+            dos.writeLargeString(key)
+            dos.writeLargeString(value)
         }
 
         // Embedding
@@ -947,9 +968,9 @@ class NeuronGraph(
         // Edges
         dos.writeInt(node.edges.size)
         for (edge in node.edges) {
-            dos.writeUTF(edge.targetId)
+            dos.writeLargeString(edge.targetId)
             dos.writeFloat(edge.weight)
-            dos.writeUTF(edge.type.name)
+            dos.writeLargeString(edge.type.name)
         }
     }
 
@@ -958,12 +979,23 @@ class NeuronGraph(
             val bis = ByteArrayInputStream(data)
             val dis = DataInputStream(bis)
 
+            // Check for NGR2 magic header
+            val isNgr2 = data.size >= 4 &&
+                    data[0] == MAGIC_NGR2[0] &&
+                    data[1] == MAGIC_NGR2[1] &&
+                    data[2] == MAGIC_NGR2[2] &&
+                    data[3] == MAGIC_NGR2[3]
+
+            if (isNgr2) {
+                dis.skipBytes(4) // Skip header
+            }
+
             // Read settings
-            val settingsJson = dis.readUTF()
+            val settingsJson = if (isNgr2) dis.readLargeString() else dis.readUTF()
             settings = Json.decodeFromString(settingsJson)
 
             // Read embedding info
-            val modelName = dis.readUTF()
+            val modelName = if (isNgr2) dis.readLargeString() else dis.readUTF()
             val dimension = dis.readInt()
 
             // Verify embedding compatibility
@@ -980,7 +1012,7 @@ class NeuronGraph(
             mutex.withLock {
                 nodes.clear()
                 repeat(nodeCount) {
-                    val node = readNode(dis)
+                    val node = readNode(dis, isNgr2)
                     nodes[node.id] = node
                 }
             }
@@ -994,20 +1026,22 @@ class NeuronGraph(
         }
     }
 
-    private fun readNode(dis: DataInputStream): NeuronNode {
-        val id = dis.readUTF()
-        val content = dis.readUTF()
-        val sourceType = SourceType.valueOf(dis.readUTF())
+    private fun readNode(dis: DataInputStream, isNgr2: Boolean): NeuronNode {
+        val id = if (isNgr2) dis.readLargeString() else dis.readUTF()
+        val content = if (isNgr2) dis.readLargeString() else dis.readUTF()
+        val sourceType = SourceType.valueOf(if (isNgr2) dis.readLargeString() else dis.readUTF())
 
         // Metadata
-        val sourceId = dis.readUTF()
-        val sourceName = dis.readUTF()
+        val sourceId = if (isNgr2) dis.readLargeString() else dis.readUTF()
+        val sourceName = if (isNgr2) dis.readLargeString() else dis.readUTF()
         val position = dis.readInt()
         val timestamp = dis.readLong()
         val extrasSize = dis.readInt()
         val extras = mutableMapOf<String, String>()
         repeat(extrasSize) {
-            extras[dis.readUTF()] = dis.readUTF()
+            val key = if (isNgr2) dis.readLargeString() else dis.readUTF()
+            val value = if (isNgr2) dis.readLargeString() else dis.readUTF()
+            extras[key] = value
         }
         val metadata = NodeMetadata(sourceId, sourceName, position, timestamp, extras)
 
@@ -1022,9 +1056,9 @@ class NeuronGraph(
         val edgeCount = dis.readInt()
         val edges = mutableListOf<NeuronEdge>()
         repeat(edgeCount) {
-            val targetId = dis.readUTF()
+            val targetId = if (isNgr2) dis.readLargeString() else dis.readUTF()
             val weight = dis.readFloat()
-            val edgeType = EdgeType.valueOf(dis.readUTF())
+            val edgeType = EdgeType.valueOf(if (isNgr2) dis.readLargeString() else dis.readUTF())
             edges.add(NeuronEdge(targetId, weight, edgeType))
         }
 

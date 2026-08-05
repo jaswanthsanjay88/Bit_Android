@@ -29,7 +29,7 @@ class VaultFileStore @Inject constructor(
 
     @Synchronized
     fun readNote(file: File): MemoryNote? {
-        if (!file.exists() || !file.isFile || file.name.startsWith(".")) return null
+        if (!file.exists() || !file.isFile || file.extension.lowercase() != "md" || file.name.startsWith(".")) return null
         return try {
             val raw = String(file.readBytes(), Charsets.UTF_8)
             val (frontmatter, body) = splitFrontmatter(raw)
@@ -81,14 +81,18 @@ class VaultFileStore @Inject constructor(
             .take(60)
             .ifBlank { "untitled-note" }
 
-        // ponytail: resolve target file — reuse existing filePath, or find by ID, or create new
+        // Find any pre-existing files for this ID on disk
+        val existingFiles = findAllFilesById(note.id)
+
         val targetFile = when {
             note.filePath.isNotBlank() && File(note.filePath).parentFile?.exists() == true -> File(note.filePath)
-            else -> {
-                // Check if a file with this ID already exists on disk (prevents duplicates)
-                val existingFile = findFileById(note.id)
-                existingFile ?: dedupeFileName(folderDir, safeSlug)
-            }
+            existingFiles.isNotEmpty() -> existingFiles.first()
+            else -> dedupeFileName(folderDir, safeSlug)
+        }
+
+        // Clean up any extra orphan files matching this ID (e.g. created during rapid typing/autosave)
+        existingFiles.filter { it.absolutePath != targetFile.absolutePath }.forEach { orphan ->
+            try { if (orphan.exists()) orphan.delete() } catch (_: Exception) {}
         }
 
         val yamlFrontmatter = buildString {
@@ -116,16 +120,16 @@ class VaultFileStore @Inject constructor(
         targetFile.writeText(fullContent)
         Log.d(TAG, "Wrote note '${note.title}' to ${targetFile.absolutePath}")
 
-        // Return updated note with correct filePath so caller can track it
         return note.copy(filePath = targetFile.absolutePath)
     }
 
-    /** Find an existing .md file by scanning frontmatter for matching id */
-    private fun findFileById(id: String): File? {
+    /** Find all .md files sharing a matching id in frontmatter */
+    fun findAllFilesById(id: String): List<File> {
         val root = getVaultRoot()
+        if (!root.exists()) return emptyList()
         return root.walkTopDown()
-            .filter { it.isFile && it.extension.lowercase() == "md" }
-            .firstOrNull { file ->
+            .filter { it.isFile && it.extension.lowercase() == "md" && !it.name.startsWith(".") }
+            .filter { file ->
                 try {
                     val firstLines = file.bufferedReader().use { reader ->
                         val lines = mutableListOf<String>()
@@ -142,7 +146,11 @@ class VaultFileStore @Inject constructor(
                     firstLines.any { it.trim().startsWith("id:") && it.substringAfter("id:").trim() == id }
                 } catch (_: Exception) { false }
             }
+            .toList()
     }
+
+    /** Find an existing .md file by scanning frontmatter for matching id */
+    private fun findFileById(id: String): File? = findAllFilesById(id).firstOrNull()
 
     /** Deduplicate file names: my-note.md, my-note-2.md, my-note-3.md */
     private fun dedupeFileName(dir: File, slug: String): File {
@@ -157,18 +165,20 @@ class VaultFileStore @Inject constructor(
 
     @Synchronized
     fun deleteNote(note: MemoryNote) {
-        var deleted = false
+        val targets = mutableSetOf<File>()
         if (note.filePath.isNotBlank()) {
-            val file = File(note.filePath)
-            if (file.exists()) {
-                file.delete()
-                deleted = true
-            }
+            targets.add(File(note.filePath))
         }
-        if (!deleted) {
-            val file = findFileById(note.id)
-            if (file != null && file.exists()) {
-                file.delete()
+        targets.addAll(findAllFilesById(note.id))
+
+        targets.forEach { file ->
+            try {
+                if (file.exists()) {
+                    file.delete()
+                    Log.d(TAG, "Deleted vault note file: ${file.absolutePath}")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete vault file ${file.absolutePath}", e)
             }
         }
     }
@@ -178,11 +188,31 @@ class VaultFileStore @Inject constructor(
         val root = getVaultRoot()
         if (!root.exists()) return emptyList()
         val noteFiles = root.walkTopDown()
-            .filter { it.isFile && it.extension.lowercase() == "md" }
+            .filter { it.isFile && it.extension.lowercase() == "md" && !it.name.startsWith(".") }
             .toList()
 
-        return noteFiles.mapNotNull { readNote(it) }
-            .sortedByDescending { it.updatedAt }
+        val parsedNotes = noteFiles.mapNotNull { readNote(it) }
+
+        // Deduplicate by note ID — keep newest per ID and auto-delete orphan duplicate files
+        val uniqueNotes = mutableMapOf<String, MemoryNote>()
+        val orphans = mutableListOf<File>()
+
+        for (note in parsedNotes.sortedByDescending { it.updatedAt }) {
+            if (!uniqueNotes.containsKey(note.id)) {
+                uniqueNotes[note.id] = note
+            } else {
+                if (note.filePath.isNotBlank()) {
+                    orphans.add(File(note.filePath))
+                }
+            }
+        }
+
+        // Clean up orphan duplicate files in background
+        orphans.forEach { file ->
+            try { if (file.exists()) file.delete() } catch (_: Exception) {}
+        }
+
+        return uniqueNotes.values.sortedByDescending { it.updatedAt }
     }
 
     private fun splitFrontmatter(raw: String): Pair<String, String> {

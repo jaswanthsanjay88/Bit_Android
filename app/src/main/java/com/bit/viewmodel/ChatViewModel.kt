@@ -74,7 +74,8 @@ data class PromptEditState(
 class ChatViewModel @Inject constructor(
     @ApplicationContext context: Context,
     private val chatManager: ChatManager,
-    private val globalRagOrchestrator: com.bit.worker.GlobalRagOrchestrator
+    private val globalRagOrchestrator: com.bit.worker.GlobalRagOrchestrator,
+    private val aiMemoryWriter: com.bit.data.AiMemoryWriter
 ) : ViewModel() {
 
     private val appContext = context
@@ -3242,18 +3243,7 @@ class ChatViewModel @Inject constructor(
     fun saveMessageToMemoryVault(messageText: String, title: String? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val noteTitle = title ?: if (messageText.length > 40) messageText.take(40).trim() + "…" else messageText.trim()
-                val note = MemoryNote(
-                    title = noteTitle,
-                    content = messageText,
-                    folder = "ai_memory",
-                    noteType = "fact"
-                )
-
-                val savedNote = vaultStore.writeNote(note)
-                memoryNoteDao.insertNote(savedNote)
-                globalRagOrchestrator.reloadNoteIntoGraph(savedNote)
-
+                val savedNote = aiMemoryWriter.saveAiMemory(text = messageText, title = title)
                 Log.d("ChatViewModel", "Saved AI memory to: ${savedNote.filePath}")
 
                 withContext(Dispatchers.Main) {

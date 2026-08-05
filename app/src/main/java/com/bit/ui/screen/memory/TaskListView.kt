@@ -1,5 +1,7 @@
 package com.bit.ui.screen.memory
 
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -57,7 +59,7 @@ import com.bit.viewmodel.MemoryVaultViewModel
 fun TaskListView(
     onBackClick: () -> Unit,
     onNoteClick: (noteId: String?, defaultType: String) -> Unit,
-    viewModel: MemoryVaultViewModel = hiltViewModel()
+    viewModel: MemoryVaultViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
 ) {
     val context = LocalContext.current
     val allNotes by viewModel.notes.collectAsStateWithLifecycle()
@@ -347,3 +349,5 @@ private fun BoardColumn(
         }
     }
 }
+
+

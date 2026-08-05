@@ -57,9 +57,9 @@ class DiffusionEngine {
             mgr.initialize(
                 DiffusionRuntimeConfig(
                     runtimeDir = "runtime_libs/qnnlibs",
-                    qnnLibsAssetPath = "qnnlibs",
-                    safetyCheckerEnabled = safetyCheckerEnabled,
-                    safetyCheckerAssetPath = if (safetyCheckerEnabled) "safety_checker.mnn" else ""
+                    qnnLibsAssetPath = "", // Disabled due to missing qnnlibs.tar.xz
+                    safetyCheckerEnabled = false,
+                    safetyCheckerAssetPath = "" // Disabled due to missing safety_checker.mnn
                 )
             )
             initDeferred.complete(true)

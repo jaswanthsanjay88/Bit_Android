@@ -1,5 +1,7 @@
 package com.bit.ui.screen.memory
 
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,7 +55,7 @@ import com.bit.viewmodel.MemoryVaultViewModel
 fun NotesListScreen(
     onBackClick: () -> Unit,
     onNoteClick: (noteId: String?, defaultType: String) -> Unit,
-    viewModel: MemoryVaultViewModel = hiltViewModel()
+    viewModel: MemoryVaultViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
 ) {
     val allNotes by viewModel.notes.collectAsStateWithLifecycle()
     val userNotes = remember(allNotes) { allNotes.filter { it.folder == "notes" || it.noteType == "note" } }
@@ -238,3 +240,5 @@ fun NotesListScreen(
         }
     }
 }
+
+

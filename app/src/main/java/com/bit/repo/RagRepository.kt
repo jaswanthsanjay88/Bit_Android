@@ -104,7 +104,11 @@ class RagRepository(
 
     // ==================== File Operations ====================
 
-    suspend fun installRagFromUri(uri: Uri, name: String? = null): Result<InstalledRag> = withContext(Dispatchers.IO) {
+    suspend fun installRagFromUri(
+        uri: Uri,
+        name: String? = null,
+        graph: NeuronGraph? = null
+    ): Result<InstalledRag> = withContext(Dispatchers.IO) {
         try {
             val inputStream = context.contentResolver.openInputStream(uri)
                 ?: return@withContext Result.failure(Exception("Cannot open file"))
@@ -153,17 +157,66 @@ class RagRepository(
                     hasAdminAccess = false // User imported it, they don't have admin access yet
                 )
             } else {
-                InstalledRag(
-                    id = ragId,
-                    name = name ?: "Imported RAG",
-                    sourceType = RagSourceType.NEURON_PACKET,
-                    filePath = destFile.absolutePath,
-                    status = RagStatus.INSTALLED,
-                    sizeBytes = destFile.length(),
-                    isEncrypted = false,
-                    loadingMode = 0,
-                    hasAdminAccess = false
-                )
+                packetManager.close()
+                
+                // 1. Check if it's a valid NGR2 or legacy raw graph
+                val isValidRawGraph = try {
+                    destFile.inputStream().use { stream ->
+                        val header = ByteArray(4)
+                        val readBytes = stream.read(header)
+                        if (readBytes == 4 && header[0] == 'N'.code.toByte() && header[1] == 'G'.code.toByte() && header[2] == 'R'.code.toByte() && header[3] == 2.toByte()) {
+                            true
+                        } else {
+                            java.io.DataInputStream(destFile.inputStream()).use { dis ->
+                                val settingsJson = dis.readUTF()
+                                settingsJson.contains("{") && settingsJson.contains("}")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    false
+                }
+
+                if (isValidRawGraph) {
+                    val fileName = name ?: "Imported Graph"
+                    InstalledRag(
+                        id = ragId,
+                        name = fileName,
+                        description = "",
+                        sourceType = RagSourceType.FILE,
+                        filePath = destFile.absolutePath,
+                        status = RagStatus.INSTALLED,
+                        sizeBytes = destFile.length(),
+                        isEncrypted = false,
+                        loadingMode = 0,
+                        hasAdminAccess = true
+                    )
+                } else {
+                    // 2. Not a pre-built package or raw graph — try parsing as a document (PDF, TXT, DOCX, etc.)
+                    destFile.delete() // Cleanup temporary file
+
+                    val targetGraph = graph ?: return@withContext Result.failure(
+                        Exception("Embedding engine must be initialized before creating RAG from document.")
+                    )
+
+                    val mimeType = context.contentResolver.getType(uri)
+                    val parseResult = DocumentParser.parseDocument(uri, context, mimeType)
+                    if (parseResult.isSuccess) {
+                        val documentText = parseResult.getOrThrow()
+                        val docName = name ?: uri.lastPathSegment?.substringAfterLast('/') ?: "Imported Document"
+                        
+                        return@withContext createRagFromText(
+                            name = docName,
+                            description = "Imported from document",
+                            text = documentText,
+                            graph = targetGraph
+                        )
+                    } else {
+                        return@withContext Result.failure(
+                            Exception("Invalid RAG format or failed to parse document: ${parseResult.exceptionOrNull()?.message}")
+                        )
+                    }
+                }
             }
 
             ragDao.insert(ragInfo)
@@ -366,25 +419,38 @@ class RagRepository(
                 }
             }
 
-            // For neuron packets, we need to decrypt
-            if (rag.sourceType == RagSourceType.NEURON_PACKET && effectivePassword != null) {
+            // For neuron packets, we need to extract payload (and decrypt if necessary)
+            if (rag.sourceType == RagSourceType.NEURON_PACKET) {
                 val packetManager = NeuronPacketManager()
+                var openedAsPacket = false
                 try {
-                    packetManager.open(file)
-                    val authResult = packetManager.authenticate(effectivePassword)
-                    if (authResult.isFailure) {
-                        return@withContext Result.failure(authResult.exceptionOrNull() ?: Exception("Authentication failed"))
-                    }
-                    val payloadResult = packetManager.decryptPayload(authResult.getOrThrow())
-                    if (payloadResult.isFailure) {
-                        return@withContext Result.failure(payloadResult.exceptionOrNull() ?: Exception("Decryption failed"))
-                    }
-                    val deserializeResult = graph.deserialize(payloadResult.getOrThrow())
-                    if (deserializeResult.isFailure) {
-                        return@withContext Result.failure(deserializeResult.exceptionOrNull() ?: Exception("Deserialization failed"))
+                    val openResult = packetManager.open(file)
+                    if (openResult.isSuccess) {
+                        openedAsPacket = true
+                        val authResult = packetManager.authenticate(effectivePassword ?: "")
+                        if (authResult.isFailure) {
+                            return@withContext Result.failure(authResult.exceptionOrNull() ?: Exception("Authentication failed"))
+                        }
+                        val payloadResult = packetManager.decryptPayload(authResult.getOrThrow())
+                        if (payloadResult.isFailure) {
+                            return@withContext Result.failure(payloadResult.exceptionOrNull() ?: Exception("Decryption failed"))
+                        }
+                        val deserializeResult = graph.deserialize(payloadResult.getOrThrow())
+                        if (deserializeResult.isFailure) {
+                            return@withContext Result.failure(deserializeResult.exceptionOrNull() ?: Exception("Deserialization failed"))
+                        }
                     }
                 } finally {
                     packetManager.close()
+                }
+                
+                if (!openedAsPacket) {
+                    // Fallback to direct file read for legacy raw graphs
+                    val payload = file.readBytes()
+                    val deserializeResult = graph.deserialize(payload)
+                    if (deserializeResult.isFailure) {
+                        return@withContext Result.failure(deserializeResult.exceptionOrNull() ?: Exception("Deserialization failed"))
+                    }
                 }
             } else {
                 // Direct file read

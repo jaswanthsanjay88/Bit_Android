@@ -9,6 +9,7 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"
         android:minSdkVersion="34" />
@@ -32,6 +33,21 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.NeuroVerse"
         tools:targetApi="34" >
+
+        <!-- Neuron SDK Libraries for MTK NPU Support -->
+        <uses-native-library
+            android:name="libapuwareutils_v2.mtk.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libapuwareapusys_v2.mtk.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libneuron_platform.mtk.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libneuronusdk_adapter.mtk.so"
+            android:required="false" />
+
         <activity
             android:name=".activity.MainActivity"
             android:exported="true"
