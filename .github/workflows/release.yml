@@ -38,10 +38,16 @@ jobs:
         with:
           cache-overwrite-existing: true
 
-      - name: Set up CCache for C++ Native Builds
-        uses: hendrikmuhs/ccache-action@v1.2
+      - name: Cache NDK build outputs (.cxx)
+        uses: actions/cache@v4
         with:
-          key: ${{ runner.os }}-ccache
+          path: |
+            llama-kt/.cxx
+            app/.cxx
+            file_ops/.cxx
+          key: ${{ runner.os }}-ndk-cxx-${{ hashFiles('**/CMakeLists.txt', '**/build.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-ndk-cxx-
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
