@@ -5,6 +5,7 @@
 #include <jni.h>
 #include <string>
 #include <vector>
+#include <dlfcn.h>
 #include <algorithm>
 #include <atomic>
 #include <mutex>
@@ -73,6 +74,27 @@ static void ensure_backend_init() {
     std::call_once(g_backend_init_flag, [] {
         llama_log_set(llama_android_log_callback, nullptr);
         llama_backend_init();
+
+        // On Android, ggml_backend_load_all() uses /proc/self/exe which points to
+        // app_process64. We use dladdr to find the actual directory containing our
+        // JNI libraries (e.g. /data/app/~~.../lib/arm64-v8a/) so ggml can scan and
+        // load the best CPU backend variant (armv8.0 vs armv8.4 etc).
+        Dl_info info;
+        if (dladdr((const void*)ensure_backend_init, &info) && info.dli_fname) {
+            std::string path = info.dli_fname;
+            size_t last_slash = path.find_last_of('/');
+            if (last_slash != std::string::npos) {
+                std::string dir = path.substr(0, last_slash);
+                LOGI("Discovered JNI library dir: %s", dir.c_str());
+                ggml_backend_load_all_from_path(dir.c_str());
+            }
+        }
+
+        // Fallback explicitly load the base CPU backend if load_all failed
+        if (!ggml_backend_reg_by_name("CPU")) {
+            LOGW("ggml_backend_load_all_from_path failed to register CPU, falling back to dlopen");
+            ggml_backend_load("libggml-cpu.so");
+        }
 
         // ggml's static-link build only auto-registers CPU. With GGML_BACKEND_DL=OFF
         // (our config — single .so, no separate libggml-vulkan.so to dlopen), the
