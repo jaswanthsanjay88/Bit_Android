@@ -487,7 +487,15 @@ static ggml_threadpool_t build_threadpool(int n_threads,
     p.strict_cpu  = false;
     p.paused      = false;
 
-    return ggml_threadpool_new(&p);
+    ggml_backend_reg_t cpu_reg = ggml_backend_reg_by_name("CPU");
+    if (!cpu_reg) {
+        return nullptr;
+    }
+    auto * ggml_threadpool_new_fn = (decltype(ggml_threadpool_new) *) ggml_backend_reg_get_proc_address(cpu_reg, "ggml_threadpool_new");
+    if (!ggml_threadpool_new_fn) {
+        return nullptr;
+    }
+    return ggml_threadpool_new_fn(&p);
 }
 
 // mode: 0=power_saving, 1=balanced, 2=performance.
