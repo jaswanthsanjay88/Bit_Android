@@ -19,6 +19,10 @@ android {
                           "-DLLAMA_BUILD_EXAMPLES=OFF",
                           "-DLLAMA_BUILD_TOOLS=OFF",
                           "-DLLAMA_BUILD_SERVER=OFF",
+                          "-DGGML_NATIVE=OFF",
+                          "-DGGML_BACKEND_DL=ON",
+                          "-DGGML_CPU_ALL_VARIANTS=ON",
+                          "-DGGML_LLAMAFILE=OFF",
                           "-Wno-deprecated",
                           "-Wno-dev")
                 abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
