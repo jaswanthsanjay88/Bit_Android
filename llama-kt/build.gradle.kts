@@ -15,6 +15,7 @@ android {
             cmake {
                 cppFlags("-std=c++17")
                 arguments("-DANDROID_STL=c++_shared",
+                          "-DBUILD_SHARED_LIBS=ON",
                           "-DLLAMA_BUILD_TESTS=OFF",
                           "-DLLAMA_BUILD_EXAMPLES=OFF",
                           "-DLLAMA_BUILD_TOOLS=OFF",
