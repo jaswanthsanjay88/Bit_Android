@@ -498,6 +498,14 @@ static ggml_threadpool_t build_threadpool(int n_threads,
     return ggml_threadpool_new_fn(&p);
 }
 
+static void safe_ggml_threadpool_free(ggml_threadpool_t pool) {
+    ggml_backend_reg_t cpu_reg = ggml_backend_reg_by_name("CPU");
+    if (!cpu_reg) return;
+    auto * fn = (decltype(ggml_threadpool_free) *) ggml_backend_reg_get_proc_address(cpu_reg, "ggml_threadpool_free");
+    if (fn) fn(pool);
+}
+
+
 // mode: 0=power_saving, 1=balanced, 2=performance.
 //
 // Always rebuilds both threadpools. Free-and-recreate is cheap (the pool is
@@ -512,8 +520,8 @@ static void apply_thread_mode(int mode) {
     // Detach + free old pools first. detach must precede free or llama_context
     // ends up with dangling pool pointers.
     if (g_state.ctx) llama_detach_threadpool(g_state.ctx);
-    if (g_state.threadpool)       { ggml_threadpool_free(g_state.threadpool);       g_state.threadpool = nullptr; }
-    if (g_state.threadpool_batch) { ggml_threadpool_free(g_state.threadpool_batch); g_state.threadpool_batch = nullptr; }
+    if (g_state.threadpool)       { safe_ggml_threadpool_free(g_state.threadpool);       g_state.threadpool = nullptr; }
+    if (g_state.threadpool_batch) { safe_ggml_threadpool_free(g_state.threadpool_batch); g_state.threadpool_batch = nullptr; }
 
     bool strict = cfg.pin_to_perf_cores || cfg.pin_to_eff_cores;
 
@@ -1112,8 +1120,8 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadModel(
 
     if (g_state.sampler) { common_sampler_free(g_state.sampler); g_state.sampler = nullptr; }
     if (g_state.ctx)     { llama_detach_threadpool(g_state.ctx); llama_free(g_state.ctx); g_state.ctx = nullptr; }
-    if (g_state.threadpool)       { ggml_threadpool_free(g_state.threadpool);       g_state.threadpool = nullptr; }
-    if (g_state.threadpool_batch) { ggml_threadpool_free(g_state.threadpool_batch); g_state.threadpool_batch = nullptr; }
+    if (g_state.threadpool)       { safe_ggml_threadpool_free(g_state.threadpool);       g_state.threadpool = nullptr; }
+    if (g_state.threadpool_batch) { safe_ggml_threadpool_free(g_state.threadpool_batch); g_state.threadpool_batch = nullptr; }
     if (g_state.model)   { llama_model_free(g_state.model); g_state.model = nullptr; }
     g_state.chat_templates.reset();
     g_chat_templates_tried = false;
@@ -1966,11 +1974,11 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeRelease(JNIEnv *, jobject) {
         g_state.ctx = nullptr;
     }
     if (g_state.threadpool) {
-        ggml_threadpool_free(g_state.threadpool);
+        safe_ggml_threadpool_free(g_state.threadpool);
         g_state.threadpool = nullptr;
     }
     if (g_state.threadpool_batch) {
-        ggml_threadpool_free(g_state.threadpool_batch);
+        safe_ggml_threadpool_free(g_state.threadpool_batch);
         g_state.threadpool_batch = nullptr;
     }
     if (g_state.model) {

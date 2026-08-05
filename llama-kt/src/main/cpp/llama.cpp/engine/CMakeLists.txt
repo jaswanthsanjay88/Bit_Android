@@ -55,7 +55,8 @@ target_compile_features(tn-engine PRIVATE cxx_std_17)
 
 target_compile_options(tn-engine PRIVATE -Wno-cast-qual)
 
-# ── vlm-bench ────────────────────────────────────────────────────────────────
+if(OFF)
+# 🎯 vlm-bench 🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯
 # Standalone binary used to measure VLM per-stage timings on an Android device.
 add_executable(vlm-bench vlm-bench.cpp)
 target_link_libraries(vlm-bench PRIVATE tn-engine)
@@ -64,7 +65,7 @@ if(ANDROID)
     target_link_libraries(vlm-bench PRIVATE log)
 endif()
 
-# ── kernel-microbench ────────────────────────────────────────────────────────
+# 🎯 kernel-microbench 🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯🎯
 # Single-op timing harness for chasing kernel-level regressions (i8mm n=1,
 # repack, etc.). Push to /data/local/tmp and run via adb. See top of
 # kernel-microbench.cpp for argv flags.
@@ -73,4 +74,5 @@ target_link_libraries(kernel-microbench PRIVATE tn-engine)
 target_compile_features(kernel-microbench PRIVATE cxx_std_17)
 if(ANDROID)
     target_link_libraries(kernel-microbench PRIVATE log)
+endif()
 endif()
