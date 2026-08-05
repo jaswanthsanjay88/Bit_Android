@@ -77,9 +77,7 @@ set(GGML_LTO             ON  CACHE BOOL "" FORCE)
 set(GGML_VULKAN          OFF CACHE BOOL "" FORCE)
 
 if(ANDROID_ABI STREQUAL "arm64-v8a")
-    # Baseline armv8-a — KleidiAI dispatches dotprod/i8mm/SVE per-device at runtime.
-    # armv8.6-a as a global target caused SIGILL on Cortex-A76/A77 without i8mm.
-    set(GGML_CPU_ARM_ARCH "armv8-a" CACHE STRING "" FORCE)
+    # KleidiAI dispatches dotprod/i8mm/SVE per-device at runtime.
     set(GGML_CPU_KLEIDIAI ON CACHE BOOL "" FORCE)
 else()
     set(GGML_CPU_KLEIDIAI OFF CACHE BOOL "" FORCE)
