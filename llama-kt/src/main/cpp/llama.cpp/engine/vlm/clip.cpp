@@ -2115,8 +2115,8 @@ struct clip_model_loader {
                 static auto print_shape = [](const char * fn, const char * name, ggml_tensor * t) {
                     LOG_WRN("%s:   %s: type = %s, ne = [%d %d %d %d], nb = [%d %d %d %d]\n", fn,
                             name, ggml_type_name(t->type),
-                            t->ne[0], t->ne[1], t->ne[2], t->ne[3],
-                            t->nb[0], t->nb[1], t->nb[2], t->nb[3]);
+                            (int)t->ne[0], (int)t->ne[1], (int)t->ne[2], (int)t->ne[3],
+                            (int)t->nb[0], (int)t->nb[1], (int)t->nb[2], (int)t->nb[3]);
                 };
                 print_shape(__func__, " dst", op);
                 print_shape(__func__, "src0", op->src[0]);
@@ -2156,7 +2156,7 @@ struct clip_model_loader {
                     LOG_WRN("%s: %16s: type = %s, ne = [%d %d %d %d]\n", __func__,
                             ggml_op_name(op.op->op),
                             ggml_type_name(op.op->type),
-                            op.op->ne[0], op.op->ne[1], op.op->ne[2], op.op->ne[3]);
+                            (int)op.op->ne[0], (int)op.op->ne[1], (int)op.op->ne[2], (int)op.op->ne[3]);
                 }
                 LOG_WRN("%s: flash attention is %s\n", __func__,
                     (ctx_clip.flash_attn_type == CLIP_FLASH_ATTN_TYPE_ENABLED) ? "enabled" : "disabled");
