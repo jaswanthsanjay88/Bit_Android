@@ -613,5 +613,13 @@
       });
     }
   </script>
+  <!-- Privacy Update Toast -->
+  <div id="privacyToast" style="position: fixed; bottom: 24px; right: 24px; background: #0A0A0A; border: 1px solid rgba(255,255,255,0.15); padding: 16px 20px; border-radius: 12px; z-index: 1000; display: flex; align-items: center; gap: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.8); animation: heroReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; color: #fff;">
+    <div style="font-family: var(--font-sans); font-size: 0.9rem;">
+      <div style="font-weight: 600; margin-bottom: 4px;">Privacy Policy Updated</div>
+      <div style="color: var(--text-secondary); font-size: 0.85rem;">We've updated our terms as of August 6, 2026. <a href="privacy.html" style="color: #fff; text-decoration: underline;">Read here</a>.</div>
+    </div>
+    <button onclick="document.getElementById('privacyToast').style.display='none'" style="background: none; border: none; color: #888; cursor: pointer; font-size: 1.2rem; padding: 0; display: flex; align-items: center; justify-content: center;">&times;</button>
+  </div>
 </body>
 </html>
