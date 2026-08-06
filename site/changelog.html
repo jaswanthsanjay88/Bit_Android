@@ -69,7 +69,18 @@
     <p class="changelog-subtitle">The development history and release notes for BIT.</p>
 
     <div class="timeline">
-      
+      <!-- v2.0.2 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v2.0.2</span>
+          <span class="release-date">August 06, 2026</span>
+        </div>
+        <p class="release-desc">Critical stability fix for MediaTek APU and Qualcomm CPU devices.</p>
+        <ul class="release-features">
+          <li><strong>Crash Fix:</strong> Resolved an issue where <code>llama_backend_init</code> would auto-load incompatible CPU variants, causing a SIGILL crash on certain chipsets. Safe variants are now loaded strictly by soname before initialization.</li>
+        </ul>
+      </div>
+
       <!-- v2.0.1 -->
       <div class="release">
         <div class="release-header">

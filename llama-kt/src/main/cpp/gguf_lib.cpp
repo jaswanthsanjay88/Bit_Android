@@ -73,14 +73,21 @@ static std::once_flag g_backend_init_flag;
 static void ensure_backend_init() {
     std::call_once(g_backend_init_flag, [] {
         llama_log_set(llama_android_log_callback, nullptr);
-        llama_backend_init();
+        // Prevent llama_backend_init() from calling ggml_backend_load_all() and scanning
+        // for unsupported CPU variants like armv8.2_2 which crash on Snapdragon 7s Gen 2 / MediaTek.
+        bool cpu_loaded = false;
+        
+        auto try_load = [&](const std::string& name) -> bool {
+            if (cpu_loaded) return true;
+            if (ggml_backend_load(name.c_str())) {
+                LOGI("Successfully loaded safe CPU backend: %s", name.c_str());
+                cpu_loaded = true;
+                return true;
+            }
+            return false;
+        };
 
-        // On Android, ggml_backend_load_all() uses /proc/self/exe which points to
-        // app_process64. We use dladdr to find the actual directory containing our
-        // JNI libraries (e.g. /data/app/~~.../lib/arm64-v8a/) so ggml can scan and
-        // load the best CPU backend variant.
-        // On Snapdragon 7s Gen 2 (and similar Cortex-A78/A55 devices), armv8.2_2 (FP16 vector)
-        // causes SIGILL/SIGSEGV in ggml. We prioritize armv8.2_1 (DotProd) which is stable.
+        // First try resolving via dladdr if the libraries are unpacked in a specific directory
         Dl_info info;
         if (dladdr((const void*)ensure_backend_init, &info) && info.dli_fname) {
             std::string path = info.dli_fname;
@@ -88,29 +95,28 @@ static void ensure_backend_init() {
             if (last_slash != std::string::npos) {
                 std::string dir = path.substr(0, last_slash);
                 LOGI("Discovered JNI library dir: %s", dir.c_str());
-
-                std::string armv82_1 = dir + "/libggml-cpu-android_armv8.2_1.so";
-                std::string armv80_1 = dir + "/libggml-cpu-android_armv8.0_1.so";
-                std::string base_cpu = dir + "/libggml-cpu.so";
-
-                if (ggml_backend_load(armv82_1.c_str())) {
-                    LOGI("Successfully loaded safe ARMv8.2 DotProd CPU backend: %s", armv82_1.c_str());
-                } else if (ggml_backend_load(armv80_1.c_str())) {
-                    LOGI("Successfully loaded safe ARMv8.0 CPU backend: %s", armv80_1.c_str());
-                } else if (ggml_backend_load(base_cpu.c_str())) {
-                    LOGI("Successfully loaded base CPU backend: %s", base_cpu.c_str());
-                } else {
-                    LOGW("Direct backend load failed, falling back to ggml_backend_load_all_from_path");
-                    ggml_backend_load_all_from_path(dir.c_str());
-                }
+#if defined(__aarch64__)
+                try_load(dir + "/libggml-cpu-android_armv8.2_1.so");
+                try_load(dir + "/libggml-cpu-android_armv8.0_1.so");
+#endif
+                try_load(dir + "/libggml-base.so");
+                try_load(dir + "/libggml.so");
             }
         }
 
-        // Fallback explicitly load the base CPU backend if load_all failed
-        if (!ggml_backend_reg_by_name("CPU")) {
-            LOGW("ggml_backend_load_all_from_path failed to register CPU, falling back to dlopen");
-            ggml_backend_load("libggml-cpu.so");
+        // Fallback to soname resolution (if extractNativeLibs=false and libraries are inside base.apk)
+#if defined(__aarch64__)
+        try_load("libggml-cpu-android_armv8.2_1.so");
+        try_load("libggml-cpu-android_armv8.0_1.so");
+#endif
+        try_load("libggml-base.so");
+        try_load("libggml.so");
+
+        if (!cpu_loaded) {
+            LOGW("Failed to load specific safe CPU backend variants by path or soname.");
         }
+
+        llama_backend_init();
 
         // ggml's static-link build only auto-registers CPU. With GGML_BACKEND_DL=OFF
         // (our config — single .so, no separate libggml-vulkan.so to dlopen), the
