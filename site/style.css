@@ -1256,18 +1256,17 @@ section.reviews-section {
   .column-hidden-sm { display: none; }
 }
 
-/* ── Announcement Banner Component ── */
+/* ── Announcement Banner Component (Clean Solid White) ── */
 .announcement-banner {
   position: relative;
   width: 100%;
   z-index: 2;
-  background: rgba(12, 12, 14, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 204, 0, 0.25);
+  background: #FFFFFF !important;
+  color: #111111 !important;
+  border-bottom: 1px solid #E5E5E5;
   padding: 10px 48px 10px 16px;
   font-family: var(--font-sans);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1281,7 +1280,8 @@ section.reviews-section {
   flex-wrap: wrap;
   gap: 6px 8px;
   text-align: center;
-  font-size: 0.92rem;
+  font-size: 0.90rem;
+  color: #111111;
   width: 100%;
   max-width: var(--container-max);
   margin: 0 auto;
@@ -1292,12 +1292,12 @@ section.reviews-section {
 }
 
 .announcement-highlight {
-  color: #ffcc00;
-  font-weight: 600;
+  color: #000000;
+  font-weight: 700;
 }
 
 .announcement-sub {
-  color: var(--text-secondary);
+  color: #444444;
 }
 
 button.announcement-btn {
@@ -1305,11 +1305,11 @@ button.announcement-btn {
   -webkit-appearance: none;
   background: transparent !important;
   border: none !important;
-  color: #ffcc00 !important;
+  color: #000000 !important;
+  font-weight: 700;
   text-decoration: underline;
-  font-weight: 600;
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: 0.90rem;
   padding: 2px 6px;
   margin-left: 4px;
   box-shadow: none !important;
@@ -1318,7 +1318,7 @@ button.announcement-btn {
 }
 
 button.announcement-btn:hover {
-  opacity: 0.8;
+  opacity: 0.75;
 }
 
 button.announcement-close {
@@ -1330,23 +1330,25 @@ button.announcement-close {
   transform: translateY(-50%);
   background: transparent !important;
   border: none !important;
-  color: rgba(255, 255, 255, 0.65) !important;
+  color: #666666 !important;
   cursor: pointer;
   font-size: 1.4rem;
+  line-height: 1;
   width: 36px;
   height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  padding: 0;
   box-shadow: none !important;
   outline: none;
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 button.announcement-close:hover {
-  color: #fff !important;
-  background-color: rgba(255, 255, 255, 0.15) !important;
+  color: #000000 !important;
+  background-color: rgba(0, 0, 0, 0.08) !important;
 }
 
 /* Announcement Banner Mobile Adjustments */
@@ -1358,9 +1360,10 @@ button.announcement-close:hover {
   .announcement-content {
     font-size: 0.82rem;
     line-height: 1.35;
-    gap: 4px;
+    gap: 2px 4px;
     justify-content: flex-start;
     text-align: left;
+    color: #111111;
   }
 
   .announcement-icon {
@@ -1370,24 +1373,24 @@ button.announcement-close:hover {
   }
 
   .announcement-sub {
+    color: #444444;
     display: inline;
   }
 
-  .announcement-btn {
+  button.announcement-btn {
     font-size: 0.82rem;
     margin-left: 2px;
-    display: inline-block;
   }
 
-  .announcement-close {
+  button.announcement-close {
     right: 4px;
-    width: 34px;
-    height: 34px;
-    font-size: 1.25rem;
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
   }
 }
 
-/* ── Privacy Toast Component ── */
+/* ── Privacy Toast Component (No Icon, Minimalist Glass) ── */
 .privacy-toast {
   position: fixed;
   bottom: 24px;
@@ -1397,14 +1400,14 @@ button.announcement-close:hover {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  padding: 16px 20px;
+  padding: 14px 18px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   gap: 14px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 1px rgba(255, 255, 255, 0.15);
   color: #fff;
-  max-width: 420px;
+  max-width: 380px;
   transform: translateY(0);
   opacity: 1;
   transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
@@ -1416,18 +1419,6 @@ button.announcement-close:hover {
   pointer-events: none;
 }
 
-.toast-icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: rgba(255, 204, 0, 0.1);
-  border: 1px solid rgba(255, 204, 0, 0.2);
-}
-
 .toast-content {
   flex: 1;
   font-family: var(--font-sans);
@@ -1435,14 +1426,14 @@ button.announcement-close:hover {
 
 .toast-title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   margin-bottom: 2px;
   color: var(--text-primary);
 }
 
 .toast-desc {
   color: var(--text-secondary);
-  font-size: 0.82rem;
+  font-size: 0.80rem;
   line-height: 1.35;
 }
 
@@ -1452,25 +1443,30 @@ button.announcement-close:hover {
   font-weight: 500;
 }
 
-.toast-close {
-  background: none;
-  border: none;
-  color: #888;
+button.toast-close {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.65) !important;
   cursor: pointer;
-  font-size: 1.3rem;
-  width: 36px;
-  height: 36px;
+  font-size: 1.2rem;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
   flex-shrink: 0;
+  padding: 0;
+  box-shadow: none !important;
+  outline: none;
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.toast-close:hover {
-  color: #fff;
-  background-color: rgba(255, 255, 255, 0.1);
+button.toast-close:hover {
+  color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Privacy Toast Mobile Rules */
@@ -1486,24 +1482,19 @@ button.announcement-close:hover {
     gap: 10px;
   }
 
-  .toast-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-  }
-
   .toast-title {
-    font-size: 0.85rem;
+    font-size: 0.84rem;
   }
 
   .toast-desc {
     font-size: 0.78rem;
   }
 
-  .toast-close {
-    width: 32px;
-    height: 32px;
-    font-size: 1.2rem;
+  button.toast-close {
+    width: 30px;
+    height: 30px;
+    font-size: 1.15rem;
   }
 }
+
 
