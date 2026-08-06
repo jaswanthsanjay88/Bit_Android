@@ -56,6 +56,22 @@ body {
     radial-gradient(circle at 10% 40%, rgba(255, 255, 255, 0.02) 0%, transparent 40%);
 }
 
+/* ── Global Custom Scrollbar ── */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-black);
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 5px;
+  border: 2px solid var(--bg-black);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -190,6 +206,11 @@ header.navbar.scrolled {
 }
 
 /* ── Hero Section ── */
+@keyframes heroReveal {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 section.hero {
   padding-top: 150px;
   padding-bottom: 60px;
@@ -210,6 +231,8 @@ section.hero {
   letter-spacing: -0.03em;
   margin-bottom: 20px;
   color: var(--text-primary);
+  opacity: 0;
+  animation: heroReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .hero-subhead {
@@ -219,6 +242,8 @@ section.hero {
   max-width: 680px;
   margin: 0 auto 32px auto;
   line-height: 1.6;
+  opacity: 0;
+  animation: heroReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
 }
 
 .hero-actions {
@@ -227,6 +252,8 @@ section.hero {
   justify-content: center;
   gap: 14px;
   flex-wrap: wrap;
+  opacity: 0;
+  animation: heroReveal 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
 }
 
 /* ── Enhanced 3D Hero Stage ── */
@@ -289,7 +316,7 @@ section.hero {
     inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
     inset 0 -1.5px 0 rgba(255, 255, 255, 0.15);
   position: relative;
-  overflow: hidden;
+  transform-style: preserve-3d;
 }
 
 /* Galaxy S24/S25 Ultra Top Speaker Slit */
@@ -297,7 +324,7 @@ section.hero {
   position: absolute;
   top: 2px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateZ(12px);
   width: 44px;
   height: 2px;
   background: #3A3B40;
@@ -311,7 +338,7 @@ section.hero {
   position: absolute;
   top: 11px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateZ(14px);
   width: 13px;
   height: 13px;
   background: #070708;
@@ -365,6 +392,7 @@ section.hero {
   pointer-events: none;
   z-index: 15;
   border-radius: 16px;
+  transform: translateZ(24px);
 }
 
 .phone-screen {
@@ -374,6 +402,7 @@ section.hero {
   display: block;
   border-radius: 16px;
   box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.15);
+  transform: translateZ(8px);
 }
 
 /* Contact Shadow */

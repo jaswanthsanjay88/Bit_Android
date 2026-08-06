@@ -19,8 +19,34 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Fix Banner Overlap */
+    body { padding-top: 48px; }
+    header.navbar { top: 48px !important; }
+    .announcement-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1001;
+      background: rgba(10, 10, 10, 0.95) !important;
+      backdrop-filter: blur(10px);
+    }
+    @media (max-width: 768px) {
+      body { padding-top: 72px; }
+      header.navbar { top: 72px !important; }
+    }
+  </style>
 </head>
 <body>
+
+  <!-- ── QA Tester Announcement Banner ── -->
+  <div class="announcement-banner" style="border-bottom: 1px solid rgba(255, 204, 0, 0.2); padding: 12px 20px; text-align: center; font-family: var(--font-sans); font-size: 0.95rem; display: flex; align-items: center; justify-content: center; flex-wrap: wrap;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" stroke-width="2" style="margin-right: 8px;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    <span style="color: #ffcc00; font-weight: 600; margin-right: 8px;">Open Source Contribution: We're looking for Professional QA Testers!</span>
+    <span style="color: var(--text-secondary);">Help us push the boundaries of on-device AI.</span>
+    <button onclick="document.getElementById('testerModal').showModal(); document.getElementById('testerForm').style.display='flex'; document.getElementById('successMsg').style.display='none'; document.getElementById('testerForm').reset();" style="background: none; border: none; color: #ffcc00; margin-left: 12px; text-decoration: underline; font-weight: 500; cursor: pointer; font-size: 0.95rem; padding: 0;">Apply to Test</button>
+  </div>
 
   <!-- ── Navigation ── -->
   <header class="navbar" id="navbar">
@@ -62,7 +88,7 @@
         <div class="hero-actions">
           <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn-pill">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span id="githubDownloadSize">Download v1.9.3 APK</span>
+            <span id="githubDownloadSize">Download v2.0.0 APK</span>
           </a>
 
           <a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/FDROID_SUBMISSION.md" class="btn-ghost" title="F-Droid Package & Build Recipe">
@@ -384,6 +410,207 @@
     </div>
   </footer>
 
+  <!-- ── Tester Application Modal ── -->
+  <dialog id="testerModal" style="border: 1px solid #333; border-radius: 12px; background: #000000; color: var(--text-primary); max-width: 450px; width: 90%; padding: 0; box-shadow: 0 24px 48px rgba(0,0,0,0.6); margin: auto; max-height: 90vh; overflow-y: auto;">
+    <div style="padding: 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: #000000; z-index: 10;">
+      <h3 style="margin: 0; font-family: var(--font-serif); font-size: 1.25rem;">Apply for QA Testing</h3>
+      <button onclick="document.getElementById('testerModal').close()" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.25rem;">&times;</button>
+    </div>
+    <form id="testerForm" onsubmit="submitTesterForm(event)" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+      <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0;">Fill out the details below to contribute to the open-source project. Our team will contact you with build access.</p>
+      
+      <!-- Anti-spam & Config for FormSubmit -->
+      <input type="hidden" name="_captcha" value="false">
+      <input type="hidden" name="_subject" value="New QA Tester Application!">
+
+      
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="testerName" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Full Name</label>
+        <input type="text" id="testerName" name="name" required style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans);" placeholder="Enter your full name">
+      </div>
+      
+      <div style="display: flex; gap: 12px;">
+        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+          <label for="testerEmail" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Email Address</label>
+          <input type="email" id="testerEmail" name="email" required style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans);" placeholder="you@company.com">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+          <label for="testerPhone" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Contact Number</label>
+          <input type="tel" id="testerPhone" name="phone" required style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans);" placeholder="Enter your phone number">
+        </div>
+      </div>
+      
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px;">
+          <label for="testerBrand" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Device Brand</label>
+          <select id="testerBrand" name="brand" onchange="document.getElementById('brandOtherWrapper').style.display = (this.value === 'Other') ? 'flex' : 'none';" required style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans); appearance: none; cursor: pointer;">
+            <option value="" disabled selected>Select Brand</option>
+            <option value="Samsung">Samsung</option>
+            <option value="Google">Google</option>
+            <option value="OnePlus">OnePlus</option>
+            <option value="Xiaomi">Xiaomi / POCO</option>
+            <option value="Motorola">Motorola</option>
+            <option value="Nothing">Nothing</option>
+            <option value="Sony">Sony</option>
+            <option value="Asus">Asus</option>
+            <option value="Other">Other...</option>
+          </select>
+          <div id="brandOtherWrapper" style="display: none; flex-direction: column; gap: 6px; margin-top: 4px;">
+            <input type="text" id="brandOther" name="brand_other" style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans);" placeholder="Specify brand">
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1.5; min-width: 140px;">
+          <label for="testerDevice" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Device Model</label>
+          <input type="text" id="testerDevice" name="device" required style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans);" placeholder="e.g. Galaxy S24 Ultra">
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px;">
+          <label for="testerAndroid" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">OS Version</label>
+          <select id="testerAndroid" name="android_version" onchange="document.getElementById('androidOtherWrapper').style.display = (this.value === 'Other') ? 'flex' : 'none';" required style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans); appearance: none; cursor: pointer;">
+            <option value="" disabled selected>Select OS</option>
+            <option value="Android 15">Android 15</option>
+            <option value="Android 14">Android 14</option>
+            <option value="Android 13">Android 13</option>
+            <option value="Android 12">Android 12</option>
+            <option value="Android 11">Android 11</option>
+            <option value="Android 10 or older">Android 10 or older</option>
+            <option value="Other">Other...</option>
+          </select>
+          <div id="androidOtherWrapper" style="display: none; flex-direction: column; gap: 6px; margin-top: 4px;">
+            <input type="text" id="androidOther" name="android_version_other" style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans);" placeholder="Specify version">
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1.5; min-width: 140px;">
+          <label for="testerProcessor" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Processor (CPU)</label>
+          <select id="testerProcessor" name="processor" onchange="document.getElementById('processorOtherWrapper').style.display = (this.value === 'Other') ? 'flex' : 'none';" required style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans); appearance: none; cursor: pointer;">
+            <option value="" disabled selected>Select CPU type</option>
+            <optgroup label="Qualcomm Snapdragon">
+              <option value="Snapdragon 8 Elite">Snapdragon 8 Elite</option>
+              <option value="Snapdragon 8 Gen 3">Snapdragon 8 Gen 3</option>
+              <option value="Snapdragon 8 Gen 2">Snapdragon 8 Gen 2</option>
+              <option value="Snapdragon 8 Gen 1 / 8+ Gen 1">Snapdragon 8 Gen 1 / 8+</option>
+              <option value="Snapdragon 888 / 870">Snapdragon 888 / 870</option>
+              <option value="Snapdragon 7 Series">Snapdragon 7 Series</option>
+              <option value="Snapdragon 6 Series">Snapdragon 6 Series</option>
+              <option value="Older Snapdragon">Older Snapdragon</option>
+            </optgroup>
+            <optgroup label="MediaTek">
+              <option value="Dimensity 9000 Series">Dimensity 9000 Series (9300/9400)</option>
+              <option value="Dimensity 8000 Series">Dimensity 8000 Series</option>
+              <option value="Dimensity 7000 Series">Dimensity 7000 Series</option>
+              <option value="Older MediaTek">Older MediaTek</option>
+            </optgroup>
+            <optgroup label="Google Tensor">
+              <option value="Tensor G4">Tensor G4</option>
+              <option value="Tensor G3">Tensor G3</option>
+              <option value="Tensor G1 / G2">Tensor G1 / G2</option>
+            </optgroup>
+            <optgroup label="Samsung Exynos">
+              <option value="Exynos 2400">Exynos 2400</option>
+              <option value="Exynos 2200 / 2100">Exynos 2200 / 2100</option>
+              <option value="Older Exynos">Older Exynos</option>
+            </optgroup>
+            <option value="Other">Other...</option>
+          </select>
+          <div id="processorOtherWrapper" style="display: none; flex-direction: column; gap: 6px; margin-top: 4px;">
+            <input type="text" id="processorOther" name="processor_other" style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans);" placeholder="Specify processor">
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <label for="testerExperience" style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">QA Experience</label>
+        <textarea id="testerExperience" name="experience" rows="2" style="padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-base); color: var(--text-primary); font-family: var(--font-sans); resize: vertical;" placeholder="Please describe your software testing experience..."></textarea>
+      </div>
+
+      <p style="font-size: 0.75rem; color: var(--text-secondary); text-align: center; margin: 0;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 2px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Data Collection: The details submitted in this form are sent directly to the core development team strictly for organizing testing groups.
+      </p>
+      
+      <button type="submit" class="btn-pill" style="margin-top: 4px; justify-content: center; width: 100%;">Submit Application</button>
+    </form>
+
+    <div id="successMsg" style="display: none; padding: 48px 24px; flex-direction: column; align-items: center; text-align: center; gap: 16px;">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <h4 style="margin: 0; font-size: 1.5rem; font-family: var(--font-serif); color: var(--text-primary);">Application Received</h4>
+      <p style="color: var(--text-secondary); margin: 0; font-size: 0.95rem; line-height: 1.5;">Thank you! Your details have been submitted securely.<br>The team will contact you soon!</p>
+      <button type="button" class="btn-pill" onclick="document.getElementById('testerModal').close()" style="margin-top: 16px;">Return to site</button>
+    </div>
+  </dialog>
+  <style>
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    #testerModal input, #testerModal textarea, #testerModal select {
+      background: #111111 !important;
+      border: 1px solid #333 !important;
+    }
+    #testerModal input:focus, #testerModal textarea:focus, #testerModal select:focus {
+      border-color: #ffcc00 !important;
+      outline: none;
+    }
+    /* Add a custom arrow for the select dropdown */
+    #testerModal select {
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23ffcc00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>') !important;
+      background-repeat: no-repeat !important;
+      background-position: right 12px center !important;
+      padding-right: 32px !important;
+    }
+    /* Custom Scrollbar for Modal */
+    #testerModal::-webkit-scrollbar {
+      width: 6px;
+    }
+    #testerModal::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #testerModal::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 4px;
+    }
+    #testerModal::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+  </style>
+
   <script src="script.js"></script>
+  <script>
+    function submitTesterForm(event) {
+      event.preventDefault();
+      const form = event.target;
+      const formData = new FormData(form);
+      
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.innerText;
+      submitBtn.innerText = "Sending...";
+      submitBtn.disabled = true;
+
+      fetch("https://formsubmit.co/ajax/jaswanthsanjay88@gmail.com", {
+        method: "POST",
+        headers: {
+          'Accept': 'application/json'
+        },
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        form.style.display = 'none';
+        document.getElementById('successMsg').style.display = 'flex';
+        submitBtn.innerText = originalText;
+        submitBtn.disabled = false;
+        form.reset();
+      })
+      .catch(error => {
+        console.error("Error submitting form:", error);
+        alert("There was an error submitting the application. Please ensure you are connected to the internet.");
+        submitBtn.innerText = originalText;
+        submitBtn.disabled = false;
+      });
+    }
+  </script>
 </body>
 </html>

@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initIntersectionObserver();
   initLiveRatings();
   initModelStoreCatalog();
+  
+  // Auto-open tester form if linked directly
+  if (window.location.hash === '#apply') {
+    const testerModal = document.getElementById('testerModal');
+    if (testerModal) testerModal.showModal();
+  }
 });
 
 /* ── Sticky Navbar Blur ── */
