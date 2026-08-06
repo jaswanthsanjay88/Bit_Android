@@ -326,8 +326,18 @@ object PluginManager {
                 useTypedGrammar = _toolCallingConfig.value.useTypedGrammar
             )
 
-            // Use direct same-process path — properly enables grammar constraints
-            val success = LlmModelWorker.enableToolCallingDirect(toolDefinitions, config)
+            // Use AIDL to sync tools with the remote inference process
+            val toolsJsonObj = org.json.JSONArray()
+            for (def in toolDefinitions) {
+                toolsJsonObj.put(def.build().toOpenAIFormat())
+            }
+            val toolsJson = toolsJsonObj.toString()
+
+            val success = LlmModelWorker.enableToolCallingGguf(
+                toolsJson = toolsJson,
+                grammarMode = mode.value,
+                useTypedGrammar = config.useTypedGrammar
+            )
 
             if (success) {
                 // With STRICT grammar, any model can do tool calling — mark as loaded

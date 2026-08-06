@@ -72,7 +72,7 @@ abstract class BaseOpenAiProvider : LlmProvider {
             model = config.modelId,
             messages = apiMessages,
             stream = true,
-            streamOptions = OpenAiStreamOptions(includeUsage = true),
+            streamOptions = if (name == Constants.PROVIDER_OPENAI || name == Constants.PROVIDER_OPEN_ROUTER) OpenAiStreamOptions(includeUsage = true) else null,
             tools = config.tools,
             temperature = config.temperature,
             maxTokens = config.maxTokens,

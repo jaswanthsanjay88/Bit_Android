@@ -1260,14 +1260,25 @@ class ChatViewModel @Inject constructor(
             maxTokens = maxTokens
         )
 
+        val startTimeMs = System.currentTimeMillis()
+        var firstTokenTimeMs = 0L
+        var tokenCount = 0
+
         val textBuilder = java.lang.StringBuilder()
         val toolCalls = mutableListOf<Pair<String, String>>()
 
         provider.generateResponse(chatMessages, config).collect { event ->
             when (event) {
                 is StreamEvent.TextChunk -> {
+                    if (firstTokenTimeMs == 0L) {
+                        firstTokenTimeMs = System.currentTimeMillis()
+                    }
+                    tokenCount++
                     textBuilder.append(event.text)
                     _streamingAssistantMessage.value = textBuilder.toString()
+                }
+                is StreamEvent.UsageUpdate -> {
+                    tokenCount = event.tokenCount
                 }
                 is StreamEvent.ToolCallRequest -> {
                     toolCalls.add(Pair(event.name, event.arguments))
@@ -1287,6 +1298,17 @@ class ChatViewModel @Inject constructor(
         val text = textBuilder.toString().trim()
         val finalToolCalls = mutableListOf<Pair<String, String>>()
         finalToolCalls.addAll(toolCalls)
+
+        val totalTimeMs = (System.currentTimeMillis() - startTimeMs).toFloat()
+        val timeToFirstToken = if (firstTokenTimeMs > 0L) (firstTokenTimeMs - startTimeMs).toFloat() else totalTimeMs
+        val tokensPerSec = if (totalTimeMs > 0) (tokenCount / (totalTimeMs / 1000f)) else 0f
+        
+        currentMetrics = com.bit.models.engine_schema.DecodingMetrics(
+            tokensPerSecond = tokensPerSec,
+            timeToFirstTokenMs = timeToFirstToken,
+            totalTimeMs = totalTimeMs,
+            tokensPredicted = tokenCount
+        )
 
         if (finalToolCalls.isEmpty() && text.isNotBlank()) {
             val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }

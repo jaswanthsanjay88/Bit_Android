@@ -125,6 +125,14 @@ fun convertToOpenAiMessages(
                     )
                 }
             }
+            for (base64 in msg.base64Images) {
+                parts.add(
+                    OpenAiContentPart(
+                        type = "image_url",
+                        imageUrl = OpenAiImageUrl(url = "data:image/jpeg;base64,$base64")
+                    )
+                )
+            }
         }
 
         if (parts.isEmpty()) {

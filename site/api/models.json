@@ -231,6 +231,21 @@
       "tags": ["STT", "English", "Whisper", "Tested"],
       "isZip": false,
       "runOnCpu": true
+    },
+    {
+      "id": "nomic-embed-text-v1.5-q4_k_m",
+      "name": "Nomic Embed Text v1.5 (Q4)",
+      "description": "High-quality embedding model for text vectorization and RAG. Supports up to 8192 context length.",
+      "type": "EMBEDDING",
+      "url": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_K_M.gguf",
+      "size": "82 MB",
+      "sizeBytes": 85983232,
+      "minRamGb": 2,
+      "icon": "nomic",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/nomic.png",
+      "tags": ["Embedding", "RAG", "Tested"],
+      "isZip": false,
+      "runOnCpu": true
     }
   ]
 }

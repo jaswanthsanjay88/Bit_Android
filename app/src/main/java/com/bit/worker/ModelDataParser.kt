@@ -114,9 +114,14 @@ class ModelDataParser {
                 return@withContext ModelLoadResult.Error("Model directory not found: ${model.modelPath}")
             }
 
-            // Check for required files — clip uses .mnn if runOnCpu OR useCpuClip (matches DiffusionManager)
-            val clipFilename = if (diffusionConfig.runOnCpu || diffusionConfig.useCpuClip) "clip.mnn" else "clip.bin"
-            val requiredFiles = if (diffusionConfig.runOnCpu) {
+            val hasMnnFiles = File(modelDir, "unet.mnn").exists() || File(modelDir, "clip.mnn").exists()
+            val isCpuByName = model.modelName.contains("CPU", ignoreCase = true) || model.modelPath.contains("CPU", ignoreCase = true)
+            val effectiveRunOnCpu = diffusionConfig.runOnCpu || hasMnnFiles || isCpuByName
+            val effectiveUseCpuClip = diffusionConfig.useCpuClip || effectiveRunOnCpu
+
+            // Check for required files — clip uses .mnn if effectiveRunOnCpu OR effectiveUseCpuClip (matches DiffusionManager)
+            val clipFilename = if (effectiveRunOnCpu || effectiveUseCpuClip) "clip.mnn" else "clip.bin"
+            val requiredFiles = if (effectiveRunOnCpu) {
                 listOf("clip.mnn", "unet.mnn", "vae_decoder.mnn", "tokenizer.json")
             } else {
                 listOf(clipFilename, "unet.bin", "vae_decoder.bin", "tokenizer.json")
@@ -134,8 +139,8 @@ class ModelDataParser {
                 height = diffusionConfig.height,
                 width = diffusionConfig.width,
                 textEmbeddingSize = diffusionConfig.textEmbeddingSize,
-                runOnCpu = diffusionConfig.runOnCpu,
-                useCpuClip = diffusionConfig.useCpuClip,
+                runOnCpu = effectiveRunOnCpu,
+                useCpuClip = effectiveUseCpuClip,
                 isPony = diffusionConfig.isPony,
                 httpPort = diffusionConfig.httpPort,
                 safetyMode = diffusionConfig.safetyMode

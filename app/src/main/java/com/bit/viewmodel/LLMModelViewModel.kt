@@ -50,7 +50,7 @@ class LLMModelViewModel @Inject constructor(
             if (ready) repository.getAllModels()
             else flowOf(emptyList())
         }
-        .map { models -> models.filter { it.providerType != ProviderType.TTS && it.providerType != ProviderType.DIFFUSION && it.providerType != ProviderType.STT } }
+        .map { models -> models.filter { it.providerType != ProviderType.TTS && it.providerType != ProviderType.STT } }
 
     private val _currentModelID = MutableStateFlow("")
     val currentModelID: StateFlow<String> = _currentModelID.asStateFlow()
@@ -94,13 +94,15 @@ class LLMModelViewModel @Inject constructor(
             // Only offer if no model is currently loaded
             if (_currentModelID.value.isNotEmpty()) return@launch
             val model = repository.getModelById(savedId) ?: return@launch
-            if (!model.isActive) return@launch
+            if (!model.isActive && model.providerType != ProviderType.API) return@launch
             // Wait for the LLM service to be ready before showing the dialog,
             // so clicking "Load" starts instantly instead of blocking on service bind
-            try {
-                LlmModelWorker.ensureServiceReady()
-            } catch (_: Exception) {
-                return@launch
+            if (model.providerType != ProviderType.API) {
+                try {
+                    LlmModelWorker.ensureServiceReady()
+                } catch (_: Exception) {
+                    return@launch
+                }
             }
 
             loadModel(model)  // auto-load silently on startup
@@ -136,13 +138,6 @@ class LLMModelViewModel @Inject constructor(
     }
 
     fun loadModel(model: Model) {
-        // Gate: DIFFUSION models require QNN runtime to be extracted first
-        if (model.providerType == ProviderType.DIFFUSION && !isQnnRuntimeReady()) {
-            _pendingDiffusionModel.value = model
-            _needsQnnSetup.value = true
-            return
-        }
-
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 // Unload any existing model first
@@ -153,11 +148,7 @@ class LLMModelViewModel @Inject constructor(
 
                 AppStateManager.setLoadingModel(model.modelName, 0f)
 
-                val config = getModelConfig(model.id)
-                if (config == null) {
-                    AppStateManager.setError("Model configuration not found")
-                    return@launch
-                }
+                val config = getModelConfig(model.id) ?: ModelConfig(modelId = model.id, modelLoadingParams = "{}", modelInferenceParams = "{}")
 
                 val loadingParamsStr = config.modelLoadingParams ?: ""
                 if (model.providerType == ProviderType.STT ||
@@ -229,15 +220,27 @@ class LLMModelViewModel @Inject constructor(
 
     private suspend fun loadDiffusionModel(model: Model, config: ModelConfig) {
         val diffusionConfig = DiffusionConfig.fromJson(config.modelLoadingParams)
+        
+        var modelDirFile = java.io.File(model.modelPath)
+        if (!modelDirFile.exists()) {
+            val appFiles = getApplication<Application>().filesDir
+            val subFile = java.io.File(appFiles, model.modelPath)
+            if (subFile.exists()) modelDirFile = subFile
+        }
+
+        val hasMnnFiles = java.io.File(modelDirFile, "unet.mnn").exists() || java.io.File(modelDirFile, "clip.mnn").exists()
+        val isCpuByName = model.modelName.contains("CPU", ignoreCase = true) || model.modelPath.contains("CPU", ignoreCase = true)
+        val effectiveRunOnCpu = diffusionConfig.runOnCpu || hasMnnFiles || isCpuByName
+        val effectiveUseCpuClip = diffusionConfig.useCpuClip || effectiveRunOnCpu
 
         val success = LlmModelWorker.loadDiffusionModel(
             name = model.modelName,
-            modelDir = model.modelPath,
+            modelDir = modelDirFile.absolutePath,
             height = diffusionConfig.height,
             width = diffusionConfig.width,
             textEmbeddingSize = diffusionConfig.textEmbeddingSize,
-            runOnCpu = diffusionConfig.runOnCpu,
-            useCpuClip = diffusionConfig.useCpuClip,
+            runOnCpu = effectiveRunOnCpu,
+            useCpuClip = effectiveUseCpuClip,
             isPony = diffusionConfig.isPony,
             httpPort = diffusionConfig.httpPort,
             safetyMode = diffusionConfig.safetyMode

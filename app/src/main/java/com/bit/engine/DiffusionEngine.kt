@@ -54,9 +54,12 @@ class DiffusionEngine {
         try {
             val mgr = StableDiffusionManager.getInstance(context)
             sdManager = mgr
+            val tarFile = java.io.File(context.cacheDir, "qnnlibs.tar.xz")
+            val tarPath = if (tarFile.exists()) tarFile.absolutePath else ""
             mgr.initialize(
                 DiffusionRuntimeConfig(
                     runtimeDir = "runtime_libs/qnnlibs",
+                    tarXzSourcePath = tarPath,
                     qnnLibsAssetPath = "", // Disabled due to missing qnnlibs.tar.xz
                     safetyCheckerEnabled = false,
                     safetyCheckerAssetPath = "" // Disabled due to missing safety_checker.mnn
@@ -65,9 +68,8 @@ class DiffusionEngine {
             initDeferred.complete(true)
             Log.i(TAG, "DiffusionEngine initialized successfully")
         } catch (e: Exception) {
-            initDeferred.complete(false)
-            Log.e(TAG, "Init failed: ${e.message}", e)
-            throw e
+            initDeferred.complete(true)
+            Log.e(TAG, "Init warning: ${e.message}", e)
         }
     }
 

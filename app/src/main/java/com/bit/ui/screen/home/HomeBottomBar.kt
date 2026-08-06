@@ -201,6 +201,8 @@ internal fun BottomBar(
 
     // Coroutine scope for RAG queries
     val scope = rememberCoroutineScope()
+    
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
 
 
@@ -664,6 +666,7 @@ internal fun BottomBar(
                             } else if (hasInput) {
                                 FilledTonalIconButton(
                                     onClick = {
+                                        haptics.action()
                                         val trimmedValue = value.trim()
                                         val isImageTrigger = trimmedValue.startsWith("/image", ignoreCase = true) ||
                                                 trimmedValue.startsWith("/draw", ignoreCase = true) ||

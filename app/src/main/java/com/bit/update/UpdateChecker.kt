@@ -63,11 +63,12 @@ class UpdateChecker(
                     .apply()
             }
 
-            val release = api.getLatestRelease(GithubApiFactory.OWNER, GithubApiFactory.REPO)
-
-            if (release.draft || release.prerelease) {
-                return UpdateCheckResult.UpToDate // skip drafts/prereleases by default
-            }
+            val releases = api.getReleases(GithubApiFactory.OWNER, GithubApiFactory.REPO)
+            
+            // Find the first release that has an APK and is not a draft. We allow pre-releases.
+            val release = releases.firstOrNull { r -> 
+                !r.draft && r.assets.any { it.name.endsWith(".apk", ignoreCase = true) }
+            } ?: return UpdateCheckResult.Error("No valid releases found")
 
             val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
                 ?: return UpdateCheckResult.Error("Latest release has no APK asset")

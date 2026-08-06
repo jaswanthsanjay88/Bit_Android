@@ -46,6 +46,7 @@ internal fun ModelTypeBadge(modelType: ModelType) {
         ModelType.SD -> "Image" to MaterialTheme.colorScheme.secondary
         ModelType.TTS -> "TTS" to MaterialTheme.colorScheme.tertiary
         ModelType.STT -> "STT" to MaterialTheme.colorScheme.tertiary
+        ModelType.EMBEDDING -> "Embedding" to MaterialTheme.colorScheme.tertiary
     }
     val shape = RoundedCornerShape(Standards.SpacingXs)
     Text(

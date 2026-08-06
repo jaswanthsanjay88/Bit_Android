@@ -118,12 +118,12 @@ internal fun AdvancedTab(
         // Repositories Section
         item {
             SectionHeader(
-                title = "Model Repositories",
+                title = "Hugging Face Models",
                 action = {
                     ActionButton(
                         onClickListener = { showAddDialog = true },
                         icon = TnIcons.Plus,
-                        contentDescription = "Add Repository"
+                        contentDescription = "Add Model"
                     )
                 }
             )

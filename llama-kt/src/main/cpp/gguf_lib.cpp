@@ -323,6 +323,7 @@ static bool ensure_embed_callback_methods(JNIEnv * env, jobject callback) {
 // the cancel_flag is the only field touched outside the mutex (atomic).
 static struct {
     llama_model    * model   = nullptr;
+    FILE           * model_file = nullptr;
     llama_context  * ctx     = nullptr;
     common_sampler * sampler = nullptr;
 
@@ -580,7 +581,13 @@ static void rebuild_sampler(bool force = true) {
         g_state.sampler = nullptr;
     }
     if (g_state.model) {
-        g_state.sampler = common_sampler_init(g_state.model, g_state.sampling_params);
+        try {
+            g_state.sampler = common_sampler_init(g_state.model, g_state.sampling_params);
+        } catch (const std::exception & e) {
+            LOGE("common_sampler_init threw: %s", e.what());
+        } catch (...) {
+            LOGE("common_sampler_init threw unknown exception");
+        }
     }
     g_sampler_needs_rebuild = false;
 }
@@ -1185,7 +1192,21 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadModel(
     // route only the *large* ops to GPU per-tensor.
     mparams.n_gpu_layers = 0;
 
-    g_state.model = llama_model_load_from_file(path_s.c_str(), mparams);
+    if (path_s.find("fd://") == 0) {
+        int fd = std::stoi(path_s.substr(5));
+        FILE * f = fdopen(fd, "rb");
+        if (f) {
+            g_state.model = llama_model_load_from_file_ptr(f, mparams);
+            if (g_state.model) {
+                g_state.model_file = f;
+            } else {
+                fclose(f);
+            }
+        }
+    } else {
+        g_state.model = llama_model_load_from_file(path_s.c_str(), mparams);
+    }
+    
     if (!g_state.model) {
         tn_error_set_last(TN_ERR_MODEL_LOAD, "ModelLoad",
             "llama_model_load_from_file returned null. Likely causes: corrupt or non-GGUF file, unsupported architecture, or out of memory.");
@@ -1354,7 +1375,7 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadModelFromFd(
     }
 
     char path[64];
-    snprintf(path, sizeof(path), "/proc/self/fd/%d", owned_fd);
+    snprintf(path, sizeof(path), "fd://%d", owned_fd);
 
     jstring jpath = env->NewStringUTF(path);
     jboolean result = Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadModel(
@@ -1362,8 +1383,8 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadModelFromFd(
         jCacheTypeK, jCacheTypeV, opOffload);
     env->DeleteLocalRef(jpath);
 
-    // Close our dup, not the caller's fd — Kotlin owns the original via PFD.
-    close(owned_fd);
+    // owned_fd is now owned by g_state.model_file (if successful) or was closed on failure.
+    // Do NOT close(owned_fd) here.
     return result;
 }
 
@@ -2007,6 +2028,11 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeRelease(JNIEnv *, jobject) {
         llama_model_free(g_state.model);
         g_state.model = nullptr;
     }
+    if (g_state.model_file) {
+        fclose(g_state.model_file);
+        g_state.model_file = nullptr;
+    }
+
     g_state.chat_templates.reset();
     g_chat_templates_tried = false;
     g_state.n_past = 0;
@@ -2278,8 +2304,9 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeStateLoadFromFile(
 // Embedding engine: independent model + context. Runs in parallel with the
 // chat engine — its own mutex, no shared state.
 static struct {
-    llama_model   * model = nullptr;
-    llama_context * ctx   = nullptr;
+    llama_model   * model      = nullptr;
+    llama_context * ctx        = nullptr;
+    FILE          * model_file = nullptr;
     std::mutex      mutex;
 } g_embed;
 
@@ -2288,40 +2315,82 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadEmbeddingModel(
         JNIEnv * env, jobject,
         jstring jpath, jint nThreads, jint nCtx) {
 
+    ensure_backend_init();
+
     std::lock_guard<std::mutex> lock(g_embed.mutex);
 
-    if (g_embed.ctx) { llama_free(g_embed.ctx); g_embed.ctx = nullptr; }
-    if (g_embed.model) { llama_model_free(g_embed.model); g_embed.model = nullptr; }
+    if (g_embed.ctx)        { llama_free(g_embed.ctx);             g_embed.ctx = nullptr; }
+    if (g_embed.model)      { llama_model_free(g_embed.model);     g_embed.model = nullptr; }
+    if (g_embed.model_file) { fclose(g_embed.model_file);          g_embed.model_file = nullptr; }
 
-    const char * path = env->GetStringUTFChars(jpath, nullptr);
+    const char * path_cstr = env->GetStringUTFChars(jpath, nullptr);
+    std::string path_s = path_cstr ? path_cstr : "";
+    if (path_cstr) env->ReleaseStringUTFChars(jpath, path_cstr);
+
+    if (path_s.empty()) {
+        LOGE("Embedding model path is empty");
+        return JNI_FALSE;
+    }
+
+    LOGI("Loading embedding model from: %s", path_s.c_str());
 
     auto mparams = llama_model_default_params();
     mparams.load_mode = LLAMA_LOAD_MODE_MMAP;
+    mparams.n_gpu_layers = 0;
 
-    g_embed.model = llama_model_load_from_file(path, mparams);
-    env->ReleaseStringUTFChars(jpath, path);
+    try {
+        if (path_s.find("fd://") == 0) {
+            int fd = std::stoi(path_s.substr(5));
+            FILE * f = fdopen(fd, "rb");
+            if (f) {
+                g_embed.model = llama_model_load_from_file_ptr(f, mparams);
+                if (g_embed.model) {
+                    g_embed.model_file = f;
+                } else {
+                    fclose(f);
+                }
+            } else {
+                LOGE("Failed to open fd %d for embedding model", fd);
+            }
+        } else {
+            g_embed.model = llama_model_load_from_file(path_s.c_str(), mparams);
+        }
+    } catch (const std::exception & e) {
+        LOGE("Exception loading embedding model: %s", e.what());
+        g_embed.model = nullptr;
+    } catch (...) {
+        LOGE("Unknown exception loading embedding model");
+        g_embed.model = nullptr;
+    }
 
     if (!g_embed.model) {
-        LOGE("Failed to load embedding model");
+        LOGE("Failed to load embedding model from path: %s", path_s.c_str());
         return JNI_FALSE;
     }
 
     auto cparams = llama_context_default_params();
     cparams.n_ctx = nCtx > 0 ? nCtx : 512;
-    cparams.n_threads = nThreads > 0 ? nThreads : tn_thread_config_for_mode((tn_thread_mode)g_state.thread_mode).n_threads_batch;
+    cparams.n_threads = nThreads > 0 ? nThreads : 4;
     cparams.n_threads_batch = cparams.n_threads;
     cparams.n_batch = 512;
     cparams.embeddings = true;
 
-    g_embed.ctx = llama_init_from_model(g_embed.model, cparams);
+    try {
+        g_embed.ctx = llama_init_from_model(g_embed.model, cparams);
+    } catch (const std::exception & e) {
+        LOGE("Exception creating embedding context: %s", e.what());
+        g_embed.ctx = nullptr;
+    }
+
     if (!g_embed.ctx) {
         LOGE("Failed to create embedding context");
         llama_model_free(g_embed.model);
         g_embed.model = nullptr;
+        if (g_embed.model_file) { fclose(g_embed.model_file); g_embed.model_file = nullptr; }
         return JNI_FALSE;
     }
 
-    LOGI("Embedding model loaded (ctx=%d)", nCtx);
+    LOGI("Embedding model loaded successfully from %s (ctx=%d)", path_s.c_str(), nCtx);
     return JNI_TRUE;
 }
 
@@ -2441,8 +2510,9 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_dark_gguf_1lib_GGUFNativeLib_nativeReleaseEmbeddingModel(JNIEnv *, jobject) {
     std::lock_guard<std::mutex> lock(g_embed.mutex);
 
-    if (g_embed.ctx) { llama_free(g_embed.ctx); g_embed.ctx = nullptr; }
-    if (g_embed.model) { llama_model_free(g_embed.model); g_embed.model = nullptr; }
+    if (g_embed.ctx)        { llama_free(g_embed.ctx);             g_embed.ctx = nullptr; }
+    if (g_embed.model)      { llama_model_free(g_embed.model);     g_embed.model = nullptr; }
+    if (g_embed.model_file) { fclose(g_embed.model_file);          g_embed.model_file = nullptr; }
 
     LOGI("Embedding model released");
 }

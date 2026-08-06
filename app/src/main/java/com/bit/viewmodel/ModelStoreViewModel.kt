@@ -227,9 +227,7 @@ class ModelStoreViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 systemRepo.getAllModels().collect { installedList ->
-                    _installedModels.value = installedList.filter {
-                        it.providerType != ProviderType.DIFFUSION && it.providerType != ProviderType.TTS
-                    }.distinctBy { it.id }
+                    _installedModels.value = installedList.distinctBy { it.id }
                 }
             } catch (e: Exception) {
                 Log.e("ModelStoreViewModel", "Error loading installed models", e)
@@ -439,16 +437,17 @@ class ModelStoreViewModel @Inject constructor(
                 ModelType.SD -> model.repositoryUrl.trim().removeSuffix("/").ifEmpty { "SD Models" }
                 ModelType.TTS -> "tts-models"
                 ModelType.STT -> "stt-models"
+                ModelType.EMBEDDING -> "embedding-models"
             }
         }.forEach { (key, groupModels) ->
             val first = groupModels.first()
             val repo = repoLookup[key]
             val displayName = when (first.modelType) {
-                ModelType.TTS, ModelType.STT -> first.name
+                ModelType.TTS, ModelType.STT, ModelType.EMBEDDING -> first.name
                 else -> repo?.name ?: key.substringAfterLast("/")
             }
             val author = when {
-                first.modelType == ModelType.TTS || first.modelType == ModelType.STT -> ""
+                first.modelType == ModelType.TTS || first.modelType == ModelType.STT || first.modelType == ModelType.EMBEDDING -> ""
                 repo?.source == RepositorySource.CUSTOM_API -> "API"
                 key.contains("/") -> key.substringBefore("/")
                 else -> ""
@@ -473,6 +472,7 @@ class ModelStoreViewModel @Inject constructor(
                 }
                 ModelType.TTS -> cleanRepoKey == "tts-models"
                 ModelType.STT -> cleanRepoKey == "stt-models"
+                ModelType.EMBEDDING -> cleanRepoKey == "embedding-models"
             }
         }
     }

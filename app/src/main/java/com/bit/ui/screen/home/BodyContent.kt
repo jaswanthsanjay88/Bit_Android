@@ -213,6 +213,15 @@ fun BodyContent(
         .collectAsStateWithLifecycle(initialValue = true)
 
     val listState = rememberLazyListState()
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+    var wasGenerating by remember { mutableStateOf(chatState.isGenerating) }
+    
+    LaunchedEffect(chatState.isGenerating) {
+        if (wasGenerating && !chatState.isGenerating) {
+            haptics.generationEnd()
+        }
+        wasGenerating = chatState.isGenerating
+    }
 
     LaunchedEffect(messages.size, chatState.isGenerating, streaming.assistantMessage.length) {
         if (chatState.isGenerating) {

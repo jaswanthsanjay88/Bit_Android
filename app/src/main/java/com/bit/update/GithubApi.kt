@@ -25,11 +25,11 @@ data class GithubAsset(
 )
 
 interface GithubApi {
-    @GET("repos/{owner}/{repo}/releases/latest")
-    suspend fun getLatestRelease(
+    @GET("repos/{owner}/{repo}/releases")
+    suspend fun getReleases(
         @Path("owner") owner: String,
         @Path("repo") repo: String
-    ): GithubRelease
+    ): List<GithubRelease>
 }
 
 object GithubApiFactory {

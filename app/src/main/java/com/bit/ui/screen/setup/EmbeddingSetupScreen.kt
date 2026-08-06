@@ -457,7 +457,7 @@ private suspend fun downloadEmbeddingModel(
 
         if (!EmbeddingEngine.isModelFileValid(modelPath)) {
             val reason = EmbeddingEngine.getModelValidationError(modelPath)
-            modelPath.delete()
+            // modelPath.delete()
             return@withContext Result.failure(Exception("Download failed - $reason"))
         }
 
@@ -474,7 +474,7 @@ private suspend fun downloadEmbeddingModel(
                     )
                 )
 
-                modelPath.delete()
+                // modelPath.delete()
                 return@withContext downloadEmbeddingModel(
                     context = context,
                     modelUrl = FALLBACK_EMBEDDING_MODEL_URL,
@@ -482,7 +482,7 @@ private suspend fun downloadEmbeddingModel(
                 )
             }
 
-            modelPath.delete()
+            // modelPath.delete()
             return@withContext Result.failure(
                 Exception("Model is not compatible with embedding engine: $reason. $EMBEDDING_MODEL_SUGGESTIONS")
             )
@@ -563,7 +563,7 @@ private suspend fun importEmbeddingModelFromUri(
         val loadValidation = validateEmbeddingEngineLoad(modelPath)
         if (loadValidation.isFailure) {
             val reason = loadValidation.exceptionOrNull()?.message ?: "Model failed runtime validation"
-            modelPath.delete()
+            // modelPath.delete()
             return@withContext Result.failure(
                 Exception("Selected model is not compatible: $reason. $EMBEDDING_MODEL_SUGGESTIONS")
             )

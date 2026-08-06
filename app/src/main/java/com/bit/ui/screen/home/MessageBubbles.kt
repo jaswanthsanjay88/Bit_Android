@@ -176,11 +176,18 @@ internal fun UserMessageBubble(
 internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = false) {
     var revealedLen by remember { mutableIntStateOf(0) }
     val latestText by rememberUpdatedState(text)
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
     LaunchedEffect(Unit) {
+        var isFirstChunk = true
         while (true) {
             val target = latestText.length
             if (revealedLen < target) {
+                if (isFirstChunk) {
+                    haptics.generationStart()
+                    isFirstChunk = false
+                }
+                
                 val behind = target - revealedLen
                 val step = when {
                     behind > 20 -> 4   // far behind: catch up faster
@@ -188,6 +195,7 @@ internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = f
                     else -> 2          // normal: gentle reveal
                 }
                 revealedLen = minOf(revealedLen + step, target)
+                haptics.generationTick()
                 delay(33) // ~30 FPS — actively revealing
             } else {
                 delay(100) // idle — waiting for tokens, check less often

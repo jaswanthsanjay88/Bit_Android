@@ -203,11 +203,11 @@ fun ModelFiltersSection(
                 label = { Text("LLM (GGUF)") }
             )
 
-            // FilterChip(
-            //     selected = selectedModelType == ModelType.SD,
-            //     onClick = { viewModel.filterByModelType(ModelType.SD) },
-            //     label = { Text("Image (SD)") }
-            // )
+            FilterChip(
+                selected = selectedModelType == ModelType.SD,
+                onClick = { viewModel.filterByModelType(ModelType.SD) },
+                label = { Text("Image (SD)") }
+            )
 
             FilterChip(
                 selected = selectedModelType == ModelType.TTS,

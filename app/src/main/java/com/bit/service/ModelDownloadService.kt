@@ -302,7 +302,13 @@ class ModelDownloadService : Service() {
                             unzipFile(tempFile!!, extractTempDir, modelId)
 
                             extractTempDir.listFiles()?.forEach { file ->
-                                file.copyRecursively(File(modelDir, file.name), overwrite = true)
+                                if (file.isDirectory) {
+                                    file.listFiles()?.forEach { innerFile ->
+                                        innerFile.copyRecursively(File(modelDir, innerFile.name), overwrite = true)
+                                    }
+                                } else {
+                                    file.copyRecursively(File(modelDir, file.name), overwrite = true)
+                                }
                             }
                             extractTempDir.deleteRecursively()
                             extractTempDir = null
@@ -310,7 +316,8 @@ class ModelDownloadService : Service() {
                             if (!modelDir.exists()) {
                                 modelDir.mkdirs()
                             }
-                            tempFile?.copyTo(File(modelDir, tempFile.name), overwrite = true)
+                            tempFile?.copyTo(File(modelDir, modelName.substringAfterLast("/")), overwrite = true)
+                            tempFile?.delete()
                         }
 
                         updateDownloadState(modelId, DownloadState.Processing(modelId))

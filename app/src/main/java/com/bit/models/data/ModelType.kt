@@ -4,5 +4,6 @@ enum class ModelType {
     SD,
     GGUF,
     TTS,
-    STT
+    STT,
+    EMBEDDING
 }

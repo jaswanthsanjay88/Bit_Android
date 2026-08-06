@@ -102,8 +102,8 @@ private class PlatformBitHaptics(
         if (isAllowed()) {
             val vibrator = vibrator?.takeIf { it.hasVibrator() }
             if (vibrator != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val timings = longArrayOf(0, 15, 60, 15)
-                val amplitudes = intArrayOf(0, 120, 0, 120)
+                val timings = longArrayOf(0, 25, 35, 40)
+                val amplitudes = intArrayOf(0, 160, 0, 220)
                 try {
                     vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
                     return

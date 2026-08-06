@@ -424,6 +424,21 @@ class ModelStoreRepository(private val context: Context) {
                 icon = "openai",
                 iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/openai.png",
                 tags = listOf("STT", "English", "Whisper", "Tested")
+            ),
+            HuggingFaceModel(
+                id = "nomic-embed-text-v1.5-q4_k_m",
+                name = "Nomic Embed Text v1.5 (Q4)",
+                description = "High-quality embedding model for text vectorization and RAG. Supports up to 8192 context length.",
+                fileUri = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/resolve/main/nomic-embed-text-v1.5.Q4_K_M.gguf",
+                approximateSize = "82 MB",
+                modelType = ModelType.EMBEDDING,
+                isZip = false,
+                runOnCpu = true,
+                minRamGb = 2,
+                sizeBytes = 85983232L,
+                icon = "nomic",
+                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/nomic.png",
+                tags = listOf("Embedding", "RAG", "Tested")
             )
         )
     }
@@ -450,6 +465,7 @@ class ModelStoreRepository(private val context: Context) {
                     "SD", "DIFFUSION" -> ModelType.SD
                     "TTS" -> ModelType.TTS
                     "STT" -> ModelType.STT
+                    "EMBEDDING", "EMBED" -> ModelType.EMBEDDING
                     else -> ModelType.GGUF
                 }
 
@@ -513,10 +529,12 @@ class ModelStoreRepository(private val context: Context) {
             val apiModels = getApiModels(apiRepos)
             val ttsModels = getTTSModels(hfRepos.filter { it.modelType == ModelType.TTS })
             val sttModels = getSTTModels(hfRepos.filter { it.modelType == ModelType.STT })
+            val embedModels = getGGUFModels(hfRepos.filter { it.modelType == ModelType.EMBEDDING })
 
             models.addAll(sdModels)
             models.addAll(ggufModels)
             models.addAll(apiModels)
+            models.addAll(embedModels)
             models.addAll(ttsModels)
             models.addAll(sttModels)
 

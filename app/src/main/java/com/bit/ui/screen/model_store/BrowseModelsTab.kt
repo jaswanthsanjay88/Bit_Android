@@ -246,6 +246,7 @@ internal fun RepoListItem(
                             com.bit.models.data.ModelType.SD -> TnIcons.Photo
                             com.bit.models.data.ModelType.TTS -> TnIcons.Volume
                             com.bit.models.data.ModelType.STT -> TnIcons.Microphone
+                            com.bit.models.data.ModelType.EMBEDDING -> TnIcons.FileText
                         },
                         contentDescription = null,
                         modifier = Modifier.size(20.dp),

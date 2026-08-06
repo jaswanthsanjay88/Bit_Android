@@ -220,7 +220,7 @@ private fun ProviderDetailView(
     }
 
     var isEnabled by remember(existingModel) { mutableStateOf(existingModel != null) }
-    var isActiveModel by remember(existingModel) { mutableStateOf(existingModel?.isActive ?: false) }
+    var isActiveModel by remember(existingModel) { mutableStateOf(existingModel?.isActive ?: true) }
 
     var endpointUrl by remember(existingModel) {
         mutableStateOf(
