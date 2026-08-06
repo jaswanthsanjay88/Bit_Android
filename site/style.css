@@ -1258,12 +1258,10 @@ section.reviews-section {
 
 /* ── Announcement Banner Component ── */
 .announcement-banner {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1001;
-  background: rgba(10, 10, 10, 0.95);
+  position: relative;
+  width: 100%;
+  z-index: 2;
+  background: rgba(12, 12, 14, 0.96);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(255, 204, 0, 0.25);
@@ -1273,6 +1271,7 @@ section.reviews-section {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .announcement-content {
@@ -1301,31 +1300,37 @@ section.reviews-section {
   color: var(--text-secondary);
 }
 
-.announcement-btn {
-  background: none;
-  border: none;
-  color: #ffcc00;
+button.announcement-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent !important;
+  border: none !important;
+  color: #ffcc00 !important;
   text-decoration: underline;
   font-weight: 600;
   cursor: pointer;
   font-size: 0.92rem;
   padding: 2px 6px;
   margin-left: 4px;
+  box-shadow: none !important;
+  outline: none;
   transition: opacity var(--transition-fast);
 }
 
-.announcement-btn:hover {
+button.announcement-btn:hover {
   opacity: 0.8;
 }
 
-.announcement-close {
+button.announcement-close {
+  appearance: none;
+  -webkit-appearance: none;
   position: absolute;
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #888;
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.65) !important;
   cursor: pointer;
   font-size: 1.4rem;
   width: 36px;
@@ -1334,12 +1339,14 @@ section.reviews-section {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  box-shadow: none !important;
+  outline: none;
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.announcement-close:hover {
-  color: #fff;
-  background-color: rgba(255, 255, 255, 0.1);
+button.announcement-close:hover {
+  color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.15) !important;
 }
 
 /* Announcement Banner Mobile Adjustments */
