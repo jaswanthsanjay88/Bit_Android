@@ -3,6 +3,8 @@
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
+  initAnnouncementBanner();
+  initPrivacyToast();
   initNavbarScroll();
   initMouseParallax();
   initGitHubApi();
@@ -12,8 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Auto-open tester form if linked directly
   if (window.location.hash === '#apply') {
-    const testerModal = document.getElementById('testerModal');
-    if (testerModal) testerModal.showModal();
+    openTesterModal();
   }
 });
 
@@ -298,3 +299,79 @@ async function initModelStoreCatalog() {
     console.log('Model Catalog fetch error:', err);
   }
 }
+
+/* ── Announcement Banner & Responsive Offset ── */
+function initAnnouncementBanner() {
+  const banner = document.getElementById('announcementBanner');
+  const navbar = document.getElementById('navbar');
+  if (!banner) return;
+
+  if (sessionStorage.getItem('bit_announcement_dismissed') === 'true') {
+    banner.style.display = 'none';
+    updateBannerOffset(0);
+    return;
+  }
+
+  function updateBannerOffset(overrideHeight) {
+    let h = 0;
+    if (overrideHeight !== undefined) {
+      h = overrideHeight;
+    } else if (banner && banner.style.display !== 'none') {
+      h = banner.offsetHeight || 0;
+    }
+    document.documentElement.style.setProperty('--banner-height', h + 'px');
+    if (navbar) {
+      navbar.style.top = h + 'px';
+    }
+  }
+
+  updateBannerOffset();
+
+  if (window.ResizeObserver) {
+    const observer = new ResizeObserver(() => updateBannerOffset());
+    observer.observe(banner);
+  } else {
+    window.addEventListener('resize', () => updateBannerOffset(), { passive: true });
+  }
+
+  window.dismissAnnouncementBanner = function() {
+    banner.style.display = 'none';
+    sessionStorage.setItem('bit_announcement_dismissed', 'true');
+    updateBannerOffset(0);
+  };
+}
+
+/* ── Privacy Toast Persistence & Dismissal ── */
+function initPrivacyToast() {
+  const toast = document.getElementById('privacyToast');
+  if (!toast) return;
+
+  if (localStorage.getItem('bit_privacy_toast_dismissed_v20260806') === 'true') {
+    toast.style.display = 'none';
+    return;
+  }
+
+  window.dismissPrivacyToast = function() {
+    toast.classList.add('toast-dismissed');
+    localStorage.setItem('bit_privacy_toast_dismissed_v20260806', 'true');
+    setTimeout(() => {
+      toast.style.display = 'none';
+    }, 400);
+  };
+}
+
+/* ── Helper to Open QA Tester Modal ── */
+window.openTesterModal = function() {
+  const testerModal = document.getElementById('testerModal');
+  const testerForm = document.getElementById('testerForm');
+  const successMsg = document.getElementById('successMsg');
+  if (testerModal) {
+    if (successMsg) successMsg.style.display = 'none';
+    if (testerForm) {
+      testerForm.style.display = 'flex';
+      testerForm.reset();
+    }
+    testerModal.showModal();
+  }
+};
+

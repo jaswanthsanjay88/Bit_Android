@@ -46,7 +46,7 @@
       <div class="docs-metadata">
         <span>Last updated: August 2026</span>
         <span>•</span>
-        <span>Version: BIT v1.9.3</span>
+        <span>Version: BIT v2.0.0</span>
         <span>•</span>
         <span>Platform: Android (ARM64 / x86_64)</span>
       </div>
@@ -87,6 +87,7 @@
             <li><a href="#configure-model-params" class="docs-sidebar-link">Configure per-model parameters</a></li>
             <li><a href="#enable-voice-mode" class="docs-sidebar-link">Enable hands-free voice mode</a></li>
             <li><a href="#constrain-gbnf-tools" class="docs-sidebar-link">Constrain tool calls with GBNF</a></li>
+            <li><a href="#architecture-overview" class="docs-sidebar-link">Architecture Overview</a></li>
             <li><a href="#tester-qa-guide" class="docs-sidebar-link">Test BIT on device (QA &amp; Tester Guide)</a></li>
           </ul>
         </div>
@@ -313,6 +314,37 @@ string ::= "\"" [a-zA-Z0-9_-]+ "\""
 object ::= "{" space "}" | "{" space string ":" space string "}"
 space ::= [ \t\n]*</pre>
           </div>
+
+          <a href="#architecture-overview" class="docs-next-step">Next step: Architecture Overview →</a>
+        </section>
+
+        <section id="architecture-overview" class="docs-section">
+          <h2 class="docs-h2">Architecture Overview</h2>
+          <p class="docs-summary">Summary: Core architectural design principles enabling real-time on-device and cloud hybrid inference seamlessly in Android.</p>
+
+          <p class="docs-p">
+            BIT follows a strict multi-module design and leverages Jetpack Compose and MVVM for an ultra-responsive UI. Computationally heavy tasks (like local LLM generation or image diffusion) are carefully managed via Background/Foreground Services and JNI layer bridging to prevent UI jank.
+          </p>
+
+          <h3 class="docs-h3">1. UI Layer (Jetpack Compose &amp; ViewModels)</h3>
+          <p class="docs-p">
+            The UI is fully declarative and reacts to StateFlow emissions from view models like `ChatViewModel`. User interactions are mapped to events that trigger background execution pipelines. The UI has no knowledge of whether the model being used is local (GGUF) or remote (Cloud API); it just consumes a unified `StreamEvent` interface.
+          </p>
+
+          <h3 class="docs-h3">2. Service Layer (Foreground Workers)</h3>
+          <p class="docs-p">
+            Android aggressively kills background processes. To allow models to persist in RAM when you minimize the app, BIT utilizes `LlmModelWorker` as a Foreground Service. This worker pins the native C++ engine in memory. `ModelDownloadService` manages asynchronous background downloading of large `.gguf` weights (which can be multi-gigabyte files).
+          </p>
+
+          <h3 class="docs-h3">3. Unified API Layer (`com.bit.api`)</h3>
+          <p class="docs-p">
+            The `com.bit.api` package encapsulates API handlers (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter). Through the `ApiProvider` and `ApiRegistry` interfaces, all interactions—including tool-calling and stream parsing—are normalized before reaching the ViewModel.
+          </p>
+
+          <h3 class="docs-h3">4. Inference Engines (JNI/C++)</h3>
+          <p class="docs-p">
+            Native inference happens inside `llama-kt` (Text/VLM) and `DiffusionEngine` (Images). `llama.cpp` handles memory mapping (mmap) automatically, efficiently swapping pages from storage so devices with 6GB of RAM can run 8GB models.
+          </p>
 
           <a href="#tester-qa-guide" class="docs-next-step">Next step: Test BIT on device (QA &amp; Tester Guide) →</a>
         </section>

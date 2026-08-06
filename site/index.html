@@ -19,33 +19,20 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css" />
-  <style>
-    /* Fix Banner Overlap */
-    body { padding-top: 48px; }
-    header.navbar { top: 48px !important; }
-    .announcement-banner {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 1001;
-      background: rgba(10, 10, 10, 0.95) !important;
-      backdrop-filter: blur(10px);
-    }
-    @media (max-width: 768px) {
-      body { padding-top: 72px; }
-      header.navbar { top: 72px !important; }
-    }
-  </style>
 </head>
 <body>
 
   <!-- ── QA Tester Announcement Banner ── -->
-  <div class="announcement-banner" style="border-bottom: 1px solid rgba(255, 204, 0, 0.2); padding: 12px 20px; text-align: center; font-family: var(--font-sans); font-size: 0.95rem; display: flex; align-items: center; justify-content: center; flex-wrap: wrap;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" stroke-width="2" style="margin-right: 8px;"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-    <span style="color: #ffcc00; font-weight: 600; margin-right: 8px;">Open Source Contribution: We're looking for Professional QA Testers!</span>
-    <span style="color: var(--text-secondary);">Help us push the boundaries of on-device AI.</span>
-    <button onclick="document.getElementById('testerModal').showModal(); document.getElementById('testerForm').style.display='flex'; document.getElementById('successMsg').style.display='none'; document.getElementById('testerForm').reset();" style="background: none; border: none; color: #ffcc00; margin-left: 12px; text-decoration: underline; font-weight: 500; cursor: pointer; font-size: 0.95rem; padding: 0;">Apply to Test</button>
+  <div id="announcementBanner" class="announcement-banner" role="region" aria-label="Announcement">
+    <div class="announcement-content">
+      <svg class="announcement-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <span class="announcement-text">
+        <span class="announcement-highlight">Open Source Contribution:</span> We're looking for Professional QA Testers!
+        <span class="announcement-sub">Help us push the boundaries of on-device AI.</span>
+      </span>
+      <button class="announcement-btn" onclick="openTesterModal()">Apply to Test</button>
+    </div>
+    <button class="announcement-close" onclick="dismissAnnouncementBanner()" aria-label="Close Announcement">&times;</button>
   </div>
 
   <!-- ── Navigation ── -->
@@ -616,12 +603,15 @@
     }
   </script>
   <!-- Privacy Update Toast -->
-  <div id="privacyToast" style="position: fixed; bottom: 24px; right: 24px; background: #0A0A0A; border: 1px solid rgba(255,255,255,0.15); padding: 16px 20px; border-radius: 12px; z-index: 1000; display: flex; align-items: center; gap: 16px; box-shadow: 0 12px 32px rgba(0,0,0,0.8); animation: heroReveal 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; color: #fff;">
-    <div style="font-family: var(--font-sans); font-size: 0.9rem;">
-      <div style="font-weight: 600; margin-bottom: 4px;">Privacy Policy Updated</div>
-      <div style="color: var(--text-secondary); font-size: 0.85rem;">We've updated our terms as of August 6, 2026. <a href="privacy.html" style="color: #fff; text-decoration: underline;">Read here</a>.</div>
+  <div id="privacyToast" class="privacy-toast" role="dialog" aria-label="Privacy Policy Notice">
+    <div class="toast-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
     </div>
-    <button onclick="document.getElementById('privacyToast').style.display='none'" style="background: none; border: none; color: #888; cursor: pointer; font-size: 1.2rem; padding: 0; display: flex; align-items: center; justify-content: center;">&times;</button>
+    <div class="toast-content">
+      <div class="toast-title">Privacy Policy Updated</div>
+      <div class="toast-desc">We've updated our terms as of August 6, 2026. <a href="privacy.html" class="toast-link">Read here</a>.</div>
+    </div>
+    <button class="toast-close" onclick="dismissPrivacyToast()" aria-label="Close Privacy Notice">&times;</button>
   </div>
 </body>
 </html>
