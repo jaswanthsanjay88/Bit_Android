@@ -2,6 +2,13 @@
    BIT — Landing Page Client-side Script
    ========================================================================== */
 
+function checkHash() {
+  const hash = (window.location.hash || '').toLowerCase();
+  if (hash === '#apply' || hash === '#testerform' || hash === '#testermodal' || hash === '#qa') {
+    openTesterModal();
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initAnnouncementBanner();
   initPrivacyToast();
@@ -12,11 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initLiveRatings();
   initModelStoreCatalog();
   
-  // Auto-open tester form if linked directly
-  if (window.location.hash === '#apply') {
-    openTesterModal();
-  }
+  // Auto-open tester form if linked directly via hash
+  setTimeout(checkHash, 100);
 });
+
+window.addEventListener('hashchange', checkHash);
 
 /* ── Sticky Navbar Blur ── */
 function initNavbarScroll() {
@@ -351,18 +358,42 @@ function initPrivacyToast() {
   };
 }
 
-/* ── Helper to Open QA Tester Modal ── */
+/* ── Helper to Open & Close QA Tester Modal ── */
 window.openTesterModal = function() {
   const testerModal = document.getElementById('testerModal');
   const testerForm = document.getElementById('testerForm');
   const successMsg = document.getElementById('successMsg');
-  if (testerModal) {
-    if (successMsg) successMsg.style.display = 'none';
-    if (testerForm) {
-      testerForm.style.display = 'flex';
-      testerForm.reset();
+  if (!testerModal) return;
+
+  if (successMsg) successMsg.style.display = 'none';
+  if (testerForm) {
+    testerForm.style.display = 'flex';
+  }
+
+  if (typeof testerModal.showModal === 'function') {
+    try {
+      if (!testerModal.open) {
+        testerModal.showModal();
+      }
+    } catch (e) {
+      testerModal.setAttribute('open', 'true');
     }
-    testerModal.showModal();
+  } else {
+    testerModal.setAttribute('open', 'true');
+  }
+};
+
+window.closeTesterModal = function() {
+  const testerModal = document.getElementById('testerModal');
+  if (!testerModal) return;
+  if (typeof testerModal.close === 'function') {
+    try {
+      testerModal.close();
+    } catch (e) {
+      testerModal.removeAttribute('open');
+    }
+  } else {
+    testerModal.removeAttribute('open');
   }
 };
 

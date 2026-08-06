@@ -403,11 +403,14 @@
     </div>
   </footer>
 
+  <!-- ── Tester Application Modal Anchor Target ── -->
+  <span id="apply" style="position: absolute; top: 0; left: 0; pointer-events: none; visibility: hidden;"></span>
+
   <!-- ── Tester Application Modal ── -->
   <dialog id="testerModal" style="border: 1px solid #333; border-radius: 12px; background: #000000; color: var(--text-primary); max-width: 450px; width: 90%; padding: 0; box-shadow: 0 24px 48px rgba(0,0,0,0.6); margin: auto; max-height: 90vh; overflow-y: auto;">
     <div style="padding: 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: #000000; z-index: 10;">
       <h3 style="margin: 0; font-family: var(--font-serif); font-size: 1.25rem;">Apply for QA Testing</h3>
-      <button onclick="document.getElementById('testerModal').close()" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.25rem;">&times;</button>
+      <button type="button" onclick="closeTesterModal()" aria-label="Close modal" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.25rem;">&times;</button>
     </div>
     <form id="testerForm" onsubmit="submitTesterForm(event)" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
       <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0;">Fill out the details below to contribute to the open-source project. Our team will contact you with build access.</p>
@@ -530,7 +533,7 @@
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       <h4 style="margin: 0; font-size: 1.5rem; font-family: var(--font-serif); color: var(--text-primary);">Application Received</h4>
       <p style="color: var(--text-secondary); margin: 0; font-size: 0.95rem; line-height: 1.5;">Thank you! Your details have been submitted securely.<br>The team will contact you soon!</p>
-      <button type="button" class="btn-pill" onclick="document.getElementById('testerModal').close()" style="margin-top: 16px;">Return to site</button>
+      <button type="button" class="btn-pill" onclick="closeTesterModal()" style="margin-top: 16px;">Return to site</button>
     </div>
   </dialog>
   <style>
@@ -538,6 +541,9 @@
       background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
+    }
+    dialog[open] {
+      display: block !important;
     }
     #testerModal input, #testerModal textarea, #testerModal select {
       background: #111111 !important;
