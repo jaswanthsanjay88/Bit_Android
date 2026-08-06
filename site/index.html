@@ -24,15 +24,15 @@
 
   <!-- ── Fixed Header Stack (Banner + Navbar) ── -->
   <header class="header-stack" id="headerStack">
-    <!-- ── QA Tester Announcement Banner ── -->
+    <!-- ── QA Tester Announcement Banner (Linear / Nothing / Apple Vision Pro Aesthetic) ── -->
     <div id="announcementBanner" class="announcement-banner" role="region" aria-label="Announcement">
       <div class="announcement-content">
-        <svg class="announcement-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        <span class="announcement-text">
-          <strong class="announcement-highlight">Open Source Contribution:</strong> We're looking for Professional QA Testers!
-          <span class="announcement-sub">Help us push the boundaries of on-device AI.</span>
-        </span>
-        <button type="button" class="announcement-btn" onclick="openTesterModal()">Apply to Test</button>
+        <span class="announcement-badge">QA Program</span>
+        <span class="announcement-text">We're looking for Professional QA Testers to benchmark on-device AI.</span>
+        <button type="button" class="announcement-btn" onclick="openTesterModal()">
+          <span>Apply to Test</span>
+          <svg class="btn-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
       </div>
       <button type="button" class="announcement-close" onclick="dismissAnnouncementBanner()" aria-label="Close Announcement">&times;</button>
     </div>

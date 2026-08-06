@@ -1256,17 +1256,17 @@ section.reviews-section {
   .column-hidden-sm { display: none; }
 }
 
-/* ── Announcement Banner Component (Clean Solid White) ── */
+/* ── Announcement Banner Component (Linear / Nothing / Apple Vision Pro Style) ── */
 .announcement-banner {
   position: relative;
   width: 100%;
   z-index: 2;
   background: #FFFFFF !important;
-  color: #111111 !important;
+  color: #000000 !important;
   border-bottom: 1px solid #E5E5E5;
-  padding: 10px 48px 10px 16px;
+  padding: 8px 48px 8px 16px;
   font-family: var(--font-sans);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1274,47 +1274,72 @@ section.reviews-section {
 }
 
 .announcement-content {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 6px 8px;
+  gap: 6px 10px;
   text-align: center;
-  font-size: 0.90rem;
+  font-size: 0.84rem;
+  line-height: 1.4;
   color: #111111;
   width: 100%;
   max-width: var(--container-max);
   margin: 0 auto;
+  letter-spacing: -0.01em;
 }
 
-.announcement-icon {
-  flex-shrink: 0;
-}
-
-.announcement-highlight {
-  color: #000000;
+.announcement-badge {
+  display: inline-flex;
+  align-items: center;
+  background: #000000;
+  color: #FFFFFF;
+  font-size: 0.65rem;
   font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  line-height: 1.2;
 }
 
-.announcement-sub {
-  color: #444444;
+.announcement-text {
+  color: #222222;
+  font-weight: 500;
+  letter-spacing: -0.012em;
 }
 
 button.announcement-btn {
   appearance: none;
   -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: transparent !important;
   border: none !important;
   color: #000000 !important;
-  font-weight: 700;
-  text-decoration: underline;
+  font-weight: 600;
+  font-size: 0.84rem;
+  padding: 0;
   cursor: pointer;
-  font-size: 0.90rem;
-  padding: 2px 6px;
-  margin-left: 4px;
   box-shadow: none !important;
   outline: none;
+  text-decoration: none;
   transition: opacity var(--transition-fast);
+}
+
+button.announcement-btn span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+button.announcement-btn .btn-arrow {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+button.announcement-btn:hover .btn-arrow {
+  transform: translateX(3px);
 }
 
 button.announcement-btn:hover {
@@ -1330,13 +1355,13 @@ button.announcement-close {
   transform: translateY(-50%);
   background: transparent !important;
   border: none !important;
-  color: #666666 !important;
+  color: #888888 !important;
   cursor: pointer;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   line-height: 1;
-  width: 36px;
-  height: 36px;
-  display: flex;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -1348,45 +1373,43 @@ button.announcement-close {
 
 button.announcement-close:hover {
   color: #000000 !important;
-  background-color: rgba(0, 0, 0, 0.08) !important;
+  background-color: rgba(0, 0, 0, 0.06) !important;
 }
 
 /* Announcement Banner Mobile Adjustments */
 @media (max-width: 640px) {
   .announcement-banner {
-    padding: 8px 40px 8px 12px;
+    padding: 8px 36px 8px 12px;
   }
 
   .announcement-content {
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     line-height: 1.35;
-    gap: 2px 4px;
+    gap: 4px 6px;
     justify-content: flex-start;
     text-align: left;
     color: #111111;
   }
 
-  .announcement-icon {
-    width: 14px;
-    height: 14px;
-    margin-right: 2px;
+  .announcement-badge {
+    font-size: 0.62rem;
+    padding: 1px 6px;
   }
 
-  .announcement-sub {
-    color: #444444;
+  .announcement-text {
     display: inline;
   }
 
   button.announcement-btn {
-    font-size: 0.82rem;
-    margin-left: 2px;
+    font-size: 0.78rem;
+    display: inline-flex;
   }
 
   button.announcement-close {
     right: 4px;
-    width: 32px;
-    height: 32px;
-    font-size: 1.2rem;
+    width: 28px;
+    height: 28px;
+    font-size: 1.1rem;
   }
 }
 
