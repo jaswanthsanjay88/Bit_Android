@@ -22,42 +22,45 @@
 </head>
 <body>
 
-  <!-- ── QA Tester Announcement Banner ── -->
-  <div id="announcementBanner" class="announcement-banner" role="region" aria-label="Announcement">
-    <div class="announcement-content">
-      <svg class="announcement-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      <span class="announcement-text">
-        <span class="announcement-highlight">Open Source Contribution:</span> We're looking for Professional QA Testers!
-        <span class="announcement-sub">Help us push the boundaries of on-device AI.</span>
-      </span>
-      <button class="announcement-btn" onclick="openTesterModal()">Apply to Test</button>
+  <!-- ── Fixed Header Stack (Banner + Navbar) ── -->
+  <header class="header-stack" id="headerStack">
+    <!-- ── QA Tester Announcement Banner ── -->
+    <div id="announcementBanner" class="announcement-banner" role="region" aria-label="Announcement">
+      <div class="announcement-content">
+        <svg class="announcement-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffcc00" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <span class="announcement-text">
+          <strong class="announcement-highlight">Open Source Contribution:</strong> We're looking for Professional QA Testers!
+          <span class="announcement-sub">Help us push the boundaries of on-device AI.</span>
+        </span>
+        <button type="button" class="announcement-btn" onclick="openTesterModal()">Apply to Test</button>
+      </div>
+      <button type="button" class="announcement-close" onclick="dismissAnnouncementBanner()" aria-label="Close Announcement">&times;</button>
     </div>
-    <button class="announcement-close" onclick="dismissAnnouncementBanner()" aria-label="Close Announcement">&times;</button>
-  </div>
 
-  <!-- ── Navigation ── -->
-  <header class="navbar" id="navbar">
-    <div class="container nav-container">
-      <a href="#" class="nav-brand" aria-label="BIT Home">
-        <img src="img/ic_logo.svg" alt="BIT Logo" class="logo-img" />
-        <span>BIT</span>
-      </a>
+    <!-- ── Navigation ── -->
+    <nav class="navbar" id="navbar">
+      <div class="container nav-container">
+        <a href="#" class="nav-brand" aria-label="BIT Home">
+          <img src="img/ic_logo.svg" alt="BIT Logo" class="logo-img" />
+          <span>BIT</span>
+        </a>
 
-      <ul class="nav-links">
-        <li><a href="#benchmarks" class="nav-link">Specs</a></li>
-        <li><a href="#showcase" class="nav-link">Models</a></li>
-        <li><a href="#architecture" class="nav-link">Architecture</a></li>
-        <li><a href="#reviews" class="nav-link">Reviews</a></li>
-        <li><a href="changelog.html" class="nav-link">Changelog</a></li>
-        <li><a href="docs.html" class="nav-link">Docs</a></li>
-        <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="nav-link">GitHub</a></li>
-      </ul>
+        <ul class="nav-links">
+          <li><a href="#benchmarks" class="nav-link">Specs</a></li>
+          <li><a href="#showcase" class="nav-link">Models</a></li>
+          <li><a href="#architecture" class="nav-link">Architecture</a></li>
+          <li><a href="#reviews" class="nav-link">Reviews</a></li>
+          <li><a href="changelog.html" class="nav-link">Changelog</a></li>
+          <li><a href="docs.html" class="nav-link">Docs</a></li>
+          <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="nav-link">GitHub</a></li>
+        </ul>
 
-      <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn-pill">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>Download APK</span>
-      </a>
-    </div>
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn-pill nav-download-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Download APK</span>
+        </a>
+      </div>
+    </nav>
   </header>
 
   <!-- ── Hero Section ── -->

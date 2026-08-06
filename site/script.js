@@ -20,15 +20,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ── Sticky Navbar Blur ── */
 function initNavbarScroll() {
+  const headerStack = document.getElementById('headerStack');
   const navbar = document.getElementById('navbar');
-  if (!navbar) return;
 
   const handleScroll = () => {
-    if (window.scrollY > 40) {
-      navbar.classList.add('scrolled');
-    } else {
-      navbar.classList.remove('scrolled');
-    }
+    const isScrolled = window.scrollY > 30;
+    if (headerStack) headerStack.classList.toggle('scrolled', isScrolled);
+    if (navbar) navbar.classList.toggle('scrolled', isScrolled);
   };
 
   window.addEventListener('scroll', handleScroll, { passive: true });
@@ -300,44 +298,37 @@ async function initModelStoreCatalog() {
   }
 }
 
-/* ── Announcement Banner & Responsive Offset ── */
+/* ── Announcement Banner & Responsive Header Offset ── */
 function initAnnouncementBanner() {
+  const headerStack = document.getElementById('headerStack');
   const banner = document.getElementById('announcementBanner');
-  const navbar = document.getElementById('navbar');
-  if (!banner) return;
 
-  if (sessionStorage.getItem('bit_announcement_dismissed') === 'true') {
+  function updateBodyPadding() {
+    if (headerStack) {
+      const h = headerStack.offsetHeight || 0;
+      document.body.style.paddingTop = h + 'px';
+    }
+  }
+
+  if (banner && sessionStorage.getItem('bit_announcement_dismissed') === 'true') {
     banner.style.display = 'none';
-    updateBannerOffset(0);
+    updateBodyPadding();
     return;
   }
 
-  function updateBannerOffset(overrideHeight) {
-    let h = 0;
-    if (overrideHeight !== undefined) {
-      h = overrideHeight;
-    } else if (banner && banner.style.display !== 'none') {
-      h = banner.offsetHeight || 0;
-    }
-    document.documentElement.style.setProperty('--banner-height', h + 'px');
-    if (navbar) {
-      navbar.style.top = h + 'px';
-    }
-  }
+  updateBodyPadding();
 
-  updateBannerOffset();
-
-  if (window.ResizeObserver) {
-    const observer = new ResizeObserver(() => updateBannerOffset());
-    observer.observe(banner);
+  if (headerStack && window.ResizeObserver) {
+    const observer = new ResizeObserver(() => updateBodyPadding());
+    observer.observe(headerStack);
   } else {
-    window.addEventListener('resize', () => updateBannerOffset(), { passive: true });
+    window.addEventListener('resize', updateBodyPadding, { passive: true });
   }
 
   window.dismissAnnouncementBanner = function() {
-    banner.style.display = 'none';
+    if (banner) banner.style.display = 'none';
     sessionStorage.setItem('bit_announcement_dismissed', 'true');
-    updateBannerOffset(0);
+    updateBodyPadding();
   };
 }
 
