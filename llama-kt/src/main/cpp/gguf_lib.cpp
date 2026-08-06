@@ -78,7 +78,9 @@ static void ensure_backend_init() {
         // On Android, ggml_backend_load_all() uses /proc/self/exe which points to
         // app_process64. We use dladdr to find the actual directory containing our
         // JNI libraries (e.g. /data/app/~~.../lib/arm64-v8a/) so ggml can scan and
-        // load the best CPU backend variant (armv8.0 vs armv8.4 etc).
+        // load the best CPU backend variant.
+        // On Snapdragon 7s Gen 2 (and similar Cortex-A78/A55 devices), armv8.2_2 (FP16 vector)
+        // causes SIGILL/SIGSEGV in ggml. We prioritize armv8.2_1 (DotProd) which is stable.
         Dl_info info;
         if (dladdr((const void*)ensure_backend_init, &info) && info.dli_fname) {
             std::string path = info.dli_fname;
@@ -86,7 +88,21 @@ static void ensure_backend_init() {
             if (last_slash != std::string::npos) {
                 std::string dir = path.substr(0, last_slash);
                 LOGI("Discovered JNI library dir: %s", dir.c_str());
-                ggml_backend_load_all_from_path(dir.c_str());
+
+                std::string armv82_1 = dir + "/libggml-cpu-android_armv8.2_1.so";
+                std::string armv80_1 = dir + "/libggml-cpu-android_armv8.0_1.so";
+                std::string base_cpu = dir + "/libggml-cpu.so";
+
+                if (ggml_backend_load(armv82_1.c_str())) {
+                    LOGI("Successfully loaded safe ARMv8.2 DotProd CPU backend: %s", armv82_1.c_str());
+                } else if (ggml_backend_load(armv80_1.c_str())) {
+                    LOGI("Successfully loaded safe ARMv8.0 CPU backend: %s", armv80_1.c_str());
+                } else if (ggml_backend_load(base_cpu.c_str())) {
+                    LOGI("Successfully loaded base CPU backend: %s", base_cpu.c_str());
+                } else {
+                    LOGW("Direct backend load failed, falling back to ggml_backend_load_all_from_path");
+                    ggml_backend_load_all_from_path(dir.c_str());
+                }
             }
         }
 

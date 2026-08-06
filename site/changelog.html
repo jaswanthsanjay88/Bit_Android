@@ -70,6 +70,19 @@
 
     <div class="timeline">
       
+      <!-- v2.0.1 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v2.0.1</span>
+          <span class="release-date">August 06, 2026</span>
+        </div>
+        <p class="release-desc">Chipset compatibility patch and native execution stability fixes.</p>
+        <ul class="release-features">
+          <li><strong>Snapdragon 7s Gen 2 Fix:</strong> Resolved FP16 CPU backend instruction SIGILL crash by prioritizing safe ARMv8.2 DotProd variant during GGUF model load (LFM 350M, etc.).</li>
+          <li><strong>Embedding & QNN Stability:</strong> Verified GGUF text embedding support in native C++ engine and added missing QNN asset fallback handling.</li>
+        </ul>
+      </div>
+
       <!-- v2.0.0 -->
       <div class="release">
         <div class="release-header">

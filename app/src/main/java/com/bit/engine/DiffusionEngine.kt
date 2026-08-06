@@ -55,18 +55,23 @@ class DiffusionEngine {
             val mgr = StableDiffusionManager.getInstance(context)
             sdManager = mgr
             val tarFile = java.io.File(context.cacheDir, "qnnlibs.tar.xz")
-            val tarPath = if (tarFile.exists()) tarFile.absolutePath else ""
-            mgr.initialize(
-                DiffusionRuntimeConfig(
-                    runtimeDir = "runtime_libs/qnnlibs",
-                    tarXzSourcePath = tarPath,
-                    qnnLibsAssetPath = "", // Disabled due to missing qnnlibs.tar.xz
-                    safetyCheckerEnabled = false,
-                    safetyCheckerAssetPath = "" // Disabled due to missing safety_checker.mnn
+            val runtimeLibsDir = java.io.File(context.filesDir, "runtime_libs/qnnlibs")
+            if (tarFile.exists() || runtimeLibsDir.exists()) {
+                val tarPath = if (tarFile.exists()) tarFile.absolutePath else ""
+                mgr.initialize(
+                    DiffusionRuntimeConfig(
+                        runtimeDir = "runtime_libs/qnnlibs",
+                        tarXzSourcePath = tarPath,
+                        qnnLibsAssetPath = "", // Disabled due to missing qnnlibs.tar.xz
+                        safetyCheckerEnabled = false,
+                        safetyCheckerAssetPath = "" // Disabled due to missing safety_checker.mnn
+                    )
                 )
-            )
+                Log.i(TAG, "DiffusionEngine initialized successfully")
+            } else {
+                Log.w(TAG, "Skipping QNN runtime setup: qnnlibs.tar.xz not present in cacheDir")
+            }
             initDeferred.complete(true)
-            Log.i(TAG, "DiffusionEngine initialized successfully")
         } catch (e: Exception) {
             initDeferred.complete(true)
             Log.e(TAG, "Init warning: ${e.message}", e)

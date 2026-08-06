@@ -17,7 +17,7 @@ BIT is a privacy-first AI assistant that runs large language models, vision mode
 
 The application is built on top of the [llama.kt SDK](#the-llamakt-sdk), a modular Kotlin wrapper around native C++ inference backends, and targets Android 10 (API 29) and above.
 ---
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow?style=for-the-badge&logo=buymeacoffee)](https://www.buymeacoffee.com/jaswanthsanjay)
+<a href="https://www.buymeacoffee.com/jaswanthsanjay" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
 ---
 
 ## Table of Contents
@@ -95,31 +95,60 @@ Connect to OpenAI-compatible API endpoints for cloud-hosted models alongside loc
 
 ## Architecture
 
-BIT is structured as a multi-module Android application. Native inference operations are isolated from the presentation layer to allow independent development and testing of each component.
+BIT is engineered as a modern, multi-module Android application leveraging **Jetpack Compose** for a reactive UI and **MVVM (Model-View-ViewModel)** for state management. Native inference operations are strongly isolated from the presentation layer to guarantee fluid 60FPS UI performance even while the CPU/GPU is under heavy load.
+
+### Core Architectural Layers
+
+1. **UI Layer (Jetpack Compose & ViewModels)**
+   - Fully declarative UI that reacts instantly to StateFlow emissions.
+   - `ChatViewModel` handles the unified generation logic, routing prompts to either local engines or remote API providers seamlessly.
+   - `LLMModelViewModel` manages background states, offering automatic session recovery when the app restarts.
+
+2. **Service Layer (Foreground Workers)**
+   - `LlmModelWorker`: An Android Foreground Service that keeps the heavy C++ inference engines (Llama, Stable Diffusion) pinned in memory. This prevents Android from killing the models when you navigate away, ensuring zero "cold start" delays when returning to the app.
+   - `ModelDownloadService`: Manages large, multi-gigabyte `.gguf` weight downloads with pause/resume capabilities and background execution.
+
+3. **Inference Engines (JNI/C++)**
+   - Native execution for maximum performance. Memory mapping (mmap) allows loading 8GB models on phones with only 6GB of RAM by swapping pages from storage.
+   - `DiffusionEngine`: Handles computationally expensive local Stable Diffusion generations securely.
+
+4. **Unified API Layer (`com.bit.api`)**
+   - Abstracts remote HTTP requests (OpenAI, Gemini, Claude, DeepSeek, Ollama) behind a single unified interface. It supports advanced streaming (`StreamEvent`) and tool-calling execution directly from the cloud without altering the UI logic.
+
+### Module Breakdown
 
 | Module | Purpose |
 |---|---|
-| `app` | Main application module. Jetpack Compose UI, ViewModels, navigation graph, plugin system, and application state management. |
-| `llama-kt` | Core inference SDK. Native JNI bindings for GGUF model inference, vision projector loading, grammar-constrained decoding, and sampler configuration. |
+| `app` | Main application module. Jetpack Compose UI, ViewModels, navigation graph, plugin system, and unified API routing. |
+| `llama-kt` | Core inference SDK. Native JNI bindings for GGUF model inference, vision projector loading, grammar-constrained decoding (GBNF), and sampler configuration. |
 | `ums` | User Management System. Secure session handling and identity management. |
-| `neuron-packet` | Parser and manager for encrypted local RAG document packets in the `.neuron` format. |
-| `system_encryptor` | Cryptographic utilities providing AES-256-GCM encryption backed by the Android Keystore System. |
+| `neuron-packet` | Parser and manager for encrypted local RAG document packets in the `.neuron` format. Extracts and chunks PDFs, Word docs, and EPUBs locally. |
+| `system_encryptor` | Cryptographic utilities providing AES-256-GCM encryption backed by the Android Keystore System for API keys and chat logs. |
 | `file_ops` | On-device file management, backup, and restore operations. |
-| `memory-vault` | Long-term episodic memory storage engine with configurable decay and retrieval mechanisms. |
+| `memory-vault` | Long-term episodic memory storage engine featuring vector search and configurable temporal decay. |
 
-```
+### Component Diagram
+
+```text
 BIT (app)
  |
- +-- llama-kt (native LLM / VLM inference)
- |      +-- llama.cpp JNI bindings
- |      +-- GGUF model loading and context management
- |      +-- Grammar-constrained decoding (GBNF)
+ +-- Unified API Router (Cloud / Local Switch)
+ |      +-- Remote: OpenAI, Gemini, Claude, Ollama (via Retrofit)
+ |      +-- Local: llama-kt (native LLM / VLM inference)
+ |             +-- llama.cpp JNI bindings
+ |             +-- GGUF model loading and KV context management
+ |             +-- Grammar-constrained decoding (GBNF)
  |
- +-- ums (user management)
- +-- neuron-packet (encrypted RAG documents)
- +-- system_encryptor (AES-256-GCM / Android Keystore)
- +-- file_ops (file management and backups)
- +-- memory-vault (episodic memory engine)
+ +-- Services
+ |      +-- LlmModelWorker (Keeps Native Engine Alive)
+ |      +-- ModelDownloadService (Background GGUF Downloads)
+ |
+ +-- Sub-Modules
+        +-- ums (user management)
+        +-- neuron-packet (encrypted RAG documents)
+        +-- system_encryptor (AES-256-GCM / Android Keystore)
+        +-- file_ops (file management and backups)
+        +-- memory-vault (episodic memory engine)
 ```
 
 ---

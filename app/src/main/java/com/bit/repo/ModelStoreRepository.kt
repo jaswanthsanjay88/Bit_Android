@@ -437,7 +437,7 @@ class ModelStoreRepository(private val context: Context) {
                 minRamGb = 2,
                 sizeBytes = 85983232L,
                 icon = "nomic",
-                iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/nomic.png",
+                iconUrl = "https://github.com/nomic-ai.png",
                 tags = listOf("Embedding", "RAG", "Tested")
             )
         )
