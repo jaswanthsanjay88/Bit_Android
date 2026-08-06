@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Changelog — BIT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { padding-top: 100px; }
+    .changelog-container { max-width: 800px; margin: 0 auto; padding: 40px 20px 100px 20px; }
+    .changelog-title { font-family: var(--font-display); font-size: 2.5rem; margin-bottom: 10px; color: var(--text-primary); }
+    .changelog-subtitle { color: var(--text-secondary); margin-bottom: 50px; font-size: 1.1rem; }
+    
+    .timeline { position: relative; padding-left: 32px; border-left: 2px solid rgba(255, 255, 255, 0.1); margin-top: 40px; }
+    .release { position: relative; margin-bottom: 48px; }
+    .release::before {
+      content: '';
+      position: absolute;
+      left: -39px;
+      top: 6px;
+      width: 12px;
+      height: 12px;
+      background: var(--bg-black);
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(255,255,255,0.2);
+    }
+    .release:first-child::before {
+      border-color: #ffcc00;
+      box-shadow: 0 0 12px rgba(255, 204, 0, 0.4);
+    }
+    
+    .release-header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+    .release-version { font-family: monospace; font-size: 1.4rem; font-weight: 700; color: var(--text-primary); }
+    .release:first-child .release-version { color: #ffcc00; }
+    .release-date { color: var(--text-secondary); font-size: 0.9rem; font-family: monospace; }
+    
+    .release-desc { color: var(--text-secondary); font-size: 1rem; line-height: 1.6; font-family: var(--font-sans); margin-bottom: 16px; }
+    
+    .release-features { list-style: none; padding: 0; margin: 0; }
+    .release-features li { position: relative; padding-left: 16px; margin-bottom: 8px; color: rgba(255,255,255,0.85); font-size: 0.95rem; line-height: 1.5; }
+    .release-features li::before { content: '•'; position: absolute; left: 0; color: #666; }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <header class="navbar scrolled" id="navbar">
+    <div class="container nav-container">
+      <a href="index.html" class="nav-brand" aria-label="BIT Home">
+        <img src="img/ic_logo.svg" alt="BIT Logo" class="logo-img" onerror="this.style.display='none'"/>
+        <span>BIT</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html" class="nav-link">Home</a></li>
+        <li><a href="index.html#benchmarks" class="nav-link">Specs</a></li>
+        <li><a href="privacy.html" class="nav-link">Privacy</a></li>
+      </ul>
+      <a href="index.html#apply" class="btn-pill">
+        <span>Apply to Test</span>
+      </a>
+    </div>
+  </header>
+
+  <div class="container changelog-container">
+    <h1 class="changelog-title">Changelog</h1>
+    <p class="changelog-subtitle">The development history and release notes for BIT.</p>
+
+    <div class="timeline">
+      
+      <!-- v2.0.0 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v2.0.0</span>
+          <span class="release-date">August 06, 2026</span>
+        </div>
+        <p class="release-desc">Major redesign and stability update focusing on UI polish and offline AI performance.</p>
+        <ul class="release-features">
+          <li><strong>Web App Redesign:</strong> Custom scrollbars, glassmorphism UI, 3D parallax hero animations, and monochrome privacy policy.</li>
+          <li><strong>QA Tester Portal:</strong> Added dynamic application form with deep-linking (#apply).</li>
+          <li><strong>Model Explorer:</strong> Enhanced API metrics, offline fallback catalog, and curated model store fetches.</li>
+          <li><strong>Native Performance:</strong> Enabled all GGML CPU variants and dynamic backend loading for massively faster inference.</li>
+        </ul>
+      </div>
+
+      <!-- v1.9.5 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v1.9.5</span>
+          <span class="release-date">July 28, 2026</span>
+        </div>
+        <p class="release-desc">CI/CD pipeline stabilization and native C++ compiler enhancements.</p>
+        <ul class="release-features">
+          <li><strong>Build System:</strong> Enforced deterministic Full LTO (-flto=full) across all 5 C++ CMake modules.</li>
+          <li><strong>Continuous Integration:</strong> Automated GitHub release workflows and secured release signing keys.</li>
+        </ul>
+      </div>
+
+      <!-- v1.9.0 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v1.9.0</span>
+          <span class="release-date">July 19, 2026</span>
+        </div>
+        <p class="release-desc">Audio integration improvements and UI component polish.</p>
+        <ul class="release-features">
+          <li><strong>Audio Handling:</strong> Multi-frame VAD barge-in with hardware AEC (Acoustic Echo Cancellation).</li>
+          <li><strong>Quality of Life:</strong> Whisper artifact filtering, stop state cleanup, and HTML sanitization.</li>
+          <li><strong>UI Polish:</strong> In-app APK installer Uri resolution, official logo in Settings, and dynamic layout bounds.</li>
+        </ul>
+      </div>
+
+      <!-- v1.8.4 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v1.8.4</span>
+          <span class="release-date">July 17, 2026</span>
+        </div>
+        <p class="release-desc">Introduction of Claude-style Live Voice Mode.</p>
+        <ul class="release-features">
+          <li><strong>Live Voice Mode:</strong> Implemented real-time voice mode with a premium monochrome visualizer aesthetic.</li>
+          <li><strong>Visuals:</strong> Relocated reactive audio glow to bottom screen edges, added frosted glass top bar with haze.</li>
+          <li><strong>Assets:</strong> Added HuggingFace vector SVG icon and synchronized end credits playback flow.</li>
+        </ul>
+      </div>
+
+      <!-- v1.6.3 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v1.6.3</span>
+          <span class="release-date">July 10, 2026</span>
+        </div>
+        <p class="release-desc">Critical patches for LLM context and hallucinations.</p>
+        <ul class="release-features">
+          <li><strong>Model Fixes:</strong> Fixed small-model prompt template leakage & sampling coherence.</li>
+          <li><strong>JNI Layer:</strong> Prevented <think> tags from leaking and fixed prompt injection to avoid hallucinations.</li>
+          <li><strong>Stability:</strong> Resolved JNI chat template execution crashes and threadpool atomic alignment issues.</li>
+        </ul>
+      </div>
+
+      <!-- v1.0.0-debug -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v1.0.0-debug</span>
+          <span class="release-date">July 08, 2026</span>
+        </div>
+        <p class="release-desc">Initial stable baseline.</p>
+        <ul class="release-features">
+          <li><strong>Premium UI:</strong> Material 3 overhaul, top bar progressive glassmorphism, unified reasoning cards.</li>
+          <li><strong>Offline Core:</strong> TTS crash fixes, multi-lingual Kokoro support, and offline TTS model downloads.</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
