@@ -21,8 +21,8 @@ android {
                           "-DLLAMA_BUILD_TOOLS=OFF",
                           "-DLLAMA_BUILD_SERVER=OFF",
                           "-DGGML_NATIVE=OFF",
-                          "-DGGML_BACKEND_DL=ON",
-                          "-DGGML_CPU_ALL_VARIANTS=ON",
+                          "-DGGML_BACKEND_DL=OFF",
+                          "-DGGML_CPU_ALL_VARIANTS=OFF",
                           "-DGGML_LLAMAFILE=OFF",
                           "-Wno-deprecated",
                           "-Wno-dev")

@@ -73,49 +73,8 @@ static std::once_flag g_backend_init_flag;
 static void ensure_backend_init() {
     std::call_once(g_backend_init_flag, [] {
         llama_log_set(llama_android_log_callback, nullptr);
-        // Prevent llama_backend_init() from calling ggml_backend_load_all() and scanning
-        // for unsupported CPU variants like armv8.2_2 which crash on Snapdragon 7s Gen 2 / MediaTek.
-        bool cpu_loaded = false;
-        
-        auto try_load = [&](const std::string& name) -> bool {
-            if (cpu_loaded) return true;
-            if (ggml_backend_load(name.c_str())) {
-                LOGI("Successfully loaded safe CPU backend: %s", name.c_str());
-                cpu_loaded = true;
-                return true;
-            }
-            return false;
-        };
-
-        // First try resolving via dladdr if the libraries are unpacked in a specific directory
-        Dl_info info;
-        if (dladdr((const void*)ensure_backend_init, &info) && info.dli_fname) {
-            std::string path = info.dli_fname;
-            size_t last_slash = path.find_last_of('/');
-            if (last_slash != std::string::npos) {
-                std::string dir = path.substr(0, last_slash);
-                LOGI("Discovered JNI library dir: %s", dir.c_str());
-#if defined(__aarch64__)
-                try_load(dir + "/libggml-cpu-android_armv8.2_1.so");
-                try_load(dir + "/libggml-cpu-android_armv8.0_1.so");
-#endif
-                try_load(dir + "/libggml-base.so");
-                try_load(dir + "/libggml.so");
-            }
-        }
-
-        // Fallback to soname resolution (if extractNativeLibs=false and libraries are inside base.apk)
-#if defined(__aarch64__)
-        try_load("libggml-cpu-android_armv8.2_1.so");
-        try_load("libggml-cpu-android_armv8.0_1.so");
-#endif
-        try_load("libggml-base.so");
-        try_load("libggml.so");
-
-        if (!cpu_loaded) {
-            LOGW("Failed to load specific safe CPU backend variants by path or soname.");
-        }
-
+        // Statically linked CPU backends don't require manual variant scanning.
+        // KleidiAI will handle safe runtime dispatch internally.
         llama_backend_init();
 
         // ggml's static-link build only auto-registers CPU. With GGML_BACKEND_DL=OFF

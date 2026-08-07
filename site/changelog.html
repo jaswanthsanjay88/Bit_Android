@@ -69,6 +69,18 @@
     <p class="changelog-subtitle">The development history and release notes for BIT.</p>
 
     <div class="timeline">
+      <!-- v2.0.3 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v2.0.3</span>
+          <span class="release-date">August 07, 2026</span>
+        </div>
+        <p class="release-desc">Resolved remaining SIGILL engine crashes on Qualcomm and MediaTek APUs.</p>
+        <ul class="release-features">
+          <li><strong>Crash Fix:</strong> Switched CPU backend from dynamic loading to a statically linked architecture. The system now safely detects runtime features natively (via KleidiAI), permanently fixing crashes that occurred during `.so` initialization on older or specific chipsets.</li>
+        </ul>
+      </div>
+
       <!-- v2.0.2 -->
       <div class="release">
         <div class="release-header">
