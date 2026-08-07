@@ -1266,6 +1266,7 @@ class ChatViewModel @Inject constructor(
 
         val textBuilder = java.lang.StringBuilder()
         val toolCalls = mutableListOf<Pair<String, String>>()
+        var lastEmitTime = 0L
 
         provider.generateResponse(chatMessages, config).collect { event ->
             when (event) {
@@ -1275,7 +1276,11 @@ class ChatViewModel @Inject constructor(
                     }
                     tokenCount++
                     textBuilder.append(event.text)
-                    _streamingAssistantMessage.value = textBuilder.toString()
+                    val now = System.currentTimeMillis()
+                    if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                        _streamingAssistantMessage.value = textBuilder.toString()
+                        lastEmitTime = now
+                    }
                 }
                 is StreamEvent.UsageUpdate -> {
                     tokenCount = event.tokenCount
@@ -1338,6 +1343,7 @@ class ChatViewModel @Inject constructor(
         val textBuilder = java.lang.StringBuilder()
         val thinkBuilder = java.lang.StringBuilder()
         val toolCalls = mutableListOf<Pair<String, String>>()
+        var lastEmitTime = 0L
         val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
         val thinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
 
@@ -1351,7 +1357,11 @@ class ChatViewModel @Inject constructor(
                         thinkingEnabled = thinkingActive,
                         onText = { text ->
                             textBuilder.append(text)
-                            _streamingAssistantMessage.value = textBuilder.toString()
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                                _streamingAssistantMessage.value = textBuilder.toString()
+                                lastEmitTime = now
+                            }
                         },
                         onThought = { thought -> thinkBuilder.append(thought) }
                     )
@@ -1884,13 +1894,18 @@ class ChatViewModel @Inject constructor(
             
             val resultBuilder = java.lang.StringBuilder()
             val nativeToolCalls = mutableListOf<Pair<String, String>>()
+            var lastEmitTime = 0L
             
             try {
                 provider.generateResponse(chatMessages, config).collect { event ->
                     when (event) {
                         is StreamEvent.TextChunk -> {
                             resultBuilder.append(event.text)
-                            _streamingAssistantMessage.value = resultBuilder.toString()
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                                _streamingAssistantMessage.value = resultBuilder.toString()
+                                lastEmitTime = now
+                            }
                         }
                         is StreamEvent.ToolCallRequest -> {
                             nativeToolCalls.add(Pair(event.name, event.arguments))

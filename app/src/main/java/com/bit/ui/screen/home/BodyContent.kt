@@ -224,13 +224,16 @@ fun BodyContent(
     }
 
     LaunchedEffect(messages.size, chatState.isGenerating, streaming.assistantMessage.length) {
-        if (chatState.isGenerating) {
-            val itemCount = listState.layoutInfo.totalItemsCount
-            if (itemCount > 0) {
+        if (!chatState.isGenerating && messages.isNotEmpty()) {
+            kotlinx.coroutines.delay(100) // allow layout to update after final message is added
+        }
+        val itemCount = listState.layoutInfo.totalItemsCount
+        if (itemCount > 0) {
+            try {
                 listState.animateScrollToItem(itemCount - 1)
+            } catch (e: Exception) {
+                // Ignore scroll exceptions
             }
-        } else if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
         }
     }
 

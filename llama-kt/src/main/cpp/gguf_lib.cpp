@@ -1544,9 +1544,11 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeGenerateStream(
     jni_progress_ctx progress_ctx = { env, callback };
     if (!new_tokens.empty() && !eval_tokens(new_tokens, g_state.n_past,
                                              jni_eval_progress, &progress_ctx)) {
-        jstring jerr = env->NewStringUTF("Failed to evaluate prompt");
-        env->CallVoidMethod(callback, g_onError, jerr);
-        env->DeleteLocalRef(jerr);
+        if (!g_state.cancel_flag.load()) {
+            jstring jerr = env->NewStringUTF("Failed to evaluate prompt");
+            env->CallVoidMethod(callback, g_onError, jerr);
+            env->DeleteLocalRef(jerr);
+        }
         return JNI_FALSE;
     }
 
@@ -1840,9 +1842,11 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeGenerateStreamMultiTurn(
     jni_progress_ctx mt_progress = { env, callback };
     if (!new_tokens.empty() && !eval_tokens(new_tokens, g_state.n_past,
                                              jni_eval_progress, &mt_progress)) {
-        jstring jerr = env->NewStringUTF("Failed to evaluate prompt");
-        env->CallVoidMethod(callback, g_onError, jerr);
-        env->DeleteLocalRef(jerr);
+        if (!g_state.cancel_flag.load()) {
+            jstring jerr = env->NewStringUTF("Failed to evaluate prompt");
+            env->CallVoidMethod(callback, g_onError, jerr);
+            env->DeleteLocalRef(jerr);
+        }
         return JNI_FALSE;
     }
 
