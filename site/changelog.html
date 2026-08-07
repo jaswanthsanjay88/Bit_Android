@@ -69,6 +69,20 @@
     <p class="changelog-subtitle">The development history and release notes for BIT.</p>
 
     <div class="timeline">
+      <!-- v2.0.6 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v2.0.6</span>
+          <span class="release-date">August 08, 2026</span>
+        </div>
+        <p class="release-desc">Native engine crash fixes and UI refinements.</p>
+        <ul class="release-features">
+          <li><strong>Crash Fix:</strong> Bypassed a severe NDK exception unwinding crash (caused by libpdfium.so) by using raw tokenization for system prompts in the native engine.</li>
+          <li><strong>Chat Logic:</strong> Fixed a bug where regenerating the last message duplicated the user prompt in the context history.</li>
+          <li><strong>UI Polish:</strong> Removed the bounding box outline from the app logo, and removed the rectangular outline from the chat input box during text generation.</li>
+        </ul>
+      </div>
+
       <!-- v2.0.5 -->
       <div class="release">
         <div class="release-header">
