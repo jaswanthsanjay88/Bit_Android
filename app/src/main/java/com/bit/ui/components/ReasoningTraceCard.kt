@@ -62,11 +62,12 @@ fun ReasoningTraceCard(
     isLive: Boolean = false,
     currentRound: Int = 0,
     maxRounds: Int = 5,
+    onStepClick: ((TraceStep) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (steps.isEmpty() && plan == null && summary == null && !isLive) return
 
-    var isExpanded by remember { mutableStateOf(isLive) }
+    var isExpanded by remember { mutableStateOf(false) }
     val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
     val rotation by animateFloatAsState(
@@ -81,9 +82,8 @@ fun ReasoningTraceCard(
     }
 
     val label = when {
-        isLive -> "Thinking process"
-        hasSearch -> "Searched the web"
-        else -> "Reasoning Trace"
+        hasSearch -> "Web Search"
+        else -> "Tool Execution"
     }
 
     val icon = when {
@@ -155,160 +155,63 @@ fun ReasoningTraceCard(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
             ) {
-                // Plan
+                // Plan / Reasoning
                 if (plan != null) {
-                    ReasoningPlanSection(plan = plan)
+                    Text(
+                        text = plan,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    )
                 }
-
+                
                 // Steps
-                steps.forEachIndexed { index, step ->
-                    ReasoningStepRow(step = step)
-                    if (index < steps.lastIndex || isLive) {
-                        ReasoningConnector(isAnimated = isLive && index == steps.lastIndex)
-                    }
+                steps.forEachIndexed { _, step ->
+                    ReasoningStepRow(step = step, onClick = { onStepClick?.invoke(step) })
                 }
 
                 // Loading next step if live
                 if (isLive) {
                     ReasoningLoadingRow()
                 }
-
-                // Summary
-                if (summary != null) {
-                    ReasoningSummarySection(summary = summary)
-                }
             }
         }
     }
 }
 
+
 @Composable
-private fun ReasoningPlanSection(plan: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Standards.RadiusMd),
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = TnIcons.BulbFilled,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "Plan",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Text(
-                text = plan,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
+private fun ReasoningStepRow(step: TraceStep, onClick: () -> Unit) {
+    val queryStr = remember(step.inputParams) {
+        try {
+            val json = org.json.JSONObject(step.inputParams)
+            json.optString("query").takeIf { it.isNotBlank() } ?: json.optString("url").takeIf { it.isNotBlank() } ?: ""
+        } catch (e: Exception) { "" }
     }
-}
-
-@Composable
-private fun ReasoningStepRow(step: TraceStep) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Standards.RadiusMd),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
-            verticalAlignment = Alignment.Top
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .background(
-                        color = if (step.success) {
-                            MaterialTheme.colorScheme.tertiary
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (step.success) TnIcons.Check else TnIcons.X,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = if (step.success) MaterialTheme.colorScheme.onTertiary else MaterialTheme.colorScheme.onError
-                )
-            }
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = step.toolName,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (step.executionTimeMs > 0) {
-                        Text(
-                            text = "${step.executionTimeMs}ms",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                Text(
-                    text = step.pluginName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                )
-
-            }
-        }
+    
+    val displayText = buildString {
+        append(if (step.success) "✓ " else "✗ ")
+        append(step.toolName)
+        if (queryStr.isNotBlank()) append(" — \"$queryStr\"")
+        if (step.executionTimeMs > 0) append(" (${String.format(java.util.Locale.US, "%.1f", step.executionTimeMs / 1000f)}s)")
     }
-}
 
-@Composable
-private fun ReasoningConnector(isAnimated: Boolean = false) {
-    Box(
+    Text(
+        text = displayText,
+        style = MaterialTheme.typography.bodySmall,
+        color = if (step.success) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = Modifier
-            .padding(start = 20.5.dp)
-            .width(3.dp)
-            .height(16.dp)
-            .background(
-                color = if (isAnimated) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f)
-                }
-            )
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 2.dp)
     )
 }
+
+
 
 @Composable
 fun PulsingDotLoader(
@@ -404,40 +307,4 @@ private fun ReasoningLoadingRow() {
     }
 }
 
-@Composable
-private fun ReasoningSummarySection(summary: String) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(Standards.RadiusMd),
-        color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)
-    ) {
-        Column(
-            modifier = Modifier.padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = TnIcons.CircleCheck,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.tertiary
-                )
-                Text(
-                    text = "Summary",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.tertiary
-                )
-            }
-            Text(
-                text = summary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-    }
-}
 

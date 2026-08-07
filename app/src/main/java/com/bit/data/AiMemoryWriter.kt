@@ -65,6 +65,44 @@ class AiMemoryWriter @Inject constructor(
         return written
     }
 
+    fun importMemory(text: String, category: String, parsedDate: Long): MemoryNote {
+        val now = System.currentTimeMillis()
+        val noteTitle = if (text.length > 40) text.take(40).trim() + "…" else text.trim()
+
+        val safeSlug = noteTitle
+            .replace(Regex("[^a-zA-Z0-9_\\- ]"), "")
+            .replace(Regex("\\s+"), "-")
+            .lowercase()
+            .take(40)
+            .ifBlank { "ai-fact" }
+
+        // Give imported notes a random suffix to avoid file name collisions
+        val randomSuffix = UUID.randomUUID().toString().take(6)
+        val fileName = "imported-$category-$safeSlug-$randomSuffix.md"
+        val targetFile = File(AppPaths.aiMemoriesVault(context), fileName)
+
+        val note = MemoryNote(
+            id = UUID.randomUUID().toString(),
+            title = noteTitle.ifBlank { "Imported memory" },
+            content = text,
+            tags = "ai_memory, $category",
+            noteType = "fact",
+            folder = "ai_memory",
+            filePath = targetFile.absolutePath,
+            isAiMemoryEnabled = true,
+            createdAt = parsedDate,
+            updatedAt = now
+        )
+
+        val written = vaultFileStore.writeNote(note)
+        scope.launch {
+            try { memoryNoteDao.insertNote(written) } catch (e: Exception) { Log.e(TAG, "Failed to insert imported memory into Room", e) }
+            try { globalRagOrchestrator.reloadNoteIntoGraph(written) } catch (e: Exception) { Log.e(TAG, "Failed to reload imported memory into graph", e) }
+        }
+        Log.d(TAG, "Imported AI memory to disk: ${written.filePath}")
+        return written
+    }
+
     fun isExplicitRememberCommand(text: String): Boolean {
         val lower = text.lowercase()
         return lower.contains("remember that") ||

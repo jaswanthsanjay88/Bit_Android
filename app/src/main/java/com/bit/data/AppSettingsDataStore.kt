@@ -49,6 +49,7 @@ class AppSettingsDataStore(private val context: Context) {
         private val GLOBAL_SYSTEM_PROMPT = stringPreferencesKey("global_system_prompt")
         private val GLOBAL_PREPEND_PROMPT = stringPreferencesKey("global_prepend_prompt")
         private val GLOBAL_POSTPEND_PROMPT = stringPreferencesKey("global_postpend_prompt")
+        private val HAS_SEEN_MEMORY_IMPORT_PROMPT = booleanPreferencesKey("has_seen_memory_import_prompt")
     }
 
     val localServerEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
@@ -249,6 +250,14 @@ class AppSettingsDataStore(private val context: Context) {
 
     suspend fun saveSecurityMode(mode: String) {
         context.appSettingsDataStore.edit { it[SECURITY_MODE] = mode }
+    }
+
+    val hasSeenMemoryImportPrompt: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[HAS_SEEN_MEMORY_IMPORT_PROMPT] ?: false
+    }
+
+    suspend fun saveHasSeenMemoryImportPrompt(seen: Boolean) {
+        context.appSettingsDataStore.edit { it[HAS_SEEN_MEMORY_IMPORT_PROMPT] = seen }
     }
 
     val guideSeen: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->

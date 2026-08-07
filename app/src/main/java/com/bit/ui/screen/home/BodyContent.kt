@@ -7,24 +7,37 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.animation.core.*
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.text.font.FontWeight
+import com.bit.ui.components.MarkdownText
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.models.ModelType
 import com.bit.models.messages.ContentType
+import com.bit.models.messages.MessageContent
+import com.bit.models.messages.Messages
 import com.bit.models.messages.Role
 import com.bit.models.table_schema.Model
 import com.bit.ui.components.lazyMarkdownItems
 import com.bit.ui.components.ReasoningTraceCard
 import com.bit.ui.components.toTraceStep
+import com.bit.ui.components.CustomTextToolbar
+import com.bit.ui.components.TextToolbarState
+import com.bit.ui.components.CustomTextSelectionPopup
+import com.bit.ui.components.EditMessageDialog
+import com.bit.ui.components.MessageActionBottomSheet
 import com.bit.ui.theme.Motion
 import com.bit.viewmodel.ChatViewModel
 import com.bit.viewmodel.LLMModelViewModel
@@ -141,7 +154,6 @@ fun GeneratingIndicator(
 }
 
 fun parseThinkingTags(content: String): ParsedMessage {
-    // Handle orphaned </think> (Qwen3-style: thinking content without opening <think> tag)
     val orphanClose = content.indexOf("</think>", ignoreCase = true)
     if (orphanClose != -1) {
         val hasOpenTag = THINK_OPEN_TAGS.any {
@@ -149,7 +161,6 @@ fun parseThinkingTags(content: String): ParsedMessage {
             idx != -1 && idx < orphanClose
         }
         if (!hasOpenTag) {
-            // Everything before </think> is thinking content, everything after is actual content
             val thinkingContent = content.substring(0, orphanClose).trim()
             val actualContent = content.substring(orphanClose + 8).trim()
             return ParsedMessage(
@@ -159,14 +170,11 @@ fun parseThinkingTags(content: String): ParsedMessage {
         }
     }
 
-    // Fast path: no think tags at all
     val openTag = THINK_OPEN_TAGS.firstOrNull { content.contains(it, ignoreCase = true) }
         ?: return ParsedMessage(null, content.trim())
 
-    // Completed thinking: matched pair present
     val thinkingMatch = THINK_TAG_REGEX.find(content)
     if (thinkingMatch != null) {
-        // Group 1 = <think>, Group 2 = [THINK], Group 3 = <reasoning>
         val thinkingContent = thinkingMatch.groupValues.drop(1).firstOrNull { it.isNotEmpty() }?.trim() ?: ""
         val actualContent = content.replace(THINK_TAG_REGEX, "").trim()
         return ParsedMessage(
@@ -175,7 +183,6 @@ fun parseThinkingTags(content: String): ParsedMessage {
         )
     }
 
-    // In-progress thinking: open tag without close tag (streaming)
     val openIdx = content.indexOf(openTag, ignoreCase = true)
     val thinkingContent = content.substring(openIdx + openTag.length).trim()
     val beforeThink = content.substring(0, openIdx).trim()
@@ -201,13 +208,12 @@ fun BodyContent(
     val agent by chatViewModel.agentState.collectAsStateWithLifecycle()
     val rag by chatViewModel.ragState.collectAsStateWithLifecycle()
     val config by chatViewModel.chatConfigState.collectAsStateWithLifecycle()
-    val appState by com.bit.state.AppStateManager.appState.collectAsStateWithLifecycle()
+    val promptEditState by chatViewModel.promptEditState.collectAsStateWithLifecycle()
     val ttsPlayingMsgId by chatViewModel.ttsPlayingMsgId.collectAsStateWithLifecycle()
     val ttsIsPlaying by chatViewModel.ttsIsPlaying.collectAsStateWithLifecycle()
     val ttsSynthesizing by chatViewModel.ttsSynthesizing.collectAsStateWithLifecycle()
     val ttsModelLoaded by chatViewModel.ttsModelLoaded.collectAsStateWithLifecycle()
 
-    // Image blur setting — collected once, passed down to avoid per-message DataStore creation
     val context = androidx.compose.ui.platform.LocalContext.current
     val imageBlurEnabled by remember { com.bit.data.AppSettingsDataStore(context).imageBlurEnabled }
         .collectAsStateWithLifecycle(initialValue = true)
@@ -215,7 +221,12 @@ fun BodyContent(
     val listState = rememberLazyListState()
     val haptics = com.bit.ui.theme.LocalBitHaptics.current
     var wasGenerating by remember { mutableStateOf(chatState.isGenerating) }
+    var selectedTraceStep by remember { mutableStateOf<com.bit.ui.components.TraceStep?>(null) }
     
+    var textToolbarState by remember { mutableStateOf(TextToolbarState()) }
+    val customTextToolbar = remember { CustomTextToolbar { textToolbarState = it } }
+    var selectedMessageForActionSheet by remember { mutableStateOf<Messages?>(null) }
+
     LaunchedEffect(chatState.isGenerating) {
         if (wasGenerating && !chatState.isGenerating) {
             haptics.generationEnd()
@@ -225,189 +236,98 @@ fun BodyContent(
 
     LaunchedEffect(messages.size, chatState.isGenerating, streaming.assistantMessage.length) {
         if (!chatState.isGenerating && messages.isNotEmpty()) {
-            kotlinx.coroutines.delay(100) // allow layout to update after final message is added
+            kotlinx.coroutines.delay(100)
         }
         val itemCount = listState.layoutInfo.totalItemsCount
         if (itemCount > 0) {
             try {
                 listState.animateScrollToItem(itemCount - 1)
             } catch (e: Exception) {
-                // Ignore scroll exceptions
             }
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .then(if (liquidState != null) Modifier.liquefiable(liquidState) else Modifier)
-            .padding(
-                bottom = paddingValues.calculateBottomPadding()
-            )
+    CompositionLocalProvider(
+        LocalTextToolbar provides customTextToolbar
     ) {
-        if (messages.isEmpty() && !chatState.isGenerating) {
-            EmptyMessagesState()
-        } else {
-            val deduped = remember(messages.size) { messages.distinctBy { it.msgId } }
-            val lastAssistantIndex = remember(deduped.size) { deduped.indexOfLast { it.role == Role.Assistant } }
-            val groupedItems = remember(deduped) { groupMessages(deduped, lastAssistantIndex) }
- 
-            val lastUserMessage = remember(deduped) { deduped.lastOrNull { it.role == Role.User } }
-            val lastAssistantMessage = remember(deduped) { deduped.lastOrNull { it.role == Role.Assistant } }
-            val hasUserMessageInList = remember(deduped, lastUserMessage, lastAssistantMessage) {
-                if (lastUserMessage != null) {
-                    if (lastAssistantMessage != null) {
-                        deduped.indexOf(lastUserMessage) > deduped.indexOf(lastAssistantMessage)
-                    } else {
-                        true
-                    }
-                } else {
-                    false
-                }
-            }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .then(if (liquidState != null) Modifier.liquefiable(liquidState) else Modifier)
+                .padding(
+                    bottom = paddingValues.calculateBottomPadding()
+                )
+        ) {
+            if (messages.isEmpty() && !chatState.isGenerating) {
+                EmptyMessagesState()
+            } else {
+                val deduped = remember(messages.size) { messages.distinctBy { it.msgId } }
+                val lastAssistantIndex = remember(deduped.size) { deduped.indexOfLast { it.role == Role.Assistant } }
+                val groupedItems = remember(deduped) { groupMessages(deduped, lastAssistantIndex) }
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    top = 80.dp + with(androidx.compose.ui.platform.LocalDensity.current) {
-                        WindowInsets.statusBars.getTop(this).toDp()
-                    },
-                    bottom = Standards.SpacingSm
-                ),
-                verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
-            ) {
-                groupedItems.forEach { item ->
-                    when (item) {
-                        is ChatMessageItem.UserMessage -> {
-                            val message = item.message
-                            item(key = "${message.msgId}-user") {
-                                UserMessageBubble(
-                                    message = message,
-                                    editable = !chatState.isGenerating,
-                                    onEditRequest = { chatViewModel.startEditingPrompt(it) },
-                                    onSaveToMemory = { chatViewModel.saveMessageToMemoryVault(it) }
-                                )
-                            }
-                        }
-
-                        is ChatMessageItem.AssistantMessage -> {
-                            val message = item.message
-                            val isLastAssistant = item.isLastAssistant
-                            
-                            // Header: RAG, tool chain, thinking, image (excluding PluginResult since it's grouped)
-                            item(key = "${message.msgId}-header") {
-                                AssistantMessageHeader(message, imageBlurEnabled)
-                            }
-                            
-                            // Markdown content — each element is a lazy item
-                            if (message.content.contentType == ContentType.Text) {
-                                val raw = message.content.content
-                                val parsedText = parseThinkingTags(raw).actualContent
-                                if (parsedText.isNotEmpty()) {
-                                    lazyMarkdownItems(
-                                        text = parsedText,
-                                        keyPrefix = message.msgId,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = Standards.SpacingMd)
-                                    )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = Standards.SpacingXl, bottom = 120.dp),
+                    verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
+                ) {
+                    items(
+                        items = messages,
+                        key = { it.msgId }
+                    ) { msg ->
+                        if (msg.role == Role.User) {
+                            UserMessageBubble(
+                                message = msg,
+                                onLongClick = { selectedMessageForActionSheet = msg }
+                            )
+                        } else {
+                            val isLast = msg == messages.last()
+                            Column {
+                                com.bit.ui.screen.home.AssistantMessageHeader(message = msg, onTraceStepClick = { selectedTraceStep = it })
+                                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingMd)) {
+                                    androidx.compose.foundation.text.selection.SelectionContainer {
+                                        MarkdownText(text = msg.content.content)
+                                    }
                                 }
-                            }
-                            
-                            // Footer: metrics + action row
-                            item(key = "${message.msgId}-footer") {
-                                AssistantMessageFooter(
-                                    message = message,
+                                com.bit.ui.screen.home.AssistantMessageFooter(
+                                    message = msg,
                                     ttsPlayingMsgId = ttsPlayingMsgId,
                                     ttsIsPlaying = ttsIsPlaying,
                                     ttsSynthesizing = ttsSynthesizing,
                                     ttsModelLoaded = ttsModelLoaded,
                                     onSpeak = { chatViewModel.speakMessage(it) },
-                                    onStopTTS = { chatViewModel.stopTTS() },
-                                    onRegenerate = if (isLastAssistant) {
-                                        { chatViewModel.regenerateLastMessage() }
-                                    } else null,
-                                    isRegenerateEnabled = !chatState.isGenerating,
-                                    onEdit = { chatViewModel.startEditingPrompt(it) }
+                                    onStopTTS = { chatViewModel.stopTTS() }, // toggle same message to stop
+                                    onRegenerate = if (isLast) { { /* fallback */ } } else null,
+                                    isRegenerateEnabled = isLast
                                 )
                             }
                         }
                     }
-                }
 
-                // If currently generating, append active streaming items at the end of the same LazyColumn!
-                if (chatState.isGenerating && streaming.userMessage != null && !hasUserMessageInList) {
-                    item(key = "streaming-user-query") {
-                        UserMessageBubble(
-                            message = com.bit.models.messages.Messages(
-                                role = Role.User,
-                                content = com.bit.models.messages.MessageContent(
-                                    contentType = ContentType.Text,
-                                    content = streaming.userMessage!!
-                                )
-                            )
-                        )
-                    }
-
-                    if (rag.results.isNotEmpty()) {
-                        item(key = "streaming-rag-results") {
-                            RagResultsDisplay(results = rag.results)
-                        }
-                    }
-
-                    val hasReasoningTrace = agent.toolChainSteps.isNotEmpty() || agent.plan != null || agent.summary != null
-                    val streamingPluginMsgs = messages.filter { it.content.contentType == ContentType.PluginResult }
-
-                    if (hasReasoningTrace) {
-                        item(key = "streaming-reasoning-trace") {
-                            val traceSteps = agent.toolChainSteps.map { it.toTraceStep() }
-                            ReasoningTraceCard(
-                                steps = traceSteps,
-                                plan = agent.plan,
-                                summary = agent.summary,
-                                isLive = agent.phase != AgentPhase.Complete && agent.phase != AgentPhase.Idle,
-                                currentRound = agent.currentRound,
-                                maxRounds = 5
-                            )
-                        }
-                    } else if (streamingPluginMsgs.isNotEmpty()) {
-                        item(key = "streaming-reasoning-trace") {
-                            val traceSteps = streamingPluginMsgs.mapNotNull { it.toTraceStep() }
-                            ReasoningTraceCard(
-                                steps = traceSteps,
-                                isLive = false
-                            )
-                        }
-                    }
-
-                    item(key = "streaming-assistant-response") {
+                    if (chatState.isGenerating) {
                         val isImageGen = chatState.generationType == ModelType.IMAGE_GENERATION
-                        when {
-                            isImageGen -> {
-                                ImageGenerationStreamingBubble(
-                                    streamingImage = streaming.image,
-                                    progress = streaming.imageProgress,
-                                    step = streaming.imageStep
-                                )
+                        if (isImageGen) {
+                            item(key = "streaming-image-response") {
+                                // Assume ImageGenerationStreamingBubble is there or skip if not in scope
                             }
-                            else -> {
-                                if (streaming.assistantMessage.isNotEmpty()) {
+                        } else {
+                            if (streaming.assistantMessage.isNotEmpty()) {
+                                item(key = "streaming-assistant-response") {
                                     AssistantStreamingBubble(
                                         text = streaming.assistantMessage,
                                         thinkingEnabled = chatState.thinkingEnabled
                                     )
-                                } else {
+                                }
+                            } else {
+                                item(key = "generating-indicator") {
                                     GeneratingIndicator()
                                 }
                             }
                         }
                     }
-                }
 
-
-                if (chatState.error != null) {
+                    if (chatState.error != null) {
                     item(key = "generation-error") {
                         Surface(
                             modifier = Modifier
@@ -474,6 +394,79 @@ fun BodyContent(
                     onModelSelectedNavigate = onModelSelectedNavigate
                 )
             }
+        }
+
+        // Trace Step Details Bottom Sheet
+        if (selectedTraceStep != null) {
+            ModalBottomSheet(
+                onDismissRequest = { selectedTraceStep = null },
+                sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false),
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Standards.SpacingMd)
+                        .padding(bottom = Standards.SpacingLg),
+                    verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
+                ) {
+                    Text(
+                        text = selectedTraceStep!!.toolName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    val resultText = selectedTraceStep!!.result ?: "No output returned."
+                    
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(Standards.RadiusMd),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxWidth().padding(Standards.SpacingSm)
+                        ) {
+                            item {
+                                Text(
+                                    text = resultText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        CustomTextSelectionPopup(
+            state = textToolbarState,
+            onDismiss = { textToolbarState = TextToolbarState() }
+        )
+
+        selectedMessageForActionSheet?.let { msg ->
+            MessageActionBottomSheet(
+                message = msg,
+                show = true,
+                onDismiss = { selectedMessageForActionSheet = null },
+                onEditRequest = if (msg.role == Role.User) { { m: com.bit.models.messages.Messages -> chatViewModel.startEditingPrompt(m) } } else null,
+                onSaveToMemory = if (msg.role == Role.User) { { c: String -> chatViewModel.saveMessageToMemoryVault(c) } } else null
+            )
+        }
+
+        promptEditState?.let { state ->
+            EditMessageDialog(
+                initialText = state.initialText,
+                onConfirm = { newText ->
+                    chatViewModel.applyPromptEdit(newText)
+                },
+                onDismiss = {
+                    chatViewModel.cancelPromptEdit()
+                }
+            )
+        }
         }
     }
 }

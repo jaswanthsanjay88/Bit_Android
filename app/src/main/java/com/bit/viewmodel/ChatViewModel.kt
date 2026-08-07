@@ -592,12 +592,12 @@ class ChatViewModel @Inject constructor(
                 var ragContext = _currentRagContext.value
                 val attachedResult = globalRagOrchestrator.queryGlobalKnowledge(prompt, topK = 5)
                 
-                if (attachedResult != null && attachedResult.results.isNotEmpty()) {
-                    Log.d(TAG, "Global RAG returned ${attachedResult.results.size} chunks")
+                if (attachedResult != null && attachedResult.results.isNotEmpty() && attachedResult.confidence != com.bit.neuron_example.RetrievalConfidence.LOW) {
+                    Log.d(TAG, "Global RAG returned ${attachedResult.results.size} chunks with confidence ${attachedResult.confidence}")
                     val attachedContextStr = attachedResult.results.joinToString("\n\n") {
-                        "<chunk id=\"${it.node.id.takeLast(4)}\">\n${it.node.content}\n</chunk>"
+                        "<chunk>\n${it.node.content}\n</chunk>"
                     }
-                    val instruction = "\n[SYSTEM INSTRUCTION: You are provided with retrieved document chunks above. You MUST cite your sources using the chunk id when answering, in the format [id].]"
+                    val instruction = "\n[SYSTEM INSTRUCTION: You are provided with retrieved document chunks above. Use them to answer the user's query if relevant.]"
                     ragContext = if (ragContext != null) ragContext + "\n\n" + attachedContextStr + instruction else attachedContextStr + instruction
                 }
 
@@ -967,6 +967,7 @@ class ChatViewModel @Inject constructor(
             val conversationMessages = buildConversationMessagesWithSteps(fullPrompt, steps, isRegeneration, hasTools)
 
             // Generate response (streaming)
+            AppStateManager.setGeneratingText()
             val result = if (activeProviderType == ProviderType.API) {
                 generateRemoteUnified(conversationMessages, steps, hasTools, maxTokens)
             } else {
@@ -995,6 +996,7 @@ class ChatViewModel @Inject constructor(
 
             // Process the tool calls
             var toolExecuted = false
+            var hallucinatedText = ""
             for ((rawName, rawArgs) in result.toolCalls) {
                 val callKey = "${rawName.lowercase()}:${rawArgs.hashCode()}"
                 if (callKey in seenCalls) {
@@ -1013,6 +1015,15 @@ class ChatViewModel @Inject constructor(
                 val normalizedName = normalizeToolName(toolName)
                 if (normalizedName.lowercase() !in enabledNames) {
                     Log.w(TAG, "Hallucinated tool name: $normalizedName")
+                    val possibleText = argsObj.optString("text").takeIf { it.isNotBlank() }
+                        ?: argsObj.optString("answer").takeIf { it.isNotBlank() }
+                        ?: argsObj.optString("summary").takeIf { it.isNotBlank() }
+                        ?: argsObj.optString("response").takeIf { it.isNotBlank() }
+                        ?: argsObj.optString("content").takeIf { it.isNotBlank() }
+                    
+                    if (possibleText != null) {
+                        hallucinatedText += (if (hallucinatedText.isEmpty()) "" else "\n") + possibleText
+                    }
                     continue
                 }
 
@@ -1084,7 +1095,7 @@ class ChatViewModel @Inject constructor(
 
             if (!toolExecuted) {
                 // If we generated tool calls but none were executed, stop.
-                finalResponse = result.text
+                finalResponse = if (hallucinatedText.isNotBlank()) hallucinatedText else result.text
                 break
             }
         }
@@ -1097,7 +1108,7 @@ class ChatViewModel @Inject constructor(
         _agentPhase.value = if (steps.isNotEmpty()) AgentPhase.Complete else AgentPhase.Idle
 
         if (steps.isNotEmpty()) {
-            val finalSummary = cleanResponse.takeIf { it.isNotBlank() } ?: "Tool execution completed."
+            val finalSummary = cleanResponse.takeIf { it.isNotBlank() } ?: "Tool execution completed, but the model failed to generate a final answer. Please view the tool outputs in the trace panel below."
             _agentSummary.value = finalSummary
             persistAgentChat(prompt, isNewChat, "Determine if any tools are needed to answer the query.", steps, finalSummary)
         } else {
@@ -1316,12 +1327,8 @@ class ChatViewModel @Inject constructor(
         )
 
         if (finalToolCalls.isEmpty() && text.isNotBlank()) {
-            val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
             parseToolCallsFromText(text)?.let { parsed ->
-                val valid = parsed.filter { (name, _) ->
-                    normalizeToolName(name).lowercase() in enabledNames
-                }
-                finalToolCalls.addAll(valid)
+                finalToolCalls.addAll(parsed)
             }
         }
 
@@ -1997,17 +2004,9 @@ class ChatViewModel @Inject constructor(
         val text = textBuilder.toString()
         if (toolCalls.isEmpty() && text.isNotBlank()) {
             Log.d(TAG, "No ToolCall events, trying text parsing fallback")
-            val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
             parseToolCallsFromText(text)?.let { parsed ->
-                // Filter against enabled tools to reject hallucinated names
-                val valid = parsed.filter { (name, _) ->
-                    normalizeToolName(name).lowercase() in enabledNames
-                }
-                if (valid.size < parsed.size) {
-                    Log.w(TAG, "Filtered out ${parsed.size - valid.size} hallucinated tool calls from fallback parsing")
-                }
-                toolCalls.addAll(valid)
-                Log.d(TAG, "Fallback parsed ${valid.size} valid tool calls from text")
+                toolCalls.addAll(parsed)
+                Log.d(TAG, "Fallback parsed ${parsed.size} tool calls from text")
             }
         }
 

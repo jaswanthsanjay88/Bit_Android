@@ -12,6 +12,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -91,6 +92,34 @@ fun MemoryVaultScreen(
     val myNotesCount = remember(allNotes) { allNotes.count { it.noteType == "note" || it.folder == "notes" } }
     val aiMemoryCount = remember(allNotes) { allNotes.count { it.noteType == "fact" || it.noteType == "ai_fact" || it.folder == "ai_memory" } }
 
+    val hasSeenImportPrompt by viewModel.hasSeenMemoryImportPrompt.collectAsStateWithLifecycle()
+    var showImportDialog by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(hasSeenImportPrompt) {
+        if (!hasSeenImportPrompt) {
+            showImportDialog = true
+        }
+    }
+
+    if (showImportDialog) {
+        val importViewModel = hiltViewModel<com.bit.viewmodel.MemoryImportViewModel>(LocalContext.current as ComponentActivity)
+        
+        val importStep by importViewModel.currentStep.collectAsStateWithLifecycle()
+        LaunchedEffect(importStep) {
+            if (importStep == com.bit.viewmodel.ImportStep.SUCCESS) {
+                viewModel.refreshNotesFromDisk()
+            }
+        }
+
+        MemoryImportSheets(
+            viewModel = importViewModel,
+            onDismiss = {
+                showImportDialog = false
+                viewModel.markMemoryImportPromptSeen()
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -108,7 +137,7 @@ fun MemoryVaultScreen(
                     }
                 },
                 actions = {
-                    // Backup Pill Button (opens BackupSettings, spec §2.1)
+                    // Backup Pill Button
                     OutlinedButton(
                         onClick = { onBackupSettingsClick() },
                         shape = RoundedCornerShape(20.dp),
@@ -126,7 +155,7 @@ fun MemoryVaultScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(end = 12.dp)
+                        modifier = Modifier.padding(end = 4.dp)
                     ) {
                         Text(
                             text = "Memory",
@@ -137,6 +166,26 @@ fun MemoryVaultScreen(
                             checked = isGlobalMemoryEnabled,
                             onCheckedChange = { isGlobalMemoryEnabled = it }
                         )
+                    }
+
+                    var showMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(TnIcons.DotsVertical, contentDescription = "More options", tint = MaterialTheme.colorScheme.onSurface)
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Import from another AI", color = MaterialTheme.colorScheme.onSurface) },
+                                onClick = {
+                                    showMenu = false
+                                    showImportDialog = true
+                                }
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)

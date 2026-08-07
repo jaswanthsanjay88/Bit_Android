@@ -52,10 +52,8 @@ import com.bit.ui.components.buildInlineFormatted
 internal fun UserMessageBubble(
     message: Messages,
     editable: Boolean = false,
-    onEditRequest: ((Messages) -> Unit)? = null,
-    onSaveToMemory: ((String) -> Unit)? = null
+    onLongClick: ((Messages) -> Unit)? = null
 ) {
-    var menuExpanded by remember(message.msgId) { mutableStateOf(false) }
     val imageBitmap = remember(message.content.imageData) {
         message.content.imageData?.let { base64 ->
             try {
@@ -77,26 +75,21 @@ internal fun UserMessageBubble(
                 .padding(horizontal = Standards.SpacingSm, vertical = 5.dp)
         ) {
             val interactionSource = remember { MutableInteractionSource() }
-            val bubbleShape = RoundedCornerShape(20.dp, 20.dp, 4.dp, 20.dp)
-            val bubbleGradient = androidx.compose.ui.graphics.Brush.verticalGradient(
-                colors = listOf(
-                    Color(0x3DFFFFFF), // 24% white glass (lighter at top)
-                    Color(0x24FFFFFF)  // 14% white glass (darker at bottom)
-                )
-            )
+            val bubbleShape = RoundedCornerShape(20.dp)
+            val bubbleColor = Color.White.copy(alpha = 0.10f)
             
             Box(
                 modifier = Modifier
                     .widthIn(max = 280.dp)
                     .clip(bubbleShape)
-                    .background(bubbleGradient)
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f), bubbleShape)
+                    .background(bubbleColor)
+                    .border(1.dp, Color.White.copy(alpha = 0.08f), bubbleShape)
                     .combinedClickable(
                         interactionSource = interactionSource,
                         indication = null,
                         onClick = {},
                         onLongClick = {
-                            menuExpanded = true
+                            onLongClick?.invoke(message)
                         }
                     )
             ) {
@@ -130,42 +123,6 @@ internal fun UserMessageBubble(
                 }
             }
 
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false }
-            ) {
-                if (editable && onEditRequest != null) {
-                    DropdownMenuItem(
-                        text = { Text("Edit prompt") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = TnIcons.Edit,
-                                contentDescription = null
-                            )
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onEditRequest.invoke(message)
-                        }
-                    )
-                }
-                if (onSaveToMemory != null) {
-                    DropdownMenuItem(
-                        text = { Text("Save to Memory Vault") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = TnIcons.Brain,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onSaveToMemory.invoke(message.content.content)
-                        }
-                    )
-                }
-            }
         }
     }
 }
@@ -173,7 +130,12 @@ internal fun UserMessageBubble(
 // ── AssistantStreamingBubble ──
 
 @Composable
-internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = false) {
+internal fun AssistantStreamingBubble(
+    message: Messages? = null,
+    text: String,
+    thinkingEnabled: Boolean = false,
+    onLongClick: ((Messages) -> Unit)? = null
+) {
     var revealedLen by remember { mutableIntStateOf(0) }
     val latestText by rememberUpdatedState(text)
     val haptics = com.bit.ui.theme.LocalBitHaptics.current
@@ -215,7 +177,17 @@ internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = f
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = Standards.SpacingSm),
+            .padding(vertical = Standards.SpacingSm)
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+                onLongClick = {
+                    if (message != null) {
+                        onLongClick?.invoke(message)
+                    }
+                }
+            ),
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
     ) {
         if (parsedMessage.thinkingContent != null) {
@@ -231,11 +203,13 @@ internal fun AssistantStreamingBubble(text: String, thinkingEnabled: Boolean = f
                     .fillMaxWidth()
                     .padding(horizontal = Standards.SpacingMd)
             ) {
-                com.bit.ui.components.markdown.IncrementalStreamingMarkdownView(
-                    state = streamingState,
-                    modifier = Modifier.fillMaxWidth()
-                ) { blockText ->
-                    MarkdownText(text = blockText)
+                androidx.compose.foundation.text.selection.SelectionContainer {
+                    com.bit.ui.components.markdown.IncrementalStreamingMarkdownView(
+                        state = streamingState,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { blockText ->
+                        MarkdownText(text = blockText)
+                    }
                 }
             }
         }

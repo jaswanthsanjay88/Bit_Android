@@ -36,7 +36,7 @@ import com.bit.global.Standards
 
 /** Header part of assistant message: RAG results, tool chain, thinking block, non-text content. */
 @Composable
-internal fun AssistantMessageHeader(message: Messages, imageBlurEnabled: Boolean = true) {
+internal fun AssistantMessageHeader(message: Messages, imageBlurEnabled: Boolean = true, onTraceStepClick: ((com.bit.ui.components.TraceStep) -> Unit)? = null) {
     val hasRagResults = remember(message.ragResults) {
         message.ragResults?.isNotEmpty() == true
     }
@@ -61,7 +61,8 @@ internal fun AssistantMessageHeader(message: Messages, imageBlurEnabled: Boolean
                 steps = traceSteps,
                 plan = message.agentPlan,
                 summary = message.agentSummary,
-                isLive = false
+                isLive = false,
+                onStepClick = onTraceStepClick
             )
         }
 
@@ -72,7 +73,8 @@ internal fun AssistantMessageHeader(message: Messages, imageBlurEnabled: Boolean
                 message.toTraceStep()?.let { step ->
                     ReasoningTraceCard(
                         steps = listOf(step),
-                        isLive = false
+                        isLive = false,
+                        onStepClick = onTraceStepClick
                     )
                 }
             }

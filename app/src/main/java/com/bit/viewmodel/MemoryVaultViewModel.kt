@@ -34,11 +34,22 @@ class MemoryVaultViewModel @Inject constructor(
     private val vaultFileStore: VaultFileStore,
     private val aiMemoryWriter: AiMemoryWriter,
     private val memoryNoteDao: MemoryNoteDao,
-    private val globalRagOrchestrator: com.bit.worker.GlobalRagOrchestrator
+    private val globalRagOrchestrator: com.bit.worker.GlobalRagOrchestrator,
+    private val appSettingsDataStore: com.bit.data.AppSettingsDataStore
 ) : ViewModel() {
 
     private val TAG = "MemoryVaultVM"
     private val deletedNoteIds = mutableSetOf<String>()
+
+    val hasSeenMemoryImportPrompt = appSettingsDataStore.hasSeenMemoryImportPrompt.stateIn(
+        viewModelScope, SharingStarted.Eagerly, true
+    )
+
+    fun markMemoryImportPromptSeen() {
+        viewModelScope.launch {
+            appSettingsDataStore.saveHasSeenMemoryImportPrompt(true)
+        }
+    }
 
     private val _notes = MutableStateFlow<List<MemoryNote>>(emptyList())
     val notes: StateFlow<List<MemoryNote>> = _notes.asStateFlow()

@@ -41,6 +41,7 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,6 +109,8 @@ import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquid
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.mutableLongStateOf
+
 
 // ── BottomBar ───────────────────────────────────────────────────────────────────
 
@@ -143,7 +146,6 @@ internal fun BottomBar(
     val currentModelID by llmModelViewModel.currentModelID.collectAsStateWithLifecycle()
     val chatState by chatViewModel.chatUiState.collectAsStateWithLifecycle()
     val config by chatViewModel.chatConfigState.collectAsStateWithLifecycle()
-    val promptEditState by chatViewModel.promptEditState.collectAsStateWithLifecycle()
     val isTextModelLoaded by chatViewModel.isTextModelLoaded.collectAsStateWithLifecycle()
     val isImageModelLoaded by chatViewModel.isImageModelLoaded.collectAsStateWithLifecycle()
     val isVlmLoaded by chatViewModel.isVlmLoaded.collectAsStateWithLifecycle()
@@ -152,6 +154,7 @@ internal fun BottomBar(
     var showAttachmentSheet by remember { mutableStateOf(false) }
     var attachedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var attachedFiles by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var lastSendTime by remember { mutableLongStateOf(0L) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -205,12 +208,6 @@ internal fun BottomBar(
     val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
 
-
-    LaunchedEffect(promptEditState?.messageId) {
-        promptEditState?.let { state ->
-            value = state.initialText
-        }
-    }
 
     // Plugin Overlay (excludes Web Search — it has its own toggle)
     PluginOverlayBottomSheet(
@@ -354,11 +351,9 @@ internal fun BottomBar(
                     .padding(top = Standards.SpacingSm, bottom = Standards.SpacingMd)
             ) {
 
-                // ── Edit prompt banner ──
-                AnimatedVisibility(visible = promptEditState != null) {
+                AnimatedVisibility(visible = isSttTranscribing) {
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
                             .padding(bottom = Standards.SpacingSm)
                             .background(Glass.Surface, shape = RoundedCornerShape(Standards.RadiusMd))
                             .border(1.dp, Glass.BorderSubtle, RoundedCornerShape(Standards.RadiusMd))
@@ -371,32 +366,18 @@ internal fun BottomBar(
                             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Icon(
-                                imageVector = TnIcons.Edit,
-                                contentDescription = null,
-                                tint = Glass.AccentPrimary,
-                                modifier = Modifier.size(Standards.IconSm)
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
                             )
+                            Spacer(modifier = Modifier.width(Standards.SpacingXs))
                             Text(
-                                text = "Editing prompt",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Glass.TextSecondary
+                                text = "Transcribing...",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-
-                        ActionButton(
-                            onClickListener = {
-                                chatViewModel.cancelPromptEdit()
-                                value = ""
-                            },
-                            icon = TnIcons.X,
-                            contentDescription = "Cancel edit",
-                            modifier = Modifier.size(36.dp),
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = Glass.SurfaceSubtle,
-                                contentColor = Glass.TextPrimary
-                            )
-                        )
                     }
                 }
 
@@ -610,13 +591,14 @@ internal fun BottomBar(
                             OutlinedTextField(
                                 value = value,
                                 onValueChange = { value = it },
+                                enabled = !chatState.isGenerating,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = 38.dp, max = 150.dp)
                                     .padding(horizontal = 4.dp),
                                 placeholder = {
                                     Text(
-                                        text = if (promptEditState != null) "Edit your prompt…" else "Ask me anything",
+                                        text = "Ask me anything",
                                         color = Glass.TextMuted
                                     )
                                 },
@@ -666,6 +648,10 @@ internal fun BottomBar(
                             } else if (hasInput) {
                                 FilledTonalIconButton(
                                     onClick = {
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastSendTime < 1000L) return@FilledTonalIconButton
+                                        lastSendTime = now
+                                        
                                         haptics.action()
                                         val trimmedValue = value.trim()
                                         val isImageTrigger = trimmedValue.startsWith("/image", ignoreCase = true) ||
@@ -688,7 +674,6 @@ internal fun BottomBar(
                                             value = ""
                                         } else {
                                             val finalPrompt = trimmedValue
-
                                             val imageBytesList = attachedImages.mapNotNull { uri ->
                                                 try {
                                                     context.contentResolver.openInputStream(uri)?.use { stream ->
@@ -706,32 +691,25 @@ internal fun BottomBar(
                                                 attachedImages = emptyList()
                                                 attachedFiles = emptyList()
                                             } else {
-                                                if (promptEditState != null) {
-                                                    chatViewModel.applyPromptEdit(finalPrompt)
+                                                val hasRags = loadedRags.isNotEmpty() && isRagEnabledForChat
+                                                if (hasRags) {
                                                     value = ""
                                                     attachedImages = emptyList()
                                                     attachedFiles = emptyList()
-                                                } else {
-                                                    val hasRags = loadedRags.isNotEmpty() && isRagEnabledForChat
-                                                    if (hasRags) {
-                                                        value = ""
-                                                        attachedImages = emptyList()
-                                                        attachedFiles = emptyList()
-                                                        scope.launch {
-                                                            val ragContext = ragViewModel.queryAndStoreResults(finalPrompt)
-                                                            chatViewModel.setRagContext(
-                                                                ragContext.ifBlank { null },
-                                                                ragViewModel.lastRagResults.value
-                                                            )
-                                                            chatViewModel.sendTextMessage(finalPrompt)
-                                                        }
-                                                    } else {
-                                                        chatViewModel.clearRagContext()
+                                                    scope.launch {
+                                                        val ragContext = ragViewModel.queryAndStoreResults(finalPrompt)
+                                                        chatViewModel.setRagContext(
+                                                            ragContext.ifBlank { null },
+                                                            ragViewModel.lastRagResults.value
+                                                        )
                                                         chatViewModel.sendTextMessage(finalPrompt)
-                                                        value = ""
-                                                        attachedImages = emptyList()
-                                                        attachedFiles = emptyList()
                                                     }
+                                                } else {
+                                                    chatViewModel.clearRagContext()
+                                                    chatViewModel.sendTextMessage(finalPrompt)
+                                                    value = ""
+                                                    attachedImages = emptyList()
+                                                    attachedFiles = emptyList()
                                                 }
                                             }
                                         }
