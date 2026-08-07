@@ -163,6 +163,16 @@ fun HomeScreen(
                     containerColor = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground,
                     modifier = Modifier.fillMaxSize(),
+                    topBar = {
+                        TopBar(
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope,
+                            onStoreButtonClicked = onStoreButtonClicked,
+                            onMenuClick = { drawerState.toggle() },
+                            showDynamicWindow = { chatViewModel.showDynamicWindow() },
+                            onMemoryClick = onVaultManagerClick
+                        )
+                    },
                     bottomBar = {
                         BottomBar(
                             chatViewModel = chatViewModel,
@@ -181,26 +191,6 @@ fun HomeScreen(
                             llmModelViewModel = llmModelViewModel,
                             liquidState = liquidState,
                             onModelSelectedNavigate = onModelSelectedNavigate
-                        )
-
-                        // Top Blur Scrim: scratch progressive vertical blur zone
-                        com.bit.ui.components.TopBlurScrim(
-                            modifier = Modifier.align(Alignment.TopCenter),
-                            height = 140.dp + with(LocalDensity.current) {
-                                WindowInsets.statusBars.getTop(this).toDp()
-                            },
-                            maxBlurRadius = 28.dp,
-                            scrimColor = MaterialTheme.colorScheme.background
-                        )
-
-                        // Top bar floats on top
-                        TopBar(
-                            sharedTransitionScope = sharedTransitionScope,
-                            animatedVisibilityScope = animatedVisibilityScope,
-                            onStoreButtonClicked = onStoreButtonClicked,
-                            onMenuClick = { drawerState.toggle() },
-                            showDynamicWindow = { chatViewModel.showDynamicWindow() },
-                            onMemoryClick = onVaultManagerClick
                         )
                     }
                 }

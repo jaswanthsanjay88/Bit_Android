@@ -571,6 +571,10 @@ class ChatViewModel @Inject constructor(
             content = MessageContent(contentType = ContentType.Text, content = prompt),
             modelId = currentModelId,
         )
+        if (!userMessageAdded.get()) {
+            _messages.add(currentUserMessage!!)
+            userMessageAdded.set(true)
+        }
         AppStateManager.setHasMessages(true)
 
         var job: Job? = null
@@ -621,6 +625,11 @@ class ChatViewModel @Inject constructor(
 
                 chatManager.addUserMessage(chatId, prompt).onSuccess { userMsg ->
                     currentUserMessage = userMsg
+                    // Update the optimistic message with the real DB message (having the correct msgId)
+                    val idx = _messages.indexOfLast { it.role == Role.User && it.msgId == "" && it.content.content == prompt }
+                    if (idx != -1) {
+                        _messages[idx] = userMsg
+                    }
                 }.onFailure { e ->
                     reportError("Failed to save message: ${e.message}")
                     return@launch
@@ -686,6 +695,10 @@ class ChatViewModel @Inject constructor(
             ),
             modelId = currentModelId,
         )
+        if (!userMessageAdded.get()) {
+            _messages.add(currentUserMessage!!)
+            userMessageAdded.set(true)
+        }
         AppStateManager.setHasMessages(true)
 
         var job: Job? = null
@@ -1020,6 +1033,7 @@ class ChatViewModel @Inject constructor(
                         ?: argsObj.optString("summary").takeIf { it.isNotBlank() }
                         ?: argsObj.optString("response").takeIf { it.isNotBlank() }
                         ?: argsObj.optString("content").takeIf { it.isNotBlank() }
+                        ?: argsObj.optString("final_answer").takeIf { it.isNotBlank() }
                     
                     if (possibleText != null) {
                         hallucinatedText += (if (hallucinatedText.isEmpty()) "" else "\n") + possibleText
@@ -1164,8 +1178,13 @@ class ChatViewModel @Inject constructor(
         }
 
         // Add history up to now
-        if (chatMemoryEnabled.value || isRegeneration) {
-            _messages.forEach { msg ->
+        if (chatMemoryEnabled.value) {
+            val historyMessages = if (isRegeneration && _messages.lastOrNull()?.role == Role.User) {
+                _messages.dropLast(1)
+            } else {
+                _messages
+            }
+            historyMessages.forEach { msg ->
                 when (msg.role) {
                     Role.User -> result.add(JSONObject().put("role", "user").put("content", msg.content.content))
                     Role.Assistant -> {
@@ -1445,12 +1464,11 @@ class ChatViewModel @Inject constructor(
             agentPlan = plan,
             agentSummary = summary
         )
+        
+        // Remove ephemeral plugin result messages from in-memory UI to prevent duplicates
+        _messages.removeAll { it.content.contentType == ContentType.PluginResult }
+        
         _messages.add(assistantMessage)
-
-        // Save plugin result messages
-        _messages.filter { it.content.contentType == ContentType.PluginResult }
-            .forEach { chatManager.addMessage(chatId, it) }
-
         chatManager.addMessage(chatId, assistantMessage)
 
         if (isNewChat) {
@@ -2421,6 +2439,36 @@ class ChatViewModel @Inject constructor(
     /** Filter out tool call syntax and code blocks from generated text. */
     private fun filterToolCallSyntax(content: String): String {
         var filtered = content
+        
+        // Rescue "final_answer", "answer", "text" from hallucinated JSON blocks before aggressive stripping
+        try {
+            val jsonBlocks = Regex("```json\\s*(\\{[^`]*\\})\\s*```", RegexOption.DOT_MATCHES_ALL).findAll(content)
+            for (match in jsonBlocks) {
+                try {
+                    val jsonObj = org.json.JSONObject(match.groupValues[1])
+                    val rescued = jsonObj.optString("final_answer").takeIf { it.isNotBlank() }
+                        ?: jsonObj.optString("answer").takeIf { it.isNotBlank() }
+                        ?: jsonObj.optString("text").takeIf { it.isNotBlank() }
+                    if (rescued != null) {
+                        filtered = filtered.replace(match.value, rescued)
+                    }
+                } catch (e: Exception) {}
+            }
+            
+            val nakedJsonBlocks = Regex("(\\{\\s*\"(?:final_answer|answer|text)\"\\s*:[^}]*\\})", RegexOption.DOT_MATCHES_ALL).findAll(filtered)
+            for (match in nakedJsonBlocks) {
+                try {
+                    val jsonObj = org.json.JSONObject(match.value)
+                    val rescued = jsonObj.optString("final_answer").takeIf { it.isNotBlank() }
+                        ?: jsonObj.optString("answer").takeIf { it.isNotBlank() }
+                        ?: jsonObj.optString("text").takeIf { it.isNotBlank() }
+                    if (rescued != null) {
+                        filtered = filtered.replace(match.value, rescued)
+                    }
+                } catch (e: Exception) {}
+            }
+        } catch (e: Exception) {}
+
         filtered = filtered.replace(Regex("<tool_call>\\s*\\{.*?\\}\\s*</tool_call>", RegexOption.DOT_MATCHES_ALL), "")
         filtered = filtered.replace(Regex("```json\\s*\\{[^`]*```", RegexOption.DOT_MATCHES_ALL), "")
         filtered = filtered.replace(Regex("```\\s*\\{[^`]*```", RegexOption.DOT_MATCHES_ALL), "")
@@ -2490,6 +2538,10 @@ class ChatViewModel @Inject constructor(
                         content = MessageContent(contentType = ContentType.Text, content = "Generate image: $prompt"),
                         modelId = LlmModelWorker.currentDiffusionModelId.value,
                             )
+                    if (!userMessageAdded.get()) {
+                        _messages.add(currentUserMessage!!)
+                        userMessageAdded.set(true)
+                    }
                     AppStateManager.setHasMessages(true)
                     generateImageForNewChat(prompt, finalNegativePrompt, finalSteps, finalCfgScale, seed, finalWidth, finalHeight, finalScheduler, inferenceParams.showDiffusionProcess, inferenceParams.showDiffusionStride)
                 } else {
@@ -2499,9 +2551,26 @@ class ChatViewModel @Inject constructor(
                         resetStreamingState()
                         return@launch
                     }
+                    
+                    currentUserMessage = Messages(
+                        msgId = "",
+                        role = Role.User,
+                        content = MessageContent(contentType = ContentType.Text, content = "Generate image: $prompt"),
+                        modelId = LlmModelWorker.currentDiffusionModelId.value,
+                    )
+                    if (!userMessageAdded.get()) {
+                        _messages.add(currentUserMessage!!)
+                        userMessageAdded.set(true)
+                    }
+                    AppStateManager.setHasMessages(true)
+
                     chatManager.addUserMessage(chatId, "Generate image: $prompt").onSuccess { userMessage ->
                         currentUserMessage = userMessage
-                        AppStateManager.setHasMessages(true)
+                        // Update the optimistic message with the real DB message
+                        val idx = _messages.indexOfLast { it.role == Role.User && it.msgId == "" && it.content.content == "Generate image: $prompt" }
+                        if (idx != -1) {
+                            _messages[idx] = userMessage
+                        }
                         generateImage(chatId, userMessage, prompt, finalNegativePrompt, finalSteps, finalCfgScale, seed, finalWidth, finalHeight, finalScheduler, inferenceParams.showDiffusionProcess, inferenceParams.showDiffusionStride)
                     }.onFailure { e ->
                         reportError("Failed to save message: ${e.message}")

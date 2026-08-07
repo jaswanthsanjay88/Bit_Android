@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bit.ui.icons.TnIcons
 import com.bit.global.Standards
 import com.bit.viewmodel.ImportStep
@@ -64,8 +65,7 @@ fun MemoryImportSheets(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
-        modifier = Modifier.fillMaxHeight(0.9f)
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         when (step) {
             ImportStep.PROMPT -> MemoryImportPromptContent(
@@ -106,8 +106,9 @@ fun MemoryImportPromptContent(
     val context = LocalContext.current
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = Standards.SpacingLg),
+            .fillMaxWidth()
+            .padding(horizontal = Standards.SpacingLg)
+            .windowInsetsPadding(WindowInsets.navigationBars),
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
     ) {
         Row(
@@ -139,10 +140,10 @@ fun MemoryImportPromptContent(
         // Read-only prompt block
         Box(
             modifier = Modifier
-                .weight(1f)
                 .fillMaxWidth()
+                .heightIn(max = 350.dp)
                 .background(
-                    color = Color.White.copy(alpha = 0.05f),
+                    color = Color.White.copy(alpha = 0.06f),
                     shape = RoundedCornerShape(Standards.RadiusMd)
                 )
                 .border(
@@ -157,8 +158,12 @@ fun MemoryImportPromptContent(
                     Text(
                         text = IMPORT_PROMPT_TEXT,
                         fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = androidx.compose.ui.text.TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
                     )
                 }
             }
@@ -174,26 +179,32 @@ fun MemoryImportPromptContent(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(Standards.RadiusMd),
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
+                containerColor = Color.White.copy(alpha = 0.12f),
+                contentColor = Color.White
             )
         ) {
             Text("Copy Prompt")
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = onSkip) {
                 Text("Skip for now", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(onClick = onPasteDirectly) {
-                Text("Paste Response", color = MaterialTheme.colorScheme.primary)
+            Button(
+                onClick = onPasteDirectly,
+                shape = RoundedCornerShape(Standards.RadiusMd),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White.copy(alpha = 0.12f),
+                    contentColor = Color.White
+                )
+            ) {
+                Text("Paste Response")
             }
         }
-        
-        Spacer(Modifier.height(Standards.SpacingMd))
     }
 }
 
@@ -207,8 +218,9 @@ fun MemoryImportPasteContent(
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = Standards.SpacingLg),
+            .fillMaxWidth()
+            .padding(horizontal = Standards.SpacingLg)
+            .windowInsetsPadding(WindowInsets.navigationBars),
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
     ) {
         Row(
@@ -236,8 +248,8 @@ fun MemoryImportPasteContent(
             value = pastedText,
             onValueChange = { viewModel.updatePastedText(it) },
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .heightIn(min = 200.dp, max = 400.dp),
             placeholder = { Text("Paste response here...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -276,8 +288,9 @@ fun MemoryImportPreviewContent(
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = Standards.SpacingLg),
+            .fillMaxWidth()
+            .padding(horizontal = Standards.SpacingLg)
+            .windowInsetsPadding(WindowInsets.navigationBars),
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
     ) {
         Row(
@@ -302,7 +315,9 @@ fun MemoryImportPreviewContent(
         )
 
         LazyColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 500.dp),
             verticalArrangement = Arrangement.spacedBy(Standards.SpacingMd)
         ) {
             groupedEntries.forEach { (category, categoryEntries) ->

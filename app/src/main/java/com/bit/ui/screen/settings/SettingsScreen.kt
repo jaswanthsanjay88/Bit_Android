@@ -73,6 +73,7 @@ fun SettingsScreen(
     onAiMemoryClick: () -> Unit = {},
     onEmbeddingSetupClick: () -> Unit = {},
     onDiagnosticsClick: () -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(),
     configEditorViewModel: ModelConfigEditorViewModel = hiltViewModel()
 ) {
@@ -436,6 +437,7 @@ fun SettingsScreen(
                                         selectedCategory = "about"
                                     }
                                 )
+
                             }
                         }
                     }

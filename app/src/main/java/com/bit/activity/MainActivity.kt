@@ -211,6 +211,7 @@ sealed class Screen(val route: String) {
     object Editor : Screen("editor")
     object Settings : Screen("settings")
     object AiMemory : Screen("ai_memory")
+    object Update : Screen("update")
     object ImageGenSetup : Screen("image_gen_setup")
     object EmbeddingSetup : Screen("embedding_setup")
     object MemoryVault : Screen("memory_vault")
@@ -407,7 +408,8 @@ fun AppNavigation(
                 onModelEditor = { navController.navigate(Screen.Editor.route) },
                 onAiMemoryClick = { navController.navigate(Screen.AiMemory.route) },
                 onEmbeddingSetupClick = { navController.navigate(Screen.EmbeddingSetup.route) },
-                onDiagnosticsClick = { context.startActivity(Intent(context, DiagnosticsActivity::class.java)) }
+                onDiagnosticsClick = { context.startActivity(Intent(context, DiagnosticsActivity::class.java)) },
+                onCheckForUpdates = { navController.navigate(Screen.Update.route) }
             )
         }
 
@@ -510,6 +512,11 @@ fun AppNavigation(
         composable(Screen.ConflictReview.route) {
             com.bit.ui.screen.memory.ConflictReviewScreen(
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.Update.route) {
+            com.bit.ui.screen.settings.UpdateScreen(
+                onBack = { navController.popBackStack() }
             )
         }
         composable(Screen.BackupSettings.route) {

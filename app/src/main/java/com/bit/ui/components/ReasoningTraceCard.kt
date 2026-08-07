@@ -24,6 +24,8 @@ import com.bit.models.messages.ContentType
 import com.bit.models.messages.Messages
 import com.bit.models.messages.ToolChainStepData
 import com.bit.ui.icons.TnIcons
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.border
 
 data class TraceStep(
     val toolName: String,
@@ -76,27 +78,25 @@ fun ReasoningTraceCard(
         label = "chevronRotation"
     )
 
+    val totalTimeMs = steps.sumOf { it.executionTimeMs }
+    val timeStr = if (totalTimeMs > 0) " for ${String.format(java.util.Locale.US, "%.1f", totalTimeMs / 1000f)}s" else ""
+    
     val totalSteps = steps.size
-    val hasSearch = steps.any {
-        it.toolName.contains("search", ignoreCase = true) || it.toolName.contains("fetch", ignoreCase = true)
+    val label = if (totalSteps > 0) {
+        "Thought$timeStr, called $totalSteps tool${if (totalSteps != 1) "s" else ""}"
+    } else {
+        "Thought process"
     }
 
-    val label = when {
-        hasSearch -> "Web Search"
-        else -> "Tool Execution"
-    }
-
-    val icon = when {
-        hasSearch -> TnIcons.World
-        else -> TnIcons.BrainCircuit
-    }
+    val icon = TnIcons.BrainCircuit
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = Standards.SpacingMd, vertical = 4.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.05f))
+            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
             .clickable {
                 haptics.selection()
                 isExpanded = !isExpanded
@@ -106,34 +106,28 @@ fun ReasoningTraceCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(10.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = "· $totalSteps step${if (totalSteps != 1) "s" else ""}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
             )
             if (isLive && currentRound > 0) {
                 Spacer(Modifier.width(4.dp))
                 Text(
                     text = "(Round $currentRound/$maxRounds)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -142,17 +136,17 @@ fun ReasoningTraceCard(
                 contentDescription = if (isExpanded) "Collapse" else "Expand",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(16.dp)
                     .rotate(rotation)
             )
         }
 
         if (isExpanded) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
             ) {
                 // Plan / Reasoning
@@ -190,10 +184,16 @@ private fun ReasoningStepRow(step: TraceStep, onClick: () -> Unit) {
             json.optString("query").takeIf { it.isNotBlank() } ?: json.optString("url").takeIf { it.isNotBlank() } ?: ""
         } catch (e: Exception) { "" }
     }
+    val actionDesc = when (step.toolName.lowercase()) {
+        "web_search", "search" -> "Searched the web"
+        "read_url", "fetch" -> "Read a webpage"
+        "calculator", "math" -> "Calculated"
+        else -> "Used ${step.toolName.replace('_', ' ')}"
+    }
     
     val displayText = buildString {
         append(if (step.success) "✓ " else "✗ ")
-        append(step.toolName)
+        append(actionDesc)
         if (queryStr.isNotBlank()) append(" — \"$queryStr\"")
         if (step.executionTimeMs > 0) append(" (${String.format(java.util.Locale.US, "%.1f", step.executionTimeMs / 1000f)}s)")
     }
@@ -201,7 +201,7 @@ private fun ReasoningStepRow(step: TraceStep, onClick: () -> Unit) {
     Text(
         text = displayText,
         style = MaterialTheme.typography.bodySmall,
-        color = if (step.success) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
+        color = if (step.success) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
@@ -216,7 +216,7 @@ private fun ReasoningStepRow(step: TraceStep, onClick: () -> Unit) {
 @Composable
 fun PulsingDotLoader(
     modifier: Modifier = Modifier,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primary,
+    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
     dotSize: androidx.compose.ui.unit.Dp = 6.dp,
     spacing: androidx.compose.ui.unit.Dp = 4.dp
 ) {
@@ -297,14 +297,12 @@ private fun ReasoningLoadingRow() {
     ) {
         PulsingDotLoader(
             modifier = Modifier.padding(end = 4.dp),
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = "Thinking...",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
-
-

@@ -66,16 +66,21 @@ internal fun AssistantMessageHeader(message: Messages, imageBlurEnabled: Boolean
             )
         }
 
+        // Tiny Token Cost Pill
+
+
         // Non-text content types
         when (message.content.contentType) {
             ContentType.Image -> ImageMessageBubble(message, imageBlurEnabled)
             ContentType.PluginResult -> {
-                message.toTraceStep()?.let { step ->
-                    ReasoningTraceCard(
-                        steps = listOf(step),
-                        isLive = false,
-                        onStepClick = onTraceStepClick
-                    )
+                if (!hasReasoningTrace) {
+                    message.toTraceStep()?.let { step ->
+                        ReasoningTraceCard(
+                            steps = listOf(step),
+                            isLive = false,
+                            onStepClick = onTraceStepClick
+                        )
+                    }
                 }
             }
             else -> {

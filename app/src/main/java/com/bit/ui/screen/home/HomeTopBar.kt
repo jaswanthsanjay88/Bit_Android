@@ -38,8 +38,8 @@ internal fun TopBar(
 ) {
     CenterAlignedTopAppBar(
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = Color.Transparent
+            containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+            scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
         ),
         title = {
             with(sharedTransitionScope) {
@@ -122,6 +122,6 @@ internal fun TopBar(
                 }
             }
         },
-        modifier = Modifier.statusBarsPadding()
+        modifier = Modifier
     )
 }

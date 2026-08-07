@@ -588,7 +588,7 @@ internal fun BottomBar(
                                 }
                             }
 
-                            OutlinedTextField(
+                            androidx.compose.foundation.text.BasicTextField(
                                 value = value,
                                 onValueChange = { value = it },
                                 enabled = !chatState.isGenerating,
@@ -596,24 +596,20 @@ internal fun BottomBar(
                                     .fillMaxWidth()
                                     .heightIn(min = 38.dp, max = 150.dp)
                                     .padding(horizontal = 4.dp),
-                                placeholder = {
-                                    Text(
-                                        text = "Ask me anything",
-                                        color = Glass.TextMuted
-                                    )
-                                },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    disabledContainerColor = Color.Transparent,
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent,
-                                    cursorColor = Glass.AccentPrimary,
-                                    focusedTextColor = Glass.TextPrimary,
-                                    unfocusedTextColor = Glass.TextPrimary
-                                ),
-                                singleLine = false,
-                                maxLines = 5
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Glass.TextPrimary),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(Glass.AccentPrimary),
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.CenterStart) {
+                                        if (value.isEmpty()) {
+                                            Text(
+                                                text = "Ask me anything",
+                                                color = Glass.TextMuted,
+                                                style = MaterialTheme.typography.bodyLarge
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
                             )
                         }
 

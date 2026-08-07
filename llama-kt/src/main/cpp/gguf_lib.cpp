@@ -1807,25 +1807,12 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeGenerateStreamMultiTurn(
 
     // track system prompt token count on first full evaluation
     if (g_state.n_past == 0 && !messages.empty() && messages[0].role == "system") {
-        try {
-            auto sys_msgs = std::vector<common_chat_msg>{messages[0]};
-            auto sys_tmpl = apply_chat_template(sys_msgs, false);
-            auto sys_tokens = tokenize_string(sys_tmpl.prompt, true);
-            g_state.n_system_tokens = (int)sys_tokens.size();
-            LOGI("System prompt: %d tokens (protected during shifts)", g_state.n_system_tokens);
-        } catch (const std::exception & e) {
-            // Some chat templates (e.g. Qwen 3.5) require user messages —
-            // fall back to tokenizing raw system content
-            LOGW("Template failed for system-only count (%s), using raw tokenization", e.what());
-            auto sys_tokens = tokenize_string(messages[0].content, false);
-            g_state.n_system_tokens = (int)sys_tokens.size() + 4; // +4 for template overhead
-            LOGI("System prompt: ~%d tokens (estimated, protected during shifts)", g_state.n_system_tokens);
-        } catch (...) {
-            LOGW("Template failed for system-only count, using raw tokenization");
-            auto sys_tokens = tokenize_string(messages[0].content, false);
-            g_state.n_system_tokens = (int)sys_tokens.size() + 4;
-            LOGI("System prompt: ~%d tokens (estimated, protected during shifts)", g_state.n_system_tokens);
-        }
+        // We avoid calling apply_chat_template here because some templates (e.g. Qwen 3.5)
+        // throw C++ exceptions if there is no user message. Throwing exceptions in this JNI
+        // context crashes the process on Android if broken unwinders (like libpdfium) are loaded.
+        auto sys_tokens = tokenize_string(messages[0].content, false);
+        g_state.n_system_tokens = (int)sys_tokens.size() + 4; // +4 for template overhead
+        LOGI("System prompt: ~%d tokens (estimated, protected during shifts)", g_state.n_system_tokens);
     }
 
     rebuild_sampler();

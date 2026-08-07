@@ -8,6 +8,7 @@ import com.bit.plugins.PluginManager
 import com.bit.ui.icons.TnIcons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.ui.res.vectorResource
 
 sealed class AppState {
     // Idle states
@@ -53,10 +54,11 @@ fun AppState.getDisplayText(): String = when (this) {
     is AppState.Error -> "Error: $message"
 }
 
+@Composable
 fun AppState.getIcon(): ImageVector = when (this) {
     is AppState.Welcome -> TnIcons.User
     is AppState.NoModelLoaded -> TnIcons.Photo
-    is AppState.ModelLoaded -> TnIcons.Sparkles // Sparkles outline (idle)
+    is AppState.ModelLoaded -> androidx.compose.ui.graphics.vector.ImageVector.vectorResource(id = com.bit.R.drawable.ic_logo) // Bit logo
     is AppState.LoadingModel -> TnIcons.Settings
     is AppState.GeneratingText -> Icons.Filled.AutoAwesome // Sparkles filled (active generation)
     is AppState.GeneratingImage -> Icons.Filled.Image
@@ -72,7 +74,7 @@ fun AppState.getColor(): Color = when (this) {
 
     is AppState.NoModelLoaded -> MaterialTheme.colorScheme.onSurfaceVariant
 
-    is AppState.ModelLoaded -> MaterialTheme.colorScheme.tertiary
+    is AppState.ModelLoaded -> androidx.compose.ui.graphics.Color.White
 
     is AppState.LoadingModel -> MaterialTheme.colorScheme.secondary
 

@@ -269,7 +269,10 @@ fun BodyContent(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = Standards.SpacingXl, bottom = 120.dp),
+                    contentPadding = PaddingValues(
+                        top = paddingValues.calculateTopPadding() + Standards.SpacingXl, 
+                        bottom = 120.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
                 ) {
                     items(
@@ -287,7 +290,10 @@ fun BodyContent(
                                 com.bit.ui.screen.home.AssistantMessageHeader(message = msg, onTraceStepClick = { selectedTraceStep = it })
                                 Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingMd)) {
                                     androidx.compose.foundation.text.selection.SelectionContainer {
-                                        MarkdownText(text = msg.content.content)
+                                        MarkdownText(
+                                            text = msg.content.content,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
                                     }
                                 }
                                 com.bit.ui.screen.home.AssistantMessageFooter(
@@ -298,7 +304,7 @@ fun BodyContent(
                                     ttsModelLoaded = ttsModelLoaded,
                                     onSpeak = { chatViewModel.speakMessage(it) },
                                     onStopTTS = { chatViewModel.stopTTS() }, // toggle same message to stop
-                                    onRegenerate = if (isLast) { { /* fallback */ } } else null,
+                                    onRegenerate = if (isLast) { { chatViewModel.regenerateLastMessage() } } else null,
                                     isRegenerateEnabled = isLast
                                 )
                             }
