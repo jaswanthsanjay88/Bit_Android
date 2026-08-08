@@ -20,8 +20,8 @@ android {
         applicationId = "com.bit"
         minSdk = 29
         targetSdk = 36
-        versionCode = 74
-        versionName = "2.0.5"
+        versionCode = 75
+        versionName = "2.0.6"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
