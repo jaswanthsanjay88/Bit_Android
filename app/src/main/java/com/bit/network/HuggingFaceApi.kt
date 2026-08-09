@@ -1,5 +1,6 @@
 package com.bit.network
 
+import com.google.gson.annotations.SerializedName
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Path
@@ -31,14 +32,19 @@ interface HuggingFaceApi {
 }
 
 data class HuggingFaceRepoResponse(
-    val modelId: String,
+    val modelId: String?,
+    val id: String?,
     val siblings: List<HuggingFaceFileResponse>?
 )
 
 data class HuggingFaceFileResponse(
-    val path: String,
-    val size: Long?
-)
+    @SerializedName("path") val rawPath: String? = null,
+    @SerializedName("rfilename") val rfilename: String? = null,
+    val size: Long? = null
+) {
+    val path: String
+        get() = rfilename?.takeIf { it.isNotBlank() } ?: rawPath ?: ""
+}
 
 data class HuggingFaceSearchRepoResponse(
     val id: String,

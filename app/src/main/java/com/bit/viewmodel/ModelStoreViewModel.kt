@@ -148,6 +148,9 @@ class ModelStoreViewModel @Inject constructor(
     private val _explorerError = MutableStateFlow<String?>(null)
     val explorerError: StateFlow<String?> = _explorerError
 
+    private val _explorerRepoFiles = MutableStateFlow<Map<String, List<com.bit.network.HuggingFaceFileResponse>>>(emptyMap())
+    val explorerRepoFiles: StateFlow<Map<String, List<com.bit.network.HuggingFaceFileResponse>>> = _explorerRepoFiles
+
     private var explorerSearchJob: Job? = null
 
     // App's internal models directory
@@ -157,6 +160,7 @@ class ModelStoreViewModel @Inject constructor(
         loadDeviceInfo()
         loadCuratedModels()
         loadInstalledModels()
+        loadTrendingExplorerModels()
 
         // Read optional tab param and set initial state
         val tabArg = savedStateHandle.get<String>("tab")
@@ -658,24 +662,39 @@ class ModelStoreViewModel @Inject constructor(
         }
     }
 
+    fun loadTrendingExplorerModels() {
+        explorerSearchJob?.cancel()
+        explorerSearchJob = viewModelScope.launch {
+            _isExplorerLoading.value = true
+            _explorerError.value = null
+            try {
+                explorerRepository.fetchTrendingGgufModels().onSuccess { repos ->
+                    _explorerResults.value = repos
+                }.onFailure { exception ->
+                    _explorerError.value = exception.message ?: "Failed to load trending models"
+                }
+            } finally {
+                _isExplorerLoading.value = false
+            }
+        }
+    }
+
     fun setExplorerQuery(query: String) {
         _explorerQuery.value = query
         if (query.isBlank()) {
-            _explorerResults.value = emptyList()
-            _explorerError.value = null
+            loadTrendingExplorerModels()
         }
     }
 
     fun searchExplorerRepositories() {
+        val query = _explorerQuery.value.trim()
+        if (query.isBlank()) {
+            loadTrendingExplorerModels()
+            return
+        }
+
         explorerSearchJob?.cancel()
         explorerSearchJob = viewModelScope.launch {
-            val query = _explorerQuery.value.trim()
-            if (query.isBlank()) {
-                _explorerError.value = "Enter a search term"
-                _explorerResults.value = emptyList()
-                return@launch
-            }
-
             _isExplorerLoading.value = true
             _explorerError.value = null
 
@@ -683,7 +702,7 @@ class ModelStoreViewModel @Inject constructor(
                 explorerRepository.searchGgufRepositories(query).onSuccess { repos ->
                     _explorerResults.value = repos
                     if (repos.isEmpty()) {
-                        _explorerError.value = "No repositories found"
+                        _explorerError.value = "No GGUF repositories found for '$query'"
                     }
                 }.onFailure { exception ->
                     _explorerResults.value = emptyList()
@@ -731,6 +750,50 @@ class ModelStoreViewModel @Inject constructor(
             repoDataStore.addRepository(repo)
             _explorerError.value = null
             loadModels()
+        }
+    }
+
+    fun fetchRepoFiles(repoPath: String) {
+        viewModelScope.launch {
+            try {
+                val files = explorerRepository.fetchRepoFilesFast(repoPath)
+                if (files.isNotEmpty()) {
+                    _explorerRepoFiles.value = _explorerRepoFiles.value + (repoPath to files)
+                }
+            } catch (e: Exception) {
+                Log.e("ModelStoreViewModel", "Failed to fetch files for $repoPath", e)
+            }
+        }
+    }
+
+    fun downloadModelFromExplorer(explorerRepo: HuggingFaceExplorerRepo, file: com.bit.network.HuggingFaceFileResponse) {
+        viewModelScope.launch {
+            val lowerId = explorerRepo.id.lowercase()
+            val lowerTags = explorerRepo.tags.map { it.lowercase() }
+
+            val modelType = when {
+                lowerTags.any { tag -> tag in listOf("stable-diffusion", "diffusion", "sd", "diffusers", "text-to-image", "image-to-image") } ||
+                        lowerId.contains("diffusion") || lowerId.contains("stable-diffusion") || lowerId.contains("sd-") -> ModelType.SD
+
+                lowerTags.any { tag -> tag in listOf("text-to-speech", "tts") } || lowerId.contains("tts") -> ModelType.TTS
+
+                lowerTags.any { tag -> tag in listOf("automatic-speech-recognition", "stt", "speech-recognition", "whisper") } || lowerId.contains("whisper") -> ModelType.STT
+
+                else -> ModelType.GGUF
+            }
+
+            val model = com.bit.models.data.HuggingFaceModel(
+                id = "${explorerRepo.id.replace("/", "-").lowercase()}-${file.path.replace("/", "-")}",
+                name = explorerRepo.id.substringAfter("/"),
+                description = explorerRepo.id,
+                fileUri = "https://huggingface.co/${explorerRepo.id}/resolve/main/${file.path}",
+                approximateSize = String.format("%.2f MB", (file.size ?: 0L) / (1024f * 1024f)),
+                modelType = modelType,
+                isZip = file.path.endsWith(".zip", ignoreCase = true),
+                tags = explorerRepo.tags,
+                repositoryUrl = "https://huggingface.co/${explorerRepo.id}"
+            )
+            downloadModel(model)
         }
     }
 

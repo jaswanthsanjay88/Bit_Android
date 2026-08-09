@@ -278,11 +278,12 @@ tn_thread_config tn_thread_config_for_mode(tn_thread_mode mode) {
             // cores including eff contribute. n_batch=1024 halves graph-build
             // overhead on long prompts.
             cfg.n_threads_generation = std::min(3, np);
-            cfg.n_threads_batch      = n_total;
-            cfg.n_batch              = 1024;
+            cfg.n_threads_batch      = n_total > 1 ? std::max(1, n_total - 1) : 1;
+            cfg.n_batch              = 512;
             cfg.pin_to_perf_cores    = true;
             cfg.pin_to_eff_cores     = false;
             cfg.priority             = TN_PRIO_HIGH;
+            cfg.poll                 = 50; // PowerInfer-style zero-latency worker thread busy-poll during decode
             fill_cpumask(cfg.cpumask_generation, cfg.perf_core_ids, np);
             // Batch mask covers ALL online cores. We build it from the union
             // of perf + eff core IDs rather than indexing 0..n_total because

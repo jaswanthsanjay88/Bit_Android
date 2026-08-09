@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class GgufLoadingParams(
     val threads: Int = 0,  // 0 = auto-detect
+    val threadMode: Int = 2, // 0 = power_saving, 1 = balanced, 2 = performance (default 2 for max speed)
     val ctxSize: Int = 4096,
     val batchSize: Int = 512,
     val useMmap: Boolean = true,

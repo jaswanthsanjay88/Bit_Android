@@ -82,6 +82,7 @@ set(GGML_VULKAN          OFF CACHE BOOL "" FORCE)
 if(ANDROID_ABI STREQUAL "arm64-v8a")
     # KleidiAI dispatches dotprod/i8mm/SVE per-device at runtime.
     set(GGML_CPU_KLEIDIAI ON CACHE BOOL "" FORCE)
+    set(GGML_CPU_ARM_ARCH "armv8.2-a+dotprod+fp16" CACHE STRING "" FORCE)
 else()
     set(GGML_CPU_KLEIDIAI OFF CACHE BOOL "" FORCE)
 endif()

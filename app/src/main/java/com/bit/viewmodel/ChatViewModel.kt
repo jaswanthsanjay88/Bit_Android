@@ -48,6 +48,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -82,6 +84,40 @@ class ChatViewModel @Inject constructor(
     private val appSettings = AppSettingsDataStore(context)
     private val ttsDataStore = com.bit.tts.TTSDataStore(context)
     // ControlVectorManager removed — will be re-added when new lib supports it
+
+    // ── TTFT optimization: cache vault memory notes to avoid re-walking filesystem every message ──
+    @Volatile private var cachedVaultNotes: List<Pair<String, String>>? = null
+    @Volatile private var vaultCacheTimestamp = 0L
+    private val VAULT_CACHE_TTL_MS = 30_000L // 30 seconds
+
+    private fun getCachedVaultNotes(): List<Pair<String, String>> {
+        val now = System.currentTimeMillis()
+        val cached = cachedVaultNotes
+        if (cached != null && now - vaultCacheTimestamp < VAULT_CACHE_TTL_MS) return cached
+
+        val vaultRoot = com.bit.global.AppPaths.vaultRoot(appContext)
+        val notes = try {
+            vaultRoot.walkTopDown()
+                .filter { it.isFile && it.extension.lowercase() == "md" }
+                .mapNotNull { file ->
+                    try {
+                        val raw = file.readText()
+                        if (raw.contains("is_ai_memory_enabled: false")) return@mapNotNull null
+                        val bodyStart = raw.indexOf("---", 3)
+                        if (bodyStart < 0) return@mapNotNull null
+                        val body = raw.substring(bodyStart + 3).trimStart('\n')
+                        val titleLine = raw.lines().find { it.trim().startsWith("title:") }
+                        val title = titleLine?.substringAfter("title:")?.trim() ?: file.nameWithoutExtension
+                        title to body
+                    } catch (_: Exception) { null }
+                }
+                .toList()
+        } catch (_: Exception) { emptyList() }
+
+        cachedVaultNotes = notes
+        vaultCacheTimestamp = now
+        return notes
+    }
 
     val streamingEnabled: StateFlow<Boolean> = appSettings.streamingEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -436,14 +472,20 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // Check thinking support whenever text model loads/unloads
+        // Check thinking support whenever text model loads/unloads or type changes
         viewModelScope.launch {
-            LlmModelWorker.isGgufModelLoaded.collect { loaded ->
-                if (loaded) {
+            kotlinx.coroutines.flow.combine(
+                LlmModelWorker.isGgufModelLoaded,
+                ActiveModelSession.currentModelType
+            ) { isGgufLoaded, modelType ->
+                Pair(isGgufLoaded, modelType)
+            }.collect { (isGgufLoaded, modelType) ->
+                if (modelType == ProviderType.API) {
+                    _modelSupportsThinking.value = true
+                } else if (isGgufLoaded) {
                     val supports = LlmModelWorker.supportsThinkingGguf()
                     _modelSupportsThinking.value = supports
-                    // Auto-disable thinking if model doesn't support it
-                    if (!supports) _thinkingModeEnabled.value = false
+                    // Do not auto-disable thinking mode; allow user to force enable it
                 } else {
                     _modelSupportsThinking.value = false
                     _thinkingModeEnabled.value = false
@@ -583,28 +625,32 @@ class ChatViewModel @Inject constructor(
                 // Let Compose render the StreamingView before native engine saturates CPU
                 kotlinx.coroutines.yield()
 
-                // Read maxTokens from the current model's config
-                val maxTokens = getCurrentModelMaxTokens()
-
                 val isNewChat = isNewConversation
                 val activeProviderType = ActiveModelSession.currentModelType.value
                 val hasTools = PluginManager.hasEnabledTools()
                         && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
                 LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value && !hasTools)
-                
-                // Query both the global RAG vault AND the chat-specific attached document
-                var ragContext = _currentRagContext.value
-                val attachedResult = globalRagOrchestrator.queryGlobalKnowledge(prompt, topK = 5)
-                
-                if (attachedResult != null && attachedResult.results.isNotEmpty() && attachedResult.confidence != com.bit.neuron_example.RetrievalConfidence.LOW) {
-                    Log.d(TAG, "Global RAG returned ${attachedResult.results.size} chunks with confidence ${attachedResult.confidence}")
-                    val attachedContextStr = attachedResult.results.joinToString("\n\n") {
-                        "<chunk>\n${it.node.content}\n</chunk>"
-                    }
-                    val instruction = "\n[SYSTEM INSTRUCTION: You are provided with retrieved document chunks above. Use them to answer the user's query if relevant.]"
-                    ragContext = if (ragContext != null) ragContext + "\n\n" + attachedContextStr + instruction else attachedContextStr + instruction
+
+                // ── TTFT optimization: fire API connection pre-warm immediately ──
+                // While we're building the request, TCP+TLS handshake happens in parallel
+                if (activeProviderType == ProviderType.API) {
+                    try {
+                        val remoteCfg = getRemoteInferenceConfig()
+                        if (remoteCfg != null) {
+                            val baseUrl = LlmProviderResolver.cleanBaseUrl(remoteCfg.endpoint)
+                            com.bit.network.HttpClient.preWarmConnection(baseUrl)
+                        }
+                    } catch (_: Exception) { /* best-effort */ }
                 }
 
+                // ── TTFT optimization: parallelize pre-generation IO work ──
+                // RAG query, maxTokens read, and chat creation all run concurrently
+                val maxTokensDeferred = async(Dispatchers.IO) { getCurrentModelMaxTokens() }
+                val ragDeferred = async(Dispatchers.IO) {
+                    globalRagOrchestrator.queryGlobalKnowledge(prompt, topK = 5)
+                }
+
+                // Create chat in DB while other async work is running
                 val chatId = if (isNewChat) {
                     var createdId: String? = null
                     chatManager.createNewChat().onSuccess { id ->
@@ -633,6 +679,20 @@ class ChatViewModel @Inject constructor(
                 }.onFailure { e ->
                     reportError("Failed to save message: ${e.message}")
                     return@launch
+                }
+
+                // ── Await parallelized results ──
+                val maxTokens = maxTokensDeferred.await()
+                val attachedResult = ragDeferred.await()
+
+                var ragContext = _currentRagContext.value
+                if (attachedResult != null && attachedResult.results.isNotEmpty() && attachedResult.confidence != com.bit.neuron_example.RetrievalConfidence.LOW) {
+                    Log.d(TAG, "Global RAG returned ${attachedResult.results.size} chunks with confidence ${attachedResult.confidence}")
+                    val attachedContextStr = attachedResult.results.joinToString("\n\n") {
+                        "<chunk>\n${it.node.content}\n</chunk>"
+                    }
+                    val instruction = "\n[SYSTEM INSTRUCTION: You are provided with retrieved document chunks above. Use them to answer the user's query if relevant.]"
+                    ragContext = if (ragContext != null) ragContext + "\n\n" + attachedContextStr + instruction else attachedContextStr + instruction
                 }
 
                 executeUnifiedGeneration(prompt, ragContext, maxTokens, isNewChat)
@@ -728,8 +788,8 @@ class ChatViewModel @Inject constructor(
                 val resultBuilder = StringBuilder()
                 val thinkingBuilder = StringBuilder()
                 var lastEmitTime = 0L
-                val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
-                val vlmThinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
+                val thinkingActive = _thinkingModeEnabled.value
+                val vlmThinkParser = StreamingThinkTagParser(assumeThinking = false)
 
                 LlmModelWorker.vlmGenerateStreaming(
                     jsonArray.toString(), imageData, maxTokens
@@ -743,11 +803,20 @@ class ChatViewModel @Inject constructor(
                                     resultBuilder.append(text)
                                     val now = System.currentTimeMillis()
                                     if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                                        _streamingAssistantMessage.value = resultBuilder.toString()
+                                        val output = if (thinkingBuilder.isNotEmpty()) "<think>${thinkingBuilder}</think>${resultBuilder}" else resultBuilder.toString()
+                                        _streamingAssistantMessage.value = output
                                         lastEmitTime = now
                                     }
                                 },
-                                onThought = { thought -> thinkingBuilder.append(thought) }
+                                onThought = { thought -> 
+                                    thinkingBuilder.append(thought) 
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                                        val output = if (thinkingBuilder.isNotEmpty()) "<think>${thinkingBuilder}</think>${resultBuilder}" else resultBuilder.toString()
+                                        _streamingAssistantMessage.value = output
+                                        lastEmitTime = now
+                                    }
+                                }
                             )
                         }
                         is GenerationEvent.Done -> {
@@ -755,7 +824,8 @@ class ChatViewModel @Inject constructor(
                                 onText = { resultBuilder.append(it) },
                                 onThought = { thinkingBuilder.append(it) }
                             )
-                            _streamingAssistantMessage.value = resultBuilder.toString()
+                            val finalResponse = if (thinkingBuilder.isNotEmpty()) "<think>${thinkingBuilder}</think>${resultBuilder}" else resultBuilder.toString()
+                            _streamingAssistantMessage.value = finalResponse
                         }
                         is GenerationEvent.Metrics -> { currentMetrics = event.metrics }
                         is GenerationEvent.Progress -> { /* progress tracked elsewhere */ }
@@ -770,7 +840,7 @@ class ChatViewModel @Inject constructor(
                     }
                 }
 
-                val finalResponse = resultBuilder.toString()
+                val finalResponse = if (thinkingBuilder.isNotEmpty()) "<think>${thinkingBuilder}</think>${resultBuilder.toString().trim()}" else resultBuilder.toString().trim()
                 _streamingAssistantMessage.value = finalResponse
 
                 if (isNewChat) {
@@ -904,8 +974,12 @@ class ChatViewModel @Inject constructor(
     ) {
         AppStateManager.setGeneratingText()
         val appSettings = AppSettingsDataStore(appContext)
-        val globalPrepend = appSettings.globalPrependPrompt.first()
-        val globalPostpend = appSettings.globalPostpendPrompt.first()
+        // ── TTFT optimization: parallelize DataStore reads ──
+        val (globalPrepend, globalPostpend) = withContext(Dispatchers.IO) {
+            val p1 = async { appSettings.globalPrependPrompt.first() }
+            val p2 = async { appSettings.globalPostpendPrompt.first() }
+            Pair(p1.await(), p2.await())
+        }
         
         val currentDateTime = java.util.Date()
         val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
@@ -958,6 +1032,12 @@ class ChatViewModel @Inject constructor(
         val isTooTinyForTools = activeModelId.contains("350m", ignoreCase = true) ||
                 activeModelId.contains("125m", ignoreCase = true) ||
                 activeModelId.contains("160m", ignoreCase = true) ||
+                activeModelId.contains("0.5b", ignoreCase = true) ||
+                activeModelId.contains("0.6b", ignoreCase = true) ||
+                activeModelId.contains("0.8b", ignoreCase = true) ||
+                activeModelId.contains("1b", ignoreCase = true) ||
+                activeModelId.contains("1.5b", ignoreCase = true) ||
+                activeModelId.contains("1.8b", ignoreCase = true) ||
                 activeModelId.contains("tiny", ignoreCase = true) ||
                 activeModelId.contains("mini", ignoreCase = true)
         val hasTools = PluginManager.hasEnabledTools()
@@ -976,29 +1056,17 @@ class ChatViewModel @Inject constructor(
             round++
             Log.d(TAG, "Unified tool loop: starting round $round")
 
+            val currentRoundHasTools = hasTools && steps.isEmpty()
+
             // Build conversation messages for this turn
-            val conversationMessages = buildConversationMessagesWithSteps(fullPrompt, steps, isRegeneration, hasTools)
+            val conversationMessages = buildConversationMessagesWithSteps(fullPrompt, steps, isRegeneration, currentRoundHasTools)
 
             // Generate response (streaming)
             AppStateManager.setGeneratingText()
             val result = if (activeProviderType == ProviderType.API) {
-                generateRemoteUnified(conversationMessages, steps, hasTools, maxTokens)
+                generateRemoteUnified(conversationMessages, steps, currentRoundHasTools, maxTokens)
             } else {
-                if (hasTools) {
-                    // 2-stage routing for local GGUF models with tools
-                    val routed = com.bit.plugins.TwoStageToolRouter.route(
-                        conversationMessages,
-                        PluginManager.getEnabledToolDefinitions()
-                    )
-                    if (routed != null) {
-                        GenerationResult(text = "", toolCalls = listOf(routed))
-                    } else {
-                        // No tool needed or none selected, run final generation
-                        generateGgufUnified(conversationMessages, hasTools = false, maxTokens = maxTokens)
-                    }
-                } else {
-                    generateGgufUnified(conversationMessages, hasTools = false, maxTokens = maxTokens)
-                }
+                generateGgufUnified(conversationMessages, hasTools = currentRoundHasTools, maxTokens = maxTokens)
             }
 
             if (result.toolCalls.isEmpty()) {
@@ -1295,6 +1363,7 @@ class ChatViewModel @Inject constructor(
         var tokenCount = 0
 
         val textBuilder = java.lang.StringBuilder()
+        val thinkBuilder = java.lang.StringBuilder()
         val toolCalls = mutableListOf<Pair<String, String>>()
         var lastEmitTime = 0L
 
@@ -1308,7 +1377,21 @@ class ChatViewModel @Inject constructor(
                     textBuilder.append(event.text)
                     val now = System.currentTimeMillis()
                     if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                        _streamingAssistantMessage.value = textBuilder.toString()
+                        val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                        _streamingAssistantMessage.value = output
+                        lastEmitTime = now
+                    }
+                }
+                is StreamEvent.ThoughtChunk -> {
+                    if (firstTokenTimeMs == 0L) {
+                        firstTokenTimeMs = System.currentTimeMillis()
+                    }
+                    tokenCount++
+                    thinkBuilder.append(event.thought)
+                    val now = System.currentTimeMillis()
+                    if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                        val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                        _streamingAssistantMessage.value = output
                         lastEmitTime = now
                     }
                 }
@@ -1330,7 +1413,10 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        val text = textBuilder.toString().trim()
+        val text = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder.toString().trim()}" else textBuilder.toString().trim()
+        if (text.isNotEmpty()) {
+            _streamingAssistantMessage.value = text
+        }
         val finalToolCalls = mutableListOf<Pair<String, String>>()
         finalToolCalls.addAll(toolCalls)
 
@@ -1370,8 +1456,8 @@ class ChatViewModel @Inject constructor(
         val thinkBuilder = java.lang.StringBuilder()
         val toolCalls = mutableListOf<Pair<String, String>>()
         var lastEmitTime = 0L
-        val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
-        val thinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
+        val thinkingActive = _thinkingModeEnabled.value
+        val thinkParser = StreamingThinkTagParser(assumeThinking = false)
 
         LlmModelWorker.ggufGenerateMultiTurnStreaming(
             jsonArray.toString(), maxTokens
@@ -1385,11 +1471,20 @@ class ChatViewModel @Inject constructor(
                             textBuilder.append(text)
                             val now = System.currentTimeMillis()
                             if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                                _streamingAssistantMessage.value = textBuilder.toString()
+                                val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                                _streamingAssistantMessage.value = output
                                 lastEmitTime = now
                             }
                         },
-                        onThought = { thought -> thinkBuilder.append(thought) }
+                        onThought = { thought -> 
+                            thinkBuilder.append(thought)
+                            val now = System.currentTimeMillis()
+                            if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                                val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                                _streamingAssistantMessage.value = output
+                                lastEmitTime = now
+                            }
+                        }
                     )
                 }
                 is GenerationEvent.ToolCall -> {
@@ -1406,13 +1501,14 @@ class ChatViewModel @Inject constructor(
                         onText = { textBuilder.append(it) },
                         onThought = { thinkBuilder.append(it) }
                     )
-                    _streamingAssistantMessage.value = textBuilder.toString()
+                    val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                    _streamingAssistantMessage.value = output
                 }
                 else -> {}
             }
         }
 
-        val text = textBuilder.toString().trim()
+        val text = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder.toString().trim()}" else textBuilder.toString().trim()
         val finalToolCalls = mutableListOf<Pair<String, String>>()
         finalToolCalls.addAll(toolCalls)
 
@@ -1781,8 +1877,8 @@ class ChatViewModel @Inject constructor(
         var lastEmitTime = 0L
         var lastRepCheckLen = 0
         var repetitionTrimIndex = -1
-        val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
-        val agentThinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
+        val thinkingActive = _thinkingModeEnabled.value
+        val agentThinkParser = StreamingThinkTagParser(assumeThinking = false)
 
         val generationFlow = LlmModelWorker.ggufGenerateMultiTurnStreaming(jsonArray.toString(), maxTokens)
 
@@ -1977,8 +2073,8 @@ class ChatViewModel @Inject constructor(
         val textBuilder = StringBuilder()
         val thinkTextBuilder = StringBuilder()
         val jsonArray = JSONArray(messages)
-        val thinkingActive = _thinkingModeEnabled.value && _modelSupportsThinking.value
-        val tcThinkParser = StreamingThinkTagParser(assumeThinking = thinkingActive)
+        val thinkingActive = _thinkingModeEnabled.value
+        val tcThinkParser = StreamingThinkTagParser(assumeThinking = false)
 
         LlmModelWorker.ggufGenerateMultiTurnStreaming(
             jsonArray.toString(), maxTokens
@@ -2097,27 +2193,8 @@ class ChatViewModel @Inject constructor(
         val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
         val dateSdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
 
-        // ponytail: read memory from vault disk files (source of truth), not Room DB
-        val vaultRoot = com.bit.global.AppPaths.vaultRoot(appContext)
-        val enabledNotes = try {
-            vaultRoot.walkTopDown()
-                .filter { it.isFile && it.extension.lowercase() == "md" }
-                .mapNotNull { file ->
-                    try {
-                        val raw = file.readText()
-                        // Quick frontmatter check — skip files with is_ai_memory_enabled: false
-                        if (raw.contains("is_ai_memory_enabled: false")) return@mapNotNull null
-                        val bodyStart = raw.indexOf("---", 3)
-                        if (bodyStart < 0) return@mapNotNull null
-                        val body = raw.substring(bodyStart + 3).trimStart('\n')
-                        // Extract title from frontmatter
-                        val titleLine = raw.lines().find { it.trim().startsWith("title:") }
-                        val title = titleLine?.substringAfter("title:")?.trim() ?: file.nameWithoutExtension
-                        title to body
-                    } catch (_: Exception) { null }
-                }
-                .toList()
-        } catch (_: Exception) { emptyList() }
+        // ── TTFT optimization: use cached vault notes instead of re-walking filesystem ──
+        val enabledNotes = getCachedVaultNotes()
 
         val activeMemoryText = if (enabledNotes.isNotEmpty()) {
             enabledNotes.joinToString("\n\n") { (title, body) ->
@@ -2930,7 +3007,10 @@ class ChatViewModel @Inject constructor(
     fun stop() {
         if (TTSManager.isPlaying.value) { TTSManager.stopPlayback() }
 
-        // 1. Snapshot mutable state BEFORE cancellation nukes it via finally→resetStreamingState
+        val currentGenType = _currentGenerationType.value
+        _isGenerating.value = false
+
+        // 1. Snapshot mutable state BEFORE cancellation
         val snapshotChatId = _currentChatId.value
         val snapshotUserMsg = currentUserMessage
         val snapshotContent = _streamingAssistantMessage.value
@@ -2939,31 +3019,30 @@ class ChatViewModel @Inject constructor(
         val snapshotImageMetrics = currentImageMetrics
         val snapshotUserAdded = userMessageAdded.get()
 
-        // 2. Stop native generation (synchronous signal to engine)
-        when (_currentGenerationType.value) {
-            ModelType.TEXT_GENERATION -> {
-                LlmModelWorker.ggufStopGeneration()
-            }
+        // 2. Stop native generation (signal to engine)
+        when (currentGenType) {
+            ModelType.TEXT_GENERATION -> LlmModelWorker.ggufStopGeneration()
             ModelType.IMAGE_GENERATION -> LlmModelWorker.stopDiffusionGeneration()
             ModelType.AUDIO_GENERATION -> stopTTS()
         }
 
-        // 3. Cancel the coroutine job (triggers finally → resetStreamingState)
+        // 3. Cancel the coroutine job
         generationJob?.cancel()
         generationJob = null
 
-        // 4. Persist partial results using snapshots taken before cancellation
-        when (_currentGenerationType.value) {
-            ModelType.TEXT_GENERATION -> handleTextStop(
-                snapshotChatId, snapshotUserMsg, snapshotContent, snapshotMetrics, snapshotUserAdded
-            )
-            ModelType.IMAGE_GENERATION -> handleImageStop(
-                snapshotChatId, snapshotUserMsg, snapshotImage, snapshotImageMetrics, snapshotUserAdded
-            )
-            else -> resetStreamingState()
+        // 4. Persist partial results asynchronously off the Main thread to avoid UI thread blocking
+        viewModelScope.launch(Dispatchers.IO) {
+            when (currentGenType) {
+                ModelType.TEXT_GENERATION -> handleTextStop(
+                    snapshotChatId, snapshotUserMsg, snapshotContent, snapshotMetrics, snapshotUserAdded
+                )
+                ModelType.IMAGE_GENERATION -> handleImageStop(
+                    snapshotChatId, snapshotUserMsg, snapshotImage, snapshotImageMetrics, snapshotUserAdded
+                )
+                else -> resetStreamingState()
+            }
+            AppStateManager.setGenerationComplete()
         }
-
-        AppStateManager.setGenerationComplete()
     }
 
     private fun handleTextStop(
@@ -2973,7 +3052,39 @@ class ChatViewModel @Inject constructor(
         metrics: DecodingMetrics?,
         wasUserAdded: Boolean
     ) {
-        val cleanContent = content.trim()
+        // Pre-process the content to forcefully close any unclosed thinking tags
+        var processedContent = content
+        val openTags = listOf(
+            "<think>" to "</think>",
+            "[THINK]" to "[/THINK]",
+            "<reasoning>" to "</reasoning>",
+            "<|channel>thought" to "<|channel>"
+        )
+        
+        var unclosedIndex = -1
+        var expectedCloseTag = ""
+        
+        for ((open, close) in openTags) {
+            val lastOpen = processedContent.lastIndexOf(open, ignoreCase = true)
+            if (lastOpen != -1) {
+                val lastClose = processedContent.lastIndexOf(close, ignoreCase = true)
+                if (lastClose < lastOpen) {
+                    // Tag is open!
+                    if (lastOpen > unclosedIndex) {
+                        unclosedIndex = lastOpen
+                        expectedCloseTag = close
+                    }
+                }
+            }
+        }
+        
+        if (unclosedIndex != -1) {
+            processedContent += expectedCloseTag
+        }
+        
+        processedContent += "\n\n_Stopped_"
+        
+        val cleanContent = processedContent.trim()
         if (chatId != null && userMsg != null && cleanContent.isNotEmpty()) {
             if (!wasUserAdded && !_messages.contains(userMsg)) {
                 _messages.add(userMsg)
@@ -3364,7 +3475,7 @@ class ChatViewModel @Inject constructor(
         private const val TAG = "ChatViewModel"
         private const val PLAN_MAX_TOKENS = 150
         private const val SUMMARY_MAX_TOKENS = 512
-        private const val STREAMING_THROTTLE_MS = 100L
+        private const val STREAMING_THROTTLE_MS = 16L
         private const val REPETITION_CHECK_INTERVAL = 200
         private const val REPETITION_MIN_PATTERN_LEN = 30
         private const val REPETITION_MIN_REPEATS = 4

@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -109,9 +110,12 @@ internal fun AdvancedTab(
                 isLoading = isExplorerLoading,
                 error = explorerError,
                 existingRepoPaths = existingRepoPaths,
+                repoFiles = viewModel.explorerRepoFiles.collectAsStateWithLifecycle().value,
                 onQueryChange = viewModel::setExplorerQuery,
                 onSearch = viewModel::searchExplorerRepositories,
-                onAdd = viewModel::addExplorerRepository
+                onAdd = viewModel::addExplorerRepository,
+                onFetchRepoFiles = viewModel::fetchRepoFiles,
+                onDownloadModel = viewModel::downloadModelFromExplorer
             )
         }
 
@@ -169,9 +173,12 @@ internal fun ExplorerRepositoriesCard(
     isLoading: Boolean,
     error: String?,
     existingRepoPaths: Set<String>,
+    repoFiles: Map<String, List<com.bit.network.HuggingFaceFileResponse>>,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
-    onAdd: (HuggingFaceExplorerRepo) -> Unit
+    onAdd: (HuggingFaceExplorerRepo) -> Unit,
+    onFetchRepoFiles: (String) -> Unit,
+    onDownloadModel: (HuggingFaceExplorerRepo, com.bit.network.HuggingFaceFileResponse) -> Unit
 ) {
     var expanded by remember { mutableStateOf(true) }
 
@@ -236,15 +243,23 @@ internal fun ExplorerRepositoriesCard(
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
+                        query.isBlank() -> {
+                            Text(
+                                text = "🔥 Trending GGUF Models on HuggingFace",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                         count > 0 -> {
-                            CaptionText(text = "$count result${if (count != 1) "s" else ""} found")
+                            CaptionText(text = "$count result${if (count != 1) "s" else ""} found for '$query'")
                         }
                         else -> Spacer(modifier = Modifier.height(0.dp))
                     }
                 }
 
                 // ── Results ──
-                val displayedResults = results.take(8)
+                val displayedResults = results.take(20)
                 displayedResults.forEachIndexed { index, repo ->
                     val isAdded = existingRepoPaths.contains(repo.id.lowercase())
 
@@ -265,7 +280,10 @@ internal fun ExplorerRepositoriesCard(
                             ExplorerResultRow(
                                 repo = repo,
                                 isAdded = isAdded,
-                                onAdd = { onAdd(repo) }
+                                repoFiles = repoFiles[repo.id],
+                                onAdd = { onAdd(repo) },
+                                onFetchFiles = { onFetchRepoFiles(repo.id) },
+                                onDownloadFile = { file -> onDownloadModel(repo, file) }
                             )
                             if (index < displayedResults.lastIndex) {
                                 HorizontalDivider(
@@ -286,53 +304,125 @@ internal fun ExplorerRepositoriesCard(
 internal fun ExplorerResultRow(
     repo: HuggingFaceExplorerRepo,
     isAdded: Boolean,
-    onAdd: () -> Unit
+    repoFiles: List<com.bit.network.HuggingFaceFileResponse>?,
+    onAdd: () -> Unit,
+    onFetchFiles: () -> Unit,
+    onDownloadFile: (com.bit.network.HuggingFaceFileResponse) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        shape = RoundedCornerShape(Standards.CardSmallCornerRadius)
+        shape = RoundedCornerShape(Standards.CardSmallCornerRadius),
+        onClick = {
+            expanded = !expanded
+            if (expanded && repoFiles == null) {
+                onFetchFiles()
+            }
+        }
     ) {
-        Row(
-            modifier = Modifier.padding(Standards.CardPadding),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = repo.id,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CaptionText(text = "${repo.downloads} downloads")
-                    CaptionText(text = "·")
-                    CaptionText(text = "${repo.likes} likes")
-                    if (repo.gated) {
+        Column {
+            Row(
+                modifier = Modifier.padding(Standards.CardPadding),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = repo.id,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CaptionText(text = "${repo.downloads} downloads")
                         CaptionText(text = "·")
-                        StatusBadge(text = "Gated", isActive = true)
+                        CaptionText(text = "${repo.likes} likes")
+                        if (repo.gated) {
+                            CaptionText(text = "·")
+                            StatusBadge(text = "Gated", isActive = true)
+                        }
                     }
                 }
-            }
 
-            if (isAdded) {
-                Icon(
-                    imageVector = TnIcons.CircleCheck,
-                    contentDescription = "Added",
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                    modifier = Modifier.size(Standards.ActionIconSize)
-                )
-            } else {
-                ActionButton(
-                    onClickListener = onAdd,
-                    icon = TnIcons.Plus,
-                    contentDescription = "Add repository"
-                )
+                if (isAdded) {
+                    Icon(
+                        imageVector = TnIcons.CircleCheck,
+                        contentDescription = "Added",
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                        modifier = Modifier.size(Standards.ActionIconSize)
+                    )
+                } else {
+                    ActionButton(
+                        onClickListener = {
+                            expanded = !expanded
+                            if (expanded && repoFiles == null) {
+                                onFetchFiles()
+                            }
+                        },
+                        icon = if (expanded) TnIcons.ChevronUp else TnIcons.ChevronDown,
+                        contentDescription = "Show files"
+                    )
+                }
+            }
+            
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.CardPadding, vertical = Standards.SpacingSm)) {
+                    if (repoFiles == null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(Standards.SpacingSm),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(Standards.SpacingSm))
+                            CaptionText(text = "Fetching files...")
+                        }
+                    } else {
+                        val ggufFiles = repoFiles.filter { it.path.endsWith(".gguf", ignoreCase = true) }
+                        if (ggufFiles.isEmpty()) {
+                            CaptionText(
+                                text = "No GGUF files found.",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(Standards.SpacingSm)
+                            )
+                        } else {
+                            ggufFiles.forEach { file ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = Standards.SpacingXs),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = file.path.substringAfterLast("/"),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        val sizeMB = (file.size ?: 0L) / (1024f * 1024f)
+                                        CaptionText(text = String.format("%.2f MB", sizeMB))
+                                    }
+                                    ActionButton(
+                                        onClickListener = { onDownloadFile(file) },
+                                        icon = TnIcons.Download,
+                                        contentDescription = "Download ${file.path}"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

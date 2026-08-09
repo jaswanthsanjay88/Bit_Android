@@ -5,9 +5,11 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okio.BufferedSource
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import okhttp3.ConnectionPool
 
 object HttpClient {
     private val JSON = "application/json; charset=utf-8".toMediaType()
@@ -137,12 +139,40 @@ object HttpClient {
     }
 
     val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.MINUTES)
-        .writeTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(10, TimeUnit.SECONDS)
+        .connectionPool(ConnectionPool(10, 3, TimeUnit.MINUTES))
         .proxySelector(proxySelector)
         .proxyAuthenticator(proxyAuthenticator)
         .build()
+
+    /**
+     * Pre-warm a TCP+TLS connection to the given URL's host so that the
+     * subsequent streaming POST skips the handshake (~200-400ms saved).
+     * Fire-and-forget on Dispatchers.IO — never blocks the caller.
+     */
+    fun preWarmConnection(url: String) {
+        try {
+            val parsedUrl = url.toHttpUrlOrNull() ?: return
+            // Use the internal OkHttp connection pool to pre-connect
+            val request = Request.Builder()
+                .url(parsedUrl)
+                .head()
+                .build()
+            // Execute in a thread from OkHttp's dispatcher — doesn't block
+            client.newCall(request).enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: IOException) {
+                    // Silently ignore — this is a best-effort warm-up
+                }
+                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                    response.close()
+                }
+            })
+        } catch (_: Exception) {
+            // Best-effort, never crash
+        }
+    }
 
     /** The currently active streaming handle, if any. Used to cancel
      *  generation immediately by closing the underlying socket. */

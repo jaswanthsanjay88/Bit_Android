@@ -59,12 +59,27 @@ class GGUFEngine {
             )
         }
 
+        // Pre-configure native thread mode to pre-spawn & attach worker threadpools
+        // 0 = Power Saving (1 thread on eff core), 1 = Balanced (2 threads on perf cores), 2 = Performance (3 threads on perf cores + all-core batching)
+        val threadMode = when {
+            loading.threads == 1 -> 0 // 1 thread -> Power Saving
+            loading.threads == 2 -> 1 // 2 threads -> Balanced
+            loading.threads >= 3 -> 2 // 3+ threads -> Performance
+            else -> loading.threadMode.coerceIn(0, 2) // Default auto-detect -> PERFORMANCE (2)
+        }
+        try {
+            engine.setThreadMode(threadMode)
+        } catch (e: Throwable) {
+            Log.w(TAG, "Failed to set thread mode prior to load", e)
+        }
+
         var success = false
         try {
             success = engine.load(
                 path = model.modelPath,
                 contextSize = loading.ctxSize,
                 threads = loading.threads,
+                batchSize = loading.batchSize,
                 flashAttn = loading.flashAttn,
                 cacheTypeK = cacheTypeIntToString(loading.cacheTypeK),
                 cacheTypeV = cacheTypeIntToString(loading.cacheTypeV)
@@ -81,6 +96,7 @@ class GGUFEngine {
                     path = model.modelPath,
                     contextSize = loading.ctxSize,
                     threads = loading.threads,
+                    batchSize = loading.batchSize,
                     flashAttn = loading.flashAttn,
                     cacheTypeK = "f16",
                     cacheTypeV = "f16"
@@ -98,6 +114,7 @@ class GGUFEngine {
                     path = model.modelPath,
                     contextSize = loading.ctxSize,
                     threads = loading.threads,
+                    batchSize = loading.batchSize,
                     flashAttn = false,
                     cacheTypeK = "f16",
                     cacheTypeV = "f16"
@@ -108,6 +125,12 @@ class GGUFEngine {
         }
 
         if (success) {
+            try {
+                engine.warmUp()
+            } catch (e: Throwable) {
+                Log.w(TAG, "Model warmUp failed (non-fatal)", e)
+            }
+
             engine.setSampling(
                 temperature = inference.temperature,
                 topK = inference.topK,
@@ -173,12 +196,27 @@ class GGUFEngine {
             )
         }
 
+        // Pre-configure native thread mode to pre-spawn & attach worker threadpools
+        // 0 = Power Saving (1 thread on eff core), 1 = Balanced (2 threads on perf cores), 2 = Performance (3 threads on perf cores + all-core batching)
+        val threadMode = when {
+            loading.threads == 1 -> 0 // 1 thread -> Power Saving
+            loading.threads == 2 -> 1 // 2 threads -> Balanced
+            loading.threads >= 3 -> 2 // 3+ threads -> Performance
+            else -> loading.threadMode.coerceIn(0, 2) // Default auto-detect -> PERFORMANCE (2)
+        }
+        try {
+            engine.setThreadMode(threadMode)
+        } catch (e: Throwable) {
+            Log.w(TAG, "Failed to set thread mode prior to loadFromFd", e)
+        }
+
         var success = false
         try {
             success = engine.loadFromFd(
                 fd = fd,
                 contextSize = loading.ctxSize,
                 threads = loading.threads,
+                batchSize = loading.batchSize,
                 flashAttn = loading.flashAttn,
                 cacheTypeK = cacheTypeIntToString(loading.cacheTypeK),
                 cacheTypeV = cacheTypeIntToString(loading.cacheTypeV)
@@ -195,6 +233,7 @@ class GGUFEngine {
                     fd = fd,
                     contextSize = loading.ctxSize,
                     threads = loading.threads,
+                    batchSize = loading.batchSize,
                     flashAttn = loading.flashAttn,
                     cacheTypeK = "f16",
                     cacheTypeV = "f16"
@@ -212,6 +251,7 @@ class GGUFEngine {
                     fd = fd,
                     contextSize = loading.ctxSize,
                     threads = loading.threads,
+                    batchSize = loading.batchSize,
                     flashAttn = false,
                     cacheTypeK = "f16",
                     cacheTypeV = "f16"
@@ -222,6 +262,12 @@ class GGUFEngine {
         }
 
         if (success) {
+            try {
+                engine.warmUp()
+            } catch (e: Throwable) {
+                Log.w(TAG, "Model warmUp failed on loadFromFd (non-fatal)", e)
+            }
+
             engine.setSampling(
                 temperature = inference.temperature,
                 topK = inference.topK,
@@ -416,11 +462,15 @@ class GGUFEngine {
     }
 
     fun setPromptCacheDir(path: String) {
-        if (engine.isLoaded) {
-            try {
-                engine.setPromptCacheDir(path)
-            } catch (_: Exception) { }
-        }
+        try {
+            engine.setPromptCacheDir(path)
+        } catch (_: Exception) { }
+    }
+
+    fun setTokenBatchSize(bytes: Int) {
+        try {
+            engine.setTokenBatchSize(bytes)
+        } catch (_: Exception) { }
     }
 
     fun warmUp(): Boolean {

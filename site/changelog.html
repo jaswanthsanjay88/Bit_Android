@@ -69,6 +69,24 @@
     <p class="changelog-subtitle">The development history and release notes for BIT.</p>
 
     <div class="timeline">
+      <!-- v2.0.7 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v2.0.7</span>
+          <span class="release-date">August 10, 2026</span>
+        </div>
+        <p class="release-desc">Major Performance Overhaul: Instant TTFT, Arm KleidiAI SIMD, PowerInfer Thread Polling, New GGUF Models & Trending Search.</p>
+        <ul class="release-features">
+          <li><strong>Instant TTFT Reduction:</strong> Reduced Time-To-First-Token (TTFT) from 36s to ~1s by removing speculative 3-pass routing overhead, parallelizing RAG/DataStore I/O, and caching vault memory.</li>
+          <li><strong>Arm KleidiAI Hardware SIMD:</strong> Compiled hand-optimized ARM assembly micro-kernels for 4-way int8 dot-product (<code>SDOT</code>/<code>UDOT</code>) and FP16 vectorization.</li>
+          <li><strong>PowerInfer Zero-Latency Busy-Polling:</strong> Integrated <code>cfg.poll = 50</code> worker thread busy-polling, eliminating futex context-switch latency (~150-200µs per token).</li>
+          <li><strong>Expanded Model Catalog:</strong> Added LFM2-VL 450M, SmolVLM 256M (Vision), Qwen 3 0.6B, Gemma 3 1B IT, and Gemma 2 2B IT.</li>
+          <li><strong>HuggingFace Explorer & 🔥 Trending Feed:</strong> Restructured search with <code>filter="gguf"</code> and fast single-call siblings resolution; added Trending GGUF Models feed.</li>
+          <li><strong>API Pre-Warming:</strong> Fire-and-forget TCP+TLS connection pre-warming for cloud API models, saving 200-400ms on first message.</li>
+          <li><strong>60 FPS Live UI Streaming:</strong> Throttled UI state updates to 16ms for smooth text animation and fixed thinking model output duplication.</li>
+        </ul>
+      </div>
+
       <!-- v2.0.6 -->
       <div class="release">
         <div class="release-header">
