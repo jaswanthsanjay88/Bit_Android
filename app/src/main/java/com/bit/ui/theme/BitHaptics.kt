@@ -92,9 +92,15 @@ private class PlatformBitHaptics(
         }
     }
 
+    private var lastTickMs = 0L
+
     override fun generationTick() {
-        if (!performPredefined(VibrationEffect.EFFECT_TICK)) {
-            perform(HapticFeedbackConstants.CLOCK_TICK)
+        val now = System.currentTimeMillis()
+        if (now - lastTickMs >= 150L) {
+            lastTickMs = now
+            if (!performPredefined(VibrationEffect.EFFECT_TICK)) {
+                perform(HapticFeedbackConstants.CLOCK_TICK)
+            }
         }
     }
 

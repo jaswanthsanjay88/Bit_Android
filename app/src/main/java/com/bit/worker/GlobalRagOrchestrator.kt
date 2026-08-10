@@ -26,7 +26,7 @@ import javax.inject.Singleton
 
 @Singleton
 class GlobalRagOrchestrator @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val embeddingEngine: EmbeddingEngine,
     private val embeddingCache: EmbeddingCache,
     private val vaultStore: VaultFileStore,
@@ -152,7 +152,10 @@ class GlobalRagOrchestrator @Inject constructor(
     suspend fun queryGlobalKnowledge(query: String, topK: Int = 5): RetrievalResult? = withContext(Dispatchers.IO) {
         try {
             val graph = graphDeferred.await()
-            embeddingEngine.ensureInitialized(context)
+            if (!embeddingEngine.ensureInitialized(context)) {
+                Log.w(TAG, "Embedding model not initialized/valid, skipping global RAG query.")
+                return@withContext null
+            }
             graph.queryWithPipeline(query, topK)
         } catch (e: Exception) {
             Log.e(TAG, "Error querying attached document", e)

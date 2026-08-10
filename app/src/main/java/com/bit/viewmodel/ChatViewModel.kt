@@ -633,12 +633,19 @@ class ChatViewModel @Inject constructor(
 
                 // ── TTFT optimization: fire API connection pre-warm immediately ──
                 // While we're building the request, TCP+TLS handshake happens in parallel
+                // Pre-warm the actual endpoint URL so the HTTP/2 connection is ready
                 if (activeProviderType == ProviderType.API) {
                     try {
                         val remoteCfg = getRemoteInferenceConfig()
                         if (remoteCfg != null) {
-                            val baseUrl = LlmProviderResolver.cleanBaseUrl(remoteCfg.endpoint)
-                            com.bit.network.HttpClient.preWarmConnection(baseUrl)
+                            val baseUrl = LlmProviderResolver.cleanBaseUrl(remoteCfg.endpoint).trimEnd('/')
+                            // Pre-warm the actual chat/completions endpoint, not just the base URL
+                            val endpointUrl = if (baseUrl.contains("/v1") || baseUrl.endsWith("/chat/completions")) {
+                                "$baseUrl/chat/completions"
+                            } else {
+                                "$baseUrl/v1/chat/completions"
+                            }
+                            com.bit.network.HttpClient.preWarmConnection(endpointUrl)
                         }
                     } catch (_: Exception) { /* best-effort */ }
                 }
@@ -725,8 +732,20 @@ class ChatViewModel @Inject constructor(
             reportError("Please load a text model first")
             return
         }
-        if (activeProviderType != ProviderType.API && activeProviderType != ProviderType.VLM && !LlmModelWorker.isVlmLoaded.value) {
-            reportError("Please load a vision projector (proj) first")
+        val modelIdLower = (currentModelId ?: "").lowercase()
+        val isVisionCapable = activeProviderType == ProviderType.API ||
+                activeProviderType == ProviderType.VLM ||
+                LlmModelWorker.isVlmLoaded.value ||
+                modelIdLower.contains("vl") ||
+                modelIdLower.contains("vision") ||
+                modelIdLower.contains("smolvlm") ||
+                modelIdLower.contains("llava") ||
+                modelIdLower.contains("moondream") ||
+                modelIdLower.contains("minicpm") ||
+                modelIdLower.contains("paligemma")
+
+        if (!isVisionCapable) {
+            reportError("Please load a vision-capable model or projector (proj) first")
             return
         }
         if (_isGenerating.value) {

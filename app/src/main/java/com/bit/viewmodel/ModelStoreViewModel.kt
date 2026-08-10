@@ -437,7 +437,7 @@ class ModelStoreViewModel @Inject constructor(
 
         models.groupBy { model ->
             when (model.modelType) {
-                ModelType.GGUF -> model.repositoryUrl.trim().removeSuffix("/").ifEmpty { "Unknown" }
+                ModelType.GGUF, ModelType.VLM -> model.repositoryUrl.trim().removeSuffix("/").ifEmpty { "Unknown" }
                 ModelType.SD -> model.repositoryUrl.trim().removeSuffix("/").ifEmpty { "SD Models" }
                 ModelType.TTS -> "tts-models"
                 ModelType.STT -> "stt-models"
@@ -466,7 +466,7 @@ class ModelStoreViewModel @Inject constructor(
         val cleanRepoKey = repoKey.trim().removeSuffix("/")
         return _filteredModels.value.filter { model ->
             when (model.modelType) {
-                ModelType.GGUF -> {
+                ModelType.GGUF, ModelType.VLM -> {
                     val cleanUrl = model.repositoryUrl.trim().removeSuffix("/")
                     (cleanUrl.ifEmpty { "Unknown" }) == cleanRepoKey
                 }
@@ -513,6 +513,9 @@ class ModelStoreViewModel @Inject constructor(
             putExtra(ModelDownloadService.EXTRA_MODEL_ID, model.id)
             putExtra(ModelDownloadService.EXTRA_MODEL_NAME, model.name)
             putExtra(ModelDownloadService.EXTRA_FILE_URL, fileUrl)
+            if (model.projectorUrl != null) {
+                putExtra(ModelDownloadService.EXTRA_PROJECTOR_URL, model.projectorUrl)
+            }
             putExtra(ModelDownloadService.EXTRA_IS_ZIP, model.isZip)
             putExtra(ModelDownloadService.EXTRA_MODEL_TYPE, model.modelType.name)
             putExtra(ModelDownloadService.EXTRA_RUN_ON_CPU, model.runOnCpu)
@@ -791,7 +794,8 @@ class ModelStoreViewModel @Inject constructor(
                 modelType = modelType,
                 isZip = file.path.endsWith(".zip", ignoreCase = true),
                 tags = explorerRepo.tags,
-                repositoryUrl = "https://huggingface.co/${explorerRepo.id}"
+                repositoryUrl = "https://huggingface.co/${explorerRepo.id}",
+                sizeBytes = file.size ?: 0L
             )
             downloadModel(model)
         }

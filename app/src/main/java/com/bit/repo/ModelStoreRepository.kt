@@ -601,6 +601,7 @@ class ModelStoreRepository(private val context: Context) {
 
             val sdModels = getSDModels(hfRepos.filter { it.modelType == ModelType.SD })
             val ggufModels = getGGUFModels(hfRepos.filter { it.modelType == ModelType.GGUF })
+            val vlmModels = getGGUFModels(hfRepos.filter { it.modelType == ModelType.VLM })
             val apiModels = getApiModels(apiRepos)
             val ttsModels = getTTSModels(hfRepos.filter { it.modelType == ModelType.TTS })
             val sttModels = getSTTModels(hfRepos.filter { it.modelType == ModelType.STT })
@@ -608,6 +609,7 @@ class ModelStoreRepository(private val context: Context) {
 
             models.addAll(sdModels)
             models.addAll(ggufModels)
+            models.addAll(vlmModels)
             models.addAll(apiModels)
             models.addAll(embedModels)
             models.addAll(ttsModels)

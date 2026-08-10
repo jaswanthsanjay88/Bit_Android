@@ -243,6 +243,7 @@ internal fun RepoListItem(
                     Icon(
                         imageVector = when (modelType) {
                             com.bit.models.data.ModelType.GGUF -> TnIcons.Sparkles
+                            com.bit.models.data.ModelType.VLM -> TnIcons.Sparkles
                             com.bit.models.data.ModelType.SD -> TnIcons.Photo
                             com.bit.models.data.ModelType.TTS -> TnIcons.Volume
                             com.bit.models.data.ModelType.STT -> TnIcons.Microphone

@@ -74,6 +74,7 @@ class ModelDownloadService : Service() {
         const val EXTRA_MODEL_ID = "model_id"
         const val EXTRA_MODEL_NAME = "model_name"
         const val EXTRA_FILE_URL = "file_url"
+        const val EXTRA_PROJECTOR_URL = "projector_url"
         const val EXTRA_IS_ZIP = "is_zip"
         const val EXTRA_MODEL_TYPE = "model_type"
         const val EXTRA_RUN_ON_CPU = "run_on_cpu"
@@ -132,13 +133,14 @@ class ModelDownloadService : Service() {
                 val modelId = intent.getStringExtra(EXTRA_MODEL_ID) ?: return START_NOT_STICKY
                 val modelName = intent.getStringExtra(EXTRA_MODEL_NAME) ?: modelId
                 val fileUrl = intent.getStringExtra(EXTRA_FILE_URL)
+                val projectorUrl = intent.getStringExtra(EXTRA_PROJECTOR_URL)
                 val isZip = intent.getBooleanExtra(EXTRA_IS_ZIP, false)
                 val modelType = intent.getStringExtra(EXTRA_MODEL_TYPE) ?: "GGUF"
                 val runOnCpu = intent.getBooleanExtra(EXTRA_RUN_ON_CPU, false)
                 val textEmbeddingSize = intent.getIntExtra(EXTRA_TEXT_EMBEDDING_SIZE, 768)
 
                 // Validate: fileUrl is required ONLY if not one of our multi-file types
-                val isMultiFile = modelType == "STT" || modelType == "VLM" || 
+                val isMultiFile = modelType == "STT" || 
                         (modelType == "TTS" && fileUrl?.let { it.contains(".tar.bz2") || it.contains(".zip") } != true)
                 if (!isMultiFile && fileUrl == null) {
                     Log.e(TAG, "fileUrl is required for model type $modelType")
@@ -148,12 +150,13 @@ class ModelDownloadService : Service() {
                 ensureForeground(modelName)
 
                 // Save pause metadata so download can resume after background kill
-                savePauseMetadata(modelId, modelName, fileUrl, isZip, modelType, runOnCpu, textEmbeddingSize)
+                savePauseMetadata(modelId, modelName, fileUrl, isZip, modelType, runOnCpu, textEmbeddingSize, projectorUrl)
 
                 startDownload(
                     modelId,
                     modelName,
                     fileUrl,
+                    projectorUrl,
                     isZip,
                     modelType,
                     runOnCpu,
@@ -201,6 +204,7 @@ class ModelDownloadService : Service() {
         modelId: String,
         modelName: String,
         fileUrl: String?,
+        projectorUrl: String?,
         isZip: Boolean,
         modelType: String,
         runOnCpu: Boolean,
@@ -227,9 +231,13 @@ class ModelDownloadService : Service() {
                 }
 
                 // Multi-file types download their own files directly, skip single-file download
-                val isMultiFile = modelType == "STT" || modelType == "VLM" || 
+                val isMultiFile = modelType == "STT" || 
                         (modelType == "TTS" && fileUrl?.let { it.contains(".tar.bz2") || it.contains(".zip") } != true)
-                if (!isMultiFile && fileUrl != null) {
+                
+                // For VLM, we download multiple files individually (main + projector)
+                // but we handle them inline below.
+                
+                if (!isMultiFile && modelType != "VLM" && fileUrl != null) {
                     tempFile = File(tempDir, "${modelId}.tmp")
                     downloadFile(fileUrl, tempFile, modelId, modelName, notificationId)
                 }
@@ -269,7 +277,12 @@ class ModelDownloadService : Service() {
                         updateDownloadState(modelId, DownloadState.Processing(modelId))
                         updateNotification(modelName, 0f, notificationId, isProcessing = true)
 
-                        downloadVLMModelFiles(vlmModelDir, modelId, modelName, notificationId)
+                        if (fileUrl != null && projectorUrl != null) {
+                            downloadVLMModelFiles(fileUrl, projectorUrl, vlmModelDir, modelId, modelName, notificationId)
+                        } else {
+                            Log.e(TAG, "VLM download failed: missing fileUrl or projectorUrl")
+                            throw IllegalStateException("Missing URLs for VLM model")
+                        }
 
                         insertModelToDatabase(
                             modelId = modelId,
@@ -782,14 +795,19 @@ class ModelDownloadService : Service() {
     }
 
     private suspend fun downloadVLMModelFiles(
-        vlmModelDir: File, modelId: String, modelName: String, notificationId: Int
+        mainUrl: String, projectorUrl: String, vlmModelDir: File, modelId: String, modelName: String, notificationId: Int
     ) = withContext(Dispatchers.IO) {
-        val baseUrl = "https://huggingface.co/bartowski/Qwen2-VL-2B-Instruct-GGUF/resolve/main"
-        val files = listOf(
-            "Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
-            "mmproj-Qwen2-VL-2B-Instruct-f16.gguf"
-        )
-        downloadMultipleFiles(files, baseUrl, vlmModelDir, modelId, modelName, notificationId)
+        val mainFileName = mainUrl.substringAfterLast("/")
+        val projFileName = projectorUrl.substringAfterLast("/")
+        
+        val mainFile = File(vlmModelDir, mainFileName)
+        val projFile = File(vlmModelDir, projFileName)
+        
+        // Download main model
+        downloadFile(mainUrl, mainFile, modelId, "$modelName (Model)", notificationId)
+        
+        // Download projector model
+        downloadFile(projectorUrl, projFile, modelId, "$modelName (Projector)", notificationId)
     }
 
     private suspend fun downloadMappedFiles(
@@ -1097,6 +1115,7 @@ class ModelDownloadService : Service() {
                 modelId = modelId,
                 modelName = meta.optString("modelName", modelName),
                 fileUrl = meta.optString("fileUrl", null),
+                projectorUrl = meta.optString("projectorUrl", null),
                 isZip = meta.optBoolean("isZip", false),
                 modelType = meta.optString("modelType", "GGUF"),
                 runOnCpu = meta.optBoolean("runOnCpu", false),
@@ -1112,7 +1131,7 @@ class ModelDownloadService : Service() {
 
     private fun savePauseMetadata(
         modelId: String, modelName: String, fileUrl: String?,
-        isZip: Boolean, modelType: String, runOnCpu: Boolean, textEmbeddingSize: Int
+        isZip: Boolean, modelType: String, runOnCpu: Boolean, textEmbeddingSize: Int, projectorUrl: String? = null
     ) {
         try {
             val metaDir = AppPaths.tempDownloads(applicationContext, modelId)
@@ -1121,6 +1140,7 @@ class ModelDownloadService : Service() {
                 put("modelId", modelId)
                 put("modelName", modelName)
                 put("fileUrl", fileUrl ?: "")
+                if (projectorUrl != null) put("projectorUrl", projectorUrl)
                 put("isZip", isZip)
                 put("modelType", modelType)
                 put("runOnCpu", runOnCpu)

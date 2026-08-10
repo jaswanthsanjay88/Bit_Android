@@ -145,9 +145,7 @@ internal fun AssistantMessageFooter(
         if (isTextContent && message.content.content.isNotEmpty()) {
             // Strip thinking tags for the text content passed to action row
             val textContent = remember(message.content.content) {
-                if (THINK_TAG_REGEX.containsMatchIn(message.content.content)) {
-                    message.content.content.replace(THINK_TAG_REGEX, "").trim()
-                } else message.content.content
+                parseThinkingTags(message.content.content).actualContent
             }
             if (textContent.isNotEmpty()) {
                 MessageActionRow(

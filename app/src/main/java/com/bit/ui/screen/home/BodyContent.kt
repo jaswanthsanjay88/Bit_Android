@@ -51,13 +51,13 @@ import com.bit.viewmodel.ChatConfigState
 import io.github.fletchmckee.liquid.LiquidState
 import io.github.fletchmckee.liquid.liquefiable
 
-// ── Pre-compiled regex (avoid allocation in composition) ──
-
-internal val THINK_TAG_REGEX = Regex(
-    "<think>(.*?)</think>|\\[THINK](.*?)\\[/THINK]|<reasoning>(.*?)</reasoning>|<\\|channel>thought(.*?)(?:<channel\\|>|<\\|channel\\|>)",
-    RegexOption.DOT_MATCHES_ALL
+// ── Pre-compiled tags ──
+private val THINK_TAGS = listOf(
+    "<think>" to "</think>",
+    "[THINK]" to "[/THINK]",
+    "<reasoning>" to "</reasoning>",
+    "<|channel>thought" to "<|channel>"
 )
-private val THINK_OPEN_TAGS = listOf("<|channel>thought", "<think>", "[THINK]", "<reasoning>")
 
 data class ParsedMessage(
     val thinkingContent: String?,
@@ -90,7 +90,8 @@ fun groupMessages(messages: List<com.bit.models.messages.Messages>, lastAssistan
 
 @Composable
 fun GeneratingIndicator(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    thinkingEnabled: Boolean = false
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "generatingIndicator")
     val alpha1 by infiniteTransition.animateFloat(
@@ -136,7 +137,7 @@ fun GeneratingIndicator(
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = "Thinking",
+            text = if (thinkingEnabled) "Thinking" else "Generating",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             fontWeight = FontWeight.Medium
@@ -153,43 +154,69 @@ fun GeneratingIndicator(
     }
 }
 
-fun parseThinkingTags(content: String): ParsedMessage {
-    val orphanClose = content.indexOf("</think>", ignoreCase = true)
-    if (orphanClose != -1) {
-        val hasOpenTag = THINK_OPEN_TAGS.any {
-            val idx = content.indexOf(it, ignoreCase = true)
-            idx != -1 && idx < orphanClose
+fun parseThinkingTags(raw: String): ParsedMessage {
+    if (raw.isEmpty()) return ParsedMessage(null, "", false)
+    if (!raw.contains('<') && !raw.contains('[') && !raw.contains("channel")) {
+        return ParsedMessage(null, raw, false)
+    }
+
+    val content = java.lang.StringBuilder()
+    val thinking = java.lang.StringBuilder()
+    var isThinkingInProgress = false
+    var i = 0
+
+    while (i < raw.length) {
+        var minIdx = -1
+        var selectedOpenTag = ""
+        for ((open, _) in THINK_TAGS) {
+            val idx = raw.indexOf(open, i, ignoreCase = true)
+            if (idx >= 0 && (minIdx < 0 || idx < minIdx)) {
+                minIdx = idx
+                selectedOpenTag = open
+            }
         }
-        if (!hasOpenTag) {
-            val thinkingContent = content.substring(0, orphanClose).trim()
-            val actualContent = content.substring(orphanClose + 8).trim()
-            return ParsedMessage(
-                thinkingContent = thinkingContent.ifEmpty { null },
-                actualContent = actualContent
-            )
+
+        if (minIdx < 0) {
+            content.append(raw, i, raw.length)
+            break
+        }
+
+        content.append(raw, i, minIdx)
+        val closeTag = THINK_TAGS.first { it.first == selectedOpenTag }.second
+        val bodyStart = minIdx + selectedOpenTag.length
+        val end = raw.indexOf(closeTag, bodyStart, ignoreCase = true)
+
+        if (end < 0) {
+            if (thinking.isNotEmpty()) thinking.append("\n\n")
+            thinking.append(raw, bodyStart, raw.length)
+            isThinkingInProgress = true
+            i = raw.length
+        } else {
+            if (thinking.isNotEmpty()) thinking.append("\n\n")
+            thinking.append(raw, bodyStart, end)
+            i = end + closeTag.length
         }
     }
 
-    val openTag = THINK_OPEN_TAGS.firstOrNull { content.contains(it, ignoreCase = true) }
-        ?: return ParsedMessage(null, content.trim())
+    val thinkingStr = thinking.toString().trim()
+    val contentStr = content.toString().trim()
 
-    val thinkingMatch = THINK_TAG_REGEX.find(content)
-    if (thinkingMatch != null) {
-        val thinkingContent = thinkingMatch.groupValues.drop(1).firstOrNull { it.isNotEmpty() }?.trim() ?: ""
-        val actualContent = content.replace(THINK_TAG_REGEX, "").trim()
+    // Handle orphaned closing tag at the very beginning (e.g., if the text starts with </think>)
+    val orphanClose = contentStr.indexOf("</think>", ignoreCase = true)
+    if (orphanClose != -1 && orphanClose < 10 && thinkingStr.isEmpty()) {
+        val actualContent = contentStr.substring(orphanClose + 8).trim()
+        val orphanThink = contentStr.substring(0, orphanClose).trim()
         return ParsedMessage(
-            thinkingContent = thinkingContent.ifEmpty { null },
-            actualContent = actualContent
+            thinkingContent = orphanThink.ifEmpty { null },
+            actualContent = actualContent,
+            isThinkingInProgress = false
         )
     }
 
-    val openIdx = content.indexOf(openTag, ignoreCase = true)
-    val thinkingContent = content.substring(openIdx + openTag.length).trim()
-    val beforeThink = content.substring(0, openIdx).trim()
     return ParsedMessage(
-        thinkingContent = thinkingContent.ifEmpty { null },
-        actualContent = beforeThink,
-        isThinkingInProgress = true
+        thinkingContent = thinkingStr.ifEmpty { null },
+        actualContent = contentStr,
+        isThinkingInProgress = isThinkingInProgress
     )
 }
 
@@ -230,6 +257,7 @@ fun BodyContent(
     LaunchedEffect(chatState.isGenerating) {
         if (wasGenerating && !chatState.isGenerating) {
             haptics.generationEnd()
+            listState.animateScrollToItem(messages.size)
         }
         wasGenerating = chatState.isGenerating
     }
@@ -286,14 +314,25 @@ fun BodyContent(
                             )
                         } else {
                             val isLast = msg == messages.last()
+                            val parsedMessage = remember(msg.content.content) { parseThinkingTags(msg.content.content) }
                             Column {
                                 com.bit.ui.screen.home.AssistantMessageHeader(message = msg, onTraceStepClick = { selectedTraceStep = it })
-                                Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingMd)) {
-                                    androidx.compose.foundation.text.selection.SelectionContainer {
-                                        MarkdownText(
-                                            text = msg.content.content,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
+                                
+                                if (parsedMessage.thinkingContent != null) {
+                                    ThinkingBlock(
+                                        thinkingText = parsedMessage.thinkingContent,
+                                        isStreaming = false
+                                    )
+                                }
+                                
+                                if (parsedMessage.actualContent.isNotEmpty()) {
+                                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingMd)) {
+                                        androidx.compose.foundation.text.selection.SelectionContainer {
+                                            MarkdownText(
+                                                text = parsedMessage.actualContent,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
                                     }
                                 }
                                 com.bit.ui.screen.home.AssistantMessageFooter(
@@ -327,7 +366,7 @@ fun BodyContent(
                                 }
                             } else {
                                 item(key = "generating-indicator") {
-                                    GeneratingIndicator()
+                                    GeneratingIndicator(thinkingEnabled = chatState.thinkingEnabled)
                                 }
                             }
                         }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import com.bit.models.data.HuggingFaceModel
 import com.bit.models.data.ModelType
 import java.util.concurrent.ConcurrentHashMap
@@ -295,60 +296,64 @@ object PluginManager {
         return id.contains("350m") || id.contains("125m") || id.contains("160m") || id.contains("tiny") || id.contains("mini")
     }
 
+    private val pluginScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO + kotlinx.coroutines.SupervisorJob())
+
     fun syncToolsWithLLM() {
-        val toolDefinitions = getEnabledToolDefinitions()
+        pluginScope.launch {
+            val toolDefinitions = getEnabledToolDefinitions()
 
-        val modelType = ActiveModelSession.currentModelType.value
-        if (modelType == ProviderType.API) {
-            Log.d(TAG, "Active model is remote API; tools will be passed dynamically per request.")
-            return
-        }
-        if (modelType == null) {
-            Log.d(TAG, "No model loaded; deferring tool sync.")
-            return
-        }
-
-        val activeModelId = ActiveModelSession.currentModelId.value
-        if (isSmallModel(activeModelId)) {
-            LlmModelWorker.clearToolsGguf()
-            _isToolCallingModelLoaded.value = false
-            Log.d(TAG, "Active model is a small model ($activeModelId); stripping tool schemas.")
-            return
-        }
-
-        if (toolDefinitions.isEmpty()) {
-            LlmModelWorker.clearToolsGguf()
-            Log.d(TAG, "Cleared all tools from LLM")
-        } else {
-            val mode = _grammarMode.value
-            val config = ToolCallingConfig(
-                grammarMode = mode,
-                useTypedGrammar = _toolCallingConfig.value.useTypedGrammar
-            )
-
-            // Use AIDL to sync tools with the remote inference process
-            val toolsJsonObj = org.json.JSONArray()
-            for (def in toolDefinitions) {
-                toolsJsonObj.put(def.build().toOpenAIFormat())
+            val modelType = ActiveModelSession.currentModelType.value
+            if (modelType == ProviderType.API) {
+                Log.d(TAG, "Active model is remote API; tools will be passed dynamically per request.")
+                return@launch
             }
-            val toolsJson = toolsJsonObj.toString()
+            if (modelType == null) {
+                Log.d(TAG, "No model loaded; deferring tool sync.")
+                return@launch
+            }
 
-            val success = LlmModelWorker.enableToolCallingGguf(
-                toolsJson = toolsJson,
-                grammarMode = mode.value,
-                useTypedGrammar = config.useTypedGrammar
-            )
+            val activeModelId = ActiveModelSession.currentModelId.value
+            if (isSmallModel(activeModelId)) {
+                LlmModelWorker.clearToolsGguf()
+                _isToolCallingModelLoaded.value = false
+                Log.d(TAG, "Active model is a small model ($activeModelId); stripping tool schemas.")
+                return@launch
+            }
 
-            if (success) {
-                // With STRICT grammar, any model can do tool calling — mark as loaded
-                if (mode == GrammarMode.STRICT && !_isToolCallingModelLoaded.value) {
-                    _isToolCallingModelLoaded.value = true
-                    Log.d(TAG, "Tool calling force-enabled via STRICT grammar")
-                }
-                Log.d(TAG, "Synced ${toolDefinitions.size} tools with LLM " +
-                        "(grammar=${mode.name}, typed=${config.useTypedGrammar})")
+            if (toolDefinitions.isEmpty()) {
+                LlmModelWorker.clearToolsGguf()
+                Log.d(TAG, "Cleared all tools from LLM")
             } else {
-                Log.e(TAG, "Failed to sync tools with LLM")
+                val mode = _grammarMode.value
+                val config = ToolCallingConfig(
+                    grammarMode = mode,
+                    useTypedGrammar = _toolCallingConfig.value.useTypedGrammar
+                )
+
+                // Use AIDL to sync tools with the remote inference process
+                val toolsJsonObj = org.json.JSONArray()
+                for (def in toolDefinitions) {
+                    toolsJsonObj.put(def.build().toOpenAIFormat())
+                }
+                val toolsJson = toolsJsonObj.toString()
+
+                val success = LlmModelWorker.enableToolCallingGguf(
+                    toolsJson = toolsJson,
+                    grammarMode = mode.value,
+                    useTypedGrammar = config.useTypedGrammar
+                )
+
+                if (success) {
+                    // With STRICT grammar, any model can do tool calling — mark as loaded
+                    if (mode == GrammarMode.STRICT && !_isToolCallingModelLoaded.value) {
+                        _isToolCallingModelLoaded.value = true
+                        Log.d(TAG, "Tool calling force-enabled via STRICT grammar")
+                    }
+                    Log.d(TAG, "Synced ${toolDefinitions.size} tools with LLM " +
+                            "(grammar=${mode.name}, typed=${config.useTypedGrammar})")
+                } else {
+                    Log.e(TAG, "Failed to sync tools with LLM")
+                }
             }
         }
     }

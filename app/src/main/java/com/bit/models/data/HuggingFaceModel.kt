@@ -20,7 +20,8 @@ data class HuggingFaceModel(
     val minRamGb: Int = 0,
     val sizeBytes: Long = 0L,
     val icon: String? = null,
-    val iconUrl: String? = null
+    val iconUrl: String? = null,
+    val projectorUrl: String? = null
 )
 @Serializable
 data class HFModelRepository(

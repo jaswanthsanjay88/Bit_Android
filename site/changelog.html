@@ -69,6 +69,21 @@
     <p class="changelog-subtitle">The development history and release notes for BIT.</p>
 
     <div class="timeline">
+      <!-- v2.0.8 -->
+      <div class="release">
+        <div class="release-header">
+          <span class="release-version">v2.0.8</span>
+          <span class="release-date">August 10, 2026</span>
+        </div>
+        <p class="release-desc">Hotfixes for Vision Models & Advanced Search.</p>
+        <ul class="release-features">
+          <li><strong>Vision Model Support:</strong> Fixed projector loading bugs preventing VLM models (SmolVLM, LFM2-VL) from fetching their multimodal projectors dynamically.</li>
+          <li><strong>Advanced Store Integration:</strong> Resolved a bug where newly added VLM models from HuggingFace Explorer would not appear in the model list.</li>
+          <li><strong>File Sizes in Explorer:</strong> Re-routed Explorer search to use non-recursive tree lookups so file sizes are correctly displayed instead of 0MB.</li>
+          <li><strong>UI Fixes:</strong> Resolved exhaustive `when` compiler errors when rendering tags and icons for Vision models.</li>
+        </ul>
+      </div>
+
       <!-- v2.0.7 -->
       <div class="release">
         <div class="release-header">

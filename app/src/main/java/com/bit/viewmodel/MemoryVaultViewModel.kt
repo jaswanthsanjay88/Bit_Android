@@ -30,7 +30,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MemoryVaultViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val vaultFileStore: VaultFileStore,
     private val aiMemoryWriter: AiMemoryWriter,
     private val memoryNoteDao: MemoryNoteDao,

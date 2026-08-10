@@ -152,13 +152,15 @@ internal fun AssistantStreamingBubble(
                 
                 val behind = target - revealedLen
                 val step = when {
-                    behind > 20 -> 4   // far behind: catch up faster
-                    behind > 8 -> 3
-                    else -> 2          // normal: gentle reveal
+                    behind > 100 -> behind / 2
+                    behind > 40 -> behind / 3
+                    behind > 15 -> 8
+                    behind > 5 -> 4
+                    else -> 2
                 }
                 revealedLen = minOf(revealedLen + step, target)
                 haptics.generationTick()
-                delay(33) // ~30 FPS — actively revealing
+                delay(16) // ~60 FPS smooth catch-up
             } else {
                 delay(100) // idle — waiting for tokens, check less often
             }

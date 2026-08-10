@@ -43,6 +43,7 @@ import com.bit.global.HardwareScanner
 internal fun ModelTypeBadge(modelType: ModelType) {
     val (label, color) = when (modelType) {
         ModelType.GGUF -> "LLM" to MaterialTheme.colorScheme.primary
+        ModelType.VLM -> "Vision" to MaterialTheme.colorScheme.primary
         ModelType.SD -> "Image" to MaterialTheme.colorScheme.secondary
         ModelType.TTS -> "TTS" to MaterialTheme.colorScheme.tertiary
         ModelType.STT -> "STT" to MaterialTheme.colorScheme.tertiary

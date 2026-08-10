@@ -944,8 +944,14 @@ static bool eval_tokens(const std::vector<llama_token> & tokens, int & n_past,
     }
 
     int total = (int)tokens.size();
-    for (size_t i = 0; i < tokens.size(); i += n_batch) {
-        int n_eval = std::min((int)(tokens.size() - i), n_batch);
+    int chunk_step = std::min(n_batch, 256);
+    for (size_t i = 0; i < tokens.size(); i += chunk_step) {
+        if (g_state.cancel_flag.load()) {
+            LOGI("Prompt evaluation cancelled before batch at %d/%d tokens", (int)i, total);
+            return false;
+        }
+
+        int n_eval = std::min((int)(tokens.size() - i), chunk_step);
 
         common_batch_clear(g_prompt_batch);
         for (int j = 0; j < n_eval; j++) {

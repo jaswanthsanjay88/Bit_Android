@@ -166,7 +166,7 @@ class LLMModelViewModel @Inject constructor(
                     ProviderType.API -> loadApiModel(model)
                     ProviderType.TTS -> { /* TTS models are managed by TTSManager, not LLMService */ }
                     ProviderType.STT -> { /* STT models are managed by speech subsystem, not LLMService */ }
-                    ProviderType.VLM -> { /* VLM loading path is not wired to LLMService yet */ }
+                    ProviderType.VLM -> loadVlmModel(model, config)
                 }
             } catch (e: Exception) {
                 AppStateManager.setError(e.message ?: "Unknown error")
@@ -215,6 +215,31 @@ class LLMModelViewModel @Inject constructor(
             com.bit.plugins.PluginManager.syncToolsWithLLM()
         } else {
             AppStateManager.setError("Failed to load GGUF model")
+        }
+    }
+
+    private suspend fun loadVlmModel(model: Model, config: ModelConfig) {
+        loadGgufModel(model, config)
+        if (_currentModelID.value == model.id) {
+            _currentModelType.value = ProviderType.VLM
+            ActiveModelSession.set(model.id, ProviderType.VLM)
+
+            // Auto-detect and load VLM projector if present in model directory
+            try {
+                val modelFile = File(model.modelPath)
+                val modelDir = modelFile.parentFile
+                if (modelDir != null && modelDir.exists()) {
+                    val projFile = modelDir.listFiles()?.find { f ->
+                        val name = f.name.lowercase()
+                        (name.contains("mmproj") || name.contains("projector")) && name.endsWith(".gguf")
+                    }
+                    if (projFile != null) {
+                        LlmModelWorker.loadVlmProjector(projFile.absolutePath)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("LLMModelVM", "Failed to auto-load VLM projector: ${e.message}")
+            }
         }
     }
 

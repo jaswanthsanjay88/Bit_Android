@@ -1,5 +1,6 @@
 package com.bit.worker
 
+import java.io.File
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
@@ -310,6 +311,24 @@ object LlmModelWorker {
                     lastLoadedConfig = modelConfig
                     _isGgufModelLoaded.value = true
                     Log.i(TAG, "GGUF model loaded successfully")
+
+                    // Auto-detect and load mmproj projector file if present in model directory
+                    try {
+                        val mFile = File(model.modelPath)
+                        val mDir = mFile.parentFile
+                        if (mDir != null && mDir.exists()) {
+                            val projFile = mDir.listFiles()?.find { f ->
+                                val name = f.name.lowercase()
+                                (name.contains("mmproj") || name.contains("projector")) && name.endsWith(".gguf")
+                            }
+                            if (projFile != null) {
+                                loadVlmProjector(projFile.absolutePath)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to auto-detect VLM projector: ${e.message}")
+                    }
+
                     continuation.resume(true)
                 }
 

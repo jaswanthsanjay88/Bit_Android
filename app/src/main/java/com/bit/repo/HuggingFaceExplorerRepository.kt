@@ -119,6 +119,20 @@ class HuggingFaceExplorerRepository @Inject constructor(
      * Prevents 10+ second timeouts from recursive git tree scanning.
      */
     suspend fun fetchRepoFilesFast(repoPath: String): List<HuggingFaceFileResponse> = withContext(Dispatchers.IO) {
+        // 1. Try non-recursive tree fetch first (fast, provides sizes)
+        try {
+            val treeResponse = api.getRepoFiles(repoPath, recursive = false)
+            if (treeResponse.isSuccessful) {
+                val files = treeResponse.body().orEmpty()
+                if (files.any { it.path.endsWith(".gguf", ignoreCase = true) }) {
+                    return@withContext files
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("HFExplorer", "Non-recursive tree failed for $repoPath", e)
+        }
+
+        // 2. Try siblings fetch (fast, but no sizes)
         try {
             val infoResponse = api.getRepoInfo(repoPath)
             if (infoResponse.isSuccessful) {

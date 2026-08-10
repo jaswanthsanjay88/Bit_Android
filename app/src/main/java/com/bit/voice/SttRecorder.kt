@@ -23,7 +23,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SttRecorder @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var recordJob: Job? = null

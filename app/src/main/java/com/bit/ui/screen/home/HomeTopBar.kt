@@ -37,7 +37,7 @@ internal fun TopBar(
     onMemoryClick: () -> Unit = {}
 ) {
     CenterAlignedTopAppBar(
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+        colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
             scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f)
         ),

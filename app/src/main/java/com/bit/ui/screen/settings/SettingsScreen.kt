@@ -59,7 +59,7 @@ import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.Glass
 import com.bit.viewmodel.SettingsViewModel
 import com.bit.stt.SherpaSTTEngine
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import com.bit.viewmodel.ModelConfigEditorViewModel

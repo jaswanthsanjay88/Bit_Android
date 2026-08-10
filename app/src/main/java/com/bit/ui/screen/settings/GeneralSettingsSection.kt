@@ -201,13 +201,14 @@ internal fun LazyListScope.systemPromptSection(
             description = "Manage prompts that are applied across all conversations"
         ) {
             Column {
-                androidx.compose.material3.TabRow(
+                @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+                androidx.compose.material3.PrimaryTabRow(
                     selectedTabIndex = selectedTabIndex,
                     containerColor = Color.Transparent,
                     contentColor = Color.White,
-                    indicator = { tabPositions ->
-                        androidx.compose.material3.TabRowDefaults.Indicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                    indicator = {
+                        androidx.compose.material3.TabRowDefaults.PrimaryIndicator(
+                            modifier = Modifier.tabIndicatorOffset(selectedTabIndex, matchContentSize = false),
                             color = MaterialTheme.colorScheme.primary
                         )
                     }

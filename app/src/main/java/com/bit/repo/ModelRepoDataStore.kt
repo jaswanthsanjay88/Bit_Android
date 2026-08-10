@@ -29,7 +29,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 name = "Qwen3.5 (0.8B)",
                 repoPath = "unsloth/Qwen3.5-0.8B-GGUF",
                 modelType = ModelType.GGUF,
-                isEnabled = true,
+                isEnabled = false,
                 category = ModelCategory.GENERAL
             ),
             HFModelRepository(
@@ -37,7 +37,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 name = "Qwen3.5 (4B)",
                 repoPath = "unsloth/Qwen3.5-4B-GGUF",
                 modelType = ModelType.GGUF,
-                isEnabled = true,
+                isEnabled = false,
                 category = ModelCategory.GENERAL
             ),
             HFModelRepository(
@@ -45,7 +45,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 name = "Qwen3.5 (9B)",
                 repoPath = "unsloth/Qwen3.5-9B-GGUF",
                 modelType = ModelType.GGUF,
-                isEnabled = true,
+                isEnabled = false,
                 category = ModelCategory.GENERAL
             ),
             HFModelRepository(
@@ -53,7 +53,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 name = "LFM2 350M",
                 repoPath = "LiquidAI/LFM2-350M-GGUF",
                 modelType = ModelType.GGUF,
-                isEnabled = true,
+                isEnabled = false,
                 category = ModelCategory.GENERAL
             ),
             // === IMAGE GENERATION (SD) ===
@@ -62,7 +62,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 name = "Stable Diffusion (NPU)",
                 repoPath = "xororz/sd-qnn",
                 modelType = ModelType.SD,
-                isEnabled = true,
+                isEnabled = false,
                 category = ModelCategory.GENERAL
             ),
             HFModelRepository(
@@ -70,7 +70,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 name = "Stable Diffusion (CPU)",
                 repoPath = "xororz/sd-mnn",
                 modelType = ModelType.SD,
-                isEnabled = true,
+                isEnabled = false,
                 category = ModelCategory.GENERAL
             ),
             HFModelRepository(
@@ -78,7 +78,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 name = "Piper US Amy (TTS)",
                 repoPath = "csukuangfj/vits-piper-en_US-amy-low",
                 modelType = ModelType.TTS,
-                isEnabled = true,
+                isEnabled = false,
                 category = ModelCategory.GENERAL
             ),
 
@@ -87,7 +87,7 @@ class ModelRepositoryDataStore(private val context: Context) {
                 name = "Whisper Tiny (STT)",
                 repoPath = "csukuangfj/sherpa-onnx-whisper-tiny.en",
                 modelType = ModelType.STT,
-                isEnabled = true,
+                isEnabled = false,
                 category = ModelCategory.GENERAL
             )
         )

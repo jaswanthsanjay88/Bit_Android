@@ -473,6 +473,17 @@ class LLMService : Service() {
         instance = this
         Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
 
+        // Batch streaming tokens (8 bytes) to dramatically reduce JNI/AIDL IPC frequency & Binder overhead
+        ggufEngine.setTokenBatchSize(8)
+
+        // Pre-configure prompt cache directory
+        try {
+            val cacheDir = java.io.File(filesDir, "prompt_cache").apply { mkdirs() }
+            ggufEngine.setPromptCacheDir(cacheDir.absolutePath)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to initialize prompt cache dir", e)
+        }
+
         // Tell llama.cpp where to find CPU backend variant .so files
         // (libggml-cpu-android_armv8.*.so) for runtime arch-level dispatch.
         try {
