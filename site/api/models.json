@@ -108,12 +108,12 @@
       "runOnCpu": false
     },
     {
-      "id": "smolvlm-256m-q4km",
+      "id": "smolvlm-256m-Q8_0",
       "name": "SmolVLM 256M (Vision)",
       "description": "Ultra-tiny 180MB Vision-Language Model. Processes images & text instantly on any mobile device.",
       "type": "VLM",
-      "url": "https://huggingface.co/ggml-org/smolvlm-256m-instruct-GGUF/resolve/main/smolvlm-256m-instruct-q4_k_m.gguf",
-      "projectorUrl": "https://huggingface.co/ggml-org/smolvlm-256m-instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf",
+      "url": "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/blob/main/SmolVLM-256M-Instruct-Q8_0.gguf",
+      "projectorUrl": "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/blob/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf",
       "size": "180 MB",
       "sizeBytes": 188743680,
       "minRamGb": 2,
