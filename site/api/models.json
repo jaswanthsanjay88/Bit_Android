@@ -107,19 +107,20 @@
       "isZip": false,
       "runOnCpu": false
     },
+
     {
-      "id": "smolvlm-256m-Q8_0",
-      "name": "SmolVLM 256M (Vision)",
-      "description": "Ultra-tiny 180MB Vision-Language Model. Processes images & text instantly on any mobile device.",
+      "id": "smolvlm-256m-q8",
+      "name": "SmolVLM 256M (Q8_0 Vision)",
+      "description": "Higher precision Q8_0 Vision-Language Model from HuggingFace. Higher accuracy multimodal chat.",
       "type": "VLM",
-      "url": "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/blob/main/SmolVLM-256M-Instruct-Q8_0.gguf",
-      "projectorUrl": "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/blob/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf",
-      "size": "180 MB",
-      "sizeBytes": 188743680,
+      "url": "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf",
+      "projectorUrl": "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf",
+      "size": "270 MB",
+      "sizeBytes": 283115520,
       "minRamGb": 2,
       "icon": "huggingface",
       "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/huggingface.png",
-      "tags": ["Vision", "Multimodal", "Ultra Fast", "Tested"],
+      "tags": ["Vision", "Multimodal", "High Quality", "Tested"],
       "isZip": false,
       "runOnCpu": false
     },
