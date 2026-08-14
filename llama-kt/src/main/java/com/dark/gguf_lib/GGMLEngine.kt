@@ -303,6 +303,7 @@ class GGMLEngine {
      */
     suspend fun unload() = withContext(Dispatchers.IO) {
         if (loaded) {
+            releaseVlmProjector()
             GGUFNativeLib.nativeRelease()
             loaded = false
         }

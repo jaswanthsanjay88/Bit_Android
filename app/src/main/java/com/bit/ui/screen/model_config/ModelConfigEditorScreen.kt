@@ -844,12 +844,30 @@ internal fun TtsConfigEditor(model: Model) {
 
 @Composable
 internal fun VlmConfigEditor(model: Model) {
+    // Resolve actual model info from the directory or file path
+    val modelDir = remember(model.modelPath) {
+        val path = java.io.File(model.modelPath)
+        if (path.isDirectory) path else path.parentFile
+    }
+    val modelFileName = remember(modelDir) {
+        modelDir?.listFiles()?.find { f ->
+            val name = f.name.lowercase()
+            name.endsWith(".gguf") && !name.contains("mmproj") && !name.contains("projector")
+        }?.name ?: "Unknown"
+    }
+    val projectorFileName = remember(modelDir) {
+        modelDir?.listFiles()?.find { f ->
+            val name = f.name.lowercase()
+            (name.contains("mmproj") || name.contains("projector")) && name.endsWith(".gguf")
+        }?.name ?: "Not found"
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {
         ConfigSection("Vision-Language Model Details") {
             ReadOnlyField(label = "Model ID", value = model.id)
             ReadOnlyField(label = "Model Path", value = model.modelPath)
-            ReadOnlyField(label = "Format/Type", value = "Qwen2-VL GGUF")
-            ReadOnlyField(label = "Projector Weights", value = "mmproj-Qwen2-VL-2B-Instruct-f16.gguf")
+            ReadOnlyField(label = "Model File", value = modelFileName)
+            ReadOnlyField(label = "Projector Weights", value = projectorFileName)
         }
 
         ConfigSection("VLM Parameters") {

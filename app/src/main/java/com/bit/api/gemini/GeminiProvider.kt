@@ -360,10 +360,10 @@ class GeminiProvider : LlmProvider {
                             if (line == null) break
                         } catch (e: java.net.SocketTimeoutException) {
                             if (!currentCoroutineContext().isActive) break
-                            continue
+                            throw e
                         }
-                        if (line.startsWith("data: ")) {
-                            val jsonStr = line.substring(6).trim()
+                        if (line.startsWith("data:")) {
+                            val jsonStr = line.substring(5).trim()
                             if (jsonStr != "[DONE]") {
                                 try {
                                     val response = json.decodeFromString<ApiStreamResponse>(jsonStr)

@@ -151,10 +151,17 @@ class OllamaProvider : LlmProvider {
             entries
         })
 
+        val optionsMap = mutableMapOf<String, kotlinx.serialization.json.JsonElement>()
+        config.temperature?.let { optionsMap["temperature"] = kotlinx.serialization.json.JsonPrimitive(it) }
+        config.topP?.let { optionsMap["top_p"] = kotlinx.serialization.json.JsonPrimitive(it) }
+        config.maxTokens?.let { optionsMap["num_predict"] = kotlinx.serialization.json.JsonPrimitive(it) }
+        val options = if (optionsMap.isNotEmpty()) kotlinx.serialization.json.JsonObject(optionsMap) else null
+
         val requestBody = OllamaChatRequest(
             model = config.modelId,
             messages = apiMessages,
             stream = true,
+            options = options,
             tools = config.tools
         )
 
@@ -202,7 +209,7 @@ class OllamaProvider : LlmProvider {
                             if (line == null) break
                         } catch (e: java.net.SocketTimeoutException) {
                             if (!currentCoroutineContext().isActive) break
-                            continue
+                            throw e
                         }
                         try {
                             val response = json.decodeFromString<OllamaStreamResponse>(line)

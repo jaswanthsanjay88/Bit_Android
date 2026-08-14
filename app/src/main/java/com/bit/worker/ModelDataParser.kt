@@ -109,10 +109,13 @@ class ModelDataParser {
             val inferenceParams = parseDiffusionInferenceParams(config?.modelInferenceParams)
 
             // Validate model directory exists
-            val modelDir = File(model.modelPath)
+            // Validate model directory exists
+            var modelDir = File(model.modelPath)
             if (!modelDir.exists() || !modelDir.isDirectory) {
                 return@withContext ModelLoadResult.Error("Model directory not found: ${model.modelPath}")
             }
+
+            modelDir = liftToModelDir(modelDir)
 
             val hasMnnFiles = File(modelDir, "unet.mnn").exists() || File(modelDir, "clip.mnn").exists()
             val isCpuByName = model.modelName.contains("CPU", ignoreCase = true) || model.modelPath.contains("CPU", ignoreCase = true)
@@ -135,7 +138,7 @@ class ModelDataParser {
             // Load using worker (which uses service)
             val success = LlmModelWorker.loadDiffusionModel(
                 name = model.modelName,
-                modelDir = model.modelPath,
+                modelDir = modelDir.absolutePath,
                 height = diffusionConfig.height,
                 width = diffusionConfig.width,
                 textEmbeddingSize = diffusionConfig.textEmbeddingSize,
@@ -590,4 +593,21 @@ data class DiffusionInferenceParams(
             }
         }
     }
+}
+
+private fun liftToModelDir(root: File): File {
+    val signals = setOf(
+        "unet.bin", "unet.mnn", "clip.mnn", "clip_v2.mnn",
+        "vae_decoder.bin", "vae_decoder.mnn", "tokenizer.json"
+    )
+    var cur = root
+    repeat(6) {
+        val files = cur.listFiles()?.toList().orEmpty()
+        val hasModelFile = files.any { it.isFile && signals.contains(it.name) }
+        if (hasModelFile) return cur
+        val onlyDir = files.singleOrNull { it.isDirectory && !it.name.startsWith(".") }
+            ?: return cur
+        cur = onlyDir
+    }
+    return cur
 }

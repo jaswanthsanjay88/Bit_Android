@@ -132,7 +132,20 @@ class HuggingFaceExplorerRepository @Inject constructor(
             android.util.Log.w("HFExplorer", "Non-recursive tree failed for $repoPath", e)
         }
 
-        // 2. Try siblings fetch (fast, but no sizes)
+        // 2. Try recursive tree fetch (provides sizes but might be slow for massive repos)
+        try {
+            val treeResponse = api.getRepoFiles(repoPath, recursive = true)
+            if (treeResponse.isSuccessful) {
+                val files = treeResponse.body().orEmpty()
+                if (files.any { it.path.endsWith(".gguf", ignoreCase = true) }) {
+                    return@withContext files
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("HFExplorer", "Recursive tree failed for $repoPath", e)
+        }
+
+        // 3. Try siblings fetch (fast, but no sizes)
         try {
             val infoResponse = api.getRepoInfo(repoPath)
             if (infoResponse.isSuccessful) {

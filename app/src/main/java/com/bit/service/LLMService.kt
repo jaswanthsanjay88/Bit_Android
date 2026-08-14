@@ -14,7 +14,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.bit.R
-import com.bit.engine.DiffusionEngine
+import com.bit.engine.bridge.StableDiffusionBridge
 import com.bit.engine.GGUFEngine
 import com.bit.engine.GenerationEvent
 import com.bit.models.enums.PathType
@@ -44,7 +44,7 @@ class LLMService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val ggufEngine = GGUFEngine()
-    private val diffusionEngine = DiffusionEngine()
+    private val sdBridge = StableDiffusionBridge
 
     private fun collectGenerationFlow(
         flow: kotlinx.coroutines.flow.Flow<GenerationEvent>,
@@ -223,6 +223,29 @@ class LLMService : Service() {
             collectGenerationFlow(ggufEngine.generateMultiTurnFlow(messagesJson, maxTokens), callback)
         }
 
+        override fun generateGgufVlm(
+            messagesJson: String, imagePaths: List<String>, maxTokens: Int, callback: IGgufGenerationCallback
+        ) {
+            val imageData = imagePaths.map { java.io.File(it).readBytes() }
+            collectGenerationFlow(ggufEngine.generateVlmFlow(messagesJson, imageData, maxTokens), callback)
+        }
+
+        override fun loadVlmProjectorGguf(path: String): Boolean {
+            return ggufEngine.loadVlmProjector(path)
+        }
+
+        override fun loadVlmProjectorFromFdGguf(pfd: android.os.ParcelFileDescriptor): Boolean {
+            return ggufEngine.loadVlmProjectorFromFd(pfd.detachFd())
+        }
+
+        override fun releaseVlmProjectorGguf() {
+            ggufEngine.releaseVlmProjector()
+        }
+
+        override fun isVlmLoadedGguf(): Boolean {
+            return ggufEngine.isVlmLoaded
+        }
+
         override fun setGrammarModeGguf(mode: Int) {
             // Grammar mode applied via tool calling config
         }
@@ -279,6 +302,8 @@ class LLMService : Service() {
         }
 
         override fun getContextUsageGguf(): Float = ggufEngine.getContextUsage()
+
+        override fun getVlmDefaultMarkerGguf(): String = ggufEngine.getVlmDefaultMarker()
 
         // ── Context Window Tracking ──
 
@@ -343,23 +368,21 @@ class LLMService : Service() {
         ) {
             scope.launch(Dispatchers.IO) {
                 try {
-                    val result = diffusionEngine.loadModel(
-                        name = name,
+                    val isSuccess = sdBridge.initModel(
+                        context = applicationContext,
                         modelDir = modelDir,
-                        height = height,
                         width = width,
+                        height = height,
                         textEmbeddingSize = textEmbeddingSize,
                         runOnCpu = runOnCpu,
                         useCpuClip = useCpuClip,
                         isPony = isPony,
-                        httpPort = httpPort,
                         safetyMode = safetyMode
                     )
-                    if (result.isSuccess) {
+                    if (isSuccess) {
                         callback.onSuccess()
                     } else {
-                        val error = result.exceptionOrNull()?.message ?: "Failed to load model: $name"
-                        callback.onError(error)
+                        callback.onError("Failed to load model: $name")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in loadDiffusionModel AIDL", e)
@@ -387,33 +410,58 @@ class LLMService : Service() {
         ) {
             scope.launch(Dispatchers.IO) {
                 try {
-                    diffusionEngine.observeGenerationState(
-                        onProgress = { progress, currentStep, totalSteps, intermediateBitmap ->
-                            val base64 = intermediateBitmap?.let { diffusionEngine.bitmapToBase64(it) }
-                            try {
-                                callback.onProgress(progress, currentStep, totalSteps, base64)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Error invoking onProgress callback", e)
-                            }
-                        },
-                        onComplete = { bitmap, completedSeed, resWidth, resHeight ->
-                            val base64 = diffusionEngine.bitmapToBase64(bitmap)
-                            try {
-                                callback.onComplete(base64, completedSeed ?: seed, resWidth, resHeight)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Error invoking onComplete callback", e)
-                            }
-                        },
-                        onError = { message ->
-                            try {
-                                callback.onError(message)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Error invoking onError callback", e)
+                    sdBridge.resetGenerationState()
+                    val progressJob = scope.launch {
+                        sdBridge.generationState.collect { state ->
+                            when (state) {
+                                is com.dark.ai_sd.DiffusionGenerationState.Progress -> {
+                                    val previewPath = state.intermediateImage?.let { bmp ->
+                                        try {
+                                            val file = java.io.File(applicationContext.cacheDir, "diff_preview_${state.currentStep}.jpg")
+                                            java.io.FileOutputStream(file).use { out ->
+                                                bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 60, out)
+                                            }
+                                            file.absolutePath
+                                        } catch (_: Exception) { null }
+                                    }
+                                    try {
+                                        callback.onProgress(state.progress, state.currentStep, state.totalSteps, previewPath)
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "Error invoking onProgress callback", e)
+                                    }
+                                }
+                                is com.dark.ai_sd.DiffusionGenerationState.Complete -> {
+                                    val finalPath = try {
+                                        val file = java.io.File(applicationContext.cacheDir, "diff_out_${System.currentTimeMillis()}.png")
+                                        java.io.FileOutputStream(file).use { out ->
+                                            state.bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                                        }
+                                        file.absolutePath
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "Failed to save complete image to cache", e)
+                                        ""
+                                    }
+                                    try {
+                                        callback.onComplete(finalPath, state.seed ?: seed, state.width, state.height)
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "Error invoking onComplete callback", e)
+                                    }
+                                    throw kotlinx.coroutines.CancellationException("Generation finished")
+                                }
+                                is com.dark.ai_sd.DiffusionGenerationState.Error -> {
+                                    try {
+                                        callback.onError(state.message)
+                                    } catch (e: Exception) {
+                                        Log.w(TAG, "Error invoking onError callback", e)
+                                    }
+                                    throw kotlinx.coroutines.CancellationException("Generation finished")
+                                }
+                                else -> {}
                             }
                         }
-                    )
+                    }
 
-                    diffusionEngine.generateImage(
+                    sdBridge.generateImageAsync(
                         prompt = prompt,
                         negativePrompt = negativePrompt,
                         steps = steps,
@@ -439,26 +487,19 @@ class LLMService : Service() {
         }
 
         override fun stopGenerationDiffusion() {
-            diffusionEngine.cancelGeneration()
+            sdBridge.cancelGeneration()
         }
 
         override fun restartDiffusionBackend(callback: IModelLoadCallback) {
-            scope.launch(Dispatchers.IO) {
-                val success = diffusionEngine.restartBackend()
-                if (success) {
-                    callback.onSuccess()
-                } else {
-                    callback.onError("Failed to restart diffusion backend")
-                }
-            }
+            callback.onError("Not supported by bridge")
         }
 
         override fun stopDiffusionBackend() {
-            diffusionEngine.stopBackend()
+            sdBridge.unloadModel()
         }
 
-        override fun getDiffusionBackendState(): String = diffusionEngine.getBackendStateString()
-        override fun getCurrentDiffusionModel(): String? = diffusionEngine.getCurrentModel()?.name
+        override fun getDiffusionBackendState(): String = sdBridge.generationState.value.javaClass.simpleName
+        override fun getCurrentDiffusionModel(): String? = null
 
         override fun simulateProcessCrash() {
             Log.w(TAG, "Simulating native engine crash. Killing process...")
@@ -494,15 +535,6 @@ class LLMService : Service() {
             // Old AAR without initBackendDir — dladdr() fallback handles it
         }
 
-        scope.launch(Dispatchers.IO) {
-            try {
-                diffusionEngine.init(applicationContext, safetyCheckerEnabled = true)
-                Log.i(TAG, "DiffusionEngine initialized in LLMService")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to initialize diffusion engine", e)
-            }
-        }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ServiceCompat.startForeground(
                 this, 1, createNotification(),
@@ -519,7 +551,6 @@ class LLMService : Service() {
         instance = null
         runBlocking(Dispatchers.IO) {
             ggufEngine.unload()
-            diffusionEngine.cleanup()
         }
         scope.cancel()
         super.onDestroy()

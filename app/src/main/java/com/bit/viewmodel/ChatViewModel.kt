@@ -1,5 +1,6 @@
 package com.bit.viewmodel
 
+import java.io.File
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
@@ -711,6 +712,8 @@ class ChatViewModel @Inject constructor(
             } finally {
                 if (generationJob == job) {
                     resetStreamingState()
+                } else {
+                    _isGenerating.value = false
                 }
             }
         }
@@ -720,34 +723,46 @@ class ChatViewModel @Inject constructor(
     // Keep old name as alias for backward compatibility with callers
     fun sendTextMessage(prompt: String) = sendChat(prompt)
 
+    private fun resizeImage(imageData: ByteArray, maxDimension: Int = 1024): ByteArray {
+        val options = android.graphics.BitmapFactory.Options()
+        options.inJustDecodeBounds = true
+        android.graphics.BitmapFactory.decodeByteArray(imageData, 0, imageData.size, options)
+        var scale = 1
+        while (options.outWidth / scale / 2 >= maxDimension &&
+               options.outHeight / scale / 2 >= maxDimension) {
+            scale *= 2
+        }
+        val outOptions = android.graphics.BitmapFactory.Options()
+        outOptions.inSampleSize = scale
+        val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageData, 0, imageData.size, outOptions) ?: return imageData
+        val resized = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
+            val ratio = Math.min(maxDimension.toFloat() / bitmap.width, maxDimension.toFloat() / bitmap.height)
+            android.graphics.Bitmap.createScaledBitmap(bitmap, (bitmap.width * ratio).toInt(), (bitmap.height * ratio).toInt(), true)
+        } else {
+            bitmap
+        }
+        val outputStream = java.io.ByteArrayOutputStream()
+        resized.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, outputStream)
+        if (resized != bitmap) {
+            resized.recycle()
+        }
+        bitmap.recycle()
+        return outputStream.toByteArray()
+    }
+
     /**
      * Send a message with images (VLM). Requires a VLM projector to be loaded.
      * @param prompt User's text prompt
      * @param imageData List of raw image file bytes (JPEG/PNG)
      */
     fun sendChatWithImages(prompt: String, imageData: List<ByteArray>) {
-        val activeProviderType = ActiveModelSession.currentModelType.value
+        val resizedImageData = imageData.map { resizeImage(it, 768) }
 
         if (!isAnyTextModelLoaded) {
             reportError("Please load a text model first")
             return
         }
-        val modelIdLower = (currentModelId ?: "").lowercase()
-        val isVisionCapable = activeProviderType == ProviderType.API ||
-                activeProviderType == ProviderType.VLM ||
-                LlmModelWorker.isVlmLoaded.value ||
-                modelIdLower.contains("vl") ||
-                modelIdLower.contains("vision") ||
-                modelIdLower.contains("smolvlm") ||
-                modelIdLower.contains("llava") ||
-                modelIdLower.contains("moondream") ||
-                modelIdLower.contains("minicpm") ||
-                modelIdLower.contains("paligemma")
 
-        if (!isVisionCapable) {
-            reportError("Please load a vision-capable model or projector (proj) first")
-            return
-        }
         if (_isGenerating.value) {
             stop()
         }
@@ -759,8 +774,8 @@ class ChatViewModel @Inject constructor(
         currentMetrics = null
         _error.value = null
 
-        val base64Image = if (imageData.isNotEmpty()) {
-            android.util.Base64.encodeToString(imageData.first(), android.util.Base64.NO_WRAP)
+        val base64Image = if (resizedImageData.isNotEmpty()) {
+            android.util.Base64.encodeToString(resizedImageData.first(), android.util.Base64.NO_WRAP)
         } else {
             null
         }
@@ -780,11 +795,54 @@ class ChatViewModel @Inject constructor(
         }
         AppStateManager.setHasMessages(true)
 
+        // Persist user message immediately for existing chats so it survives navigation
+        if (!isNewConversation) {
+            val chatId = _currentChatId.value
+            if (chatId != null && currentUserMessage != null) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        chatManager.addMessage(chatId, currentUserMessage!!)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to persist VLM user message: ${e.message}")
+                    }
+                }
+            }
+        }
+
         var job: Job? = null
         job = viewModelScope.launch {
             try {
                 // Let Compose render the StreamingView before native engine saturates CPU
                 kotlinx.coroutines.yield()
+
+                val modelId = currentModelId ?: ""
+                val modelDb = try { AppContainer.getModelRepository().getModelById(modelId) } catch (_: Exception) { null }
+                val activeProviderType = ActiveModelSession.currentModelType.value
+
+                // 1. If native VLM projector is already loaded, or using remote API with vision, we are ready
+                var isVisionReady = LlmModelWorker.isVlmLoaded.value || activeProviderType == ProviderType.API || activeProviderType == ProviderType.VLM
+
+                // 2. If not yet loaded, attempt to discover and load a colocated or installed projector
+                if (!isVisionReady && activeProviderType != ProviderType.API) {
+                    val candidateProj = try {
+                        val mFile = modelDb?.modelPath?.let { File(it) }
+                        (mFile?.let { com.bit.util.VlmPaths.colocatedMmproj(it) })
+                            ?: com.bit.util.VlmPaths.findAnyProjector(com.bit.global.AppPaths.models(appContext))
+                    } catch (_: Exception) { null }
+
+                    if (candidateProj != null && candidateProj.exists() && candidateProj.length() > 1024L) {
+                        val loaded = LlmModelWorker.loadVlmProjector(candidateProj.absolutePath)
+                        if (loaded) {
+                            ActiveModelSession.set(modelId, ProviderType.VLM)
+                            isVisionReady = true
+                        }
+                    }
+                }
+
+                if (!isVisionReady) {
+                    reportError("Please load a vision-capable model with its projector (mmproj) first")
+                    return@launch
+                }
 
                 val isNewChat = isNewConversation
                 if (activeProviderType == ProviderType.API) {
@@ -795,12 +853,41 @@ class ChatViewModel @Inject constructor(
                 val maxTokens = getCurrentModelMaxTokens()
 
                 // Insert image marker into prompt for VLM
-                val marker = LlmModelWorker.getVlmDefaultMarker()
-                val vlmPrompt = if (prompt.contains(marker)) prompt
-                    else marker.repeat(imageData.size) + "\n" + prompt
+                val marker = LlmModelWorker.getVlmDefaultMarker().ifBlank { "<__image__>" }
+                val imageCount = resizedImageData.size.coerceAtLeast(1)
+                val vlmPrompt = if (prompt.contains(marker) || prompt.contains("<__image__>") || prompt.contains("<__media__>")) {
+                    prompt
+                } else {
+                    (1..imageCount).joinToString("") { "$marker\n" } + prompt
+                }
 
-                val conversationMessages = buildConversationMessages(vlmPrompt)
-                val jsonArray = JSONArray(conversationMessages)
+                val messagesJsonList = mutableListOf<JSONObject>()
+                val systemPrompt = getCurrentModelSystemPrompt(userQuery = prompt, hasTools = false)
+                if (systemPrompt.isNotEmpty()) {
+                    messagesJsonList.add(JSONObject().put("role", "system").put("content", systemPrompt))
+                }
+                
+                // Add conversation history (excluding the current user message)
+                if (chatMemoryEnabled.value) {
+                    val currentMsgId = currentUserMessage?.msgId
+                    _messages.forEach { msg ->
+                        if (msg.msgId != currentMsgId) {
+                            when (msg.role) {
+                                Role.User -> messagesJsonList.add(JSONObject().put("role", "user").put("content", msg.content.content))
+                                Role.Assistant -> {
+                                    if (msg.content.contentType == ContentType.Text) {
+                                        messagesJsonList.add(JSONObject().put("role", "assistant").put("content", msg.content.content))
+                                    }
+                                }
+                                else -> {}
+                            }
+                        }
+                    }
+                }
+                
+                // Add current VLM user message with <__image__> marker
+                messagesJsonList.add(JSONObject().put("role", "user").put("content", vlmPrompt))
+                val jsonArray = JSONArray(messagesJsonList)
 
                 AppStateManager.setGeneratingText()
 
@@ -811,7 +898,7 @@ class ChatViewModel @Inject constructor(
                 val vlmThinkParser = StreamingThinkTagParser(assumeThinking = false)
 
                 LlmModelWorker.vlmGenerateStreaming(
-                    jsonArray.toString(), imageData, maxTokens
+                    jsonArray.toString(), resizedImageData, maxTokens
                 ).collect { event ->
                     when (event) {
                         is GenerationEvent.Token -> {
@@ -888,10 +975,15 @@ class ChatViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Error in sendChatWithImages", e)
+                _isGenerating.value = false
                 reportError(e.message)
             } finally {
                 if (generationJob == job) {
                     resetStreamingState()
+                } else {
+                    // Another generation was started — ensure we don't leave
+                    // the UI stuck in "generating" from this coroutine.
+                    _isGenerating.value = false
                 }
             }
         }
@@ -2594,6 +2686,7 @@ class ChatViewModel @Inject constructor(
 
         if (_isGenerating.value) return
         _isGenerating.value = true
+        _currentGenerationType.value = ModelType.IMAGE_GENERATION
 
         viewModelScope.launch {
             try {

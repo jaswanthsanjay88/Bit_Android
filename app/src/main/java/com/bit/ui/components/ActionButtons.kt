@@ -108,6 +108,7 @@ fun ActionProgressButton(
     onClickListener: () -> Unit,
     icon: ImageVector = TnIcons.PlayerStop,
     contentDescription: String = "Stop generation",
+    progress: Float? = null,
     modifier: Modifier = Modifier,
     shape: Shape = MaterialShapes.Circle.toShape(),
     colors: IconButtonColors = IconButtonDefaults.filledIconButtonColors(
@@ -120,13 +121,23 @@ fun ActionProgressButton(
         contentAlignment = Alignment.Center,
         modifier = modifier
     ) {
-        // Background circular progress indicator
-        CircularProgressIndicator(
-            modifier = Modifier.size(Standards.ActionIconSize),
-            color = MaterialTheme.colorScheme.primary,
-            strokeWidth = 2.dp,
-            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-        )
+        if (progress != null) {
+            CircularProgressIndicator(
+                progress = { progress.coerceIn(0f, 1f) },
+                modifier = Modifier.size(Standards.ActionIconSize),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 2.5.dp,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            )
+        } else {
+            // Indeterminate circular progress indicator
+            CircularProgressIndicator(
+                modifier = Modifier.size(Standards.ActionIconSize),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 2.5.dp,
+                trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            )
+        }
 
         // Icon button in center
         FilledIconButton(

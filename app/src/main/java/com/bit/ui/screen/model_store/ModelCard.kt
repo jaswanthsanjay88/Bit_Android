@@ -31,6 +31,7 @@ import com.bit.models.data.ModelType
 import com.bit.service.ModelDownloadService
 import com.bit.ui.components.ActionButton
 import com.bit.ui.components.ActionProgressButton
+import com.bit.ui.components.M3WavyLinearProgressIndicator
 import com.bit.ui.theme.Motion
 import com.bit.ui.theme.MonoWarning
 import com.bit.ui.icons.TnIcons
@@ -155,6 +156,7 @@ fun ModelCard(
                     }
 
                     isDownloading -> {
+                        val currentProgress = (downloadState as? ModelDownloadService.DownloadState.Downloading)?.progress ?: 0f
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -165,11 +167,12 @@ fun ModelCard(
                                 icon = TnIcons.PlayerPause,
                                 contentDescription = "Pause Download"
                             )
-                            // Cancel button
+                            // Cancel button with circular progress ring
                             ActionProgressButton(
                                 onClickListener = onCancelDownload,
                                 icon = TnIcons.PlayerStop,
-                                contentDescription = "Cancel Download"
+                                contentDescription = "Cancel Download",
+                                progress = currentProgress
                             )
                         }
                     }
@@ -195,10 +198,14 @@ fun ModelCard(
                     }
 
                     isExtracting || isProcessing || isVerifying -> {
+                        val extractProgress = (downloadState as? ModelDownloadService.DownloadState.Extracting)?.let {
+                            if (it.totalFiles > 0) it.extractedCount.toFloat() / it.totalFiles else null
+                        }
                         ActionProgressButton(
                             onClickListener = onCancelDownload,
                             icon = TnIcons.PlayerStop,
-                            contentDescription = "Cancel Download"
+                            contentDescription = "Cancel Download",
+                            progress = extractProgress
                         )
                     }
 
@@ -367,26 +374,13 @@ fun ModelCard(
                         else -> 0f
                     }
 
-                    if (isIndeterminate) {
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp)),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    } else {
-                        LinearProgressIndicator(
-                            progress = { progressVal },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp)),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    }
+                    M3WavyLinearProgressIndicator(
+                        progress = progressVal,
+                        isIndeterminate = isIndeterminate,
+                        activeColor = if (isPaused) MonoWarning else MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }

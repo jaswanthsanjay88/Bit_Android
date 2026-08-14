@@ -453,7 +453,6 @@ fun AppNavigation(
                 },
                 onNotesListClick = { navController.navigate(Screen.NotesList.route) },
                 onAiMemoryListClick = { navController.navigate(Screen.AiMemoryList.route) },
-                onDocumentsClick = { navController.navigate(Screen.DocumentsRag.route) },
                 onBackupSettingsClick = { navController.navigate(Screen.BackupSettings.route) }
             )
         }
@@ -496,11 +495,7 @@ fun AppNavigation(
                 }
             )
         }
-        composable(Screen.DocumentsRag.route) {
-            com.bit.ui.screen.memory.DocumentsRagScreen(
-                onBackClick = { navController.popBackStack() }
-            )
-        }
+
         composable(Screen.TaskList.route) {
             com.bit.ui.screen.memory.TaskListView(
                 onBackClick = { navController.popBackStack() },

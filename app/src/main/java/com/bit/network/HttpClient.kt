@@ -144,14 +144,14 @@ object HttpClient {
      * OkHttp client tuned for minimal TTFT on API streaming:
      * - HTTP/2 negotiation via ALPN for multiplexed streams (eliminates head-of-line blocking)
      * - Aggressive connection pooling: 10 idle connections, 5min keep-alive
-     * - Fast connect timeout (8s) but generous read timeout (90s) for long generation
+     * - Fast connect timeout (30s) but generous read timeout (90s) for long generation
      * - DNS caching via system defaults (OkHttp respects JVM DNS cache)
      */
     val client: OkHttpClient = OkHttpClient.Builder()
         .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(90, TimeUnit.SECONDS)
-        .writeTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(300, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
         .retryOnConnectionFailure(true)
         .proxySelector(proxySelector)
@@ -224,37 +224,10 @@ object HttpClient {
             .post(body)
             .header("Accept", "text/event-stream")
         headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
-
-        var lastException: Exception? = null
-        for (attempt in 1..3) {
-            try {
-                val call = client.newCall(requestBuilder.build())
-                val handle = StreamHandle(call, call.execute())
-                activeStreamHandle = handle
-                return handle
-            } catch (e: SocketTimeoutException) {
-                lastException = e
-                if (attempt < 3) {
-                    Log.w("HttpClient", "Connect timeout on attempt $attempt/3, retrying...")
-                    continue
-                }
-            } catch (e: java.net.ConnectException) {
-                lastException = e
-                if (attempt < 3) {
-                    Log.w("HttpClient", "Connect failed on attempt $attempt/3, retrying...")
-                    continue
-                }
-            } catch (e: javax.net.ssl.SSLException) {
-                lastException = e
-                if (attempt < 3) {
-                    Log.w("HttpClient", "TLS error on attempt $attempt/3, retrying...")
-                    continue
-                }
-            } catch (e: Exception) {
-                throw e // non-retryable
-            }
-        }
-        throw lastException ?: IOException("Failed to connect after 3 attempts")
+        val call = client.newCall(requestBuilder.build())
+        val handle = StreamHandle(call, call.execute())
+        activeStreamHandle = handle
+        return handle
     }
 
     fun post(url: String, jsonBody: String, headers: Map<String, String> = emptyMap()): String? {

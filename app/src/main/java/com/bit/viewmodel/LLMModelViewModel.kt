@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
 import com.bit.global.AppPaths
+import com.bit.util.VlmPaths
 import java.io.File
 
 @HiltViewModel
@@ -160,13 +161,23 @@ class LLMModelViewModel @Inject constructor(
                     return@launch
                 }
 
-                when (model.providerType) {
-                    ProviderType.GGUF -> loadGgufModel(model, config)
-                    ProviderType.DIFFUSION -> loadDiffusionModel(model, config)
-                    ProviderType.API -> loadApiModel(model)
-                    ProviderType.TTS -> { /* TTS models are managed by TTSManager, not LLMService */ }
-                    ProviderType.STT -> { /* STT models are managed by speech subsystem, not LLMService */ }
-                    ProviderType.VLM -> loadVlmModel(model, config)
+                val isVlm = model.providerType == ProviderType.VLM || try {
+                    val pathFile = File(model.modelPath)
+                    VlmPaths.colocatedMmproj(pathFile) != null ||
+                    (pathFile.isDirectory && pathFile.listFiles()?.any { VlmPaths.isMmprojFileName(it.name) } == true)
+                } catch (e: Exception) { false }
+
+                if (isVlm) {
+                    loadVlmModel(model, config)
+                } else {
+                    when (model.providerType) {
+                        ProviderType.GGUF -> loadGgufModel(model, config)
+                        ProviderType.DIFFUSION -> loadDiffusionModel(model, config)
+                        ProviderType.API -> loadApiModel(model)
+                        ProviderType.TTS -> { /* TTS models are managed by TTSManager, not LLMService */ }
+                        ProviderType.STT -> { /* STT models are managed by speech subsystem, not LLMService */ }
+                        ProviderType.VLM -> loadVlmModel(model, config)
+                    }
                 }
             } catch (e: Exception) {
                 AppStateManager.setError(e.message ?: "Unknown error")
@@ -219,27 +230,34 @@ class LLMModelViewModel @Inject constructor(
     }
 
     private suspend fun loadVlmModel(model: Model, config: ModelConfig) {
-        loadGgufModel(model, config)
-        if (_currentModelID.value == model.id) {
+        // VLM models can store directory path or direct file path
+        val pathFile = File(model.modelPath)
+        val ggufFile = if (pathFile.isDirectory) {
+            VlmPaths.findGgufModelFile(pathFile) ?: run {
+                AppStateManager.setError("No GGUF model file found in VLM model directory")
+                return
+            }
+        } else {
+            pathFile
+        }
+
+        val resolvedModel = model.copy(modelPath = ggufFile.absolutePath)
+        val projFile = VlmPaths.colocatedMmproj(ggufFile)
+
+        // Load base model first
+        loadGgufModel(resolvedModel, config)
+        if (_currentModelID.value == resolvedModel.id) {
+            // Load projector if found
+            if (projFile != null && projFile.exists() && projFile.length() > 1024L) {
+                val projLoaded = LlmModelWorker.loadVlmProjector(projFile.absolutePath)
+                if (projLoaded) {
+                    Log.i("LLMModelVM", "VLM projector loaded successfully: ${projFile.name}")
+                } else {
+                    Log.w("LLMModelVM", "VLM projector failed to load: ${projFile.name}")
+                }
+            }
             _currentModelType.value = ProviderType.VLM
             ActiveModelSession.set(model.id, ProviderType.VLM)
-
-            // Auto-detect and load VLM projector if present in model directory
-            try {
-                val modelFile = File(model.modelPath)
-                val modelDir = modelFile.parentFile
-                if (modelDir != null && modelDir.exists()) {
-                    val projFile = modelDir.listFiles()?.find { f ->
-                        val name = f.name.lowercase()
-                        (name.contains("mmproj") || name.contains("projector")) && name.endsWith(".gguf")
-                    }
-                    if (projFile != null) {
-                        LlmModelWorker.loadVlmProjector(projFile.absolutePath)
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("LLMModelVM", "Failed to auto-load VLM projector: ${e.message}")
-            }
         }
     }
 
@@ -253,7 +271,13 @@ class LLMModelViewModel @Inject constructor(
             if (subFile.exists()) modelDirFile = subFile
         }
 
-        val hasMnnFiles = java.io.File(modelDirFile, "unet.mnn").exists() || java.io.File(modelDirFile, "clip.mnn").exists()
+        // Lift to the actual model directory containing unet/clip files
+        modelDirFile = liftToModelDir(modelDirFile)
+
+        val hasMnnFiles = java.io.File(modelDirFile, "unet.mnn").exists() || 
+                          java.io.File(modelDirFile, "clip.mnn").exists() ||
+                          java.io.File(modelDirFile, "unet/unet.mnn").exists() || 
+                          java.io.File(modelDirFile, "text_encoder/clip.mnn").exists()
         val isCpuByName = model.modelName.contains("CPU", ignoreCase = true) || model.modelPath.contains("CPU", ignoreCase = true)
         val effectiveRunOnCpu = diffusionConfig.runOnCpu || hasMnnFiles || isCpuByName
         val effectiveUseCpuClip = diffusionConfig.useCpuClip || effectiveRunOnCpu
@@ -300,6 +324,11 @@ class LLMModelViewModel @Inject constructor(
                     LlmModelWorker.unloadGgufModel()
                     LlmModelWorker.setCurrentGgufModelId(null)
                 }
+                ProviderType.VLM -> {
+                    LlmModelWorker.releaseVlmProjector()
+                    LlmModelWorker.unloadGgufModel()
+                    LlmModelWorker.setCurrentGgufModelId(null)
+                }
                 ProviderType.DIFFUSION -> {
                     LlmModelWorker.stopDiffusionBackend()
                     LlmModelWorker.setCurrentDiffusionModelId(null)
@@ -322,6 +351,11 @@ class LLMModelViewModel @Inject constructor(
             try {
                 when (_currentModelType.value) {
                     ProviderType.GGUF -> {
+                        LlmModelWorker.unloadGgufModel()
+                        LlmModelWorker.setCurrentGgufModelId(null)
+                    }
+                    ProviderType.VLM -> {
+                        LlmModelWorker.releaseVlmProjector()
                         LlmModelWorker.unloadGgufModel()
                         LlmModelWorker.setCurrentGgufModelId(null)
                     }
@@ -408,5 +442,21 @@ class LLMModelViewModel @Inject constructor(
                 AppStateManager.setError("Failed to delete model: ${e.message}")
             }
         }
+    }
+    private fun liftToModelDir(root: java.io.File): java.io.File {
+        val signals = setOf(
+            "unet.bin", "unet.mnn", "clip.mnn", "clip_v2.mnn",
+            "vae_decoder.bin", "vae_decoder.mnn", "tokenizer.json"
+        )
+        var cur = root
+        repeat(6) {
+            val files = cur.listFiles()?.toList().orEmpty()
+            val hasModelFile = files.any { it.isFile && signals.contains(it.name) }
+            if (hasModelFile) return cur
+            val onlyDir = files.singleOrNull { it.isDirectory && !it.name.startsWith(".") }
+                ?: return cur
+            cur = onlyDir
+        }
+        return cur
     }
 }

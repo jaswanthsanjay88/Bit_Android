@@ -23,9 +23,34 @@ object CrashReporter {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to save crash report", e)
             }
+
+            // Known Compose Foundation bug: LazyListState throws when a drag
+            // gesture starts while a fling still has pending scroll delta.
+            // This is non-fatal — recover by restarting the activity instead of crashing.
+            if (throwable is IllegalStateException &&
+                throwable.message?.contains("entered drag with non-zero pending scroll") == true
+            ) {
+                Log.w(TAG, "Caught known Compose scroll bug — restarting activity", throwable)
+                try {
+                    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+                    if (intent != null) {
+                        intent.addFlags(
+                            android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                            android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        )
+                        context.startActivity(intent)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to restart after Compose scroll bug", e)
+                }
+                android.os.Process.killProcess(android.os.Process.myPid())
+                return@setDefaultUncaughtExceptionHandler
+            }
+
             defaultHandler?.uncaughtException(thread, throwable)
         }
     }
+
 
     private fun saveCrash(context: Context, thread: Thread, throwable: Throwable) {
         val file = File(context.filesDir, CRASH_FILE_NAME)

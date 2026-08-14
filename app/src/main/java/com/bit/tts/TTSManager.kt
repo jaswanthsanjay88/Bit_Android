@@ -149,7 +149,7 @@ object TTSManager {
 
             val modelFile = findFileRecursive(dir) { it.name.endsWith(".onnx") }
             val tokensFile = findFileRecursive(dir) { it.name == "tokens.txt" }
-            val voicesFile = findFileRecursive(dir) { it.name == "voices.bin" }
+            val voicesFile = findFileRecursive(dir) { it.name == "voices.bin" || it.name == "voices.npz" }
             val espeakDir = findDirRecursive(dir, "espeak-ng-data")
             val dictDir = findDirRecursive(dir, "dict")
 

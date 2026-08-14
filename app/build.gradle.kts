@@ -13,15 +13,15 @@ val localPropertiesFile = rootProject.file("local.properties")
 
 android {
     namespace = "com.bit"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "com.bit"
         minSdk = 29
         targetSdk = 36
-        versionCode = 77
-        versionName = "2.0.8"
+        versionCode = 78
+        versionName = "2.0.9"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }

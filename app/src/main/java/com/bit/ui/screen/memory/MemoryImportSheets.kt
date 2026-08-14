@@ -26,31 +26,24 @@ import com.bit.viewmodel.ImportStep
 import com.bit.viewmodel.MemoryImportViewModel
 
 val IMPORT_PROMPT_TEXT = """
-Export all of my stored memories and any context you've learned about me from past conversations. Preserve my words verbatim where possible, especially for instructions and preferences.
+Hey! I'm exporting my memories and context with you over to another AI assistant. Could you please export all the stored memories, profile details, and preferences you've learned about me from our conversations? Please keep my original phrasing verbatim wherever possible, especially for custom instructions and personal preferences.
 
-## Categories (output in this order):
+## Categories (please organize in this order):
 
-1. **Instructions**: Rules I've explicitly asked you to follow going forward — tone, format, style, "always do X", "never do Y", and corrections to your behavior. Only include rules from stored memories, not from conversations.
-
-2. **Identity**: Name, age, location, education, family, relationships, languages, and personal interests.
-
-3. **Career**: Current and past roles, companies, and general skill areas.
-
-4. **Projects**: Projects I meaningfully built or committed to. Ideally ONE entry per project. Include what it does, current status, and any key decisions. Use the project name or a short descriptor as the first words of the entry.
-
+1. **Instructions**: Rules and guidelines I've explicitly asked you to follow — tone, format, style, "always do X", "never do Y", and corrections to your behavior.
+2. **Identity**: My name, age, location, education, background, family, relationships, languages, and personal interests.
+3. **Career**: Current and past roles, companies, projects, and general skill areas.
+4. **Projects**: Projects I meaningfully built or committed to (ideally one entry per project with status, tech stack, and key decisions).
 5. **Preferences**: Opinions, tastes, and working-style preferences that apply broadly.
 
 ## Format:
-
-Use section headers for each category. Within each category, list one entry per line, sorted by oldest date first. Format each line as:
-
+Use section headers for each category. Within each category, list entries line-by-line formatted as:
 [YYYY-MM-DD] - Entry content here.
-
-If no date is known, use [unknown] instead.
+(If no date is known, use [unknown] instead.)
 
 ## Output:
-- Wrap the entire export in a single code block for easy copying.
-- After the code block, state whether this is the complete set or if more remain.
+- Please wrap the complete export inside a single markdown code block so I can easily copy it all at once.
+- After the code block, let me know if this is the complete set or if there is more.
 """.trimIndent()
 
 @OptIn(ExperimentalMaterial3Api::class)

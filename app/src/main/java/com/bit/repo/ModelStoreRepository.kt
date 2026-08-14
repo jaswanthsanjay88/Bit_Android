@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import java.io.File
 import java.util.Locale
+import kotlinx.coroutines.async
 import com.bit.network.HuggingFaceClient
 import com.bit.network.HuggingFaceFileResponse
 import com.bit.network.ExternalModelApiClient
@@ -28,7 +29,7 @@ data class ModelStoreCache(
 ) {
     companion object {
         // Bump this when filtering logic changes to auto-invalidate stale caches
-        const val CURRENT_VERSION = 3
+        const val CURRENT_VERSION = 7
     }
 }
 
@@ -144,52 +145,50 @@ class ModelStoreRepository(private val context: Context) {
     }
 
     suspend fun fetchCuratedModels(forceRefresh: Boolean = false): Result<List<HuggingFaceModel>> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        // Return disk cache if not forcing refresh
         if (!forceRefresh) {
-            loadCuratedDiskCache()?.let { cached ->
-                return@withContext Result.success(cached)
-            }
+            loadCuratedDiskCache()?.let { return@withContext Result.success(it) }
         }
 
-        val client = okhttp3.OkHttpClient.Builder()
-            .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
+        val networkModels = fetchCuratedModelsFromNetwork()
+        val models = networkModels ?: loadCuratedDiskCache() ?: getBuiltInCuratedModels()
 
-        val urlsToTry = listOf(CURATED_API_URL, CURATED_API_RAW_URL, CURATED_API_ALT_URL)
-        for (url in urlsToTry) {
-            try {
-                val request = okhttp3.Request.Builder()
-                    .url(url)
-                    .get()
-                    .build()
-
-                val response = client.newCall(request).execute()
-                if (response.isSuccessful) {
-                    val body = response.body.string().ifBlank { null }
-                    if (body != null) {
-                        val models = parseCuratedJson(body)
-                        if (models.isNotEmpty()) {
-                            try { curatedCacheFile.writeText(body) } catch (e: Exception) { Log.w("ModelStoreRepository", "Failed to cache curated models", e) }
-                            return@withContext Result.success(models)
-                        }
-                    }
-                }
+        if (models.isNotEmpty()) {
+            try { 
+                val cacheData = ModelStoreCache(models, System.currentTimeMillis(), ModelStoreCache.CURRENT_VERSION)
+                curatedCacheFile.writeText(json.encodeToString(cacheData)) 
             } catch (e: Exception) {
-                Log.w("ModelStoreRepository", "Failed to fetch from $url: ${e.message}")
+                Log.w("ModelStoreRepository", "Failed to write curated disk cache", e)
             }
-        }
-
-        // Fall back to disk cache if available
-        loadCuratedDiskCache()?.let { return@withContext Result.success(it) }
-
-        // Ultimate fallback: built-in curated models so the store NEVER fails
-        val fallbackModels = getBuiltInCuratedModels()
-        if (fallbackModels.isNotEmpty()) {
-            return@withContext Result.success(fallbackModels)
+            return@withContext Result.success(models)
         }
 
         Result.failure(Exception("Failed to fetch curated models from API"))
+    }
+
+    private fun fetchCuratedModelsFromNetwork(): List<HuggingFaceModel>? {
+        val urlsToTry = listOf(CURATED_API_URL, CURATED_API_RAW_URL, CURATED_API_ALT_URL)
+        for (urlString in urlsToTry) {
+            try {
+                val url = java.net.URL(urlString)
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Accept", "application/json")
+                connection.setRequestProperty("User-Agent", "BIT-Android-App")
+                if (connection.responseCode == 200) {
+                    val body = connection.inputStream.bufferedReader().use { it.readText() }
+                    val models = parseCuratedJson(body)
+                    if (models.isNotEmpty()) {
+                        Log.i("ModelStoreRepository", "Successfully fetched ${models.size} curated models from $urlString")
+                        return models
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("ModelStoreRepository", "Failed to fetch curated models from $urlString: ${e.message}")
+            }
+        }
+        return null
     }
 
     private fun getBuiltInCuratedModels(): List<HuggingFaceModel> {
@@ -289,8 +288,9 @@ class ModelStoreRepository(private val context: Context) {
                 name = "LFM2-VL 450M",
                 description = "Ultra-fast Vision-Language Model from Liquid AI. Multimodal image + text chat for mobile.",
                 fileUri = "https://huggingface.co/LiquidAI/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf",
+                projectorUrl = "https://huggingface.co/LiquidAI/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf",
                 approximateSize = "520 MB",
-                modelType = ModelType.GGUF,
+                modelType = ModelType.VLM,
                 isZip = false,
                 runOnCpu = false,
                 minRamGb = 3,
@@ -299,20 +299,22 @@ class ModelStoreRepository(private val context: Context) {
                 iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/liquid.png",
                 tags = listOf("Vision", "Multimodal", "Ultra Fast", "Tested")
             ),
+
             HuggingFaceModel(
-                id = "smolvlm-256m-q4km",
-                name = "SmolVLM 256M (Vision)",
-                description = "Ultra-tiny 180MB Vision-Language Model. Processes images & text instantly on any mobile device.",
-                fileUri = "https://huggingface.co/ggml-org/smolvlm-256m-instruct-GGUF/resolve/main/smolvlm-256m-instruct-q4_k_m.gguf",
-                approximateSize = "180 MB",
-                modelType = ModelType.GGUF,
+                id = "smolvlm-256m-q8",
+                name = "SmolVLM 256M (Q8_0 Vision)",
+                description = "Higher precision Q8_0 Vision-Language Model from HuggingFace. Higher accuracy multimodal chat.",
+                fileUri = "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q8_0.gguf",
+                projectorUrl = "https://huggingface.co/ggml-org/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-Q8_0.gguf",
+                approximateSize = "270 MB",
+                modelType = ModelType.VLM,
                 isZip = false,
                 runOnCpu = false,
                 minRamGb = 2,
-                sizeBytes = 188743680L,
+                sizeBytes = 283115520L,
                 icon = "huggingface",
                 iconUrl = "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/huggingface.png",
-                tags = listOf("Vision", "Multimodal", "Ultra Fast", "Tested")
+                tags = listOf("Vision", "Multimodal", "High Quality", "Tested")
             ),
             HuggingFaceModel(
                 id = "qwen2.5-0.5b-q4km",
@@ -540,6 +542,7 @@ class ModelStoreRepository(private val context: Context) {
                     "SD", "DIFFUSION" -> ModelType.SD
                     "TTS" -> ModelType.TTS
                     "STT" -> ModelType.STT
+                    "VLM", "VISION" -> ModelType.VLM
                     "EMBEDDING", "EMBED" -> ModelType.EMBEDDING
                     else -> ModelType.GGUF
                 }
@@ -555,6 +558,7 @@ class ModelStoreRepository(private val context: Context) {
                         name = name,
                         description = description,
                         fileUri = url,
+                        projectorUrl = item.get("projectorUrl")?.asString,
                         approximateSize = size,
                         modelType = modelType,
                         isZip = item.get("isZip")?.asBoolean ?: false,

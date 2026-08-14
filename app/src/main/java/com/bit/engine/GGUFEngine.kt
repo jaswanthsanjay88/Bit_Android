@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.withContext
 import com.dark.gguf_lib.models.GenerationEvent as LibGenerationEvent
 
@@ -308,10 +309,10 @@ class GGUFEngine {
     // ── Generation ──
 
     fun generateFlow(prompt: String, maxTokens: Int): Flow<GenerationEvent> =
-        engine.generateFlow(prompt, maxTokens).map { it.toLocal() }
+        engine.generateFlow(prompt, maxTokens).mapNotNull { it.toLocal() }
 
     fun generateMultiTurnFlow(messagesJson: String, maxTokens: Int): Flow<GenerationEvent> =
-        engine.generateMultiTurnFlow(messagesJson, maxTokens).map { it.toLocal() }
+        engine.generateMultiTurnFlow(messagesJson, maxTokens).mapNotNull { it.toLocal() }
 
     fun stopGeneration() {
         engine.stopGeneration()
@@ -319,6 +320,7 @@ class GGUFEngine {
 
     suspend fun unload() = withContext(Dispatchers.IO) {
         if (engine.isLoaded) {
+            releaseVlmProjector()
             engine.unload()
             currentModelId = null
             currentToolsJson = null
@@ -618,18 +620,20 @@ class GGUFEngine {
 
     fun loadVlmProjector(path: String, threads: Int = 0): Boolean {
         if (!engine.isLoaded) return false
+        val effThreads = if (threads > 0) threads else 4
         return try {
             kotlinx.coroutines.runBlocking {
-                engine.loadVlmProjector(path, threads, imageMinTokens = -1, imageMaxTokens = -1)
+                engine.loadVlmProjector(path, effThreads, imageMinTokens = 256, imageMaxTokens = 1024)
             }
         } catch (_: Exception) { false }
     }
 
     fun loadVlmProjectorFromFd(fd: Int, threads: Int = 0): Boolean {
         if (!engine.isLoaded) return false
+        val effThreads = if (threads > 0) threads else 4
         return try {
             kotlinx.coroutines.runBlocking {
-                engine.loadVlmProjectorFromFd(fd, threads, imageMinTokens = -1, imageMaxTokens = -1)
+                engine.loadVlmProjectorFromFd(fd, effThreads, imageMinTokens = 256, imageMaxTokens = 1024)
             }
         } catch (_: Exception) { false }
     }
@@ -647,7 +651,7 @@ class GGUFEngine {
         imageData: List<ByteArray>,
         maxTokens: Int
     ): Flow<GenerationEvent> =
-        engine.generateVlmFlow(messagesJson, imageData, maxTokens).map { it.toLocal() }
+        engine.generateVlmFlow(messagesJson, imageData, maxTokens).mapNotNull { it.toLocal() }
 
     companion object {
         private const val TAG = "GGUFEngine"
@@ -692,11 +696,11 @@ sealed class GenerationEvent {
 }
 
 /** Map library GenerationEvent → local GenerationEvent */
-private fun LibGenerationEvent.toLocal(): GenerationEvent = when (this) {
+private fun LibGenerationEvent.toLocal(): GenerationEvent? = when (this) {
     is LibGenerationEvent.Token -> GenerationEvent.Token(text)
     is LibGenerationEvent.Done -> GenerationEvent.Done
     is LibGenerationEvent.Error -> GenerationEvent.Error(message)
     is LibGenerationEvent.Metrics -> GenerationEvent.Metrics(metrics.toLocal())
     is LibGenerationEvent.Progress -> GenerationEvent.Progress(progress)
-    else -> GenerationEvent.Done // VlmStageMetrics, VtCacheStatus, VlmKvCacheStatus — not consumed by app
+    else -> null // Intermediate VLM stage metrics, VT cache status, VLM-KV cache status — filter out, do NOT terminate early!
 }

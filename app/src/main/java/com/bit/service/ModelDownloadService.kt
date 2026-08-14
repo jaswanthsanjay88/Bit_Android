@@ -230,20 +230,17 @@ class ModelDownloadService : Service() {
                     tempDir.mkdirs()
                 }
 
-                // Multi-file types download their own files directly, skip single-file download
-                val isMultiFile = modelType == "STT" || 
+                val isVlm = modelType == "VLM" || projectorUrl != null || (fileUrl != null && (fileUrl.contains("mmproj") || fileUrl.lowercase().contains("vlm")))
+                val isMultiFile = modelType == "STT" || isVlm ||
                         (modelType == "TTS" && fileUrl?.let { it.contains(".tar.bz2") || it.contains(".zip") } != true)
                 
-                // For VLM, we download multiple files individually (main + projector)
-                // but we handle them inline below.
-                
-                if (!isMultiFile && modelType != "VLM" && fileUrl != null) {
+                if (!isMultiFile && fileUrl != null) {
                     tempFile = File(tempDir, "${modelId}.tmp")
                     downloadFile(fileUrl, tempFile, modelId, modelName, notificationId)
                 }
 
-                when (modelType) {
-                    "STT" -> {
+                when {
+                    modelType == "STT" -> {
                         val modelsDir = AppPaths.models(applicationContext)
                         modelsDir.mkdirs()
 
@@ -266,7 +263,7 @@ class ModelDownloadService : Service() {
                         )
                     }
 
-                    "VLM" -> {
+                    isVlm -> {
                         val modelsDir = AppPaths.models(applicationContext)
                         modelsDir.mkdirs()
 
@@ -277,24 +274,31 @@ class ModelDownloadService : Service() {
                         updateDownloadState(modelId, DownloadState.Processing(modelId))
                         updateNotification(modelName, 0f, notificationId, isProcessing = true)
 
-                        if (fileUrl != null && projectorUrl != null) {
-                            downloadVLMModelFiles(fileUrl, projectorUrl, vlmModelDir, modelId, modelName, notificationId)
+                        val actualProjUrl = projectorUrl?.takeIf { it.isNotBlank() }
+                            ?: (fileUrl?.let { autoInferProjectorUrl(it) })
+
+                        if (fileUrl != null && actualProjUrl != null) {
+                            downloadVLMModelFiles(fileUrl, actualProjUrl, vlmModelDir, modelId, modelName, notificationId)
+                        } else if (fileUrl != null) {
+                            val mainFileName = fileUrl.substringAfterLast("/")
+                            val mainFile = File(vlmModelDir, mainFileName)
+                            downloadFile(fileUrl, mainFile, modelId, modelName, notificationId)
                         } else {
-                            Log.e(TAG, "VLM download failed: missing fileUrl or projectorUrl")
-                            throw IllegalStateException("Missing URLs for VLM model")
+                            Log.e(TAG, "VLM download failed: missing fileUrl")
+                            throw IllegalStateException("Missing fileUrl for VLM model")
                         }
 
                         insertModelToDatabase(
                             modelId = modelId,
                             modelName = modelName,
-                            modelPath = vlmModelDir.absolutePath, // Storing directory for VLM as we need two files
-                            modelType = modelType,
+                            modelPath = vlmModelDir.absolutePath,
+                            modelType = "VLM",
                             runOnCpu = runOnCpu,
                             textEmbeddingSize = textEmbeddingSize
                         )
                     }
 
-                    "SD" -> {
+                    modelType == "SD" -> {
                         val modelsDir = AppPaths.models(applicationContext)
                         modelsDir.mkdirs()
 
@@ -346,7 +350,7 @@ class ModelDownloadService : Service() {
                         )
                     }
 
-                    "GGUF" -> {
+                    modelType == "GGUF" || modelType == "LLM" -> {
                         AppPaths.models(applicationContext).mkdirs()
 
                         val targetFile = AppPaths.modelFile(applicationContext, modelId)
@@ -376,7 +380,7 @@ class ModelDownloadService : Service() {
                         )
                     }
 
-                    "TTS" -> {
+                    modelType == "TTS" -> {
                         AppPaths.models(applicationContext).mkdirs()
 
                         val ttsModelParentDir = AppPaths.ttsModel(applicationContext)
@@ -409,7 +413,7 @@ class ModelDownloadService : Service() {
                         )
                     }
 
-                    "IMAGE_TOOL" -> {
+                    modelType == "IMAGE_TOOL" -> {
                         val toolDir = AppPaths.imageTools(applicationContext)
                         toolDir.mkdirs()
 
@@ -433,8 +437,25 @@ class ModelDownloadService : Service() {
                         } else {
                             tempFile?.copyTo(targetFile, overwrite = true)
                         }
+                    }
 
-                        // No database entry — image tool models are managed by ImageToolsViewModel
+                    else -> {
+                        val modelsDir = AppPaths.models(applicationContext)
+                        modelsDir.mkdirs()
+
+                        val targetFile = File(modelsDir, "${modelId}.gguf")
+                        if (tempFile != null) {
+                            tempFile.copyTo(targetFile, overwrite = true)
+                        }
+
+                        insertModelToDatabase(
+                            modelId = modelId,
+                            modelName = modelName,
+                            modelPath = targetFile.absolutePath,
+                            modelType = modelType,
+                            runOnCpu = runOnCpu,
+                            textEmbeddingSize = textEmbeddingSize
+                        )
                     }
                 }
 
@@ -739,25 +760,25 @@ class ModelDownloadService : Service() {
     private suspend fun downloadTTSModelFiles(
         ttsModelDir: File, modelId: String, modelName: String, notificationId: Int
     ) = withContext(Dispatchers.IO) {
-        val repo = when (modelId) {
-            "vits-ljs-tts" -> "csukuangfj/vits-ljs"
-            else -> "csukuangfj/vits-ljs" // default fallback
-        }
-        val baseUrl = "https://huggingface.co/$repo/resolve/main"
-
-        val files = when (modelId) {
-            "vits-ljs-tts" -> listOf("vits-ljs.onnx", "lexicon.txt", "tokens.txt")
-            else -> listOf("vits-ljs.onnx", "lexicon.txt", "tokens.txt")
+        val fileUrls = when (modelId) {
+            "vits-piper-en_US-amy-low" -> listOf(
+                "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2" to "vits-piper-en_US-amy-low.tar.bz2"
+            )
+            "kitten-tts" -> listOf(
+                "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32/resolve/main/kitten_tts_nano_v0_8.onnx" to "kitten_tts_nano_v0_8.onnx",
+                "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32/resolve/main/voices.npz" to "voices.npz",
+                "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2" to "kokoro-en-v0_19.tar.bz2"
+            )
+            else -> listOf()
         }
 
         var filesDownloaded = 0
 
-        for (filePath in files) {
+        for ((url, filePath) in fileUrls) {
             if (!downloadJobs.containsKey(modelId) || downloadJobs[modelId]?.isCancelled == true) {
                 throw kotlinx.coroutines.CancellationException("TTS download cancelled")
             }
 
-            val url = "$baseUrl/$filePath"
             val destFile = File(ttsModelDir, filePath)
             destFile.parentFile?.mkdirs()
 
@@ -774,9 +795,9 @@ class ModelDownloadService : Service() {
             }
 
             filesDownloaded++
-            val progress = filesDownloaded.toFloat() / files.size
+            val progress = filesDownloaded.toFloat() / fileUrls.size
             updateDownloadState(modelId, DownloadState.Downloading(
-                modelId, progress, filesDownloaded.toLong(), files.size.toLong()
+                modelId, progress, filesDownloaded.toLong(), fileUrls.size.toLong()
             ))
             updateNotification(modelName, progress, notificationId)
         }
@@ -803,11 +824,23 @@ class ModelDownloadService : Service() {
         val mainFile = File(vlmModelDir, mainFileName)
         val projFile = File(vlmModelDir, projFileName)
         
-        // Download main model
-        downloadFile(mainUrl, mainFile, modelId, "$modelName (Model)", notificationId)
+        // Download main model first (the larger file)
+        downloadFile(mainUrl, mainFile, modelId, "$modelName [1/2]", notificationId)
         
-        // Download projector model
-        downloadFile(projectorUrl, projFile, modelId, "$modelName (Projector)", notificationId)
+        // Verify main file downloaded completely
+        if (!mainFile.exists() || mainFile.length() < 1024L) {
+            throw IllegalStateException("VLM main model download incomplete: ${mainFile.length()} bytes")
+        }
+        Log.i(TAG, "VLM main model downloaded: ${mainFile.name} (${mainFile.length()} bytes)")
+        
+        // Download projector
+        downloadFile(projectorUrl, projFile, modelId, "$modelName [2/2]", notificationId)
+        
+        // Verify projector downloaded completely
+        if (!projFile.exists() || projFile.length() < 1024L) {
+            throw IllegalStateException("VLM projector download incomplete: ${projFile.length()} bytes")
+        }
+        Log.i(TAG, "VLM projector downloaded: ${projFile.name} (${projFile.length()} bytes)")
     }
 
     private suspend fun downloadMappedFiles(
@@ -1263,6 +1296,18 @@ class ModelDownloadService : Service() {
         }
 
         notificationManager.notify(notificationId, notification)
+    }
+
+    private fun autoInferProjectorUrl(fileUrl: String): String {
+        val baseUrl = fileUrl.substringBeforeLast("/")
+        val fileName = fileUrl.substringAfterLast("/")
+        // Try the common mmproj naming convention: mmproj-<modelname>.gguf
+        val projName = if (fileName.startsWith("mmproj", ignoreCase = true)) {
+            fileName // Already a projector URL
+        } else {
+            "mmproj-${fileName}"
+        }
+        return "$baseUrl/$projName"
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

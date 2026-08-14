@@ -19,6 +19,7 @@ interface ILLMService {
     // Multi-turn tool calling
     boolean enableToolCallingGguf(String toolsJson, int grammarMode, boolean useTypedGrammar);
     void generateGgufMultiTurn(String messagesJson, int maxTokens, IGgufGenerationCallback callback);
+    void generateGgufVlm(String messagesJson, in List<String> imagePaths, int maxTokens, IGgufGenerationCallback callback);
     void setGrammarModeGguf(int mode);
     void setTypedGrammarGguf(boolean enabled);
     boolean isToolCallingSupportedGguf();
@@ -43,6 +44,11 @@ interface ILLMService {
     boolean supportsThinkingGguf();
     void setThinkingEnabledGguf(boolean enabled);
     float getContextUsageGguf();
+    String getVlmDefaultMarkerGguf();
+    boolean loadVlmProjectorGguf(String path);
+    boolean loadVlmProjectorFromFdGguf(in ParcelFileDescriptor pfd);
+    void releaseVlmProjectorGguf();
+    boolean isVlmLoadedGguf();
 
     // Context window tracking
     String getContextInfoGguf(String prompt);
