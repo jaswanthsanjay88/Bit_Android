@@ -46,10 +46,10 @@
         </a>
 
         <ul class="nav-links">
+          <li><a href="#philosophy" class="nav-link">Philosophy</a></li>
+          <li><a href="#products" class="nav-link">Products</a></li>
           <li><a href="#benchmarks" class="nav-link">Specs</a></li>
-          <li><a href="#showcase" class="nav-link">Models</a></li>
           <li><a href="#architecture" class="nav-link">Architecture</a></li>
-          <li><a href="#reviews" class="nav-link">Reviews</a></li>
           <li><a href="changelog.html" class="nav-link">Changelog</a></li>
           <li><a href="docs.html" class="nav-link">Docs</a></li>
           <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="nav-link">GitHub</a></li>
@@ -68,18 +68,18 @@
     <div class="container">
       <div class="hero-content">
         <h1 class="hero-headline">
-          Offline AI Engine for Android. <br />
-          <em class="serif-italic">Quantized GGUF on local silicon.</em>
+          Offline AI that belongs on your device. <br />
+          <em class="serif-italic">Private, fast, and subscription-free.</em>
         </h1>
 
         <p class="hero-subhead">
-          A complete mobile AI stack — text generation, visual understanding, speech synthesis, document retrieval, and GBNF-constrained tool calling running 100% on-device with zero network requests.
+          Run powerful language models locally on Android without subscriptions, accounts, or cloud dependency.
         </p>
 
         <div class="hero-actions">
           <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn-pill">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span id="githubDownloadSize">Download v2.0.0 APK</span>
+            <span id="githubDownloadSize">Download v2.0.9 APK</span>
           </a>
 
           <a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/FDROID_SUBMISSION.md" class="btn-ghost" title="F-Droid Package & Build Recipe">
@@ -146,6 +146,186 @@
             <img src="img/bit_live_voice_mode.jpg" alt="BIT Live Voice Mode" class="phone-screen app-shot" />
           </div>
           <div class="phone-contact-shadow"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section: Philosophy (Belief → Problem → Solution) ── -->
+  <section class="philosophy-section" id="philosophy">
+    <div class="container">
+      <span class="philosophy-badge">The Philosophy</span>
+      <h2 class="philosophy-heading">
+        AI should work anywhere — <br />
+        <em class="serif-italic">even without the internet.</em>
+      </h2>
+      <p class="philosophy-lead">
+        Most AI today depends entirely on remote cloud servers. That means your personal data leaves your device, your conversations are logged, and your tools stop working the moment you lose signal.
+      </p>
+
+      <div class="story-grid">
+        <div class="story-card problem">
+          <span class="story-tag">The Status Quo</span>
+          <h3 class="story-title">Cloud-dependent AI leaves you locked in.</h3>
+          <p class="story-desc">
+            Every prompt is sent over the internet to centralized data centers. You pay recurring monthly subscriptions, endure strict token rate limits, and risk sensitive personal data being analyzed or retained.
+          </p>
+        </div>
+
+        <div class="story-card solution">
+          <span class="story-tag">The BIT Approach</span>
+          <h3 class="story-title">Direct on-device execution on your own silicon.</h3>
+          <p class="story-desc">
+            BIT runs open-weights GGUF models directly on your phone's processor using llama.cpp and llama.kt. Fast, private, zero-latency intelligence that works on planes, subways, or remote trails without a single network call.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section: 3 Core Benefits / Pillars ── -->
+  <section class="pillars-section" id="benefits">
+    <div class="container">
+      <div class="pillars-grid">
+        <div class="pillar-card">
+          <div class="pillar-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h3 class="pillar-title">Private by Default</h3>
+          <p class="pillar-desc">
+            Your conversations, files, and personal data stay strictly on your device. Zero telemetry, zero accounts, and zero cloud logging.
+          </p>
+        </div>
+
+        <div class="pillar-card">
+          <div class="pillar-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+          </div>
+          <h3 class="pillar-title">Works 100% Offline</h3>
+          <p class="pillar-desc">
+            Run text generation, vision analysis, speech recognition, and document retrieval without an internet connection.
+          </p>
+        </div>
+
+        <div class="pillar-card">
+          <div class="pillar-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          </div>
+          <h3 class="pillar-title">Open Source</h3>
+          <p class="pillar-desc">
+            Inspect the source code, verify on-device execution, and build custom local applications with our Apache-2.0 native stack.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Section: 3-Product Ecosystem (BIT App, llama.kt, Memory Vault) ── -->
+  <section class="products-section" id="products">
+    <div class="container">
+      <div class="showcase-header">
+        <h2 class="showcase-title">Built for Users. Engineered for Developers.</h2>
+        <p class="showcase-desc">A complete local AI ecosystem — from a ready-to-use mobile assistant to native Kotlin and C++ inference libraries.</p>
+      </div>
+
+      <div class="products-grid">
+        <!-- Product 1: BIT App -->
+        <div class="product-card">
+          <div>
+            <span class="product-badge">Ready to Use</span>
+            <h3 class="product-title">BIT App</h3>
+            <div class="product-target">Private AI for Android</div>
+            <p class="product-desc">
+              A full-featured mobile AI assistant. Chat locally, analyze photos, speak naturally with offline voice, and download GGUF models directly.
+            </p>
+            <ul class="product-features">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Chat locally with quantized GGUFs</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Multimodal vision & document OCR</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Offline Whisper STT & Piper TTS</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>No accounts or signups required</span>
+              </li>
+            </ul>
+          </div>
+          <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn-pill" style="width: 100%; justify-content: center;">
+            <span>Download APK</span>
+          </a>
+        </div>
+
+        <!-- Product 2: llama.kt Library -->
+        <div class="product-card">
+          <div>
+            <span class="product-badge">For Developers</span>
+            <h3 class="product-title">llama.kt Library</h3>
+            <div class="product-target">On-device AI engine for Kotlin & Android</div>
+            <p class="product-desc">
+              High-performance Kotlin Multiplatform inference library powered by optimized C++ llama.cpp bindings and hardware acceleration.
+            </p>
+            <ul class="product-features">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Kotlin Multiplatform & Android JNI</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Arm KleidiAI SIMD & Vulkan GPU</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>GBNF sampler-level structured JSON</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Maven & JitPack distribution</span>
+              </li>
+            </ul>
+          </div>
+          <a href="https://github.com/jaswanthsanjay88/llama.kt" target="_blank" rel="noopener" class="btn-ghost" style="width: 100%; justify-content: center;">
+            <span>View llama.kt</span>
+          </a>
+        </div>
+
+        <!-- Product 3: Memory Vault & Tools -->
+        <div class="product-card">
+          <div>
+            <span class="product-badge">Autonomous Tools</span>
+            <h3 class="product-title">Memory Vault</h3>
+            <div class="product-target">AI that remembers and acts</div>
+            <p class="product-desc">
+              Long-term episodic knowledge graph, offline document RAG, and autonomous multi-turn tool calling for personal workflows.
+            </p>
+            <ul class="product-features">
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Long-term episodic fact retention</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Vector + BM25 document search</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Multi-turn tool calling (Web, Files, System)</span>
+              </li>
+              <li>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Encrypted local database storage</span>
+              </li>
+            </ul>
+          </div>
+          <a href="docs.html" class="btn-ghost" style="width: 100%; justify-content: center;">
+            <span>Read Architecture Docs</span>
+          </a>
         </div>
       </div>
     </div>
@@ -351,6 +531,34 @@
     </div>
   </section>
 
+  <!-- ── Section: Future Vision & Final CTA ── -->
+  <section class="future-vision-section" style="padding: 120px 0 100px 0; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.06); position: relative;">
+    <div class="container" style="max-width: 800px; margin: 0 auto;">
+      <span class="philosophy-badge">The Future</span>
+      <h2 style="font-family: var(--font-display); font-size: clamp(2.4rem, 5vw, 3.8rem); font-weight: 300; letter-spacing: -0.03em; margin-bottom: 20px; line-height: 1.15; color: var(--text-primary);">
+        The future of AI is <br />
+        <em class="serif-italic">local-first.</em>
+      </h2>
+      <p style="font-size: clamp(1rem, 1.8vw, 1.2rem); color: var(--text-secondary); line-height: 1.6; margin-bottom: 36px;">
+        Take back ownership of your data, your compute, and your intelligence. Experience BIT on your Android device today.
+      </p>
+      <div class="hero-actions" style="opacity: 1;">
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android/releases/latest" class="btn-pill">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Download v2.0.9 APK</span>
+        </a>
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/FDROID_SUBMISSION.md" class="btn-ghost" title="F-Droid Package & Build Recipe">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L1 21h22L12 2zm0 3.83L19.17 19H4.83L12 5.83z"/></svg>
+          <span>F-Droid Ready</span>
+        </a>
+        <a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="btn-ghost">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <span>Star on GitHub</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Footer & Oversized Wordmark ── -->
   <footer class="site-footer">
     <div class="container">
@@ -530,7 +738,7 @@
     </form>
 
     <div id="successMsg" style="display: none; padding: 48px 24px; flex-direction: column; align-items: center; text-align: center; gap: 16px;">
-      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       <h4 style="margin: 0; font-size: 1.5rem; font-family: var(--font-serif); color: var(--text-primary);">Application Received</h4>
       <p style="color: var(--text-secondary); margin: 0; font-size: 0.95rem; line-height: 1.5;">Thank you! Your details have been submitted securely.<br>The team will contact you soon!</p>
       <button type="button" class="btn-pill" onclick="closeTesterModal()" style="margin-top: 16px;">Return to site</button>
@@ -550,12 +758,12 @@
       border: 1px solid #333 !important;
     }
     #testerModal input:focus, #testerModal textarea:focus, #testerModal select:focus {
-      border-color: #ffcc00 !important;
+      border-color: #ffffff !important;
       outline: none;
     }
     /* Add a custom arrow for the select dropdown */
     #testerModal select {
-      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23ffcc00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>') !important;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>') !important;
       background-repeat: no-repeat !important;
       background-position: right 12px center !important;
       padding-right: 32px !important;

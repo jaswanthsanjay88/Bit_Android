@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initIntersectionObserver();
   initLiveRatings();
   initModelStoreCatalog();
+  initOilSpringMotion();
   
   // Auto-open tester form if linked directly via hash
   setTimeout(checkHash, 100);
@@ -396,4 +397,48 @@ window.closeTesterModal = function() {
     testerModal.removeAttribute('open');
   }
 };
+
+/* ── Oil Motion: Spring Physics & Magnetic Micro-interactions ── */
+function initOilSpringMotion() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  // 1. Magnetic Buttons with Spring Physics
+  const magneticButtons = document.querySelectorAll('.btn-pill, .btn-ghost, .announcement-btn');
+  magneticButtons.forEach((btn) => {
+    btn.addEventListener('mousemove', (e) => {
+      const rect = btn.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+
+      btn.style.transform = `translate(${x * 0.18}px, ${y * 0.18}px) scale(1.02)`;
+      btn.style.transition = 'transform 0.1s ease-out';
+    });
+
+    btn.addEventListener('mouseleave', () => {
+      btn.style.transform = 'translate(0px, 0px) scale(1)';
+      btn.style.transition = 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)';
+    });
+  });
+
+  // 2. Spring 3D Tilt for Story and Pillar Cards
+  const tiltCards = document.querySelectorAll('.story-card, .pillar-card, .product-card');
+  tiltCards.forEach((card) => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+
+      const rotX = (y / (rect.height / 2)) * -4;
+      const rotY = (x / (rect.width / 2)) * 4;
+
+      card.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateY(-4px)`;
+      card.style.transition = 'transform 0.1s ease-out';
+    });
+
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px)';
+      card.style.transition = 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
+    });
+  });
+}
 
