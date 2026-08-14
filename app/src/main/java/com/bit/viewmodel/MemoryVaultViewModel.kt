@@ -169,6 +169,18 @@ class MemoryVaultViewModel @Inject constructor(
         }
     }
 
+    fun importDocumentFromUri(uri: android.net.Uri, onComplete: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            val result = globalRagOrchestrator.attachDocument(uri)
+            if (result.isSuccess) {
+                refreshNotesFromDisk()
+                onComplete?.invoke(true)
+            } else {
+                onComplete?.invoke(false)
+            }
+        }
+    }
+
     fun updateTaskStatus(note: MemoryNote, newStatus: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val now = System.currentTimeMillis()

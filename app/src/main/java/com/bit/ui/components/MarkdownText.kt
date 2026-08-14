@@ -91,11 +91,15 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier) {
         com.bit.ui.components.markdown.MarkdownPreprocessor.toRenderableMarkdownText(text) 
     }
     val parsedContent = remember(processedText) { parseMarkdown(processedText) }
-    val colors = InlineColors(
-        codeBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-        highlightBg = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f),
-        mathColor = MaterialTheme.colorScheme.primary
-    )
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val colors = remember(surfaceVariant, primary) {
+        InlineColors(
+            codeBg = surfaceVariant.copy(alpha = 0.5f),
+            highlightBg = primary.copy(alpha = 0.3f),
+            mathColor = primary
+        )
+    }
     Column(
         modifier = modifier.padding(horizontal = Standards.SpacingXs),
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)

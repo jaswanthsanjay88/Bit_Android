@@ -601,8 +601,13 @@ internal fun BottomBar(
                                 decorationBox = { innerTextField ->
                                     Box(contentAlignment = Alignment.CenterStart) {
                                         if (value.isEmpty()) {
+                                            val placeholder = when {
+                                                isImageModelLoaded && !isTextModelLoaded -> "Describe the image to generate..."
+                                                chatState.generationType == ModelType.IMAGE_GENERATION -> "Describe the image to generate..."
+                                                else -> "Ask me anything"
+                                            }
                                             Text(
-                                                text = "Ask me anything",
+                                                text = placeholder,
                                                 color = Glass.TextMuted,
                                                 style = MaterialTheme.typography.bodyLarge
                                             )
@@ -656,7 +661,9 @@ internal fun BottomBar(
                                                 trimmedValue.startsWith("generate image", ignoreCase = true) ||
                                                 trimmedValue.startsWith("create image", ignoreCase = true)
 
-                                        if (isImageTrigger && isImageModelLoaded) {
+                                        val shouldGenerateImage = isImageModelLoaded && (isImageTrigger || !isTextModelLoaded || chatState.generationType == ModelType.IMAGE_GENERATION)
+
+                                        if (shouldGenerateImage) {
                                             val cleanPrompt = when {
                                                 trimmedValue.startsWith("/image", ignoreCase = true) -> trimmedValue.removePrefix("/image").trim()
                                                 trimmedValue.startsWith("/draw", ignoreCase = true) -> trimmedValue.removePrefix("/draw").trim()
@@ -922,7 +929,6 @@ fun AddAttachmentBottomSheet(
                 if (toolCallingEnabled) {
                     ToggleRow(icon = TnIcons.World, title = "Web search", checked = isWebSearchEnabled, onCheckedChange = onWebSearchToggle)
                 }
-                ToggleRow(icon = TnIcons.Database, title = "Connectors", subtitle = if (isRagEnabled) "On" else "Off", onClick = onRagClick)
                 if (toolCallingEnabled) {
                     ToggleRow(icon = TnIcons.Wrench, title = "Tool access", subtitle = if (activePluginCount > 0) "$activePluginCount active" else "Auto", onClick = onPluginClick)
                 }

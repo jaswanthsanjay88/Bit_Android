@@ -1,6 +1,7 @@
 package com.bit.worker
 
 import java.io.File
+import com.bit.util.VlmPaths
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
@@ -315,15 +316,12 @@ object LlmModelWorker {
                     // Auto-detect and load mmproj projector file if present in model directory
                     try {
                         val mFile = File(model.modelPath)
-                        val mDir = mFile.parentFile
-                        if (mDir != null && mDir.exists()) {
-                            val projFile = mDir.listFiles()?.find { f ->
-                                val name = f.name.lowercase()
-                                (name.contains("mmproj") || name.contains("projector")) && name.endsWith(".gguf")
-                            }
-                            if (projFile != null) {
-                                loadVlmProjector(projFile.absolutePath)
-                            }
+                        val projFile = VlmPaths.colocatedMmproj(mFile)
+                        if (projFile != null && projFile.exists() && projFile.length() > 1024L) {
+                            Log.i(TAG, "Auto-detected VLM projector: ${projFile.name}")
+                            loadVlmProjector(projFile.absolutePath)
+                        } else {
+                            Log.i(TAG, "No VLM projector found for ${mFile.name} (Assuming text-only GGUF)")
                         }
                     } catch (e: Exception) {
                         Log.w(TAG, "Failed to auto-detect VLM projector: ${e.message}")
@@ -440,6 +438,7 @@ object LlmModelWorker {
         lastLoadedModel = null
         lastLoadedConfig = null
         _isGgufModelLoaded.value = false
+        _isVlmLoaded.value = false
         Log.i(TAG, "GGUF model unloaded")
     }
 
@@ -827,8 +826,13 @@ object LlmModelWorker {
     val isVlmLoaded: StateFlow<Boolean> = _isVlmLoaded.asStateFlow()
 
     fun loadVlmProjector(path: String, threads: Int = 0): Boolean {
-        val engine = LLMService.instance?.ggufEngine ?: return false
-        val success = engine.loadVlmProjector(path, threads)
+        val svc = _serviceFlow.value ?: return false
+        val success = try {
+            svc.loadVlmProjectorGguf(path)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load VLM projector via IPC", e)
+            false
+        }
         _isVlmLoaded.value = success
         if (success) Log.i(TAG, "VLM projector loaded: $path")
         else Log.e(TAG, "VLM projector failed to load: $path")
@@ -836,32 +840,107 @@ object LlmModelWorker {
     }
 
     fun loadVlmProjectorFromFd(fd: Int, threads: Int = 0): Boolean {
-        val engine = LLMService.instance?.ggufEngine ?: return false
-        val success = engine.loadVlmProjectorFromFd(fd, threads)
+        val svc = _serviceFlow.value ?: return false
+        val pfd = try {
+            android.os.ParcelFileDescriptor.fromFd(fd)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create PFD from fd: $fd", e)
+            return false
+        }
+        val success = try {
+            svc.loadVlmProjectorFromFdGguf(pfd)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load VLM projector from FD via IPC", e)
+            false
+        }
         _isVlmLoaded.value = success
         return success
     }
 
     fun releaseVlmProjector() {
-        LLMService.instance?.ggufEngine?.releaseVlmProjector()
+        try {
+            _serviceFlow.value?.releaseVlmProjectorGguf()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to release VLM projector via IPC", e)
+        }
         _isVlmLoaded.value = false
         Log.i(TAG, "VLM projector released")
     }
 
     fun getVlmDefaultMarker(): String {
-        return LLMService.instance?.ggufEngine?.getVlmDefaultMarker() ?: "<__image__>"
+        return try {
+            _serviceFlow.value?.vlmDefaultMarkerGguf ?: "<__image__>"
+        } catch (e: Exception) {
+            "<__image__>"
+        }
     }
 
     fun vlmGenerateStreaming(
         messagesJson: String,
         imageData: List<ByteArray>,
         maxTokens: Int
-    ): Flow<GenerationEvent> {
-        val engine = LLMService.instance?.ggufEngine
-            ?: return kotlinx.coroutines.flow.flowOf(GenerationEvent.Error("LLM service not available"))
-        return engine.generateVlmFlow(messagesJson, imageData, maxTokens)
-            .flowOn(Dispatchers.IO)
-    }
+    ): Flow<GenerationEvent> = kotlinx.coroutines.flow.callbackFlow {
+        val svc = _serviceFlow.value
+        if (svc == null) {
+            trySend(GenerationEvent.Error("LLM service not available"))
+            close()
+            return@callbackFlow
+        }
+
+        val callback = object : IGgufGenerationCallback.Stub() {
+            override fun onToken(token: String) { trySend(GenerationEvent.Token(token)) }
+            override fun onToolCall(name: String?, args: String?) {}
+            override fun onMetrics(
+                tps: Float, ttftMs: Float, totalMs: Float, tokensEvaluated: Int,
+                tokensPredicted: Int, modelMB: Float, ctxMB: Float, peakMB: Float, memPct: Float
+            ) {
+                trySend(GenerationEvent.Metrics(
+                    DecodingMetrics(
+                        tokensPerSecond = tps,
+                        timeToFirstTokenMs = ttftMs,
+                        totalTimeMs = totalMs,
+                        tokensEvaluated = tokensEvaluated,
+                        tokensPredicted = tokensPredicted,
+                        modelSizeMB = modelMB,
+                        contextSizeMB = ctxMB,
+                        peakMemoryMB = peakMB,
+                        memoryUsagePercent = memPct
+                    )
+                ))
+            }
+            override fun onProgress(progress: Float) {}
+            override fun onDone() {
+                trySend(GenerationEvent.Done)
+                close()
+            }
+            override fun onError(message: String) {
+                trySend(GenerationEvent.Error(message))
+                close()
+            }
+        }
+
+        val tempFiles = mutableListOf<java.io.File>()
+        try {
+            val imagePaths = imageData.mapIndexed { index, bytes ->
+                val tempFile = java.io.File(boundContext?.cacheDir, "vlm_temp_img_$index.jpg")
+                tempFile.writeBytes(bytes)
+                tempFiles.add(tempFile)
+                tempFile.absolutePath
+            }
+            svc.generateGgufVlm(messagesJson, imagePaths, maxTokens, callback)
+        } catch (e: Exception) {
+            trySend(GenerationEvent.Error(e.message ?: "IPC Error"))
+            close()
+        }
+        
+        awaitClose {
+            try { svc.stopGenerationGguf() } catch (e: Exception) {}
+            // Clean up temporary image files
+            tempFiles.forEach { file ->
+                try { file.delete() } catch (_: Exception) {}
+            }
+        }
+    }.flowOn(Dispatchers.IO)
 
     // ==================== Diffusion Methods ====================
 
@@ -971,10 +1050,15 @@ object LlmModelWorker {
                 progress: Float,
                 currentStep: Int,
                 totalSteps: Int,
-                intermediateImageBase64: String?
+                intermediatePayload: String?
             ) {
-                val bitmap = intermediateImageBase64?.takeIf { it.isNotEmpty() }?.let {
-                    base64ToBitmap(it)
+                val bitmap = intermediatePayload?.takeIf { it.isNotEmpty() }?.let { payload ->
+                    val file = File(payload)
+                    if (file.exists() && file.isFile) {
+                        BitmapFactory.decodeFile(file.absolutePath)
+                    } else {
+                        base64ToBitmap(payload)
+                    }
                 }
 
                 trySend(
@@ -988,25 +1072,36 @@ object LlmModelWorker {
             }
 
             override fun onComplete(
-                imageBase64: String,
+                imagePayload: String,
                 completedSeed: Long,
                 resultWidth: Int,
                 resultHeight: Int
             ) {
                 try {
-                    val bitmap = base64ToBitmap(imageBase64)
-                    trySend(
-                        DiffusionGenerationEvent.Complete(
-                            bitmap,
-                            completedSeed,
-                            resultWidth,
-                            resultHeight
+                    val file = File(imagePayload)
+                    val bitmap = if (file.exists() && file.isFile) {
+                        val bmp = BitmapFactory.decodeFile(file.absolutePath)
+                        try { file.delete() } catch (_: Exception) {}
+                        bmp
+                    } else {
+                        base64ToBitmap(imagePayload)
+                    }
+                    if (bitmap != null) {
+                        trySend(
+                            DiffusionGenerationEvent.Complete(
+                                bitmap,
+                                completedSeed,
+                                resultWidth,
+                                resultHeight
+                            )
                         )
-                    )
+                    } else {
+                        trySend(DiffusionGenerationEvent.Error("Failed to decode result image"))
+                    }
                     close()
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to decode result image", e)
-                    trySend(DiffusionGenerationEvent.Error("Failed to decode result"))
+                    trySend(DiffusionGenerationEvent.Error("Failed to decode result: ${e.message}"))
                     close()
                 }
             }

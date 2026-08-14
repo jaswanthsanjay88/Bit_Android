@@ -41,6 +41,8 @@ hs_err_*.log
 
 # Scratch and temp directories
 /scratch/
+bit-dependencies/
+/bit-dependencies/
 
 # Kotlin build cache
 .kotlin/
@@ -48,6 +50,24 @@ hs_err_*.log
 # Reference directories
 /.aisystems_ref/
 /.toolneuron_ref/
+/.freebuff/
+*_ref/
+*_ref*/
+.*_ref*/
+
+# Database dumps and local logs
+bit_db
+*.db
+*.db-shm
+*.db-wal
+log*.txt
+chunk.txt
+job.txt
+test.*
+test_*.kt
+test.py
+modify*.cjs
+modify*.py
 
 # Zip archives and skill artifacts
 *.zip

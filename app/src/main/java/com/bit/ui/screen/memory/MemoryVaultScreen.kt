@@ -76,7 +76,6 @@ fun MemoryVaultScreen(
     onNoteClick: (noteId: String?, defaultType: String) -> Unit,
     onNotesListClick: () -> Unit = {},
     onAiMemoryListClick: () -> Unit = {},
-    onDocumentsClick: () -> Unit = {},
     onBackupSettingsClick: () -> Unit = {},
     viewModel: MemoryVaultViewModel = hiltViewModel(LocalContext.current as ComponentActivity)
 ) {
@@ -91,9 +90,24 @@ fun MemoryVaultScreen(
 
     val myNotesCount = remember(allNotes) { allNotes.count { it.noteType == "note" || it.folder == "notes" } }
     val aiMemoryCount = remember(allNotes) { allNotes.count { it.noteType == "fact" || it.noteType == "ai_fact" || it.folder == "ai_memory" } }
+    val docsCount = remember(allNotes) { allNotes.count { it.noteType == "document" || it.folder == "documents" } }
 
     val hasSeenImportPrompt by viewModel.hasSeenMemoryImportPrompt.collectAsStateWithLifecycle()
     var showImportDialog by remember { mutableStateOf(false) }
+
+    val docPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        uri?.let {
+            viewModel.importDocumentFromUri(it) { success ->
+                if (success) {
+                    android.widget.Toast.makeText(context, "Document added to Vault", android.widget.Toast.LENGTH_SHORT).show()
+                } else {
+                    android.widget.Toast.makeText(context, "Failed to parse document", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
     
     LaunchedEffect(hasSeenImportPrompt) {
         if (!hasSeenImportPrompt) {
@@ -103,6 +117,10 @@ fun MemoryVaultScreen(
 
     if (showImportDialog) {
         val importViewModel = hiltViewModel<com.bit.viewmodel.MemoryImportViewModel>(LocalContext.current as ComponentActivity)
+        
+        LaunchedEffect(Unit) {
+            importViewModel.reset()
+        }
         
         val importStep by importViewModel.currentStep.collectAsStateWithLifecycle()
         LaunchedEffect(importStep) {
@@ -244,17 +262,19 @@ fun MemoryVaultScreen(
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { onNotesListClick() },
+                            .clickable { viewModel.setSelectedCategory(if (selectedCategory == "notes") "all" else "notes") },
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (selectedCategory == "notes") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+                        )
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(TnIcons.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
-                            Text("My notes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                            Text("$myNotesCount files", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                            Icon(TnIcons.Edit, contentDescription = null, tint = if (selectedCategory == "notes") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                            Text("My notes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = if (selectedCategory == "notes") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+                            Text("$myNotesCount files", style = MaterialTheme.typography.bodySmall, color = if (selectedCategory == "notes") MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline)
                         }
                     }
 
@@ -262,28 +282,32 @@ fun MemoryVaultScreen(
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { onAiMemoryListClick() },
+                            .clickable { viewModel.setSelectedCategory(if (selectedCategory == "facts") "all" else "facts") },
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (selectedCategory == "facts") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+                        )
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(TnIcons.Brain, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
-                            Text("AI memory", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                            Text("$aiMemoryCount facts", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                            Icon(TnIcons.Brain, contentDescription = null, tint = if (selectedCategory == "facts") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                            Text("AI memory", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = if (selectedCategory == "facts") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+                            Text("$aiMemoryCount facts", style = MaterialTheme.typography.bodySmall, color = if (selectedCategory == "facts") MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline)
                         }
                     }
                 }
 
-                // Wide Documents RAG Card
+                // Wide Documents Card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onDocumentsClick() },
+                        .clickable { viewModel.setSelectedCategory(if (selectedCategory == "documents") "all" else "documents") },
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
+                    )
                 ) {
                     Row(
                         modifier = Modifier
@@ -294,39 +318,65 @@ fun MemoryVaultScreen(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f)
                         ) {
-                            Icon(TnIcons.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
+                            Icon(TnIcons.Folder, contentDescription = null, tint = if (selectedCategory == "documents") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
                             Column {
-                                Text("Documents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                Text("PDFs & files indexed for RAG", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                                Text("Documents", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = if (selectedCategory == "documents") MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface)
+                                Text("$docsCount files stored in vault", style = MaterialTheme.typography.bodySmall, color = if (selectedCategory == "documents") MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline)
                             }
                         }
-                        Icon(TnIcons.ArrowLeft, contentDescription = "Open", tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(20.dp))
+
+                        Button(
+                            onClick = { docPickerLauncher.launch("*/*") },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
+                                contentColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                            ),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(TnIcons.Plus, contentDescription = "Add Document", modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Add", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
 
-                // Recent Section Header + New Note Button
+                // Recent Section Header + New Note/Doc Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Recent",
+                        text = if (selectedCategory == "all") "Recent" else selectedCategory.replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Button(
-                        onClick = { onNoteClick(null, "note") },
-                        shape = RoundedCornerShape(20.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface)
-                    ) {
-                        Icon(TnIcons.Plus, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("+ New note", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    if (selectedCategory == "documents") {
+                        Button(
+                            onClick = { docPickerLauncher.launch("*/*") },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
+                        ) {
+                            Icon(TnIcons.Plus, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Import doc", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Button(
+                            onClick = { onNoteClick(null, if (selectedCategory == "facts") "fact" else "note") },
+                            shape = RoundedCornerShape(20.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface)
+                        ) {
+                            Icon(TnIcons.Plus, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("+ New note", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 
@@ -368,6 +418,7 @@ private fun RecentItemCard(
             val icon = when (note.noteType) {
                 "task" -> TnIcons.Check
                 "ai_fact" -> TnIcons.Brain
+                "document" -> TnIcons.Folder
                 else -> TnIcons.Edit
             }
 
@@ -391,7 +442,8 @@ private fun RecentItemCard(
                 val subtitle = when (note.noteType) {
                     "task" -> "Task · ${note.status}"
                     "ai_fact" -> "AI saved · from chat"
-                    else -> "Note · linked to 3"
+                    "document" -> "Document · attached file"
+                    else -> "Note · ${note.folder}"
                 }
 
                 Text(

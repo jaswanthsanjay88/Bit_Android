@@ -71,8 +71,10 @@ fun DynamicActionWindow(
     onModelSelectedNavigate: (Model) -> Unit = {}
 ) {
     val context = LocalContext.current
-    val installedModels by modelViewModel.installedModels.collectAsStateWithLifecycle(initialValue = emptyList())
+    val allModels by modelViewModel.installedModels.collectAsStateWithLifecycle(initialValue = emptyList())
+    val installedModels = allModels
     val currentModelID by modelViewModel.currentModelID.collectAsStateWithLifecycle()
+    val downloadStates by com.bit.service.ModelDownloadService.downloadStates.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier
@@ -82,6 +84,141 @@ fun DynamicActionWindow(
             .animateContentSize(animationSpec = Motion.content()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // ── ACTIVE DOWNLOADS SECTION (Shown when any model is downloading) ──
+        if (downloadStates.isNotEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .border(
+                        1.dp,
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "ACTIVE DOWNLOADS",
+                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+
+                downloadStates.values.forEach { dlState ->
+                    val info = when (dlState) {
+                        is com.bit.service.ModelDownloadService.DownloadState.Downloading -> {
+                            val downloadedMB = dlState.downloadedBytes / 1_000_000
+                            val totalMB = dlState.totalBytes / 1_000_000
+                            val pct = (dlState.progress * 100).toInt()
+                            val speedText = if (dlState.speedBytesPerSec > 0) {
+                                val speedMB = dlState.speedBytesPerSec / 1_000_000.0
+                                " · %.1f MB/s".format(speedMB)
+                            } else ""
+                            val etaText = if (dlState.etaSeconds > 0) {
+                                val mins = dlState.etaSeconds / 60
+                                val secs = dlState.etaSeconds % 60
+                                if (mins > 0) " · ${mins}m ${secs}s left" else " · ${secs}s left"
+                            } else ""
+                            DownloadDisplayInfo(
+                                title = com.bit.ui.components.getShortModelLabel(dlState.modelId),
+                                subtitle = "$downloadedMB/${totalMB}MB ($pct%)$speedText$etaText",
+                                progress = dlState.progress,
+                                isIndeterminate = false
+                            )
+                        }
+                        is com.bit.service.ModelDownloadService.DownloadState.Extracting -> {
+                            DownloadDisplayInfo(
+                                title = com.bit.ui.components.getShortModelLabel(dlState.modelId),
+                                subtitle = "Extracting files (${dlState.extractedCount}/${dlState.totalFiles})",
+                                progress = if (dlState.totalFiles > 0) dlState.extractedCount.toFloat() / dlState.totalFiles else 0f,
+                                isIndeterminate = dlState.totalFiles <= 0
+                            )
+                        }
+                        is com.bit.service.ModelDownloadService.DownloadState.Processing -> {
+                            DownloadDisplayInfo(
+                                title = com.bit.ui.components.getShortModelLabel(dlState.modelId),
+                                subtitle = "Processing model assets...",
+                                progress = 0f,
+                                isIndeterminate = true
+                            )
+                        }
+                        is com.bit.service.ModelDownloadService.DownloadState.Verifying -> {
+                            DownloadDisplayInfo(
+                                title = com.bit.ui.components.getShortModelLabel(dlState.modelId),
+                                subtitle = "Verifying model integrity...",
+                                progress = 0f,
+                                isIndeterminate = true
+                            )
+                        }
+                        is com.bit.service.ModelDownloadService.DownloadState.Paused -> {
+                            val pct = (dlState.progress * 100).toInt()
+                            DownloadDisplayInfo(
+                                title = com.bit.ui.components.getShortModelLabel(dlState.modelId),
+                                subtitle = "Paused ($pct%)",
+                                progress = dlState.progress,
+                                isIndeterminate = false
+                            )
+                        }
+                        else -> {
+                            val modelId = when (dlState) {
+                                is com.bit.service.ModelDownloadService.DownloadState.Success -> dlState.modelId
+                                is com.bit.service.ModelDownloadService.DownloadState.Error -> dlState.modelId
+                                is com.bit.service.ModelDownloadService.DownloadState.Cancelled -> dlState.modelId
+                                else -> "Model"
+                            }
+                            DownloadDisplayInfo(
+                                title = com.bit.ui.components.getShortModelLabel(modelId),
+                                subtitle = "Ready",
+                                progress = 1f,
+                                isIndeterminate = false
+                            )
+                        }
+                    }
+
+                    val title = info.title
+                    val subtitle = info.subtitle
+                    val progress = info.progress
+                    val isIndeterminate = info.isIndeterminate
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = subtitle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        com.bit.ui.components.M3WavyLinearProgressIndicator(
+                            progress = progress,
+                            isIndeterminate = isIndeterminate,
+                            activeColor = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        }
+
         // ── HEADER: Active Model & Status ──
         val activeModel = installedModels.find { it.id == currentModelID }
         Row(
@@ -344,6 +481,13 @@ fun DynamicActionWindow(
         }
     }
 }
+
+private data class DownloadDisplayInfo(
+    val title: String,
+    val subtitle: String,
+    val progress: Float,
+    val isIndeterminate: Boolean
+)
 
 private data class MemoryStats(
     val formatted: String,

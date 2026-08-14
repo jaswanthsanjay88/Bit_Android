@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -65,7 +66,7 @@ import com.bit.ui.components.providerIcon
 import com.bit.ui.icons.TnIcons
 import com.bit.viewmodel.SettingsViewModel
 
-// ── General Settings Section ──
+// ── General Settings Section (Intelligence & Tools) ──
 
 internal fun LazyListScope.generalSettingsSection(
     toolCallingEnabled: Boolean,
@@ -76,18 +77,20 @@ internal fun LazyListScope.generalSettingsSection(
 ) {
     item {
         val canEnableToolCalling = hasToolCallingModel || toolCallingBypassEnabled
+        val multiTurnEnabled by com.bit.plugins.PluginManager.multiTurnEnabled.collectAsStateWithLifecycle()
+
         GlassSectionCard(
-            title = "AI Plugins & Tools",
-            icon = TnIcons.Settings,
-            description = "Configure intelligence layers, action tools, and local execution pipelines"
+            title = "Tool Calling Engine",
+            icon = TnIcons.Sparkles,
+            description = "Empower on-device models to invoke tools, search the web, and execute actions"
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)) {
                 SettingsSwitchRow(
-                    title = "Tool Calling",
+                    title = "Enable Tool Calling",
                     description = when {
-                        toolCallingBypassEnabled -> "Bypass enabled — tool calling available for all models"
-                        hasToolCallingModel -> "Any model with a chat template can use tools"
-                        else -> "Install a GGUF model to enable tool calling"
+                        toolCallingBypassEnabled -> "Direct execution enabled across all loaded models"
+                        hasToolCallingModel -> "Available for models with tool chat templates"
+                        else -> "Install a compatible GGUF model to enable tool calling"
                     },
                     checked = toolCallingEnabled && canEnableToolCalling,
                     onCheckedChange = { viewModel.setToolCallingEnabled(it) },
@@ -97,48 +100,84 @@ internal fun LazyListScope.generalSettingsSection(
                 if (!hasToolCallingModel) {
                     GlassDivider()
                     ModelDownloadCard(
-                        title = "Recommended Tool Calling Model",
-                        description = "Ruvltra Claude Code 0.5B · ~400 MB\nCompact model optimized for tool calling",
+                        title = "Recommended Tool Calling Router",
+                        description = "Ruvltra Claude Code 0.5B · ~400 MB\nUltra-compact specialized router for function calling",
                         downloadState = toolCallingDownloadState,
                         onDownload = { viewModel.downloadToolCallingModel() }
                     )
                 }
 
                 GlassDivider()
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-                    ) {
-                        Icon(
-                            TnIcons.AlertTriangle,
-                            contentDescription = null,
-                            tint = Glass.StatusError,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = "Bypass Model Check",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Glass.StatusError
-                        )
-                    }
-                    Text(
-                        text = "Force tool calling on models without a chat template. May cause errors or unexpected output.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Glass.TextSecondary
-                    )
-                    SettingsSwitchRow(
-                        title = "Enable Bypass",
-                        description = if (toolCallingBypassEnabled) "Tool calling forced for all models" else "Only models with chat templates can use tools",
-                        checked = toolCallingBypassEnabled,
-                        onCheckedChange = { viewModel.setToolCallingBypassEnabled(it) },
-                        titleColor = Glass.StatusError
-                    )
-                }
+
+                SettingsSwitchRow(
+                    title = "Direct Tool Execution",
+                    description = "Allow the primary LLM to output function calls directly without requiring a separate router model",
+                    checked = toolCallingBypassEnabled,
+                    onCheckedChange = { viewModel.setToolCallingBypassEnabled(it) }
+                )
+
+                GlassDivider()
+
+                SettingsSwitchRow(
+                    title = "Multi-Turn Tool Execution",
+                    description = "Allow the model to iteratively call multiple tools in sequence before giving the final answer",
+                    checked = multiTurnEnabled,
+                    onCheckedChange = { com.bit.plugins.PluginManager.setMultiTurnEnabled(it) }
+                )
+            }
+        }
+    }
+
+    item {
+        val enabledPlugins by com.bit.plugins.PluginManager.enabledPluginNames.collectAsStateWithLifecycle()
+        val isWebSearchEnabled by com.bit.plugins.PluginManager.isWebSearchEnabled.collectAsStateWithLifecycle()
+
+        GlassSectionCard(
+            title = "Built-in AI Tools & Plugins",
+            icon = TnIcons.Settings,
+            description = "Manage local capabilities and live data tools accessible by the AI model"
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)) {
+                // Web Search
+                SettingsSwitchRow(
+                    title = "Live Web Search",
+                    description = "Search the web in real-time, extract live web pages, and scrape information",
+                    checked = isWebSearchEnabled,
+                    onCheckedChange = { com.bit.plugins.PluginManager.enableWebSearch(it) }
+                )
+
+                GlassDivider()
+
+                // File Manager
+                val isFileManagerEnabled = enabledPlugins.contains("File Manager")
+                SettingsSwitchRow(
+                    title = "File & Workspace Manager",
+                    description = "Allow AI to read workspace files, inspect code directories, and view documents",
+                    checked = isFileManagerEnabled,
+                    onCheckedChange = { com.bit.plugins.PluginManager.togglePlugin("File Manager", it) }
+                )
+
+                GlassDivider()
+
+                // System Info
+                val isSystemInfoEnabled = enabledPlugins.contains("System Info")
+                SettingsSwitchRow(
+                    title = "System Diagnostics & Sensors",
+                    description = "Access battery level, RAM usage, storage metrics, and hardware state",
+                    checked = isSystemInfoEnabled,
+                    onCheckedChange = { com.bit.plugins.PluginManager.togglePlugin("System Info", it) }
+                )
+
+                GlassDivider()
+
+                // Memory Vault
+                val isMemoryVaultEnabled = enabledPlugins.contains("Memory Vault")
+                SettingsSwitchRow(
+                    title = "Memory Vault Recall",
+                    description = "Query long-term semantic notes, preferences, and knowledge graphs",
+                    checked = isMemoryVaultEnabled,
+                    onCheckedChange = { com.bit.plugins.PluginManager.togglePlugin("Memory Vault", it) }
+                )
             }
         }
     }

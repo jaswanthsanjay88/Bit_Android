@@ -4,6 +4,8 @@ import com.bit.api.*
 import com.bit.api.util.StreamingThinkTagParser
 import com.bit.api.util.convertToOpenAiMessages
 import com.bit.api.util.prepareMessages
+import com.bit.api.util.ProviderRetryPolicy
+import com.bit.api.util.asRetryableTransportError
 import com.bit.network.HttpClient
 import android.util.Log
 import kotlinx.coroutines.CancellationException
@@ -51,7 +53,7 @@ abstract class BaseOpenAiProvider : LlmProvider {
 
     protected open val retryMissingV1BaseUrl: Boolean = false
 
-    protected open fun retryDelayMillis(statusCode: Int, attempt: Int): Long = 1000L * attempt
+    protected open fun retryDelayMillis(statusCode: Int, attempt: Int): Long = ProviderRetryPolicy.delayMillis(attempt)
 
     override fun generateResponse(
         messages: List<ChatMessage>,
@@ -92,7 +94,7 @@ abstract class BaseOpenAiProvider : LlmProvider {
             if (config.apiKey.isNotBlank()) headers["Authorization"] = "Bearer ${config.apiKey}"
             for ((key, value) in getExtraHeaders(config)) headers[key] = value
 
-            val maxAttempts = 3
+            val maxAttempts = ProviderRetryPolicy.MAX_ATTEMPTS
             var attempt = 0
             var finished = false
 
@@ -103,7 +105,21 @@ abstract class BaseOpenAiProvider : LlmProvider {
 
                 while (endpointIndex < endpointUrls.size && !finished && !retryScheduled) {
                     val endpointUrl = endpointUrls[endpointIndex]
-                    val handle = HttpClient.streamPost(endpointUrl, requestBodyJson, headers)
+                    val handle = try {
+                        HttpClient.streamPost(endpointUrl, requestBodyJson, headers)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        val retryable = e.asRetryableTransportError()
+                        if (retryable != null && attempt < maxAttempts) {
+                            Log.w("AgoraAPI", "[$name] Transport error on attempt $attempt/$maxAttempts (${e.javaClass.simpleName}), retrying...")
+                            emit(StreamEvent.Retrying(attempt, ProviderRetryPolicy.MAX_RETRIES))
+                            delay(ProviderRetryPolicy.delayMillis(attempt))
+                            retryScheduled = true
+                            continue
+                        }
+                        throw e
+                    }
                     try {
                         if (handle.code == 200) {
                             consumeSuccessfulStream(handle, config, thinkParser) { emit(it) }
@@ -120,9 +136,9 @@ abstract class BaseOpenAiProvider : LlmProvider {
                             Log.e("AgoraAPI", "[$name] ERR ${handle.code} at $endpointUrl: $errorRaw")
 
                             if (handle.code in retryableStatusCodes && attempt < maxAttempts) {
-                                val retryDelayMs = retryDelayMillis(handle.code, attempt)
+                                val retryDelayMs = ProviderRetryPolicy.delayMillis(attempt)
                                 Log.w("AgoraAPI", "[$name] Transient error ${handle.code} on attempt $attempt/$maxAttempts, retrying in ${retryDelayMs}ms...")
-                                emit(StreamEvent.Retrying(attempt, maxAttempts))
+                                emit(StreamEvent.Retrying(attempt, ProviderRetryPolicy.MAX_RETRIES))
                                 delay(retryDelayMs)
                                 retryScheduled = true
                             } else {
@@ -178,11 +194,11 @@ abstract class BaseOpenAiProvider : LlmProvider {
                 handle.readLine()
             } catch (e: SocketTimeoutException) {
                 if (!currentCoroutineContext().isActive) break
-                continue
+                throw e
             } ?: break
 
-            if (!line.startsWith("data: ")) continue
-            val jsonStr = line.substring(6).trim()
+            if (!line.startsWith("data:")) continue
+            val jsonStr = line.substring(5).trim()
             if (jsonStr == "[DONE]") break
 
             try {

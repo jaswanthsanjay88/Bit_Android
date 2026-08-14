@@ -35,11 +35,13 @@ class NVApplication : Application() {
         super.onCreate()
         Log.d(TAG, "Application onCreate (process: ${if (isMainProcess()) "main" else "secondary"})")
 
-        // Load native libraries globally on earliest process startup before any class static initializers
-        try {
-            TTSManager.loadNativeLibraries(applicationContext)
-        } catch (e: Throwable) {
-            Log.e(TAG, "Early TTSManager.loadNativeLibraries failed: ${e.message}")
+        // Load native libraries globally in background so main thread isn't blocked on startup
+        appScope.launch {
+            try {
+                TTSManager.loadNativeLibraries(applicationContext)
+            } catch (e: Throwable) {
+                Log.e(TAG, "Background TTSManager.loadNativeLibraries failed: ${e.message}")
+            }
         }
 
         // Initialize global Crash Reporter

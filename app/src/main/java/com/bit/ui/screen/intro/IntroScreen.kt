@@ -131,11 +131,11 @@ fun ElementLogoReveal(
     // final settle — barely-there scale pulse, not a bounce
     val settleScale = remember { Animatable(1f) }
 
-    val revealDuration = 650 // same for every shape
-    val stagger = 140 // ms between each shape's start — small, feels like one motion, not a cascade of bounces
+    val revealDuration = 280 // crisp and snappy
+    val stagger = 50 // fast fluid stagger
 
     LaunchedEffect(Unit) {
-        delay(200) // brief hold on black before anything moves — reads as intentional, not rushed
+        delay(40) // minimal hold
 
         launch { barReveal.animateTo(1f, tween(revealDuration, easing = EmphasizedEasing)) }
         delay(stagger.toLong())
@@ -143,17 +143,17 @@ fun ElementLogoReveal(
         delay(stagger.toLong())
         launch { bottomBlockReveal.animateTo(1f, tween(revealDuration, easing = EmphasizedEasing)) }
 
-        // wait for the last shape's reveal to finish
+        // wait for the reveal to finish
         delay(revealDuration.toLong())
 
-        // glow recedes as the mark reads as "solid" / finished
-        launch { glowAlpha.animateTo(0f, tween(400, easing = EmphasizedEasing)) }
+        // glow recedes quickly
+        launch { glowAlpha.animateTo(0f, tween(150, easing = EmphasizedEasing)) }
 
-        // one quiet settle pulse — small, no bounce overshoot beyond this
-        settleScale.animateTo(1.025f, tween(140, easing = EmphasizedEasing))
-        settleScale.animateTo(1f, tween(220, easing = EmphasizedDecelerate))
+        // snappy settle
+        settleScale.animateTo(1.015f, tween(80, easing = EmphasizedEasing))
+        settleScale.animateTo(1f, tween(100, easing = EmphasizedDecelerate))
 
-        delay(300)
+        delay(40)
         onFinished()
     }
 

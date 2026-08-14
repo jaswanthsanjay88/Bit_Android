@@ -142,6 +142,7 @@ internal fun AssistantStreamingBubble(
 
     LaunchedEffect(Unit) {
         var isFirstChunk = true
+        var lastHapticLen = 0
         while (true) {
             val target = latestText.length
             if (revealedLen < target) {
@@ -159,7 +160,12 @@ internal fun AssistantStreamingBubble(
                     else -> 2
                 }
                 revealedLen = minOf(revealedLen + step, target)
-                haptics.generationTick()
+                
+                // Pleasant rhythmic haptic feedback every ~20 characters
+                if (revealedLen - lastHapticLen >= 20) {
+                    haptics.generationTick()
+                    lastHapticLen = revealedLen
+                }
                 delay(16) // ~60 FPS smooth catch-up
             } else {
                 delay(100) // idle — waiting for tokens, check less often
@@ -168,44 +174,46 @@ internal fun AssistantStreamingBubble(
     }
 
     val displayed = if (revealedLen < text.length) text.substring(0, revealedLen) else text
-    val parsedMessage = remember(displayed) { parseThinkingTags(displayed) }
 
-    val streamingState = remember { com.bit.ui.components.markdown.StreamingMarkdownRenderState() }
+    if (displayed.isEmpty()) {
+        GeneratingIndicator(thinkingEnabled = thinkingEnabled)
+    } else {
+        val parsedMessage = remember(displayed) { parseThinkingTags(displayed) }
+        val streamingState = remember { com.bit.ui.components.markdown.StreamingMarkdownRenderState() }
 
-    LaunchedEffect(parsedMessage.actualContent, revealedLen < text.length) {
-        streamingState.offer(parsedMessage.actualContent, isStreaming = revealedLen < text.length)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Standards.SpacingSm)
-            .combinedClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = {},
-                onLongClick = {
-                    if (message != null) {
-                        onLongClick?.invoke(message)
-                    }
-                }
-            ),
-        verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-    ) {
-        if (parsedMessage.thinkingContent != null) {
-            ThinkingBlock(
-                thinkingText = parsedMessage.thinkingContent,
-                isStreaming = parsedMessage.isThinkingInProgress
-            )
+        LaunchedEffect(parsedMessage.actualContent, revealedLen < text.length) {
+            streamingState.offer(parsedMessage.actualContent, isStreaming = revealedLen < text.length)
         }
 
-        if (parsedMessage.actualContent.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Standards.SpacingMd)
-            ) {
-                androidx.compose.foundation.text.selection.SelectionContainer {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = Standards.SpacingSm)
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                    onLongClick = {
+                        if (message != null) {
+                            onLongClick?.invoke(message)
+                        }
+                    }
+                ),
+            verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+        ) {
+            if (parsedMessage.thinkingContent != null) {
+                ThinkingBlock(
+                    thinkingText = parsedMessage.thinkingContent,
+                    isStreaming = parsedMessage.isThinkingInProgress
+                )
+            }
+
+            if (parsedMessage.actualContent.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Standards.SpacingMd)
+                ) {
                     com.bit.ui.components.markdown.IncrementalStreamingMarkdownView(
                         state = streamingState,
                         modifier = Modifier.fillMaxWidth()

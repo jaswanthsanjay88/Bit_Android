@@ -3,8 +3,11 @@ package com.bit.api.anthropic
 import com.bit.api.*
 import com.bit.api.util.buildToolCallId
 import com.bit.api.util.prepareMessages
+import com.bit.api.util.ProviderRetryPolicy
+import com.bit.api.util.asRetryableTransportError
 import com.bit.network.HttpClient
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -120,6 +123,20 @@ internal data class AnthropicUsage(
     @SerialName("output_tokens") val outputTokens: Int? = null
 )
 
+private enum class ClaudeFamily { NO_THINKING, BUDGET_THINKING, TRANSITIONAL_4_6, CURRENT_ADAPTIVE }
+
+private fun classifyClaudeFamily(model: String): ClaudeFamily {
+    val m = model.lowercase()
+    if (m.contains("claude-3-opus") || m.contains("claude-3-sonnet") || m.contains("claude-3-haiku") ||
+        m.contains("claude-3.0") || m.contains("claude-3-0") ||
+        m.contains("claude-3.5") || m.contains("claude-3-5")) return ClaudeFamily.NO_THINKING
+    if (m.contains("claude-3.7") || m.contains("claude-3-7") ||
+        m.contains("claude-4.0") || m.contains("claude-4-0") ||
+        m.contains("claude-4.5") || m.contains("claude-4-5")) return ClaudeFamily.BUDGET_THINKING
+    if (m.contains("4-6") || m.contains("4.6")) return ClaudeFamily.TRANSITIONAL_4_6
+    return ClaudeFamily.CURRENT_ADAPTIVE
+}
+
 class AnthropicProvider : LlmProvider {
     override val name: String = Constants.PROVIDER_ANTHROPIC
     override val defaultBaseUrl: String = "https://api.anthropic.com/v1"
@@ -187,6 +204,9 @@ class AnthropicProvider : LlmProvider {
             AnthropicOutputConfig(effort = ThinkingLevels.anthropicEffort(config.thinkingLevel))
         } else null
 
+        val family = classifyClaudeFamily(modelName)
+        val allowsSamplingParams = family != ClaudeFamily.CURRENT_ADAPTIVE
+
         val anthropicTools = config.tools?.map { td ->
             AnthropicTool(
                 name = td.function.name,
@@ -225,10 +245,14 @@ class AnthropicProvider : LlmProvider {
             system = config.systemPrompt,
             thinking = thinking,
             outputConfig = outputConfig,
-            maxTokens = config.maxTokens ?: if (thinking?.budgetTokens != null) maxOf(thinking.budgetTokens + 1024, 4096) else 4096,
+            maxTokens = config.maxTokens ?: when {
+                thinking?.budgetTokens != null -> maxOf(thinking.budgetTokens + 8192, 16384)
+                thinking?.type == "adaptive" -> 32768
+                else -> 8192
+            },
             tools = anthropicTools,
-            temperature = config.temperature,
-            topP = config.topP
+            temperature = config.temperature.takeIf { allowsSamplingParams },
+            topP = config.topP.takeIf { allowsSamplingParams }
         )
 
         try {
@@ -238,14 +262,27 @@ class AnthropicProvider : LlmProvider {
             headers["anthropic-version"] = "2023-06-01"
             val requestBodyJson = json.encodeToString(AnthropicRequest.serializer(), requestBody)
             Log.d("AgoraAPI", "[Anthropic] REQ → $baseUrl/messages | model=$modelName | msgs=${apiMessages.size} | thinking=${thinking != null} | tools=${anthropicTools?.size ?: 0}")
-            val maxAttempts = 3
+            val maxAttempts = ProviderRetryPolicy.MAX_ATTEMPTS
             val retryableCodes = setOf(429, 502, 503, 504)
             var attempt = 0
             var done = false
 
             while (attempt < maxAttempts && !done) {
                 attempt++
-                val handle = HttpClient.streamPost(url, requestBodyJson, headers)
+                val handle = try {
+                    HttpClient.streamPost(url, requestBodyJson, headers)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    val retryable = e.asRetryableTransportError()
+                    if (retryable != null && attempt < maxAttempts) {
+                        Log.w("AgoraAPI", "[Anthropic] Transport error on attempt $attempt/$maxAttempts (${e.javaClass.simpleName}), retrying...")
+                        emit(StreamEvent.Retrying(attempt, ProviderRetryPolicy.MAX_RETRIES))
+                        delay(ProviderRetryPolicy.delayMillis(attempt))
+                        continue
+                    }
+                    throw e
+                }
                 try {
                 if (handle.code == 200) {
                     done = true
@@ -257,21 +294,33 @@ class AnthropicProvider : LlmProvider {
                     var thinkingSignature: String? = null
                     var messageInputTokens = 0
 
-                    while (currentCoroutineContext().isActive) {
+                    sseLoop@ while (currentCoroutineContext().isActive) {
                         try {
                             line = handle.readLine()
                             if (line == null) break
                         } catch (e: java.net.SocketTimeoutException) {
                             if (!currentCoroutineContext().isActive) break
-                            continue
+                            throw e
                         }
-                        if (line.startsWith("event: ")) {
-                            currentType = line.substring(7).trim()
-                        } else if (line.startsWith("data: ")) {
-                            val jsonStr = line.substring(6).trim()
+                        if (line.startsWith("event:")) {
+                            currentType = line.substring(6).trim()
+                        } else if (line.startsWith("data:")) {
+                            val jsonStr = line.substring(5).trim()
+                            if (currentType == "error") {
+                                try {
+                                    val errorJson = json.decodeFromString<OpenAiErrorResponse>(jsonStr)
+                                    emit(StreamEvent.Error(GenerationError.Api(code = errorJson.error.code ?: "error", type = errorJson.error.type, message = errorJson.error.message)))
+                                } catch (e: Exception) {
+                                    emit(StreamEvent.Error(GenerationError.Network(statusCode = handle.code, message = jsonStr)))
+                                }
+                                break@sseLoop
+                            }
                             try {
                                 val event = json.decodeFromString<AnthropicStreamEvent>(jsonStr)
                                 when (event.type) {
+                                    "message_stop" -> {
+                                        break@sseLoop
+                                    }
                                     "message_start" -> {
                                         event.message?.usage?.inputTokens?.let { messageInputTokens = it }
                                     }
@@ -335,9 +384,9 @@ class AnthropicProvider : LlmProvider {
                     Log.e("AgoraAPI", "[Anthropic] ERR ${handle.code}: $errorRaw")
 
                     if (handle.code in retryableCodes && attempt < maxAttempts) {
-                        Log.w("AgoraAPI", "[Anthropic] Transient error ${handle.code} on attempt $attempt/$maxAttempts, retrying in ${1000 * attempt}ms...")
-                        emit(StreamEvent.Retrying(attempt, maxAttempts))
-                        delay(1000L * attempt)
+                        Log.w("AgoraAPI", "[Anthropic] Transient error ${handle.code} on attempt $attempt/$maxAttempts, retrying in ${ProviderRetryPolicy.delayMillis(attempt)}ms...")
+                        emit(StreamEvent.Retrying(attempt, ProviderRetryPolicy.MAX_RETRIES))
+                        delay(ProviderRetryPolicy.delayMillis(attempt))
                     } else {
                         val genError = try {
                             val errorJson = json.decodeFromString<OpenAiErrorResponse>(errorRaw)

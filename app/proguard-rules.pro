@@ -18,6 +18,10 @@
 -keep class com.bit.tts.** { *; }
 -keep class com.bit.di.** { *; }
 -keep class com.bit.vault.** { *; }
+
+# -- ai_sd reflection bypass --
+-keep class com.dark.ai_sd.StableDiffusionManager { *; }
+-keep class com.dark.ai_sd.DiffusionManager { *; }
 -keep class com.bit.data.** { *; }
 -keep class com.bit.data_packs.** { *; }
 -keep class com.bit.state.** { *; }

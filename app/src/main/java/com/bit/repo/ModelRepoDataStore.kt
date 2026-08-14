@@ -23,39 +23,6 @@ class ModelRepositoryDataStore(private val context: Context) {
         private val DELETED_DEFAULTS_KEY = stringPreferencesKey("deleted_default_repo_ids")
 
         val DEFAULT_REPOSITORIES = listOf(
-            // === GENERAL ===
-            HFModelRepository(
-                id = "unsloth-qwen3_5-0_8b",
-                name = "Qwen3.5 (0.8B)",
-                repoPath = "unsloth/Qwen3.5-0.8B-GGUF",
-                modelType = ModelType.GGUF,
-                isEnabled = false,
-                category = ModelCategory.GENERAL
-            ),
-            HFModelRepository(
-                id = "unsloth-qwen3_5-4b",
-                name = "Qwen3.5 (4B)",
-                repoPath = "unsloth/Qwen3.5-4B-GGUF",
-                modelType = ModelType.GGUF,
-                isEnabled = false,
-                category = ModelCategory.GENERAL
-            ),
-            HFModelRepository(
-                id = "unsloth-qwen3_5-9b",
-                name = "Qwen3.5 (9B)",
-                repoPath = "unsloth/Qwen3.5-9B-GGUF",
-                modelType = ModelType.GGUF,
-                isEnabled = false,
-                category = ModelCategory.GENERAL
-            ),
-            HFModelRepository(
-                id = "liquidai-lfm2-350m",
-                name = "LFM2 350M",
-                repoPath = "LiquidAI/LFM2-350M-GGUF",
-                modelType = ModelType.GGUF,
-                isEnabled = false,
-                category = ModelCategory.GENERAL
-            ),
             // === IMAGE GENERATION (SD) ===
             HFModelRepository(
                 id = "sd-qnn",

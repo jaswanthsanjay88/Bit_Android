@@ -158,7 +158,7 @@ class ModelStoreViewModel @Inject constructor(
 
     init {
         loadDeviceInfo()
-        loadCuratedModels()
+        loadModels()
         loadInstalledModels()
         loadTrendingExplorerModels()
 
@@ -180,45 +180,33 @@ class ModelStoreViewModel @Inject constructor(
     }
 
     fun refreshModels() {
-        loadCuratedModels(forceRefresh = true)
+        loadModels(forceRefresh = true)
     }
 
-    private fun loadCuratedModels(forceRefresh: Boolean = false) {
+    fun loadModels(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 
             try {
-                repository.fetchCuratedModels(forceRefresh).onSuccess { modelsList ->
-                    _curatedModels.value = modelsList
-                    _models.value = modelsList
-                    applyAllFilters()
-                }.onFailure { exception ->
-                    _error.value = exception.message
-                }
-            } catch (e: Exception) {
-                _error.value = e.message
-            } finally {
-                _isLoading.value = false
-            }
-        }
-    }
-
-    // Legacy repo-based loading for Advanced tab
-    fun loadModels() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _error.value = null
-
-            try {
+                // 1. Fetch trending + specialized models
+                val curatedResult = repository.fetchCuratedModels(forceRefresh).getOrNull() ?: emptyList()
+                
+                // 2. Fetch user-added custom repositories
                 val repos = repositories.first()
                 cachedRepos = repos
-                repository.getAvailableModels(repos).onSuccess { modelsList ->
-                    _models.value = modelsList
-                    applyAllFilters()
-                }.onFailure { exception ->
-                    _error.value = exception.message
+                val addedResult = if (repos.isNotEmpty()) {
+                    repository.getAvailableModels(repos, forceRefresh).getOrNull() ?: emptyList()
+                } else {
+                    emptyList()
                 }
+
+                // Combine and remove duplicates
+                val combined = (addedResult + curatedResult).distinctBy { it.id }
+                
+                _curatedModels.value = combined
+                _models.value = combined
+                applyAllFilters()
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {

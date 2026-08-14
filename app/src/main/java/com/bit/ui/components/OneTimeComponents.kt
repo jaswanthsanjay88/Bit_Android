@@ -10,9 +10,12 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -65,11 +68,37 @@ fun AnimatedTitle(
     onShowDynamicWindow: () -> Unit = {}
 ) {
     val appState by AppStateManager.appState.collectAsStateWithLifecycle()
+    val downloadStates by com.bit.service.ModelDownloadService.downloadStates.collectAsStateWithLifecycle()
+    val activeDownload = remember(downloadStates) {
+        downloadStates.values.firstOrNull {
+            it is com.bit.service.ModelDownloadService.DownloadState.Downloading ||
+            it is com.bit.service.ModelDownloadService.DownloadState.Extracting ||
+            it is com.bit.service.ModelDownloadService.DownloadState.Processing ||
+            it is com.bit.service.ModelDownloadService.DownloadState.Verifying
+        }
+    }
+
+    val dlProgress = (activeDownload as? com.bit.service.ModelDownloadService.DownloadState.Downloading)?.progress
+
+    // Perimeter border progress traces around the active pill during downloads
+    val borderModifier = if (activeDownload != null) {
+        Modifier.pillBorderProgress(
+            progress = dlProgress,
+            strokeWidth = 2.dp,
+            activeColor = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f),
+            cornerRadius = 24.dp
+        )
+    } else {
+        Modifier
+    }
 
     AnimatedContent(
-        targetState = appState, transitionSpec = {
+        targetState = appState,
+        transitionSpec = {
             fadeIn(Motion.entrance()) togetherWith fadeOut(Motion.entrance())
-        }, label = "AppStateTitleAnim"
+        },
+        label = "AppStateTitleAnim"
     ) { state ->
         TitleRow(
             sharedTransitionScope = sharedTransitionScope,
@@ -77,9 +106,11 @@ fun AnimatedTitle(
             text = state.getDisplayText(),
             icon = state.getIcon(),
             state = state,
-            modifier = modifier.clickable {
-                onShowDynamicWindow()
-            })
+            activeDownload = activeDownload,
+            modifier = modifier
+                .then(borderModifier)
+                .clickable { onShowDynamicWindow() }
+        )
     }
 }
 
@@ -117,19 +148,26 @@ fun TitleRow(
     modifier: Modifier = Modifier,
     text: String,
     icon: ImageVector,
-    state: AppState
+    state: AppState,
+    activeDownload: com.bit.service.ModelDownloadService.DownloadState? = null
 ) {
     val iconColor = state.getColor()
     val contentColor = MaterialTheme.colorScheme.onSurface
     val isLoading = state is AppState.LoadingModel
 
-    val collapsedText = remember(text, state) {
-        when (state) {
-            is AppState.ModelLoaded -> "Ready: ${getShortModelLabel(state.modelName)}"
-            is AppState.LoadingModel -> "Loading: ${getShortModelLabel(state.modelName)}"
-            is AppState.GeneratingText -> "Generating: ${getShortModelLabel(state.modelName)}"
-            is AppState.GeneratingImage -> "Generating: ${getShortModelLabel(state.modelName)}"
-            is AppState.GeneratingAudio -> "Generating: ${getShortModelLabel(state.modelName)}"
+    val collapsedText = remember(text, state, activeDownload) {
+        when {
+            state is AppState.LoadingModel -> "Loading: ${getShortModelLabel(state.modelName)}"
+            state is AppState.ModelLoaded -> "Ready: ${getShortModelLabel(state.modelName)}"
+            state is AppState.GeneratingText -> "Generating: ${getShortModelLabel(state.modelName)}"
+            state is AppState.GeneratingImage -> "Generating: ${getShortModelLabel(state.modelName)}"
+            state is AppState.GeneratingAudio -> "Generating: ${getShortModelLabel(state.modelName)}"
+            activeDownload != null -> {
+                val pct = (activeDownload as? com.bit.service.ModelDownloadService.DownloadState.Downloading)?.let {
+                    (it.progress * 100).toInt()
+                }
+                if (pct != null) "Downloading · $pct%" else "Downloading"
+            }
             else -> text
         }
     }
@@ -140,18 +178,19 @@ fun TitleRow(
                 color = androidx.compose.ui.graphics.Color.Transparent,
                 shape = RoundedCornerShape(24.dp),
                 border = null,
-                modifier = Modifier
-                    .height(Standards.ActionIconSize)
+                modifier = Modifier.height(Standards.ActionIconSize)
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = Standards.SpacingLg)
                 ) {
                     if (isLoading) {
-                        LoadingIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = iconColor
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = iconColor,
+                            strokeWidth = 2.dp,
+                            trackColor = iconColor.copy(alpha = 0.15f)
                         )
                     } else {
                         Icon(
@@ -171,7 +210,6 @@ fun TitleRow(
                         overflow = TextOverflow.Ellipsis
                     )
 
-                    // Small chevron to show details overlay is tapable
                     Icon(
                         imageVector = TnIcons.ChevronDown,
                         contentDescription = "Show details",

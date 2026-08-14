@@ -52,27 +52,20 @@ data class TtsModelInfo(
     val url: String
 )
 
-internal val AVAILABLE_TTS_MODELS = listOf(
+internal val availableTtsModels = listOf(
     TtsModelInfo(
-        id = "vits-ljs-tts",
-        name = "VITS LJSpeech (Default)",
-        description = "Single-speaker English voice, light and fast",
-        size = "~40 MB",
-        url = "https://huggingface.co/csukuangfj/vits-ljs/resolve/main/vits-ljs.onnx"
-    ),
-    TtsModelInfo(
-        id = "vits-piper-en_us-amy-low",
-        name = "Piper US Amy (Female)",
+        id = "vits-piper-en_US-amy-low",
+        name = "Piper US Amy",
         description = "High-quality low-latency English female voice",
-        size = "~28 MB",
+        size = "35 MB",
         url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2"
     ),
     TtsModelInfo(
-        id = "vits-piper-en_us-lessac-low",
-        name = "Piper US Lessac (Female)",
-        description = "Natural sounding US English female voice",
-        size = "~29 MB",
-        url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-low.tar.bz2"
+        id = "kitten-tts",
+        name = "Kitten TTS (Nano)",
+        description = "Fast and high-quality Kokoro-based TTS engine. English voice.",
+        size = "30 MB",
+        url = "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32/resolve/main/model.onnx"
     )
 )
 
@@ -105,7 +98,7 @@ internal fun LazyListScope.ttsSettingsSection(
                     modifier = Modifier.padding(top = Standards.SpacingXs)
                 )
 
-                AVAILABLE_TTS_MODELS.forEach { ttsModel ->
+                availableTtsModels.forEach { ttsModel ->
                     val isDownloaded = installedTtsModelIds.contains(ttsModel.id)
                     val isActive = installedTtsModelId == ttsModel.id
                     val downloadState = ttsDownloadStates[ttsModel.id]

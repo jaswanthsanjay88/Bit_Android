@@ -114,10 +114,26 @@ class GlobalRagOrchestrator @Inject constructor(
                 }
             }
             
-            // Add extracted document text directly to the RAG graph (skipping vault note creation)
+            // Save the extracted document as a MemoryNote in the vault
+            val docId = java.util.UUID.randomUUID().toString()
+            val docNote = com.bit.models.table_schema.MemoryNote(
+                id = docId,
+                title = name,
+                content = content,
+                noteType = "document",
+                folder = "documents",
+                isAiMemoryEnabled = true,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            
+            // Write to disk and add to Room DB
+            val writtenNote = vaultStore.writeNote(docNote)
+            val dao = com.bit.database.AppDatabase.getDatabase(context).memoryNoteDao()
+            try { dao.insertNote(writtenNote) } catch (_: Exception) {}
+
             val graph = graphDeferred.await()
             embeddingEngine.ensureInitialized(context)
-            val docId = java.util.UUID.randomUUID().toString()
             graph.addText(text = content, sourceName = name, sourceId = docId)
             
             Result.success(Unit)

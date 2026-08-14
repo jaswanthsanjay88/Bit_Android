@@ -363,6 +363,12 @@ static struct {
     int  requested_mode = 1; // mirror of thread_mode prior to auto-derate
 } g_state;
 
+// VLM (Vision Language Model) state
+static struct {
+    mtmd_context * ctx = nullptr;
+    std::mutex     mutex;
+} g_vlm;
+
 static void kv_evict_streaming();
 
 static float read_proc_status_mb(const char * key) {
@@ -2030,6 +2036,13 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeRelease(JNIEnv *, jobject) {
         g_single_batch = {};
         g_single_batch_init = false;
     }
+    {
+        std::lock_guard<std::mutex> vlm_lock(g_vlm.mutex);
+        if (g_vlm.ctx) {
+            mtmd_free(g_vlm.ctx);
+            g_vlm.ctx = nullptr;
+        }
+    }
     LOGI("Model released");
 }
 
@@ -3335,15 +3348,6 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeListBackendsJson(JNIEnv * env, jobje
     out["devices"]  = devs;
     return env->NewStringUTF(out.dump().c_str());
 }
-
-// VLM (Vision Language Model) state. The mtmd projector context binds n_threads
-// at init time; if the caller switches thread mode after loading, the projector
-// keeps the old count. Reload via releaseVlmProjector() + loadVlmProjector() to
-// pick up the new mode.
-static struct {
-    mtmd_context * ctx = nullptr;
-    std::mutex     mutex;
-} g_vlm;
 
 // imageMinTokens / imageMaxTokens (-1 = model default) cap the mmproj token
 // budget for the *overview* image. For LFM2-VL the per-tile count is a

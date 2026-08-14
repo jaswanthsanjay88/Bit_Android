@@ -177,6 +177,7 @@ class DataIntegrityManager(
         for (model in models) {
             if (!model.isActive) continue
             if (model.pathType == PathType.CONTENT_URI) continue
+            if (model.providerType == com.bit.models.enums.ProviderType.API) continue
 
             val file = File(model.modelPath)
             if (!file.exists()) {

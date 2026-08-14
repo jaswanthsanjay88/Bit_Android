@@ -257,20 +257,37 @@ fun BodyContent(
     LaunchedEffect(chatState.isGenerating) {
         if (wasGenerating && !chatState.isGenerating) {
             haptics.generationEnd()
-            listState.animateScrollToItem(messages.size)
+            val itemCount = listState.layoutInfo.totalItemsCount
+            if (itemCount > 0) {
+                try {
+                    listState.animateScrollToItem(itemCount - 1)
+                } catch (_: Exception) {}
+            }
         }
         wasGenerating = chatState.isGenerating
     }
 
-    LaunchedEffect(messages.size, chatState.isGenerating, streaming.assistantMessage.length) {
-        if (!chatState.isGenerating && messages.isNotEmpty()) {
-            kotlinx.coroutines.delay(100)
-        }
+    LaunchedEffect(messages.size) {
         val itemCount = listState.layoutInfo.totalItemsCount
         if (itemCount > 0) {
             try {
                 listState.animateScrollToItem(itemCount - 1)
-            } catch (e: Exception) {
+            } catch (_: Exception) {}
+        }
+    }
+
+    // Stable, non-shaking scroll tracking during active text generation
+    LaunchedEffect(streaming.assistantMessage.length) {
+        if (chatState.isGenerating && streaming.assistantMessage.isNotEmpty()) {
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            if (totalItems > 0) {
+                val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                if (lastVisibleIndex >= totalItems - 3) {
+                    try {
+                        listState.scrollToItem(totalItems - 1)
+                    } catch (_: Exception) {}
+                }
             }
         }
     }
@@ -282,7 +299,6 @@ fun BodyContent(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
-                .then(if (liquidState != null) Modifier.liquefiable(liquidState) else Modifier)
                 .padding(
                     bottom = paddingValues.calculateBottomPadding()
                 )
@@ -316,7 +332,11 @@ fun BodyContent(
                             val isLast = msg == messages.last()
                             val parsedMessage = remember(msg.content.content) { parseThinkingTags(msg.content.content) }
                             Column {
-                                com.bit.ui.screen.home.AssistantMessageHeader(message = msg, onTraceStepClick = { selectedTraceStep = it })
+                                com.bit.ui.screen.home.AssistantMessageHeader(
+                                    message = msg,
+                                    imageBlurEnabled = imageBlurEnabled,
+                                    onTraceStepClick = { selectedTraceStep = it }
+                                )
                                 
                                 if (parsedMessage.thinkingContent != null) {
                                     ThinkingBlock(
@@ -354,20 +374,18 @@ fun BodyContent(
                         val isImageGen = chatState.generationType == ModelType.IMAGE_GENERATION
                         if (isImageGen) {
                             item(key = "streaming-image-response") {
-                                // Assume ImageGenerationStreamingBubble is there or skip if not in scope
+                                ImageGenerationStreamingBubble(
+                                    streamingImage = streaming.image,
+                                    progress = streaming.imageProgress,
+                                    step = streaming.imageStep
+                                )
                             }
                         } else {
-                            if (streaming.assistantMessage.isNotEmpty()) {
-                                item(key = "streaming-assistant-response") {
-                                    AssistantStreamingBubble(
-                                        text = streaming.assistantMessage,
-                                        thinkingEnabled = chatState.thinkingEnabled
-                                    )
-                                }
-                            } else {
-                                item(key = "generating-indicator") {
-                                    GeneratingIndicator(thinkingEnabled = chatState.thinkingEnabled)
-                                }
+                            item(key = "streaming-assistant-response") {
+                                AssistantStreamingBubble(
+                                    text = streaming.assistantMessage,
+                                    thinkingEnabled = chatState.thinkingEnabled
+                                )
                             }
                         }
                     }

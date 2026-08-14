@@ -130,12 +130,20 @@ fun HomeScreen(
                     .fillMaxSize()
                     .graphicsLayer {
                         val currentProgress = (drawerState.offsetX.value / maxOffsetPx).coerceIn(0f, 1f)
-                        translationX = drawerState.offsetX.value
-                        scaleX = 1f - (currentProgress * 0.15f)
-                        scaleY = 1f - (currentProgress * 0.15f)
-                        shape = RoundedCornerShape((currentProgress * 24f).dp)
-                        clip = true
-                        shadowElevation = 16f
+                        if (currentProgress > 0f) {
+                            translationX = drawerState.offsetX.value
+                            scaleX = 1f - (currentProgress * 0.15f)
+                            scaleY = 1f - (currentProgress * 0.15f)
+                            shape = RoundedCornerShape((currentProgress * 24f).dp)
+                            clip = true
+                            shadowElevation = 16f * currentProgress
+                        } else {
+                            translationX = 0f
+                            scaleX = 1f
+                            scaleY = 1f
+                            clip = false
+                            shadowElevation = 0f
+                        }
                     }
                     .pointerInput(Unit) {
                         detectHorizontalDragGestures(
@@ -191,6 +199,12 @@ fun HomeScreen(
                             llmModelViewModel = llmModelViewModel,
                             liquidState = liquidState,
                             onModelSelectedNavigate = onModelSelectedNavigate
+                        )
+
+                        // Top section progressive blur scrim
+                        com.bit.ui.components.TopBlurScrim(
+                            modifier = Modifier.align(Alignment.TopCenter),
+                            height = 120.dp
                         )
                     }
                 }
