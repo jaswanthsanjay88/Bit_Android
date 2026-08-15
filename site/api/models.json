@@ -280,21 +280,21 @@
       "isZip": false,
       "runOnCpu": true
     },
-      {
-        "id": "kitten-tts",
-        "name": "Kitten TTS (Nano)",
-        "description": "Fast and high-quality Kokoro-based TTS engine. English voice.",
-        "type": "TTS",
-        "url": "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32/resolve/main/model.onnx",
-        "size": "45 MB",
-        "sizeBytes": 47185920,
-        "minRamGb": 2,
-        "icon": "tts",
-        "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/huggingface.png",
-        "tags": ["TTS", "English", "Kokoro", "Tested"],
-        "isZip": false,
-        "runOnCpu": true
-      },
+    {
+      "id": "kokoro-en-v0_19",
+      "name": "Kokoro TTS (English)",
+      "description": "State-of-the-art natural English multi-voice neural TTS engine (82M parameters, 11 voices).",
+      "type": "TTS",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2",
+      "size": "86 MB",
+      "sizeBytes": 90177536,
+      "minRamGb": 2,
+      "icon": "tts",
+      "iconUrl": "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/huggingface.png",
+      "tags": ["TTS", "English", "Kokoro", "Multi-Voice", "Tested"],
+      "isZip": false,
+      "runOnCpu": true
+    },
     {
       "id": "whisper-tiny-stt",
       "name": "Whisper Tiny (English STT)",

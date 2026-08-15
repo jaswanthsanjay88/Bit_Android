@@ -56,16 +56,16 @@ internal val availableTtsModels = listOf(
     TtsModelInfo(
         id = "vits-piper-en_US-amy-low",
         name = "Piper US Amy",
-        description = "High-quality low-latency English female voice",
+        description = "High-quality low-latency English female voice (Piper VITS)",
         size = "35 MB",
         url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2"
     ),
     TtsModelInfo(
-        id = "kitten-tts",
-        name = "Kitten TTS (Nano)",
-        description = "Fast and high-quality Kokoro-based TTS engine. English voice.",
-        size = "30 MB",
-        url = "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32/resolve/main/model.onnx"
+        id = "kokoro-en-v0_19",
+        name = "Kokoro TTS (English)",
+        description = "Natural English multi-voice neural TTS (82M params, 11 voices)",
+        size = "86 MB",
+        url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2"
     )
 )
 
@@ -358,13 +358,32 @@ data class VoiceInfo(
 )
 
 private fun getVoiceInfo(modelId: String?, voiceId: String): VoiceInfo {
-    return when (modelId) {
-
+    return when (modelId?.lowercase()) {
+        "kokoro-en-v0_19", "kokoro", "kokoro-tts" -> {
+            when (voiceId) {
+                "0" -> VoiceInfo(voiceId, "Heart", "Female", "US")
+                "1" -> VoiceInfo(voiceId, "Bella", "Female", "US")
+                "2" -> VoiceInfo(voiceId, "Nicole", "Female", "US")
+                "3" -> VoiceInfo(voiceId, "Aoede", "Female", "US")
+                "4" -> VoiceInfo(voiceId, "Kore", "Female", "US")
+                "5" -> VoiceInfo(voiceId, "Sarah", "Female", "US")
+                "6" -> VoiceInfo(voiceId, "Nova", "Female", "US")
+                "7" -> VoiceInfo(voiceId, "Sky", "Female", "US")
+                "8" -> VoiceInfo(voiceId, "Adam", "Male", "US")
+                "9" -> VoiceInfo(voiceId, "Michael", "Male", "US")
+                "10" -> VoiceInfo(voiceId, "George", "Male", "UK")
+                else -> {
+                    val num = voiceId.toIntOrNull() ?: 0
+                    if (num in 0..7) VoiceInfo(voiceId, "Female $voiceId", "Female", "US")
+                    else VoiceInfo(voiceId, "Male $voiceId", "Male", "US")
+                }
+            }
+        }
         "vits-ljs-tts" -> {
             if (voiceId == "0") VoiceInfo(voiceId, "LJSpeech", "Female", "US")
             else VoiceInfo(voiceId, "Speaker $voiceId", "Female", "US")
         }
-        "vits-piper-en_us-amy-low" -> {
+        "vits-piper-en_us-amy-low", "vits-piper-en_US-amy-low" -> {
             if (voiceId == "0") VoiceInfo(voiceId, "Amy", "Female", "US")
             else VoiceInfo(voiceId, "Speaker $voiceId", "Female", "US")
         }

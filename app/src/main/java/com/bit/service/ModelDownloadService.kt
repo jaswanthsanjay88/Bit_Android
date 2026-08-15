@@ -764,9 +764,7 @@ class ModelDownloadService : Service() {
             "vits-piper-en_US-amy-low" -> listOf(
                 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-amy-low.tar.bz2" to "vits-piper-en_US-amy-low.tar.bz2"
             )
-            "kitten-tts" -> listOf(
-                "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32/resolve/main/kitten_tts_nano_v0_8.onnx" to "kitten_tts_nano_v0_8.onnx",
-                "https://huggingface.co/KittenML/kitten-tts-nano-0.8-fp32/resolve/main/voices.npz" to "voices.npz",
+            "kokoro-en-v0_19", "kokoro-tts", "kokoro" -> listOf(
                 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-en-v0_19.tar.bz2" to "kokoro-en-v0_19.tar.bz2"
             )
             else -> listOf()
