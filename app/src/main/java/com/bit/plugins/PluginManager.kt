@@ -51,7 +51,7 @@ object PluginManager {
     @Volatile private var _cachedEnabledToolDefs: List<ToolDefinitionBuilder>? = null
 
     // Set of enabled plugin names
-    private val _enabledPluginNames = MutableStateFlow<Set<String>>(setOf(WEB_SEARCH_PLUGIN_NAME, "Memory Vault"))
+    private val _enabledPluginNames = MutableStateFlow<Set<String>>(setOf(WEB_SEARCH_PLUGIN_NAME, "Memory Vault", McpPlugin.PLUGIN_NAME, SkillPlugin.PLUGIN_NAME))
     val enabledPluginNames: StateFlow<Set<String>> = _enabledPluginNames.asStateFlow()
 
     // Web Search enabled state (independent toggle)
@@ -378,6 +378,20 @@ object PluginManager {
             _cachedEnabledToolDefs = defs
             return defs
         }
+    }
+
+    /**
+     * Invalidate tool definition and lookup caches (e.g. after MCP server sync or tool toggle)
+     */
+    fun invalidateToolCache() {
+        _toolNameToPluginKey.clear()
+        _plugins.forEach { (pluginName, plugin) ->
+            plugin.getPluginInfo().toolDefinitionBuilder.forEach { toolDef ->
+                _toolNameToPluginKey[toolDef.name.lowercase()] = pluginName
+            }
+        }
+        _cachedEnabledToolDefs = null
+        syncToolsWithLLM()
     }
 
     /**

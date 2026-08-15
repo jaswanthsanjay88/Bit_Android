@@ -176,9 +176,14 @@ internal fun DataManagementSection(viewModel: SettingsViewModel) {
             }
         }
 
+        val haptics = com.bit.ui.theme.LocalBitHaptics.current
+
         // --- Green Backup Card ---
         Surface(
-            onClick = { showBackupDialog = true },
+            onClick = {
+                haptics.pop()
+                showBackupDialog = true
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(Standards.CardCornerRadius),
             color = Glass.Surface,
@@ -212,7 +217,10 @@ internal fun DataManagementSection(viewModel: SettingsViewModel) {
 
         // --- Restore Card ---
         Surface(
-            onClick = { showRestoreDialog = true },
+            onClick = {
+                haptics.pop()
+                showRestoreDialog = true
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(Standards.CardCornerRadius),
             color = Glass.Surface,
@@ -246,7 +254,10 @@ internal fun DataManagementSection(viewModel: SettingsViewModel) {
 
         // --- Red Delete All Card ---
         Surface(
-            onClick = { showDeleteDialog = true },
+            onClick = {
+                haptics.thud()
+                showDeleteDialog = true
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(Standards.CardCornerRadius),
             color = Color(0x1AFF4D4D),

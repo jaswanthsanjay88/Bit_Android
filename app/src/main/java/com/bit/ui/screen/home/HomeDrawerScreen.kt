@@ -85,6 +85,7 @@ fun HomeDrawerScreen(
 
     val isChatRefreshed by AppStateManager.isChatRefreshed.collectAsStateWithLifecycle()
     val chatState by chatViewModel.chatUiState.collectAsStateWithLifecycle()
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
     LaunchedEffect(isChatRefreshed) {
         if (isChatRefreshed) {
@@ -116,7 +117,10 @@ fun HomeDrawerScreen(
                     ),
                     actions = {
                         TextButton(
-                            onClick = onStoreClick,
+                            onClick = {
+                                haptics.pop()
+                                onStoreClick()
+                            },
                             modifier = Modifier.padding(end = 4.dp)
                         ) {
                             Icon(
@@ -133,7 +137,10 @@ fun HomeDrawerScreen(
                             )
                         }
                         TextButton(
-                            onClick = onSettingsClick,
+                            onClick = {
+                                haptics.pop()
+                                onSettingsClick()
+                            },
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Icon(
@@ -164,6 +171,7 @@ fun HomeDrawerScreen(
             // New Chat button using Material 3 Primary Container
             Card(
                 onClick = {
+                    haptics.action()
                     viewModel.createNewChat { chatId ->
                         onChatSelected(chatId)
                     }
@@ -331,6 +339,8 @@ private fun ChatListItem(
         }
     }
 
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+
     Box {
         Surface(
             shape = RoundedCornerShape(Standards.RadiusMd),
@@ -339,8 +349,14 @@ private fun ChatListItem(
             modifier = Modifier
                 .fillMaxWidth()
                 .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = { showMenu = true }
+                    onClick = {
+                        haptics.selection()
+                        onClick()
+                    },
+                    onLongClick = {
+                        haptics.buildup()
+                        showMenu = true
+                    }
                 )
         ) {
             Row(

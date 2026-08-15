@@ -562,6 +562,9 @@ fun SettingsScreen(
                     Text(
                         text = when (selectedCategory) {
                             "services" -> "Services & Models"
+                            "web_access" -> "Web Access (BIT in Browser)"
+                            "mcp" -> "MCP Servers"
+                            "skills" -> "Agent Skills"
                             "chat" -> "Responses & Chat"
                             "hardware" -> "Hardware Tuning"
                             "intelligence" -> "Intelligence & Tools"
@@ -740,35 +743,46 @@ fun SettingsScreen(
             modifier = Modifier.padding(padding).background(Color.Black),
             label = "settings_navigation"
         ) { category ->
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .imePadding()
-                    .background(Color.Black),
-                contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
-                verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-            ) {
-                when (category) {
-                    "services" -> {
-                        // ── Services & Models ──
-                        modelConfigurationSection(
-                            hardwareTuningEnabled = hardwareTuningEnabled,
-                            installedModels = installedModels,
-                            onModelSelected = { model -> 
-                                configEditorViewModel.selectModel(model)
-                                editorModel = model 
-                            },
-                            onEmbeddingSetup = onEmbeddingSetupClick,
-                            onModelEditor = onModelEditor
-                        )
-                        huggingFaceTokenSection(
-                            tokenState = hfTokenState,
-                            testResult = hfTestResult,
-                            onSaveToken = viewModel::saveHfToken,
-                            onClearToken = viewModel::clearHfToken,
-                            onTestConnection = viewModel::testHfConnection
-                        )
-                    }
+            when (category) {
+                "skills" -> {
+                    SkillsScreen(skillManager = viewModel.skillManager)
+                }
+                "mcp" -> {
+                    McpServersScreen(mcpManager = viewModel.mcpManager)
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .imePadding()
+                            .background(Color.Black),
+                        contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
+                        verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                    ) {
+                        when (category) {
+                            "services" -> {
+                                // ── Services & Models ──
+                                modelConfigurationSection(
+                                    hardwareTuningEnabled = hardwareTuningEnabled,
+                                    installedModels = installedModels,
+                                    onModelSelected = { model -> 
+                                        configEditorViewModel.selectModel(model)
+                                        editorModel = model 
+                                    },
+                                    onEmbeddingSetup = onEmbeddingSetupClick,
+                                    onModelEditor = onModelEditor
+                                )
+                                huggingFaceTokenSection(
+                                    tokenState = hfTokenState,
+                                    testResult = hfTestResult,
+                                    onSaveToken = viewModel::saveHfToken,
+                                    onClearToken = viewModel::clearHfToken,
+                                    onTestConnection = viewModel::testHfConnection
+                                )
+                            }
+                            "web_access" -> {
+                                webAccessSection(webAccessManager = viewModel.webAccessManager)
+                            }
                     "chat" -> {
                         // ── Responses & Chat Experience ──
                         llmSettingsSection(
@@ -833,59 +847,18 @@ fun SettingsScreen(
                         )
                     }
                     "storage" -> {
-                        // ── Storage & Diagnostics ──
+                        // ── Storage Dashboard ──
                         item {
-                            GlassSectionCard(
-                                title = "System Storage",
-                                icon = TnIcons.Refresh,
-                                description = "Securely manage, backup, or reset your local data footprints"
-                            ) {
-                                DataManagementSection(viewModel = viewModel)
-                            }
+                            StorageManagementSection(viewModel = viewModel)
                         }
 
                         item {
-                            GlassCard(
-                                onClick = {
-                                    haptics.selection()
-                                    onDiagnosticsClick()
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                backgroundColor = Glass.Surface,
-                                borderColor = Glass.BorderSubtle,
-                                cornerRadius = Standards.CardCornerRadius,
-                                contentPadding = PaddingValues(Standards.CardPadding)
+                            GlassSectionCard(
+                                title = "Encrypted Backups & Migration",
+                                icon = TnIcons.Refresh,
+                                description = "Securely export, import, or reset your local database and settings"
                             ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-                                ) {
-                                    Icon(
-                                        imageVector = TnIcons.Terminal,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(Standards.IconLg),
-                                        tint = Glass.AccentSecondary
-                                    )
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "System Diagnostics",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Glass.TextPrimary
-                                        )
-                                        Text(
-                                            text = "View logs, native audits, and crash reports",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = Glass.TextSecondary
-                                        )
-                                    }
-                                    Icon(
-                                        imageVector = TnIcons.ChevronRight,
-                                        contentDescription = null,
-                                        tint = Glass.TextSecondary
-                                    )
-                                }
+                                DataManagementSection(viewModel = viewModel)
                             }
                         }
                     }
@@ -899,13 +872,44 @@ fun SettingsScreen(
                     else -> {
                         // ── Main Dashboard list (Cleaned up Material Design 3 style) ──
                         item {
-                            SettingsGroup(title = "Models") {
+                            SettingsGroup(title = "Models & Remote Access") {
                                 SettingsItem(
                                     title = "Services & Models",
                                     description = "Manage installed LLMs and RAG embeddings",
                                     icon = TnIcons.Sparkles,
                                     onClick = {
                                         selectedCategory = "services"
+                                    }
+                                )
+                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
+                                SettingsItem(
+                                    title = "Web Access (BIT in Browser)",
+                                    description = "Remote LAN access to chat from any device or PC",
+                                    icon = TnIcons.World,
+                                    onClick = {
+                                        selectedCategory = "web_access"
+                                    }
+                                )
+                            }
+                        }
+
+                        item {
+                            SettingsGroup(title = "Agents & Tools") {
+                                SettingsItem(
+                                    title = "MCP Servers",
+                                    description = "Model Context Protocol remote tools & SSE servers",
+                                    icon = TnIcons.Terminal,
+                                    onClick = {
+                                        selectedCategory = "mcp"
+                                    }
+                                )
+                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
+                                SettingsItem(
+                                    title = "Agent Skills",
+                                    description = "Custom capabilities, prompt injections & tool workflows",
+                                    icon = TnIcons.Code,
+                                    onClick = {
+                                        selectedCategory = "skills"
                                     }
                                 )
                             }
@@ -974,7 +978,6 @@ fun SettingsScreen(
                                         selectedCategory = "about"
                                     }
                                 )
-
                             }
                         }
                     }
@@ -982,7 +985,9 @@ fun SettingsScreen(
             }
         }
     }
-    }
+}
+}
+}
 
     if (editorModel != null) {
         ModalBottomSheet(

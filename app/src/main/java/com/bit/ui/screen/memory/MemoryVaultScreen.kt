@@ -94,6 +94,7 @@ fun MemoryVaultScreen(
 
     val hasSeenImportPrompt by viewModel.hasSeenMemoryImportPrompt.collectAsStateWithLifecycle()
     var showImportDialog by remember { mutableStateOf(false) }
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
     val docPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -150,14 +151,20 @@ fun MemoryVaultScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = {
+                        haptics.pop()
+                        onBackClick()
+                    }) {
                         Icon(TnIcons.ArrowLeft, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 actions = {
                     // Backup Pill Button
                     OutlinedButton(
-                        onClick = { onBackupSettingsClick() },
+                        onClick = {
+                            haptics.pop()
+                            onBackupSettingsClick()
+                        },
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.height(36.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
@@ -182,13 +189,19 @@ fun MemoryVaultScreen(
                         )
                         Switch(
                             checked = isGlobalMemoryEnabled,
-                            onCheckedChange = { isGlobalMemoryEnabled = it }
+                            onCheckedChange = {
+                                haptics.selection()
+                                isGlobalMemoryEnabled = it
+                            }
                         )
                     }
 
                     var showMenu by remember { mutableStateOf(false) }
                     Box {
-                        IconButton(onClick = { showMenu = true }) {
+                        IconButton(onClick = {
+                            haptics.pop()
+                            showMenu = true
+                        }) {
                             Icon(TnIcons.DotsVertical, contentDescription = "More options", tint = MaterialTheme.colorScheme.onSurface)
                         }
                         DropdownMenu(
@@ -199,6 +212,7 @@ fun MemoryVaultScreen(
                             DropdownMenuItem(
                                 text = { Text("Import from another AI", color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
+                                    haptics.pop()
                                     showMenu = false
                                     showImportDialog = true
                                 }
@@ -262,7 +276,10 @@ fun MemoryVaultScreen(
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { viewModel.setSelectedCategory(if (selectedCategory == "notes") "all" else "notes") },
+                            .clickable {
+                                haptics.selection()
+                                viewModel.setSelectedCategory(if (selectedCategory == "notes") "all" else "notes")
+                            },
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = if (selectedCategory == "notes") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
@@ -282,7 +299,10 @@ fun MemoryVaultScreen(
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { viewModel.setSelectedCategory(if (selectedCategory == "facts") "all" else "facts") },
+                            .clickable {
+                                haptics.selection()
+                                viewModel.setSelectedCategory(if (selectedCategory == "facts") "all" else "facts")
+                            },
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = if (selectedCategory == "facts") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
@@ -303,7 +323,10 @@ fun MemoryVaultScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.setSelectedCategory(if (selectedCategory == "documents") "all" else "documents") },
+                        .clickable {
+                            haptics.selection()
+                            viewModel.setSelectedCategory(if (selectedCategory == "documents") "all" else "documents")
+                        },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
@@ -329,7 +352,10 @@ fun MemoryVaultScreen(
                         }
 
                         Button(
-                            onClick = { docPickerLauncher.launch("*/*") },
+                            onClick = {
+                                haptics.pop()
+                                docPickerLauncher.launch("*/*")
+                            },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -359,7 +385,10 @@ fun MemoryVaultScreen(
 
                     if (selectedCategory == "documents") {
                         Button(
-                            onClick = { docPickerLauncher.launch("*/*") },
+                            onClick = {
+                                haptics.pop()
+                                docPickerLauncher.launch("*/*")
+                            },
                             shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                         ) {
@@ -369,7 +398,10 @@ fun MemoryVaultScreen(
                         }
                     } else {
                         Button(
-                            onClick = { onNoteClick(null, if (selectedCategory == "facts") "fact" else "note") },
+                            onClick = {
+                                haptics.action()
+                                onNoteClick(null, if (selectedCategory == "facts") "fact" else "note")
+                            },
                             shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface)
                         ) {
@@ -389,7 +421,10 @@ fun MemoryVaultScreen(
                     items(notes, key = { it.id }) { note ->
                         RecentItemCard(
                             note = note,
-                            onClick = { onNoteClick(note.id, note.noteType) }
+                            onClick = {
+                                haptics.selection()
+                                onNoteClick(note.id, note.noteType)
+                            }
                         )
                     }
                 }

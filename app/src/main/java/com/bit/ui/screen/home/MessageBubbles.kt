@@ -336,8 +336,24 @@ internal fun ThinkingBlock(
     // Auto-expand while streaming, auto-collapse when done
     var userToggled by remember { mutableStateOf(false) }
     var userExpandState by remember { mutableStateOf(false) }
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
     val isExpanded = if (userToggled) userExpandState else isStreaming
+
+    // Live elapsed timer tracking
+    val startTime = remember { System.currentTimeMillis() }
+    var elapsedMs by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(isStreaming) {
+        if (isStreaming) {
+            while (true) {
+                elapsedMs = System.currentTimeMillis() - startTime
+                kotlinx.coroutines.delay(100)
+            }
+        }
+    }
+
+    val elapsedSeconds = (elapsedMs / 1000f)
 
     // Pulsing dot animation for streaming state
     val infiniteTransition = rememberInfiniteTransition(label = "thinkPulse")
@@ -366,6 +382,7 @@ internal fun ThinkingBlock(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
+                        haptics.pop()
                         userToggled = true
                         userExpandState = !isExpanded
                     }
@@ -386,7 +403,12 @@ internal fun ThinkingBlock(
                         tint = Glass.AccentWarm
                     )
                     Text(
-                        text = if (isStreaming) "Thinking…" else "Thought",
+                        text = when {
+                            isStreaming && elapsedSeconds > 0.5f -> "Thinking (${String.format("%.1fs", elapsedSeconds)})…"
+                            isStreaming -> "Thinking…"
+                            elapsedSeconds > 0.5f -> "Thought for ${String.format("%.1fs", elapsedSeconds)}"
+                            else -> "Thought"
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = Glass.AccentWarm

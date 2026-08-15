@@ -31,6 +31,12 @@ class NVApplication : Application() {
         private const val TAG = "NVApplication"
     }
 
+    @javax.inject.Inject
+    lateinit var mcpManager: com.bit.mcp.McpManager
+
+    @javax.inject.Inject
+    lateinit var skillManager: com.bit.skills.SkillManager
+
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Application onCreate (process: ${if (isMainProcess()) "main" else "secondary"})")
@@ -64,6 +70,8 @@ class NVApplication : Application() {
         PluginManager.registerPlugin(FileManagerPlugin(applicationContext))
         PluginManager.registerPlugin(SystemInfoPlugin(applicationContext))
         PluginManager.registerPlugin(com.bit.plugins.MemoryPlugin(applicationContext))
+        PluginManager.registerPlugin(com.bit.plugins.McpPlugin(applicationContext, mcpManager))
+        PluginManager.registerPlugin(com.bit.plugins.SkillPlugin(applicationContext, skillManager))
         Log.d(TAG, "Plugins registered: ${PluginManager.registeredPlugins.value.size} plugins")
 
         // Initialize TTS Manager without auto-loading (loading controlled by settings)

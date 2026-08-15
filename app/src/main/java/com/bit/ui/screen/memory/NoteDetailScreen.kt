@@ -212,29 +212,38 @@ fun NoteDetailScreen(
     val textSecondary = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceBg = MaterialTheme.colorScheme.surface
 
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { if (!isDeleted) performSave(); onBackClick() }) {
-                        Icon(TnIcons.ArrowLeft, contentDescription = "Back", tint = textPrimary)
+                    IconButton(onClick = {
+                        haptics.pop()
+                        onBackClick()
+                    }) {
+                        Icon(TnIcons.ArrowLeft, contentDescription = "Back", tint = textSecondary)
                     }
                 },
                 actions = {
-                    // Material 3 Edit/Preview Mode FilterChip
+                    // Preview / Edit Toggle Chip
                     FilterChip(
                         selected = isPreviewMode,
-                        onClick = { isPreviewMode = !isPreviewMode },
+                        onClick = {
+                            haptics.selection()
+                            isPreviewMode = !isPreviewMode
+                        },
                         label = {
                             Text(
-                                text = if (isPreviewMode) "Preview" else "Edit",
-                                style = MaterialTheme.typography.labelMedium
+                                if (isPreviewMode) "Preview" else "Edit",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium
                             )
                         },
                         leadingIcon = {
                             Icon(
-                                imageVector = if (isPreviewMode) TnIcons.Code else TnIcons.Edit,
+                                if (isPreviewMode) TnIcons.Eye else TnIcons.Edit,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -247,6 +256,7 @@ fun NoteDetailScreen(
                     Spacer(Modifier.width(8.dp))
                     // Save Action
                     IconButton(onClick = {
+                        haptics.success()
                         performSave()
                         Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
                     }) {
@@ -256,6 +266,7 @@ fun NoteDetailScreen(
                     val activeNoteId = currentNoteId ?: existingNote?.id
                     if (activeNoteId != null) {
                         IconButton(onClick = {
+                            haptics.thud()
                             isDeleted = true
                             val noteToDelete = existingNote ?: MemoryNote(
                                 id = activeNoteId,

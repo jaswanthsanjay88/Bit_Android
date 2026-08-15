@@ -69,18 +69,23 @@ private fun ProviderListView(
     viewModel: ModelStoreViewModel,
     onSelectProvider: (String) -> Unit
 ) {
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     val installedModels by viewModel.installedModels.collectAsState()
-    val providers = listOf(
-        "Google Gemini",
-        "OpenAI",
-        "Anthropic Claude",
-        "DeepSeek",
-        "Hugging Face",
-        "NVIDIA NIM",
-        "Ollama",
-        "OpenRouter",
-        "Custom API"
-    )
+    var providers by remember {
+        mutableStateOf(
+            listOf(
+                "Google Gemini",
+                "OpenAI",
+                "Anthropic Claude",
+                "DeepSeek",
+                "Hugging Face",
+                "NVIDIA NIM",
+                "Ollama",
+                "OpenRouter",
+                "Custom API"
+            )
+        )
+    }
 
     fun isConfigured(provider: String): Boolean {
         val cleanName = provider.lowercase(Locale.US).replace(" ", "-")
@@ -107,14 +112,17 @@ private fun ProviderListView(
             fontWeight = FontWeight.Bold
         )
 
-        providers.forEach { provider ->
+        providers.forEachIndexed { index, provider ->
             val configured = isConfigured(provider)
             val activeModel = getActiveModelName(provider)
 
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onSelectProvider(provider) },
+                    .clickable {
+                        haptics.selection()
+                        onSelectProvider(provider)
+                    },
                 colors = CardDefaults.cardColors(
                     containerColor = if (activeModel != null) {
                         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
@@ -135,7 +143,8 @@ private fun ProviderListView(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
                         val iconRes = com.bit.ui.components.providerIcon(provider)
                         if (provider.equals("Hugging Face", ignoreCase = true)) {
@@ -191,11 +200,55 @@ private fun ProviderListView(
                         }
                     }
 
-                    Icon(
-                        imageVector = TnIcons.ChevronRight,
-                        contentDescription = "Configure",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (index > 0) {
+                            IconButton(
+                                onClick = {
+                                    haptics.selection()
+                                    val list = providers.toMutableList()
+                                    val item = list.removeAt(index)
+                                    list.add(index - 1, item)
+                                    providers = list
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.ChevronUp,
+                                    contentDescription = "Move Up",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        if (index < providers.size - 1) {
+                            IconButton(
+                                onClick = {
+                                    haptics.selection()
+                                    val list = providers.toMutableList()
+                                    val item = list.removeAt(index)
+                                    list.add(index + 1, item)
+                                    providers = list
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.ChevronDown,
+                                    contentDescription = "Move Down",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = TnIcons.ChevronRight,
+                            contentDescription = "Configure",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }

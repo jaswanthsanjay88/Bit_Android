@@ -355,6 +355,7 @@ fun BodyContent(
                                         }
                                     }
                                 }
+                                com.bit.ui.components.ContextStackIndicator(message = msg)
                                 com.bit.ui.screen.home.AssistantMessageFooter(
                                     message = msg,
                                     ttsPlayingMsgId = ttsPlayingMsgId,

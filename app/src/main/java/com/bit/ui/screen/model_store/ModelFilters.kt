@@ -68,9 +68,13 @@ private fun FilterChip(
     label: @Composable () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
     androidx.compose.material3.FilterChip(
         selected = selected,
-        onClick = onClick,
+        onClick = {
+            haptics.selection()
+            onClick()
+        },
         label = label,
         modifier = modifier,
         leadingIcon = if (selected) {

@@ -66,6 +66,7 @@ fun ModelStoreScreen(
 
     var searchQuery by remember { mutableStateOf("") }
     var showSearch by remember { mutableStateOf(false) }
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -78,6 +79,7 @@ fun ModelStoreScreen(
                         viewModel.setExplorerQuery(it)
                         viewModel.searchExplorerRepositories()
                     }, onCloseSearch = {
+                        haptics.pop()
                         showSearch = false
                         searchQuery = ""
                         viewModel.filterModels("")
@@ -94,7 +96,10 @@ fun ModelStoreScreen(
                         },
                         navigationIcon = {
                             FilledTonalIconButton(
-                                onClick = onNavigateBack,
+                                onClick = {
+                                    haptics.pop()
+                                    onNavigateBack()
+                                },
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                                 )
@@ -110,7 +115,10 @@ fun ModelStoreScreen(
                             if (selectedTab == StoreTab.MODELS) {
                                 Row {
                                     FilledTonalIconButton(
-                                        onClick = { viewModel.refreshModels() },
+                                        onClick = {
+                                            haptics.pop()
+                                            viewModel.refreshModels()
+                                        },
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                                         )
@@ -123,7 +131,10 @@ fun ModelStoreScreen(
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     FilledTonalIconButton(
-                                        onClick = { showSearch = true },
+                                        onClick = {
+                                            haptics.pop()
+                                            showSearch = true
+                                        },
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
                                         )
@@ -158,22 +169,34 @@ fun ModelStoreScreen(
             ) {
                 Tab(
                     selected = selectedTab == StoreTab.MODELS,
-                    onClick = { viewModel.selectTab(StoreTab.MODELS) },
+                    onClick = {
+                        haptics.selection()
+                        viewModel.selectTab(StoreTab.MODELS)
+                    },
                     text = { Text("Store", fontWeight = if (selectedTab == StoreTab.MODELS) FontWeight.Bold else FontWeight.Normal) }
                 )
                 Tab(
                     selected = selectedTab == StoreTab.INSTALLED,
-                    onClick = { viewModel.selectTab(StoreTab.INSTALLED) },
+                    onClick = {
+                        haptics.selection()
+                        viewModel.selectTab(StoreTab.INSTALLED)
+                    },
                     text = { Text("Installed", fontWeight = if (selectedTab == StoreTab.INSTALLED) FontWeight.Bold else FontWeight.Normal) }
                 )
                 Tab(
                     selected = selectedTab == StoreTab.PROVIDERS,
-                    onClick = { viewModel.selectTab(StoreTab.PROVIDERS) },
+                    onClick = {
+                        haptics.selection()
+                        viewModel.selectTab(StoreTab.PROVIDERS)
+                    },
                     text = { Text("Providers", fontWeight = if (selectedTab == StoreTab.PROVIDERS) FontWeight.Bold else FontWeight.Normal) }
                 )
                 Tab(
                     selected = selectedTab == StoreTab.ADVANCED,
-                    onClick = { viewModel.selectTab(StoreTab.ADVANCED) },
+                    onClick = {
+                        haptics.selection()
+                        viewModel.selectTab(StoreTab.ADVANCED)
+                    },
                     text = { Text("Advanced", fontWeight = if (selectedTab == StoreTab.ADVANCED) FontWeight.Bold else FontWeight.Normal) }
                 )
             }

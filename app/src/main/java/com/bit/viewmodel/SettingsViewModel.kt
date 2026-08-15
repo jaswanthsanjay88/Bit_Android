@@ -48,6 +48,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val modelRepository = AppContainer.getModelRepository()
 
+    // ── Web Access Manager (BIT in Browser) ──
+    val webAccessManager = com.bit.network.server.WebAccessManager(application)
+
+    // ── MCP Manager (Model Context Protocol) ──
+    val mcpManager = com.bit.mcp.McpManager(application)
+
+    // ── Skill Manager (Agent Skills & Prompt Capabilities) ──
+    val skillManager = com.bit.skills.SkillManager(application)
+
     // ── HuggingFace Token ──
     private val hfTokenManager = HuggingFaceTokenManager(application)
     private val _hfTokenState = MutableStateFlow(
@@ -558,6 +567,42 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     Log.e("SettingsViewModel", "Failed to switch TTS model", e)
                 }
             }
+        }
+    }
+
+    // ── App Storage & Diagnostics ──
+    val storageRepository = com.bit.repo.AppStorageRepository(application)
+    val storageSnapshot: StateFlow<com.bit.repo.AppStorageSnapshot> = storageRepository.snapshot
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.repo.AppStorageSnapshot(isScanning = true))
+
+    fun refreshStorage() {
+        viewModelScope.launch {
+            storageRepository.refresh()
+        }
+    }
+
+    suspend fun listStorageCategoryFiles(categoryId: String): List<com.bit.repo.StorageFileItem> {
+        return storageRepository.listCategoryFiles(categoryId)
+    }
+
+    fun deleteStorageFile(path: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val success = storageRepository.deleteFile(path)
+            onResult(success)
+        }
+    }
+
+    fun clearTempCache(onFreed: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val freed = storageRepository.clearTempCache()
+            onFreed(freed)
+        }
+    }
+
+    fun vacuumDatabase(onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val success = storageRepository.vacuumDatabase()
+            onResult(success)
         }
     }
 }

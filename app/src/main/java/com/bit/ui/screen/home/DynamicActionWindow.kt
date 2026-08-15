@@ -221,6 +221,8 @@ fun DynamicActionWindow(
 
         // ── HEADER: Active Model & Status ──
         val activeModel = installedModels.find { it.id == currentModelID }
+        val haptics = com.bit.ui.theme.LocalBitHaptics.current
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -247,7 +249,10 @@ fun DynamicActionWindow(
 
             if (activeModel != null) {
                 TextButton(
-                    onClick = { modelViewModel.unloadModel() },
+                    onClick = {
+                        haptics.thud()
+                        modelViewModel.unloadModel()
+                    },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     ),
@@ -302,6 +307,7 @@ fun DynamicActionWindow(
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable {
+                                    haptics.selection()
                                     if (isSelected) {
                                         modelViewModel.unloadModel()
                                     } else {

@@ -175,6 +175,9 @@ dependencies {
     implementation("io.noties.markwon:ext-strikethrough:4.6.2")
     implementation("io.noties.markwon:ext-tasklist:4.6.2")
 
+    // Reorderable LazyList for Drag-to-Reorder
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+
     // Database & Storage
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
@@ -220,6 +223,8 @@ dependencies {
     implementation(libs.androidx.material)
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+    implementation("com.google.zxing:core:3.5.3")
 
     // Debug
     debugImplementation(libs.androidx.compose.ui.tooling)

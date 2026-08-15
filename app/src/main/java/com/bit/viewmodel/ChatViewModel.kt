@@ -84,6 +84,7 @@ class ChatViewModel @Inject constructor(
     private val appContext = context
     private val appSettings = AppSettingsDataStore(context)
     private val ttsDataStore = com.bit.tts.TTSDataStore(context)
+    private val skillManager = com.bit.skills.SkillManager(context)
     // ControlVectorManager removed — will be re-added when new lib supports it
 
     // ── TTFT optimization: cache vault memory notes to avoid re-walking filesystem every message ──
@@ -1161,7 +1162,7 @@ class ChatViewModel @Inject constructor(
         var round = 0
         val maxRounds = 5
 
-        val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+        val enabledNames = PluginManager.getEnabledToolNames().map { normalizeToolName(it) }.toSet()
 
         while (round < maxRounds) {
             round++
@@ -1624,10 +1625,10 @@ class ChatViewModel @Inject constructor(
         finalToolCalls.addAll(toolCalls)
 
         if (finalToolCalls.isEmpty() && text.isNotBlank()) {
-            val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+            val enabledNames = PluginManager.getEnabledToolNames().map { normalizeToolName(it) }.toSet()
             parseToolCallsFromText(text)?.let { parsed ->
                 val valid = parsed.filter { (name, _) ->
-                    normalizeToolName(name).lowercase() in enabledNames
+                    normalizeToolName(name) in enabledNames
                 }
                 finalToolCalls.addAll(valid)
             }
@@ -1962,10 +1963,10 @@ class ChatViewModel @Inject constructor(
             _streamingAssistantMessage.value = result
             
             if (nativeToolCalls.isEmpty() && result.isNotBlank()) {
-                val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+                val enabledNames = PluginManager.getEnabledToolNames().map { normalizeToolName(it) }.toSet()
                 parseToolCallsFromText(result)?.let { parsed ->
                     val valid = parsed.filter { (name, _) ->
-                        normalizeToolName(name).lowercase() in enabledNames
+                        normalizeToolName(name) in enabledNames
                     }
                     if (valid.size < parsed.size) {
                         Log.w(TAG, "Filtered out ${parsed.size - valid.size} hallucinated tool calls from fallback parsing")
@@ -2070,10 +2071,10 @@ class ChatViewModel @Inject constructor(
 
         // Fallback: if no native ToolCall events, try text parsing
         if (nativeToolCalls.isEmpty() && result.isNotBlank()) {
-            val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+            val enabledNames = PluginManager.getEnabledToolNames().map { normalizeToolName(it) }.toSet()
             parseToolCallsFromText(result)?.let { parsed ->
                 val valid = parsed.filter { (name, _) ->
-                    normalizeToolName(name).lowercase() in enabledNames
+                    normalizeToolName(name) in enabledNames
                 }
                 if (valid.size < parsed.size) {
                     Log.w(TAG, "Filtered out ${parsed.size - valid.size} hallucinated tool calls from fallback parsing")
@@ -2163,10 +2164,10 @@ class ChatViewModel @Inject constructor(
             toolCalls.addAll(nativeToolCalls)
             
             if (toolCalls.isEmpty() && result.isNotBlank()) {
-                val enabledNames = PluginManager.getEnabledToolNames().map { it.lowercase() }
+                val enabledNames = PluginManager.getEnabledToolNames().map { normalizeToolName(it) }.toSet()
                 parseToolCallsFromText(result)?.let { parsed ->
                     val valid = parsed.filter { (name, _) ->
-                        normalizeToolName(name).lowercase() in enabledNames
+                        normalizeToolName(name) in enabledNames
                     }
                     if (valid.size < parsed.size) {
                         Log.w(TAG, "Filtered out ${parsed.size - valid.size} hallucinated tool calls from fallback parsing")
@@ -2327,6 +2328,19 @@ class ChatViewModel @Inject constructor(
         var compiledPrompt = basePrompt
         for ((key, value) in runtimeValues) {
             compiledPrompt = compiledPrompt.replace(key, value)
+        }
+
+        val skillsPrompt = if (hasTools && PluginManager.hasEnabledTools()) {
+            skillManager.getSkillCatalogPrompt()
+        } else {
+            skillManager.getActiveSkillsPrompt()
+        }
+        if (skillsPrompt.isNotBlank()) {
+            compiledPrompt = if (compiledPrompt.isNotBlank()) {
+                "$compiledPrompt\n\n$skillsPrompt"
+            } else {
+                skillsPrompt
+            }
         }
 
         return buildString {

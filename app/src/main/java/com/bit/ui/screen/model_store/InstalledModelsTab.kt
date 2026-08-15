@@ -54,7 +54,13 @@ import com.bit.ui.components.MultiActionButton
 import com.bit.ui.components.StatusBadge
 import com.bit.ui.theme.maple
 import com.bit.viewmodel.ModelStoreViewModel
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DragIndicator
 import com.bit.ui.icons.TnIcons
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -72,12 +78,27 @@ internal fun InstalledModelsTab(
 
     val context = androidx.compose.ui.platform.LocalContext.current
 
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var localModels by remember(models) { mutableStateOf(models) }
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val reorderableState = sh.calvin.reorderable.rememberReorderableLazyListState(lazyListState) { from, to ->
+        val fromIdx = localModels.indexOfFirst { it.id == from.key }
+        val toIdx = localModels.indexOfFirst { it.id == to.key }
+        if (fromIdx != -1 && toIdx != -1) {
+            localModels = localModels.toMutableList().apply {
+                add(toIdx, removeAt(fromIdx))
+            }
+            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        }
+    }
+
     LazyColumn(
+        state = lazyListState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
     ) {
-        item {
+        item(key = "import_banner") {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -116,8 +137,8 @@ internal fun InstalledModelsTab(
             }
         }
 
-        if (models.isEmpty()) {
-            item {
+        if (localModels.isEmpty()) {
+            item(key = "empty_state") {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -143,14 +164,43 @@ internal fun InstalledModelsTab(
                 }
             }
         } else {
-            items(models) { model ->
-                InstalledModelCard(
-                    model = model,
-                    isDeleting = deleteInProgress == model.id,
-                    onShowDetails = { selectedModel = model },
-                    onDelete = { showDeleteDialog = model },
-                    onClick = { llmModelViewModel.loadModel(model) }
-                )
+            items(localModels, key = { it.id }) { model ->
+                ReorderableItem(state = reorderableState, key = model.id) { isDragging ->
+                    val elevation by androidx.compose.animation.core.animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "elevation")
+                    val scale by androidx.compose.animation.core.animateFloatAsState(if (isDragging) 1.02f else 1f, label = "scale")
+
+                    InstalledModelCard(
+                        model = model,
+                        isDeleting = deleteInProgress == model.id,
+                        modifier = Modifier
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                shadowElevation = elevation.toPx()
+                            },
+                        dragHandle = {
+                            Icon(
+                                Icons.Rounded.DragIndicator,
+                                contentDescription = "Reorder ${model.modelName}",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .padding(8.dp)
+                                    .longPressDraggableHandle(
+                                        onDragStarted = {
+                                            haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        },
+                                        onDragStopped = {
+                                            // Order updated in memory
+                                        }
+                                    )
+                            )
+                        },
+                        onShowDetails = { selectedModel = model },
+                        onDelete = { showDeleteDialog = model },
+                        onClick = { llmModelViewModel.loadModel(model) }
+                    )
+                }
             }
         }
     }
@@ -193,14 +243,14 @@ internal fun InstalledModelsTab(
 internal fun InstalledModelCard(
     model: Model,
     isDeleting: Boolean,
+    modifier: Modifier = Modifier,
+    dragHandle: @Composable () -> Unit = {},
     onShowDetails: () -> Unit,
     onDelete: () -> Unit,
     onClick: () -> Unit
 ) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (model.isActive) {
                 MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
@@ -216,10 +266,13 @@ internal fun InstalledModelCard(
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
-            modifier = Modifier.padding(Standards.CardPadding),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
+            // Drag handle — isolated touch target
+            dragHandle()
+
             Icon(
                 imageVector = when (model.providerType) {
                     ProviderType.GGUF -> TnIcons.Sparkles
@@ -232,7 +285,14 @@ internal fun InstalledModelCard(
                        else MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Column(modifier = Modifier.weight(1f)) {
+            // Clickable text info region
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onClick)
+                    .padding(vertical = 4.dp)
+            ) {
                 Text(
                     text = model.modelName,
                     style = MaterialTheme.typography.bodyMedium,
