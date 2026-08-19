@@ -120,7 +120,7 @@ fun HomeScreen(
                             val currentProgress = (drawerState.offsetX.value / maxOffsetPx).coerceIn(0f, 1f)
                             alpha = (1f - currentProgress) * 0.6f
                         }
-                        .background(Color.Black)
+                        .background(MaterialTheme.colorScheme.scrim)
                 )
             }
 

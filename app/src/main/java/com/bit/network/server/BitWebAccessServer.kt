@@ -3,29 +3,34 @@ package com.bit.network.server
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.bit.data.AppSettingsDataStore
 import com.bit.data.VaultManager
 import com.bit.di.AppContainer
+import com.bit.engine.GenerationEvent
 import com.bit.models.messages.ContentType
 import com.bit.models.messages.MessageContent
 import com.bit.models.messages.Messages
 import com.bit.models.messages.Role
 import com.bit.models.table_schema.Model
+import com.bit.worker.ActiveModelSession
+import com.bit.worker.LlmModelWorker
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlin.coroutines.coroutineContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.*
 import java.net.*
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Pure Native Android ServerSocket HTTP/SSE Server.
- * Serves the compiled React Router SPA from Android assets with full REST/SSE APIs.
+ * Robust Native Android HTTP & Server-Sent Events (SSE) Server.
+ * Serves the React Router SPA web client from assets and provides full real-time REST & SSE APIs.
  */
 class BitWebAccessServer(private val context: Context) {
 
@@ -39,15 +44,24 @@ class BitWebAccessServer(private val context: Context) {
     private val _serverUrl = MutableStateFlow("")
     val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
 
-    private val _activePort = MutableStateFlow(8080)
+    private val _activePort = MutableStateFlow(7070)
     val activePort: StateFlow<Int> = _activePort.asStateFlow()
 
     private val _clientCount = MutableStateFlow(0)
     val clientCount: StateFlow<Int> = _clientCount.asStateFlow()
 
+    // SSE active client maps
+    private val conversationSseClients = ConcurrentHashMap<String, MutableSet<OutputStream>>()
+    private val settingsSseClients = ConcurrentHashMap.newKeySet<OutputStream>()
+    private val conversationListSseClients = ConcurrentHashMap.newKeySet<OutputStream>()
+
+    // Generation tracking
+    private val activeGenerations = ConcurrentHashMap<String, Job>()
+    private val sequenceCounter = AtomicInteger(1)
+
     companion object {
         private const val TAG = "BitWebAccessServer"
-        private const val DEFAULT_PORT = 8080
+        private const val DEFAULT_PORT = 7070
     }
 
     fun start(port: Int = DEFAULT_PORT): Boolean {
@@ -65,12 +79,12 @@ class BitWebAccessServer(private val context: Context) {
             _isRunning.value = true
 
             serverJob = scope.launch(Dispatchers.IO) {
-                Log.i(TAG, "BIT Web Access Server running on port $port")
+                Log.i(TAG, "BIT Web Access Server running on port $port (URL: http://$ipAddress:$port)")
                 while (isActive && !socket.isClosed) {
                     try {
                         val client = socket.accept()
                         client.tcpNoDelay = true
-                        client.soTimeout = 15000
+                        client.soTimeout = 30000
                         launch(Dispatchers.IO) {
                             handleClientSocket(client)
                         }
@@ -97,7 +111,16 @@ class BitWebAccessServer(private val context: Context) {
             serverJob = null
             serverSocket?.close()
             serverSocket = null
-            Log.i(TAG, "BIT Web Access Server stopped immediately")
+
+            // Stop all active generations
+            activeGenerations.values.forEach { it.cancel() }
+            activeGenerations.clear()
+
+            conversationSseClients.clear()
+            settingsSseClients.clear()
+            conversationListSseClients.clear()
+
+            Log.i(TAG, "BIT Web Access Server stopped")
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping server", e)
         }
@@ -133,7 +156,8 @@ class BitWebAccessServer(private val context: Context) {
         } catch (e: Exception) {
             emptyList<Model>()
         }
-        val activeModel = models.firstOrNull { it.isActive }
+        val activeGgufId = LlmModelWorker.currentGgufModelId.value
+        val activeModel = models.firstOrNull { it.modelName == activeGgufId || it.isActive } ?: models.firstOrNull()
         val assistantId = "default"
 
         val assistantObj = JSONObject().apply {
@@ -141,23 +165,90 @@ class BitWebAccessServer(private val context: Context) {
             put("name", "BIT Assistant")
             put("description", "On-Device Neural AI")
             put("model", activeModel?.modelName ?: "On-Device Local Model")
-            put("avatar", "")
+            put("avatar", JSONObject().apply {
+                put("type", "emoji")
+                put("content", "🤖")
+            })
+            put("useAssistantAvatar", false)
             put("prompt", "You are BIT AI, an intelligent on-device assistant.")
             put("temperature", 0.7)
             put("topP", 0.9)
             put("contextSize", 4096)
             put("maxTokens", 2048)
             put("systemPrompt", "")
+            put("tags", JSONArray())
+            put("quickMessages", JSONArray())
             put("presetMessages", JSONArray())
             put("skillIds", JSONArray())
+            put("modeInjectionIds", JSONArray())
+            put("lorebookIds", JSONArray())
+            put("mcpServers", JSONArray())
+            put("enableMemory", false)
+            put("chatModelId", activeModel?.modelName ?: "default")
         }
 
         val displaySetting = JSONObject().apply {
+            put("userNickname", "User")
+            put("showUserAvatar", true)
+            put("showModelIcon", true)
+            put("showModelName", true)
+            put("showAssistantBubbles", true)
+            put("showTokenUsage", true)
+            put("showThinkingContent", true)
+            put("autoCloseThinking", false)
+            put("codeBlockAutoWrap", true)
+            put("codeBlockAutoCollapse", false)
+            put("showLineNumbers", true)
+            put("sendOnEnter", true)
+            put("enableAutoScroll", true)
+            put("fontSizeRatio", 1.0)
+            put("pasteLongTextAsFile", false)
+            put("pasteLongTextThreshold", 4000)
             put("theme", "dark")
             put("fontSize", 14)
-            put("sendOnEnter", true)
             put("codeHighlighting", true)
         }
+
+        val modelsArray = JSONArray().apply {
+            for (m in models) {
+                put(JSONObject().apply {
+                    put("id", m.modelName)
+                    put("modelId", m.modelName)
+                    put("name", m.modelName)
+                    put("displayName", m.modelName)
+                    put("type", "CHAT")
+                    put("providerSlug", "local")
+                    put("iconUrl", "")
+                    put("customIconUri", "")
+                    put("inputModalities", JSONArray().apply { put("TEXT") })
+                    put("outputModalities", JSONArray().apply { put("TEXT") })
+                    put("abilities", JSONArray().apply {
+                        put("REASONING")
+                        put("TOOL")
+                    })
+                })
+            }
+            if (models.isEmpty()) {
+                put(JSONObject().apply {
+                    put("id", "default")
+                    put("modelId", "default")
+                    put("name", "On-Device Model")
+                    put("displayName", "On-Device Neural Model")
+                    put("type", "CHAT")
+                    put("providerSlug", "local")
+                    put("iconUrl", "")
+                    put("customIconUri", "")
+                    put("inputModalities", JSONArray().apply { put("TEXT") })
+                    put("outputModalities", JSONArray().apply { put("TEXT") })
+                    put("abilities", JSONArray().apply {
+                        put("REASONING")
+                        put("TOOL")
+                    })
+                })
+            }
+        }
+
+        val activeModelId = activeModel?.modelName ?: "default"
 
         return JSONObject().apply {
             put("status", "ONLINE")
@@ -170,24 +261,19 @@ class BitWebAccessServer(private val context: Context) {
             put("developerMode", false)
             put("displaySetting", displaySetting)
             put("enableWebSearch", true)
-            put("favoriteModels", JSONArray())
-            put("chatModelId", activeModel?.modelName ?: "default")
+            put("favoriteModels", JSONArray().apply { put(activeModelId) })
+            put("chatModelId", activeModelId)
             put("assistantId", assistantId)
             put("currentAssistantId", assistantId)
-            put("activeModel", activeModel?.modelName ?: "None Loaded")
-            put("modelType", if (activeModel != null) "Local GGUF" else "Standby")
+            put("activeModel", activeModelId)
+            put("modelType", if (LlmModelWorker.isGgufModelLoaded.value) "Local GGUF" else "Standby")
             put("providers", JSONArray().apply {
                 put(JSONObject().apply {
                     put("id", "local")
                     put("name", "On-Device Neural Engine")
                     put("type", "local")
-                    put("models", JSONArray().apply {
-                        put(JSONObject().apply {
-                            put("id", activeModel?.modelName ?: "default")
-                            put("name", activeModel?.modelName ?: "On-Device Local Model")
-                            put("type", "chat")
-                        })
-                    })
+                    put("enabled", true)
+                    put("models", modelsArray)
                 })
             })
             put("assistants", JSONArray().apply { put(assistantObj) })
@@ -203,7 +289,72 @@ class BitWebAccessServer(private val context: Context) {
         }
     }
 
-    // ── HTTP / SSE Request Handler ──
+    private suspend fun buildConversationDto(chatId: String): JSONObject {
+        val repo = VaultManager.chatRepo
+        val chatInfo = repo?.getAllChats()?.firstOrNull { it.chatId == chatId }
+        val messages = withTimeoutOrNull(2000) { repo?.getMessagesForChat(chatId) } ?: emptyList()
+
+        val nodesArray = JSONArray()
+        var nodeIdx = 0
+
+        for (msg in messages) {
+            val nodeId = "node-${msg.msgId}"
+            val roleStr = if (msg.role == Role.User) "user" else "assistant"
+            val partsArray = JSONArray().apply {
+                put(JSONObject().apply {
+                    put("type", "text")
+                    put("text", msg.content.content)
+                })
+            }
+
+            val msgDto = JSONObject().apply {
+                put("id", msg.msgId)
+                put("role", roleStr)
+                put("parts", partsArray)
+                put("createdAt", formatIsoTimestamp(msg.timestamp ?: System.currentTimeMillis()))
+                put("modelId", LlmModelWorker.currentGgufModelId.value ?: "default")
+            }
+
+            val nodeDto = JSONObject().apply {
+                put("id", nodeId)
+                put("messages", JSONArray().apply { put(msgDto) })
+                put("selectIndex", 0)
+            }
+            nodesArray.put(nodeDto)
+            nodeIdx++
+        }
+
+        val isGenerating = activeGenerations.containsKey(chatId)
+
+        return JSONObject().apply {
+            put("id", chatId)
+            put("assistantId", "default")
+            put("title", chatInfo?.title?.takeIf { it.isNotBlank() } ?: "Conversation")
+            put("messages", nodesArray)
+            put("enabledSkillIds", JSONArray())
+            put("truncateIndex", -1)
+            put("chatSuggestions", JSONArray())
+            put("isPinned", false)
+            put("createAt", chatInfo?.createdAt ?: System.currentTimeMillis())
+            put("updateAt", chatInfo?.lastMessageTime ?: System.currentTimeMillis())
+            put("isGenerating", isGenerating)
+            put("isFork", false)
+            put("isConsolidated", false)
+            put("contextSummary", JSONObject.NULL)
+            put("contextSummaryUpToIndex", -1)
+            put("lastPruneTime", 0L)
+            put("lastPruneMessageCount", 0)
+            put("lastRefreshTime", 0L)
+        }
+    }
+
+    private fun formatIsoTimestamp(epochMs: Long): String {
+        return java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }.format(java.util.Date(epochMs))
+    }
+
+    // ── HTTP / SSE Connection Handler ──
 
     private suspend fun handleClientSocket(socket: Socket) {
         var keepOpenForSse = false
@@ -211,334 +362,566 @@ class BitWebAccessServer(private val context: Context) {
             val input = BufferedReader(InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8))
             val output = BufferedOutputStream(socket.getOutputStream())
 
-            val requestLine = input.readLine() ?: return
-            val parts = requestLine.split(" ")
-            if (parts.size < 2) return
+            while (scope.isActive && !socket.isClosed) {
+                val requestLine = input.readLine() ?: break
+                if (requestLine.isBlank()) continue
 
-            val method = parts[0].uppercase()
-            val uri = parts[1]
-            val path = uri.substringBefore("?").trimEnd('/')
-            val query = if (uri.contains("?")) uri.substringAfter("?") else ""
+                val parts = requestLine.split(" ")
+                if (parts.size < 2) break
 
-            // Read headers
-            val headers = mutableMapOf<String, String>()
-            var contentLength = 0
-            while (true) {
-                val headerLine = input.readLine() ?: break
-                if (headerLine.isBlank()) break
-                val colonIdx = headerLine.indexOf(":")
-                if (colonIdx > 0) {
-                    val key = headerLine.substring(0, colonIdx).trim().lowercase()
-                    val value = headerLine.substring(colonIdx + 1).trim()
-                    headers[key] = value
-                    if (key == "content-length") {
-                        contentLength = value.toIntOrNull() ?: 0
-                    }
-                }
-            }
+                val method = parts[0].uppercase()
+                val uri = parts[1]
+                val path = uri.substringBefore("?").trimEnd('/')
+                val query = if (uri.contains("?")) uri.substringAfter("?") else ""
 
-            // Always read body if present
-            var bodyStr = ""
-            if (contentLength > 0) {
-                val bodyChars = CharArray(contentLength)
-                var readTotal = 0
-                while (readTotal < contentLength) {
-                    val read = input.read(bodyChars, readTotal, contentLength - readTotal)
-                    if (read == -1) break
-                    readTotal += read
-                }
-                bodyStr = String(bodyChars, 0, readTotal)
-            }
-            val bodyJson = try { if (bodyStr.isNotBlank()) JSONObject(bodyStr) else JSONObject() } catch (e: Exception) { JSONObject() }
-
-            // Handle CORS OPTIONS preflight
-            if (method == "OPTIONS") {
-                val res = "HTTP/1.1 204 No Content\r\n" +
-                        "Access-Control-Allow-Origin: *\r\n" +
-                        "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n" +
-                        "Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With\r\n\r\n"
-                output.write(res.toByteArray(StandardCharsets.UTF_8))
-                output.flush()
-                return
-            }
-
-            when {
-                // ── API ROUTES FOR LASTCHAT REACT SPA ──
-
-                // GET /api/settings/stream -> Settings SSE stream (Required by root.tsx useSettingsSubscription)
-                method == "GET" && path == "/api/settings/stream" -> {
-                    keepOpenForSse = true
-                    val sseHeader = "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: text/event-stream; charset=UTF-8\r\n" +
-                            "Cache-Control: no-cache\r\n" +
-                            "Connection: keep-alive\r\n" +
-                            "Access-Control-Allow-Origin: *\r\n\r\n"
-                    output.write(sseHeader.toByteArray(StandardCharsets.UTF_8))
-                    output.flush()
-
-                    // Send initial update event with full settings
-                    val settingsDto = buildFullSettingsDto()
-                    sendSsePayload(output, "update", settingsDto.toString())
-
-                    // Keep alive loop
-                    while (coroutineContext.isActive && !socket.isClosed) {
-                        try {
-                            output.write(": heartbeat\n\n".toByteArray(StandardCharsets.UTF_8))
-                            output.flush()
-                            delay(15000)
-                        } catch (e: Exception) {
-                            break
+                // Read request headers
+                val headers = mutableMapOf<String, String>()
+                var contentLength = 0
+                while (true) {
+                    val headerLine = input.readLine() ?: break
+                    if (headerLine.isBlank()) break
+                    val colonIdx = headerLine.indexOf(":")
+                    if (colonIdx > 0) {
+                        val key = headerLine.substring(0, colonIdx).trim().lowercase()
+                        val value = headerLine.substring(colonIdx + 1).trim()
+                        headers[key] = value
+                        if (key == "content-length") {
+                            contentLength = value.toIntOrNull() ?: 0
                         }
                     }
                 }
 
-                // GET /api/status or /api/settings or /api/bootstrap
-                method == "GET" && (path == "/api/status" || path == "/api/settings" || path == "/api/bootstrap") -> {
-                    sendJsonResponse(output, 200, buildFullSettingsDto())
-                }
-
-                // GET /api/conversations/stream -> SSE stream for list updates
-                method == "GET" && path == "/api/conversations/stream" -> {
-                    keepOpenForSse = true
-                    val sseHeader = "HTTP/1.1 200 OK\r\n" +
-                            "Content-Type: text/event-stream; charset=UTF-8\r\n" +
-                            "Cache-Control: no-cache\r\n" +
-                            "Connection: keep-alive\r\n" +
-                            "Access-Control-Allow-Origin: *\r\n\r\n"
-                    output.write(sseHeader.toByteArray(StandardCharsets.UTF_8))
-                    output.flush()
-
-                    // Send initial comment and keep alive loop
-                    while (coroutineContext.isActive && !socket.isClosed) {
-                        try {
-                            output.write(": heartbeat\n\n".toByteArray(StandardCharsets.UTF_8))
-                            output.flush()
-                            delay(15000)
-                        } catch (e: Exception) {
-                            break
-                        }
+                // Read request body if present
+                var bodyStr = ""
+                if (contentLength > 0) {
+                    val bodyChars = CharArray(contentLength)
+                    var readTotal = 0
+                    while (readTotal < contentLength) {
+                        val read = input.read(bodyChars, readTotal, contentLength - readTotal)
+                        if (read == -1) break
+                        readTotal += read
                     }
+                    bodyStr = String(bodyChars, 0, readTotal)
+                }
+                val bodyJson = try { if (bodyStr.isNotBlank()) JSONObject(bodyStr) else JSONObject() } catch (_: Exception) { JSONObject() }
+
+                // Handle CORS preflight
+                if (method == "OPTIONS") {
+                    val res = "HTTP/1.1 204 No Content\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n" +
+                            "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n" +
+                            "Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept\r\n\r\n"
+                    output.write(res.toByteArray(StandardCharsets.UTF_8))
+                    output.flush()
+                    continue
                 }
 
-                // GET /api/conversations/paged or /api/conversations or /api/chats
-                method == "GET" && (path == "/api/conversations/paged" || path == "/api/conversations" || path == "/api/chats") -> {
-                    val itemsArray = JSONArray()
-                    try {
-                        val repo = VaultManager.chatRepo
-                        if (repo != null) {
-                            val allChats = withTimeoutOrNull(2000) { repo.getAllChats() } ?: emptyList()
-                            for (chat in allChats) {
-                                itemsArray.put(JSONObject().apply {
-                                    put("id", chat.chatId)
-                                    put("title", if (!chat.title.isNullOrBlank()) chat.title else "Conversation")
-                                    put("isPinned", false)
-                                    put("createAt", chat.createdAt)
-                                    put("updateAt", chat.lastMessageTime ?: chat.createdAt)
-                                    put("isGenerating", false)
-                                    put("isConsolidated", false)
-                                    put("contextSummary", JSONObject.NULL)
-                                    put("contextSummaryUpToIndex", 0)
-                                    put("lastPruneTime", 0L)
-                                    put("lastPruneMessageCount", 0)
-                                    put("lastRefreshTime", chat.lastMessageTime ?: chat.createdAt)
-                                })
+                when {
+                    // ── SSE: Settings Stream ──
+                    method == "GET" && path == "/api/settings/stream" -> {
+                        keepOpenForSse = true
+                        startSseStream(output)
+                        settingsSseClients.add(output)
+
+                        // Send initial update event
+                        val settingsDto = buildFullSettingsDto()
+                        sendSsePayload(output, "update", settingsDto.toString())
+
+                        try {
+                            while (scope.isActive && !socket.isClosed) {
+                                output.write(": heartbeat\n\n".toByteArray(StandardCharsets.UTF_8))
+                                output.flush()
+                                delay(15000)
+                            }
+                        } finally {
+                            settingsSseClients.remove(output)
+                        }
+                        break
+                    }
+
+                    // ── SSE: Conversation List Stream ──
+                    method == "GET" && path == "/api/conversations/stream" -> {
+                        keepOpenForSse = true
+                        startSseStream(output)
+                        conversationListSseClients.add(output)
+
+                        try {
+                            while (scope.isActive && !socket.isClosed) {
+                                output.write(": heartbeat\n\n".toByteArray(StandardCharsets.UTF_8))
+                                output.flush()
+                                delay(15000)
+                            }
+                        } finally {
+                            conversationListSseClients.remove(output)
+                        }
+                        break
+                    }
+
+                    // ── SSE: Conversation Detail Stream (/api/conversations/:id/stream) ──
+                    method == "GET" && path.startsWith("/api/conversations/") && path.endsWith("/stream") -> {
+                        keepOpenForSse = true
+                        val chatId = path.removePrefix("/api/conversations/").removeSuffix("/stream").substringBefore("/")
+
+                        startSseStream(output)
+                        val clientSet = conversationSseClients.computeIfAbsent(chatId) { ConcurrentHashMap.newKeySet() }
+                        clientSet.add(output)
+
+                        // Send initial snapshot event
+                        val convDto = buildConversationDto(chatId)
+                        val snapshot = JSONObject().apply {
+                            put("type", "snapshot")
+                            put("seq", sequenceCounter.incrementAndGet())
+                            put("conversation", convDto)
+                            put("serverTime", System.currentTimeMillis())
+                        }
+                        sendSsePayload(output, "snapshot", snapshot.toString())
+
+                        try {
+                            while (scope.isActive && !socket.isClosed) {
+                                output.write(": heartbeat\n\n".toByteArray(StandardCharsets.UTF_8))
+                                output.flush()
+                                delay(15000)
+                            }
+                        } finally {
+                            clientSet.remove(output)
+                            if (clientSet.isEmpty()) {
+                                conversationSseClients.remove(chatId)
                             }
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error reading conversations", e)
+                        break
                     }
 
-                    if (path == "/api/conversations/paged") {
-                        val response = JSONObject().apply {
-                            put("items", itemsArray)
-                            put("nextOffset", JSONObject.NULL)
-                            put("hasMore", false)
-                        }
-                        sendJsonResponse(output, 200, response)
-                    } else {
-                        sendJsonResponse(output, 200, itemsArray)
-                    }
-                }
-
-                // POST /api/conversations -> Create new conversation
-                method == "POST" && path == "/api/conversations" -> {
-                    val newId = UUID.randomUUID().toString()
-                    try {
-                        VaultManager.chatRepo?.createChat(newId)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error creating chat $newId", e)
-                    }
-                    val json = JSONObject().apply {
-                        put("id", newId)
-                        put("assistantId", "default")
-                    }
-                    sendJsonResponse(output, 201, json)
-                }
-
-                // GET /api/conversations/:id or /api/messages
-                method == "GET" && (path.startsWith("/api/conversations/") || path == "/api/messages") -> {
-                    val chatId = if (path.startsWith("/api/conversations/")) {
-                        path.removePrefix("/api/conversations/").substringBefore("/")
-                    } else {
-                        parseQueryParams(query)["chatId"]
+                    // ── REST: Bootstrap & Status & Settings ──
+                    method == "GET" && (path == "/api/status" || path == "/api/settings" || path == "/api/bootstrap") -> {
+                        val settings = buildFullSettingsDto()
+                        sendJsonResponse(output, 200, settings)
                     }
 
-                    if (chatId.isNullOrBlank()) {
-                        sendJsonResponse(output, 400, JSONObject().apply { put("error", "Missing chatId") })
-                    } else {
-                        val nodesArray = JSONArray()
+                    // ── REST: AI Icon Proxy ──
+                    method == "GET" && path == "/api/ai-icon" -> {
+                        serveAssetFile(output, "ic_logo.svg")
+                    }
+
+                    // ── REST: Conversation List (Paged) ──
+                    method == "GET" && (path == "/api/conversations/paged" || path == "/api/conversations" || path == "/api/chats") -> {
+                        val itemsArray = JSONArray()
                         try {
                             val repo = VaultManager.chatRepo
                             if (repo != null) {
-                                val messages = withTimeoutOrNull(2000) { repo.getMessagesForChat(chatId) } ?: emptyList()
-                                var parentId: String? = null
-                                for (msg in messages) {
-                                    val nodeId = "node-${msg.msgId}"
-                                    val roleStr = if (msg.role == Role.User) "user" else "assistant"
-                                    val nodeObj = JSONObject().apply {
-                                        put("id", nodeId)
-                                        put("parentId", if (parentId != null) parentId else JSONObject.NULL)
-                                        put("selected", true)
-                                        put("message", JSONObject().apply {
-                                            put("id", msg.msgId)
-                                            put("role", roleStr)
-                                            put("createdAt", msg.timestamp)
-                                            put("parts", JSONArray().apply {
-                                                put(JSONObject().apply {
-                                                    put("type", "text")
-                                                    put("text", msg.content.content)
-                                                })
-                                            })
-                                        })
-                                    }
-                                    nodesArray.put(nodeObj)
-                                    parentId = nodeId
+                                val allChats = withTimeoutOrNull(2000) { repo.getAllChats() } ?: emptyList()
+                                for (chat in allChats) {
+                                    itemsArray.put(JSONObject().apply {
+                                        put("id", chat.chatId)
+                                        put("assistantId", "default")
+                                        put("title", if (!chat.title.isNullOrBlank()) chat.title else "Conversation")
+                                        put("isPinned", false)
+                                        put("createAt", chat.createdAt)
+                                        put("updateAt", chat.lastMessageTime ?: chat.createdAt)
+                                        put("isGenerating", activeGenerations.containsKey(chat.chatId))
+                                        put("isFork", false)
+                                        put("isConsolidated", false)
+                                        put("contextSummary", JSONObject.NULL)
+                                        put("contextSummaryUpToIndex", -1)
+                                        put("lastPruneTime", 0L)
+                                        put("lastPruneMessageCount", 0)
+                                        put("lastRefreshTime", chat.lastMessageTime ?: chat.createdAt)
+                                    })
                                 }
                             }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Error reading messages for $chatId", e)
+                            Log.e(TAG, "Error reading conversations", e)
                         }
 
-                        val convObj = JSONObject().apply {
-                            put("id", chatId)
-                            put("title", "Conversation")
+                        if (path == "/api/conversations/paged") {
+                            val response = JSONObject().apply {
+                                put("items", itemsArray)
+                                put("nextOffset", JSONObject.NULL)
+                                put("hasMore", false)
+                            }
+                            sendJsonResponse(output, 200, response)
+                        } else {
+                            sendJsonResponse(output, 200, itemsArray)
+                        }
+                    }
+
+                    // ── REST: Create Conversation ──
+                    method == "POST" && path == "/api/conversations" -> {
+                        val newId = UUID.randomUUID().toString()
+                        try {
+                            VaultManager.chatRepo?.createChat(newId)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error creating chat $newId", e)
+                        }
+                        val json = JSONObject().apply {
+                            put("id", newId)
                             put("assistantId", "default")
-                            put("isPinned", false)
-                            put("createAt", System.currentTimeMillis())
-                            put("updateAt", System.currentTimeMillis())
-                            put("isGenerating", false)
-                            put("isConsolidated", false)
-                            put("messages", nodesArray)
                         }
-                        sendJsonResponse(output, 200, convObj)
-                    }
-                }
-
-                // POST /api/conversations/:id/messages -> Send message & trigger reply
-                method == "POST" && (path.contains("/messages") || path == "/api/send") -> {
-                    val chatId = if (path.startsWith("/api/conversations/")) {
-                        path.removePrefix("/api/conversations/").substringBefore("/")
-                    } else {
-                        bodyJson.optString("chatId", UUID.randomUUID().toString())
+                        sendJsonResponse(output, 201, json)
                     }
 
-                    var userText = bodyJson.optString("prompt", bodyJson.optString("message", "")).trim()
-                    if (userText.isEmpty()) {
-                        val partsArr = bodyJson.optJSONArray("parts")
-                        if (partsArr != null && partsArr.length() > 0) {
-                            for (i in 0 until partsArr.length()) {
-                                val p = partsArr.optJSONObject(i)
-                                if (p?.optString("type") == "text") {
-                                    userText += p.optString("text", "")
+                    // ── REST: Get Conversation Details ──
+                    method == "GET" && (path.startsWith("/api/conversations/") || path == "/api/messages") -> {
+                        val chatId = if (path.startsWith("/api/conversations/")) {
+                            path.removePrefix("/api/conversations/").substringBefore("/")
+                        } else {
+                            parseQueryParams(query)["chatId"]
+                        }
+
+                        if (chatId.isNullOrBlank()) {
+                            sendJsonResponse(output, 400, JSONObject().apply { put("error", "Missing chatId") })
+                        } else {
+                            val convObj = buildConversationDto(chatId)
+                            sendJsonResponse(output, 200, convObj)
+                        }
+                    }
+
+                    // ── REST: Send Message & Trigger Real AI Inference ──
+                    method == "POST" && (path.contains("/messages") || path == "/api/send") -> {
+                        val chatId = if (path.startsWith("/api/conversations/")) {
+                            path.removePrefix("/api/conversations/").substringBefore("/")
+                        } else {
+                            bodyJson.optString("chatId", UUID.randomUUID().toString())
+                        }
+
+                        var userText = bodyJson.optString("prompt", bodyJson.optString("message", "")).trim()
+                        if (userText.isEmpty()) {
+                            val partsArr = bodyJson.optJSONArray("parts")
+                            if (partsArr != null && partsArr.length() > 0) {
+                                for (i in 0 until partsArr.length()) {
+                                    val p = partsArr.optJSONObject(i)
+                                    if (p?.optString("type") == "text") {
+                                        userText += p.optString("text", "")
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    if (userText.isNotEmpty()) {
-                        try {
+                        if (userText.isNotEmpty()) {
                             val repo = VaultManager.chatRepo
-                            if (repo != null) {
-                                val userMsg = Messages(
-                                    msgId = UUID.randomUUID().toString(),
-                                    role = Role.User,
-                                    content = MessageContent(contentType = ContentType.Text, content = userText),
-                                    timestamp = System.currentTimeMillis()
-                                )
-                                repo.addMessage(chatId, userMsg)
+                            val userMsgId = UUID.randomUUID().toString()
+                            val userMsg = Messages(
+                                msgId = userMsgId,
+                                role = Role.User,
+                                content = MessageContent(contentType = ContentType.Text, content = userText),
+                                timestamp = System.currentTimeMillis()
+                            )
+                            repo?.addMessage(chatId, userMsg)
 
-                                // Generate assistant response
-                                val models = try {
-                                    AppContainer.getModelRepository().getAllModels().first()
-                                } catch (e: Exception) {
-                                    emptyList<Model>()
-                                }
-                                val activeModel = models.firstOrNull { it.isActive }
-                                val replyText = if (activeModel != null) {
-                                    "Connected to on-device model **${activeModel.modelName}**.\n\nReceived your message: \"$userText\"."
-                                } else {
-                                    "Message received on your phone: \"$userText\". (No GGUF or Cloud API model is currently active in RAM)."
-                                }
-
-                                val assistantMsg = Messages(
-                                    msgId = UUID.randomUUID().toString(),
-                                    role = Role.Assistant,
-                                    content = MessageContent(contentType = ContentType.Text, content = replyText),
-                                    timestamp = System.currentTimeMillis()
-                                )
-                                repo.addMessage(chatId, assistantMsg)
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error storing message", e)
+                            // Launch live AI inference
+                            startInferenceForWebClient(chatId, userText)
                         }
+
+                        sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
                     }
 
-                    sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
-                }
-
-                // DELETE /api/conversations/:id
-                method == "DELETE" && path.startsWith("/api/conversations/") -> {
-                    val chatId = path.removePrefix("/api/conversations/").substringBefore("/")
-                    try {
-                        VaultManager.chatRepo?.deleteChat(chatId)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error deleting chat $chatId", e)
+                    // ── REST: Stop Generation ──
+                    method == "POST" && path.endsWith("/stop") -> {
+                        val chatId = path.removePrefix("/api/conversations/").removeSuffix("/stop").substringBefore("/")
+                        activeGenerations[chatId]?.cancel()
+                        activeGenerations.remove(chatId)
+                        LlmModelWorker.ggufStopGeneration()
+                        sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
                     }
-                    sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
-                }
 
-                // Other POST /api settings routes (pin, regenerate, assistant)
-                method == "POST" && path.startsWith("/api/") -> {
-                    sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
-                }
-
-                // ── STATIC ASSETS (React Router 7 SPA) ──
-                method == "GET" -> {
-                    val rawPath = uri.substringBefore("?")
-                    val assetPath = if (rawPath == "/" || rawPath == "/index.html" || !rawPath.contains(".")) {
-                        "index.html"
-                    } else {
-                        rawPath.removePrefix("/")
+                    // ── REST: Regenerate Last Message ──
+                    method == "POST" && path.endsWith("/regenerate") -> {
+                        val chatId = path.removePrefix("/api/conversations/").removeSuffix("/regenerate").substringBefore("/")
+                        val repo = VaultManager.chatRepo
+                        val msgs = repo?.getMessagesForChat(chatId) ?: emptyList()
+                        val lastUserMsg = msgs.lastOrNull { it.role == Role.User }
+                        if (lastUserMsg != null) {
+                            startInferenceForWebClient(chatId, lastUserMsg.content.content)
+                        }
+                        sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
                     }
-                    serveAssetFile(output, assetPath)
+
+                    // ── REST: Delete Conversation ──
+                    method == "DELETE" && path.startsWith("/api/conversations/") -> {
+                        val chatId = path.removePrefix("/api/conversations/").substringBefore("/")
+                        try {
+                            VaultManager.chatRepo?.deleteChat(chatId)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error deleting chat $chatId", e)
+                        }
+                        sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
+                    }
+
+                    // ── REST: Settings Updates (Assistant model, favorites, search) ──
+                    method == "POST" && path.startsWith("/api/settings/") -> {
+                        val settingsDataStore = AppSettingsDataStore(context)
+                        when {
+                            path.contains("/assistant/model") -> {
+                                val modelId = bodyJson.optString("modelId")
+                                if (modelId.isNotBlank()) {
+                                    scope.launch {
+                                        ActiveModelSession.set(modelId, com.bit.models.enums.ProviderType.GGUF)
+                                    }
+                                }
+                            }
+                            path.contains("/search/service") || path.contains("/search/enabled") -> {
+                                val provider = bodyJson.optString("provider", "duckduckgo")
+                                scope.launch {
+                                    settingsDataStore.saveWebSearchProvider(provider)
+                                }
+                            }
+                        }
+                        sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
+                    }
+
+                    // ── REST: Generic Fallback for other /api POSTs ──
+                    method == "POST" && path.startsWith("/api/") -> {
+                        sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
+                    }
+
+                    // ── STATIC ASSETS (React Router SPA) ──
+                    method == "GET" -> {
+                        val rawPath = uri.substringBefore("?")
+                        val assetPath = if (rawPath.isBlank() || rawPath == "/" || rawPath == "/index.html" || !rawPath.contains(".")) {
+                            "index.html"
+                        } else {
+                            rawPath.removePrefix("/")
+                        }
+                        serveAssetFile(output, assetPath)
+                    }
+
+                    else -> {
+                        sendJsonResponse(output, 404, JSONObject().apply { put("error", "Not found") })
+                    }
                 }
 
-                else -> {
-                    sendJsonResponse(output, 404, JSONObject().apply { put("error", "Not found") })
+                if (headers["connection"]?.equals("close", ignoreCase = true) == true) {
+                    break
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Client handling exception", e)
+            Log.d(TAG, "Socket loop terminated: ${e.message}")
         } finally {
             if (!keepOpenForSse) {
-                try { socket.close() } catch (ignored: Exception) {}
+                try { socket.close() } catch (_: Exception) {}
             }
         }
     }
 
+    // ── Real AI Inference for Web Access Clients ──
+
+    private fun startInferenceForWebClient(chatId: String, @Suppress("UNUSED_PARAMETER") userPrompt: String) {
+        activeGenerations[chatId]?.cancel()
+
+        val generationJob = scope.launch(Dispatchers.IO) {
+            val repo = VaultManager.chatRepo ?: return@launch
+            val assistantMsgId = UUID.randomUUID().toString()
+            val assistantNodeId = "node-$assistantMsgId"
+
+            val existingMsgs = repo.getMessagesForChat(chatId)
+            val nodeIndex = existingMsgs.size
+
+            val responseBuffer = StringBuilder()
+
+            // Emit initial empty assistant node
+            emitNodeUpdate(
+                chatId = chatId,
+                nodeId = assistantNodeId,
+                nodeIndex = nodeIndex,
+                messageId = assistantMsgId,
+                text = "",
+                isGenerating = true
+            )
+
+            try {
+                if (LlmModelWorker.isGgufModelLoaded.value) {
+                    // Multi-turn GGUF streaming
+                    val messagesJson = JSONArray().apply {
+                        for (m in existingMsgs) {
+                            put(JSONObject().apply {
+                                put("role", if (m.role == Role.User) "user" else "assistant")
+                                put("content", m.content.content)
+                            })
+                        }
+                    }.toString()
+
+                    var lastEmitTime = 0L
+                    LlmModelWorker.ggufGenerateMultiTurnStreaming(messagesJson, maxTokens = 2048).collect { event ->
+                        when (event) {
+                            is GenerationEvent.Token -> {
+                                responseBuffer.append(event.text)
+                                val now = System.currentTimeMillis()
+                                if (now - lastEmitTime > 60) {
+                                    lastEmitTime = now
+                                    emitNodeUpdate(
+                                        chatId = chatId,
+                                        nodeId = assistantNodeId,
+                                        nodeIndex = nodeIndex,
+                                        messageId = assistantMsgId,
+                                        text = responseBuffer.toString(),
+                                        isGenerating = true
+                                    )
+                                }
+                            }
+                            is GenerationEvent.Done -> {
+                                // Final save
+                                val assistantMsg = Messages(
+                                    msgId = assistantMsgId,
+                                    role = Role.Assistant,
+                                    content = MessageContent(contentType = ContentType.Text, content = responseBuffer.toString()),
+                                    timestamp = System.currentTimeMillis()
+                                )
+                                repo.addMessage(chatId, assistantMsg)
+
+                                emitNodeUpdate(
+                                    chatId = chatId,
+                                    nodeId = assistantNodeId,
+                                    nodeIndex = nodeIndex,
+                                    messageId = assistantMsgId,
+                                    text = responseBuffer.toString(),
+                                    isGenerating = false
+                                )
+                            }
+                            is GenerationEvent.Error -> {
+                                responseBuffer.append("\n\n[Error: ${event.message}]")
+                                val assistantMsg = Messages(
+                                    msgId = assistantMsgId,
+                                    role = Role.Assistant,
+                                    content = MessageContent(contentType = ContentType.Text, content = responseBuffer.toString()),
+                                    timestamp = System.currentTimeMillis()
+                                )
+                                repo.addMessage(chatId, assistantMsg)
+
+                                emitNodeUpdate(
+                                    chatId = chatId,
+                                    nodeId = assistantNodeId,
+                                    nodeIndex = nodeIndex,
+                                    messageId = assistantMsgId,
+                                    text = responseBuffer.toString(),
+                                    isGenerating = false
+                                )
+                            }
+                            else -> {}
+                        }
+                    }
+                } else {
+                    // No model loaded fallback message
+                    val fallbackText = "No on-device GGUF model is currently loaded in RAM on your Android phone.\n\nPlease open the BIT AI app on your phone and load a local model (or activate an API model) to start chatting."
+                    val assistantMsg = Messages(
+                        msgId = assistantMsgId,
+                        role = Role.Assistant,
+                        content = MessageContent(contentType = ContentType.Text, content = fallbackText),
+                        timestamp = System.currentTimeMillis()
+                    )
+                    repo.addMessage(chatId, assistantMsg)
+
+                    emitNodeUpdate(
+                        chatId = chatId,
+                        nodeId = assistantNodeId,
+                        nodeIndex = nodeIndex,
+                        messageId = assistantMsgId,
+                        text = fallbackText,
+                        isGenerating = false
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Inference error in web client handler", e)
+                val errText = responseBuffer.toString() + "\n\n[Generation interrupted: ${e.message}]"
+                emitNodeUpdate(
+                    chatId = chatId,
+                    nodeId = assistantNodeId,
+                    nodeIndex = nodeIndex,
+                    messageId = assistantMsgId,
+                    text = errText,
+                    isGenerating = false
+                )
+            } finally {
+                activeGenerations.remove(chatId)
+            }
+        }
+
+        activeGenerations[chatId] = generationJob
+    }
+
+    private fun emitNodeUpdate(
+        chatId: String,
+        nodeId: String,
+        nodeIndex: Int,
+        messageId: String,
+        text: String,
+        isGenerating: Boolean
+    ) {
+        val clients = conversationSseClients[chatId] ?: return
+        if (clients.isEmpty()) return
+
+        val msgDto = JSONObject().apply {
+            put("id", messageId)
+            put("role", "assistant")
+            put("parts", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("type", "text")
+                    put("text", text)
+                })
+            })
+            put("createdAt", formatIsoTimestamp(System.currentTimeMillis()))
+            put("modelId", LlmModelWorker.currentGgufModelId.value ?: "default")
+        }
+
+        val nodeDto = JSONObject().apply {
+            put("id", nodeId)
+            put("messages", JSONArray().apply { put(msgDto) })
+            put("selectIndex", 0)
+        }
+
+        val updateEvent = JSONObject().apply {
+            put("type", "node_update")
+            put("seq", sequenceCounter.incrementAndGet())
+            put("conversationId", chatId)
+            put("nodeId", nodeId)
+            put("nodeIndex", nodeIndex)
+            put("node", nodeDto)
+            put("updateAt", System.currentTimeMillis())
+            put("isGenerating", isGenerating)
+            put("serverTime", System.currentTimeMillis())
+        }
+
+        val payload = "event: node_update\ndata: $updateEvent\n\n"
+        val bytes = payload.toByteArray(StandardCharsets.UTF_8)
+
+        val deadClients = mutableListOf<OutputStream>()
+        for (client in clients) {
+            try {
+                client.write(bytes)
+                client.flush()
+            } catch (_: Exception) {
+                deadClients.add(client)
+            }
+        }
+        clients.removeAll(deadClients)
+    }
+
+    private fun startSseStream(output: OutputStream) {
+        val sseHeader = "HTTP/1.1 200 OK\r\n" +
+                "Content-Type: text/event-stream; charset=UTF-8\r\n" +
+                "Cache-Control: no-cache\r\n" +
+                "Connection: keep-alive\r\n" +
+                "Access-Control-Allow-Origin: *\r\n\r\n"
+        output.write(sseHeader.toByteArray(StandardCharsets.UTF_8))
+        output.flush()
+    }
+
     private fun serveAssetFile(output: OutputStream, assetPath: String) {
         try {
-            val bytes = context.assets.open(assetPath).use { it.readBytes() }
+            var bytes = context.assets.open(assetPath).use { it.readBytes() }
+
+            // Inject __LASTCHAT_WEB_BOOT__ into index.html
+            if (assetPath == "index.html" || assetPath.endsWith(".html")) {
+                var htmlStr = String(bytes, StandardCharsets.UTF_8)
+                if (!htmlStr.contains("__LASTCHAT_WEB_BOOT__")) {
+                    val bootScript = "<script>window.__LASTCHAT_WEB_BOOT__ = {\"authRequired\": false};</script>"
+                    htmlStr = if (htmlStr.contains("<head>")) {
+                        htmlStr.replace("<head>", "<head>$bootScript")
+                    } else {
+                        bootScript + htmlStr
+                    }
+                    bytes = htmlStr.toByteArray(StandardCharsets.UTF_8)
+                }
+            }
+
             val mimeType = guessMimeType(assetPath)
             val cacheControl = if (assetPath.startsWith("assets/")) "public, max-age=31536000, immutable" else "no-cache"
 
@@ -547,13 +930,13 @@ class BitWebAccessServer(private val context: Context) {
                     "Content-Length: ${bytes.size}\r\n" +
                     "Cache-Control: $cacheControl\r\n" +
                     "Access-Control-Allow-Origin: *\r\n" +
-                    "Connection: close\r\n\r\n"
+                    "Connection: keep-alive\r\n\r\n"
 
             output.write(header.toByteArray(StandardCharsets.UTF_8))
             output.write(bytes)
             output.flush()
-        } catch (e: Exception) {
-            // Fallback for SPA routing to index.html
+        } catch (_: Exception) {
+            // SPA routing fallback
             if (assetPath != "index.html") {
                 serveAssetFile(output, "index.html")
             } else {
@@ -582,9 +965,9 @@ class BitWebAccessServer(private val context: Context) {
     private fun parseQueryParams(query: String): Map<String, String> {
         if (query.isBlank()) return emptyMap()
         return query.split("&").associate {
-            val parts = it.split("=")
-            if (parts.size == 2) URLDecoder.decode(parts[0], "UTF-8") to URLDecoder.decode(parts[1], "UTF-8")
-            else URLDecoder.decode(parts[0], "UTF-8") to ""
+            val p = it.split("=")
+            if (p.size == 2) URLDecoder.decode(p[0], "UTF-8") to URLDecoder.decode(p[1], "UTF-8")
+            else URLDecoder.decode(p[0], "UTF-8") to ""
         }
     }
 
@@ -601,7 +984,7 @@ class BitWebAccessServer(private val context: Context) {
                 "Content-Type: application/json; charset=UTF-8\r\n" +
                 "Content-Length: ${bytes.size}\r\n" +
                 "Access-Control-Allow-Origin: *\r\n" +
-                "Connection: close\r\n\r\n"
+                "Connection: keep-alive\r\n\r\n"
         output.write(header.toByteArray(StandardCharsets.UTF_8))
         output.write(bytes)
         output.flush()
@@ -614,7 +997,7 @@ class BitWebAccessServer(private val context: Context) {
                 "Content-Type: application/json; charset=UTF-8\r\n" +
                 "Content-Length: ${bytes.size}\r\n" +
                 "Access-Control-Allow-Origin: *\r\n" +
-                "Connection: close\r\n\r\n"
+                "Connection: keep-alive\r\n\r\n"
         output.write(header.toByteArray(StandardCharsets.UTF_8))
         output.write(bytes)
         output.flush()

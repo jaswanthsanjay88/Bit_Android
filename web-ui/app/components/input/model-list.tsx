@@ -37,8 +37,8 @@ interface ModelSection {
 
 const FAVORITE_SECTION_ID = "__favorites__";
 
-function normalizeKeyword(value: string) {
-  return value.trim().toLowerCase();
+function normalizeKeyword(value?: string | null) {
+  return (value ?? "").trim().toLowerCase();
 }
 
 function formatModality(model: ProviderModel): string {
@@ -197,8 +197,9 @@ export function ModelList({ disabled = false, className, onChanged }: ModelListP
             return true;
           }
 
-          const displayName = getModelDisplayName(model.displayName, model.modelId).toLowerCase();
-          const modelId = model.modelId.toLowerCase();
+          const modelKey = model.modelId ?? model.id ?? "";
+          const displayName = getModelDisplayName(model.displayName, modelKey).toLowerCase();
+          const modelId = modelKey.toLowerCase();
           return displayName.includes(keyword) || modelId.includes(keyword);
         });
 
@@ -229,12 +230,12 @@ export function ModelList({ disabled = false, className, onChanged }: ModelListP
   const displayedModels = isFavoriteSectionSelected ? favoriteModels : (selectedSection?.models ?? []);
 
   const currentModel = React.useMemo(
-    () => allModels.find((model) => model.id === currentModelId) ?? null,
+    () => allModels.find((model) => model.id === currentModelId || (model.modelId && model.modelId === currentModelId)) ?? null,
     [allModels, currentModelId],
   );
 
   const currentModelLabel = currentModel
-    ? getModelDisplayName(currentModel.displayName, currentModel.modelId)
+    ? getModelDisplayName(currentModel.displayName, currentModel.modelId ?? currentModel.id ?? "")
     : t("model_list.select_model");
 
   React.useEffect(() => {

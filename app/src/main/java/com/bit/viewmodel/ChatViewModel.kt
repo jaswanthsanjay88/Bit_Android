@@ -78,7 +78,8 @@ class ChatViewModel @Inject constructor(
     @ApplicationContext context: Context,
     private val chatManager: ChatManager,
     private val globalRagOrchestrator: com.bit.worker.GlobalRagOrchestrator,
-    private val aiMemoryWriter: com.bit.data.AiMemoryWriter
+    private val aiMemoryWriter: com.bit.data.AiMemoryWriter,
+    private val mcpManager: com.bit.mcp.McpManager
 ) : ViewModel() {
 
     private val appContext = context
@@ -313,11 +314,27 @@ class ChatViewModel @Inject constructor(
     val modelSupportsThinking: StateFlow<Boolean> = _modelSupportsThinking.asStateFlow()
 
     fun toggleThinkingMode() {
-        _thinkingModeEnabled.value = !_thinkingModeEnabled.value
+        val next = !_thinkingModeEnabled.value
+        _thinkingModeEnabled.value = next
+        viewModelScope.launch {
+            try {
+                appSettings.updateThinkingModeEnabled(next)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to persist thinkingModeEnabled: ${e.message}")
+            }
+        }
     }
 
     fun setThinkingMode(enabled: Boolean) {
+        if (_thinkingModeEnabled.value == enabled) return
         _thinkingModeEnabled.value = enabled
+        viewModelScope.launch {
+            try {
+                appSettings.updateThinkingModeEnabled(enabled)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to persist thinkingModeEnabled: ${e.message}")
+            }
+        }
     }
 
     // Model state
@@ -474,6 +491,17 @@ class ChatViewModel @Inject constructor(
             }
         }
 
+        // Load persisted thinking / reasoning mode preference
+        viewModelScope.launch {
+            try {
+                appSettings.thinkingModeEnabled.collect { saved ->
+                    _thinkingModeEnabled.value = saved
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to load thinkingModeEnabled: ${e.message}")
+            }
+        }
+
         // Check thinking support whenever text model loads/unloads or type changes
         viewModelScope.launch {
             kotlinx.coroutines.flow.combine(
@@ -490,7 +518,7 @@ class ChatViewModel @Inject constructor(
                     // Do not auto-disable thinking mode; allow user to force enable it
                 } else {
                     _modelSupportsThinking.value = false
-                    _thinkingModeEnabled.value = false
+                    // Preserve user toggle preference across unloads / app launches
                 }
             }
         }
@@ -880,7 +908,6 @@ class ChatViewModel @Inject constructor(
                                         messagesJsonList.add(JSONObject().put("role", "assistant").put("content", msg.content.content))
                                     }
                                 }
-                                else -> {}
                             }
                         }
                     }
@@ -1161,6 +1188,9 @@ class ChatViewModel @Inject constructor(
         var finalResponse = ""
         var round = 0
         val maxRounds = 5
+        var totalTokensAccumulated = 0
+        var totalTimeMsAccumulated = 0f
+        var firstTokenTimeOverall = 0f
 
         val enabledNames = PluginManager.getEnabledToolNames().map { normalizeToolName(it) }.toSet()
 
@@ -1168,7 +1198,7 @@ class ChatViewModel @Inject constructor(
             round++
             Log.d(TAG, "Unified tool loop: starting round $round")
 
-            val currentRoundHasTools = hasTools && steps.isEmpty()
+            val currentRoundHasTools = hasTools && round < maxRounds
 
             // Build conversation messages for this turn
             val conversationMessages = buildConversationMessagesWithSteps(fullPrompt, steps, isRegeneration, currentRoundHasTools)
@@ -1179,6 +1209,14 @@ class ChatViewModel @Inject constructor(
                 generateRemoteUnified(conversationMessages, steps, currentRoundHasTools, maxTokens)
             } else {
                 generateGgufUnified(conversationMessages, hasTools = currentRoundHasTools, maxTokens = maxTokens)
+            }
+
+            result.metrics?.let { m ->
+                totalTokensAccumulated += m.tokensPredicted
+                totalTimeMsAccumulated += m.totalTimeMs
+                if (firstTokenTimeOverall == 0f && m.timeToFirstTokenMs > 0f) {
+                    firstTokenTimeOverall = m.timeToFirstTokenMs
+                }
             }
 
             if (result.toolCalls.isEmpty()) {
@@ -1294,15 +1332,67 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        // Clean final response and update state
-        val cleanResponse = filterToolCallSyntax(finalResponse).trim()
+        // Clean final response
+        var cleanResponse = filterToolCallSyntax(finalResponse).trim()
+
+        // If tools executed but no natural-language final response was provided, run a synthesis pass
+        if (steps.isNotEmpty() && cleanResponse.isBlank()) {
+            AppStateManager.setGeneratingText()
+            _agentPhase.value = AgentPhase.Summarizing
+            val synthesisMessages = buildConversationMessagesWithSteps(fullPrompt, steps, isRegeneration, hasTools = false)
+            val synthResult = if (activeProviderType == ProviderType.API) {
+                generateRemoteUnified(synthesisMessages, steps, hasTools = false, maxTokens = maxTokens)
+            } else {
+                generateGgufUnified(synthesisMessages, hasTools = false, maxTokens = maxTokens)
+            }
+            synthResult.metrics?.let { m ->
+                totalTokensAccumulated += m.tokensPredicted
+                totalTimeMsAccumulated += m.totalTimeMs
+            }
+            cleanResponse = filterToolCallSyntax(synthResult.text).trim()
+        }
+
+        // Calculate overall accumulated metrics
+        val overallTps = if (totalTimeMsAccumulated > 0f) (totalTokensAccumulated / (totalTimeMsAccumulated / 1000f)) else 0f
+        currentMetrics = com.bit.models.engine_schema.DecodingMetrics(
+            tokensPerSecond = overallTps,
+            timeToFirstTokenMs = firstTokenTimeOverall,
+            totalTimeMs = totalTimeMsAccumulated,
+            tokensPredicted = totalTokensAccumulated
+        )
+
         _streamingAssistantMessage.value = cleanResponse
 
         // Save to DB and finish
         _agentPhase.value = if (steps.isNotEmpty()) AgentPhase.Complete else AgentPhase.Idle
 
         if (steps.isNotEmpty()) {
-            val finalSummary = cleanResponse.takeIf { it.isNotBlank() } ?: "Tool execution completed, but the model failed to generate a final answer. Please view the tool outputs in the trace panel below."
+            val finalSummary = if (cleanResponse.isNotBlank()) {
+                cleanResponse
+            } else {
+                buildString {
+                    appendLine("Completed the requested actions in your workspace:")
+                    steps.forEach { s ->
+                        val name = s.toolName.replace('_', ' ').replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                        val snippet = runCatching {
+                            val json = JSONObject(s.result)
+                            when {
+                                json.has("content") && s.toolName.contains("read", ignoreCase = true) -> "Read file `${json.optString("path")}` (${json.optString("content").length} chars)"
+                                json.has("sizeBytes") && s.toolName.contains("write", ignoreCase = true) -> "Wrote file `${json.optString("path")}` (${json.optLong("sizeBytes", 0)} bytes)"
+                                json.has("path") && s.toolName.contains("edit", ignoreCase = true) -> "Edited file `${json.optString("path")}`"
+                                json.has("stdout") && json.getString("stdout").isNotBlank() -> json.getString("stdout").trim().take(300)
+                                json.has("output") -> json.getString("output").trim().take(300)
+                                json.has("stderr") && json.getString("stderr").isNotBlank() -> "Error: ${json.getString("stderr").trim().take(300)}"
+                                json.has("content") -> "Content: ${json.getString("content").trim().take(200)}"
+                                json.has("status") -> "Status: ${json.getString("status")}"
+                                else -> s.result.trim().take(200)
+                            }
+                        }.getOrDefault(s.result.trim().take(200))
+                        appendLine("• **$name**: $snippet")
+                    }
+                }.trim()
+            }
+            _streamingAssistantMessage.value = finalSummary
             _agentSummary.value = finalSummary
             persistAgentChat(prompt, isNewChat, "Determine if any tools are needed to answer the query.", steps, finalSummary)
         } else {
@@ -1391,7 +1481,7 @@ class ChatViewModel @Inject constructor(
             val contentText = if (step.toolName == "web_search") {
                 "Tool '${step.toolName}' result: $formattedResult\n\n[Instruction: If the search results above do not clearly state a fact, state that you cannot find it. Do not invent or assume any details.]"
             } else {
-                "Tool '${step.toolName}' result: $formattedResult"
+                "Tool '${step.toolName}' result:\n$formattedResult\n\n[Instruction: You may call another tool if further steps are needed (e.g. running the script or inspecting files), or provide your full final answer to the user.]"
             }
             
             result.add(JSONObject().put("role", "user").put("content", contentText))
@@ -1481,6 +1571,14 @@ class ChatViewModel @Inject constructor(
 
         provider.generateResponse(chatMessages, config).collect { event ->
             when (event) {
+                is StreamEvent.Retrying -> {
+                    // Reset accumulators on retry so reconnecting does not duplicate text or thought blocks
+                    textBuilder.setLength(0)
+                    thinkBuilder.setLength(0)
+                    toolCalls.clear()
+                    tokenCount = 0
+                    firstTokenTimeMs = 0L
+                }
                 is StreamEvent.TextChunk -> {
                     if (firstTokenTimeMs == 0L) {
                         firstTokenTimeMs = System.currentTimeMillis()
@@ -1489,7 +1587,12 @@ class ChatViewModel @Inject constructor(
                     textBuilder.append(event.text)
                     val now = System.currentTimeMillis()
                     if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                        val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                        val hasThinkInText = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+                        val output = if (thinkBuilder.isNotEmpty() && !hasThinkInText) {
+                            "<think>${thinkBuilder}</think>${textBuilder}"
+                        } else {
+                            textBuilder.toString()
+                        }
                         _streamingAssistantMessage.value = output
                         lastEmitTime = now
                     }
@@ -1502,7 +1605,12 @@ class ChatViewModel @Inject constructor(
                     thinkBuilder.append(event.thought)
                     val now = System.currentTimeMillis()
                     if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                        val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                        val hasThinkInText = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+                        val output = if (thinkBuilder.isNotEmpty() && !hasThinkInText) {
+                            "<think>${thinkBuilder}</think>${textBuilder}"
+                        } else {
+                            textBuilder.toString()
+                        }
                         _streamingAssistantMessage.value = output
                         lastEmitTime = now
                     }
@@ -1525,7 +1633,12 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        val text = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder.toString().trim()}" else textBuilder.toString().trim()
+        val hasThinkInText = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+        val text = if (thinkBuilder.isNotEmpty() && !hasThinkInText) {
+            "<think>${thinkBuilder}</think>${textBuilder.toString().trim()}"
+        } else {
+            textBuilder.toString().trim()
+        }
         if (text.isNotEmpty()) {
             _streamingAssistantMessage.value = text
         }
@@ -1536,12 +1649,13 @@ class ChatViewModel @Inject constructor(
         val timeToFirstToken = if (firstTokenTimeMs > 0L) (firstTokenTimeMs - startTimeMs).toFloat() else totalTimeMs
         val tokensPerSec = if (totalTimeMs > 0) (tokenCount / (totalTimeMs / 1000f)) else 0f
         
-        currentMetrics = com.bit.models.engine_schema.DecodingMetrics(
+        val metrics = com.bit.models.engine_schema.DecodingMetrics(
             tokensPerSecond = tokensPerSec,
             timeToFirstTokenMs = timeToFirstToken,
             totalTimeMs = totalTimeMs,
             tokensPredicted = tokenCount
         )
+        currentMetrics = metrics
 
         if (finalToolCalls.isEmpty() && text.isNotBlank()) {
             parseToolCallsFromText(text)?.let { parsed ->
@@ -1549,7 +1663,7 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        return GenerationResult(text = text, toolCalls = finalToolCalls)
+        return GenerationResult(text = text, toolCalls = finalToolCalls, metrics = metrics)
     }
 
     private suspend fun generateGgufUnified(
@@ -1583,7 +1697,8 @@ class ChatViewModel @Inject constructor(
                             textBuilder.append(text)
                             val now = System.currentTimeMillis()
                             if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                                val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                                val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+                                val output = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
                                 _streamingAssistantMessage.value = output
                                 lastEmitTime = now
                             }
@@ -1592,7 +1707,8 @@ class ChatViewModel @Inject constructor(
                             thinkBuilder.append(thought)
                             val now = System.currentTimeMillis()
                             if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                                val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                                val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+                                val output = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
                                 _streamingAssistantMessage.value = output
                                 lastEmitTime = now
                             }
@@ -1613,14 +1729,16 @@ class ChatViewModel @Inject constructor(
                         onText = { textBuilder.append(it) },
                         onThought = { thinkBuilder.append(it) }
                     )
-                    val output = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                    val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+                    val output = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
                     _streamingAssistantMessage.value = output
                 }
                 else -> {}
             }
         }
 
-        val text = if (thinkBuilder.isNotEmpty()) "<think>${thinkBuilder}</think>${textBuilder.toString().trim()}" else textBuilder.toString().trim()
+        val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+        val text = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>${textBuilder.toString().trim()}" else textBuilder.toString().trim()
         val finalToolCalls = mutableListOf<Pair<String, String>>()
         finalToolCalls.addAll(toolCalls)
 
@@ -1634,7 +1752,7 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        return GenerationResult(text = text, toolCalls = finalToolCalls)
+        return GenerationResult(text = text, toolCalls = finalToolCalls, metrics = currentMetrics)
     }
 
     private suspend fun persistAgentChat(
@@ -1884,7 +2002,8 @@ class ChatViewModel @Inject constructor(
 
     private data class GenerationResult(
         val text: String,
-        val toolCalls: List<Pair<String, String>> = emptyList()
+        val toolCalls: List<Pair<String, String>> = emptyList(),
+        val metrics: com.bit.models.engine_schema.DecodingMetrics? = null
     )
 
     /** Generate text, streaming to UI. Collects any native ToolCall events. */
@@ -2340,6 +2459,17 @@ class ChatViewModel @Inject constructor(
                 "$compiledPrompt\n\n$skillsPrompt"
             } else {
                 skillsPrompt
+            }
+        }
+
+        val mcpPrompt = if (hasTools && PluginManager.hasEnabledTools()) {
+            mcpManager.getMcpCatalogPrompt()
+        } else ""
+        if (mcpPrompt.isNotBlank()) {
+            compiledPrompt = if (compiledPrompt.isNotBlank()) {
+                "$compiledPrompt\n\n$mcpPrompt"
+            } else {
+                mcpPrompt
             }
         }
 

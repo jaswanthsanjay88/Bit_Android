@@ -44,7 +44,7 @@ class WebServerService : Service() {
         private const val CHANNEL_ID = "bit_web_server_channel"
         private const val TAG = "WebServerService"
 
-        fun start(context: Context, port: Int = 8080) {
+        fun start(context: Context, port: Int = 7070) {
             val intent = Intent(context, WebServerService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_PORT, port)
@@ -78,7 +78,7 @@ class WebServerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val port = intent.getIntExtra(EXTRA_PORT, 8080)
+                val port = intent.getIntExtra(EXTRA_PORT, 7070)
                 startForegroundCompat(buildNotification("BIT Web Server Active on port $port"))
                 acquireWifiLock()
                 if (!webAccessManager.isRunning.value) {
@@ -191,10 +191,16 @@ class WebServerService : Service() {
         manager?.notify(NOTIFICATION_ID, notification)
     }
 
+    @Suppress("DEPRECATION")
     private fun acquireWifiLock() {
         if (wifiLock == null) {
             val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            wifiLock = wm?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "bit:web_server")
+            val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+            } else {
+                WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            }
+            wifiLock = wm?.createWifiLock(mode, "bit:web_server")
             wifiLock?.setReferenceCounted(false)
         }
         wifiLock?.acquire()

@@ -57,6 +57,42 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // ── Skill Manager (Agent Skills & Prompt Capabilities) ──
     val skillManager = com.bit.skills.SkillManager(application)
 
+    // ── App Storage & Diagnostics ──
+    val storageRepository = com.bit.repo.AppStorageRepository(application)
+    val storageSnapshot: StateFlow<com.bit.repo.AppStorageSnapshot> = storageRepository.snapshot
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.repo.AppStorageSnapshot(isScanning = true))
+
+    fun refreshStorage() {
+        viewModelScope.launch {
+            storageRepository.refresh()
+        }
+    }
+
+    suspend fun listStorageCategoryFiles(categoryId: String): List<com.bit.repo.StorageFileItem> {
+        return storageRepository.listCategoryFiles(categoryId)
+    }
+
+    fun deleteStorageFile(path: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val success = storageRepository.deleteFile(path)
+            onResult(success)
+        }
+    }
+
+    fun clearTempCache(onFreed: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val freed = storageRepository.clearTempCache()
+            onFreed(freed)
+        }
+    }
+
+    fun vacuumDatabase(onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val success = storageRepository.vacuumDatabase()
+            onResult(success)
+        }
+    }
+
     // ── HuggingFace Token ──
     private val hfTokenManager = HuggingFaceTokenManager(application)
     private val _hfTokenState = MutableStateFlow(
@@ -81,6 +117,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _hfTokenState.value = if (!token.isNullOrBlank()) HfTokenState.SET else HfTokenState.NOT_SET
             }
         }
+
+        // Initialize storage & diagnostics scan
+        refreshStorage()
     }
 
     fun saveHfToken(token: String) {
@@ -570,39 +609,94 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // ── App Storage & Diagnostics ──
-    val storageRepository = com.bit.repo.AppStorageRepository(application)
-    val storageSnapshot: StateFlow<com.bit.repo.AppStorageSnapshot> = storageRepository.snapshot
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.repo.AppStorageSnapshot(isScanning = true))
+    // ── Theme & Font Customization ──
+    val fontManager = com.bit.utils.FontFileManager(application)
 
-    fun refreshStorage() {
+    private val _customFontsList = MutableStateFlow(fontManager.listCustomFonts())
+    val customFontsList: StateFlow<List<com.bit.utils.CustomFontItem>> = _customFontsList
+
+    val colorMode: StateFlow<com.bit.ui.theme.ColorMode> = appSettingsDataStore.colorMode
+        .map { modeStr ->
+            runCatching { com.bit.ui.theme.ColorMode.valueOf(modeStr) }.getOrDefault(com.bit.ui.theme.ColorMode.SYSTEM)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.ui.theme.ColorMode.SYSTEM)
+
+    fun setColorMode(mode: com.bit.ui.theme.ColorMode) {
         viewModelScope.launch {
-            storageRepository.refresh()
+            appSettingsDataStore.saveColorMode(mode.name)
         }
     }
 
-    suspend fun listStorageCategoryFiles(categoryId: String): List<com.bit.repo.StorageFileItem> {
-        return storageRepository.listCategoryFiles(categoryId)
-    }
+    val dynamicColorEnabled: StateFlow<Boolean> = appSettingsDataStore.dynamicColorEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
-    fun deleteStorageFile(path: String, onResult: (Boolean) -> Unit = {}) {
+    fun setDynamicColorEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            val success = storageRepository.deleteFile(path)
-            onResult(success)
+            appSettingsDataStore.saveDynamicColorEnabled(enabled)
         }
     }
 
-    fun clearTempCache(onFreed: (Long) -> Unit = {}) {
+    val themePresetId: StateFlow<String> = appSettingsDataStore.themePresetId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "obsidian")
+
+    fun setThemePresetId(id: String) {
         viewModelScope.launch {
-            val freed = storageRepository.clearTempCache()
-            onFreed(freed)
+            appSettingsDataStore.saveThemePresetId(id)
         }
     }
 
-    fun vacuumDatabase(onResult: (Boolean) -> Unit = {}) {
+    val fontFamily: StateFlow<com.bit.ui.theme.BuiltinFont> = appSettingsDataStore.fontFamily
+        .map { fontStr ->
+            runCatching { com.bit.ui.theme.BuiltinFont.valueOf(fontStr) }.getOrDefault(com.bit.ui.theme.BuiltinFont.MANROPE)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.ui.theme.BuiltinFont.MANROPE)
+
+    fun setFontFamily(font: com.bit.ui.theme.BuiltinFont) {
         viewModelScope.launch {
-            val success = storageRepository.vacuumDatabase()
-            onResult(success)
+            appSettingsDataStore.saveFontFamily(font.name)
+        }
+    }
+
+    val customFontPath: StateFlow<String> = appSettingsDataStore.customFontPath
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    fun setCustomFontPath(path: String) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveCustomFontPath(path)
+        }
+    }
+
+    val fontScale: StateFlow<Float> = appSettingsDataStore.fontScale
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
+
+    fun setFontScale(scale: Float) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveFontScale(scale)
+        }
+    }
+
+    fun importCustomFont(uri: Uri, name: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val path = fontManager.importFont(uri, name)
+            if (path != null) {
+                _customFontsList.value = fontManager.listCustomFonts()
+                appSettingsDataStore.saveCustomFontPath(path)
+                appSettingsDataStore.saveFontFamily(com.bit.ui.theme.BuiltinFont.CUSTOM.name)
+                onResult(true)
+            } else {
+                onResult(false)
+            }
+        }
+    }
+
+    fun deleteCustomFont(path: String) {
+        viewModelScope.launch {
+            fontManager.deleteFont(path)
+            _customFontsList.value = fontManager.listCustomFonts()
+            if (customFontPath.value == path) {
+                appSettingsDataStore.saveCustomFontPath("")
+                appSettingsDataStore.saveFontFamily(com.bit.ui.theme.BuiltinFont.MANROPE.name)
+            }
         }
     }
 }

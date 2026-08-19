@@ -284,7 +284,7 @@ internal fun FloatingTtsPlayer(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Color.White)
+                    .background(MaterialTheme.colorScheme.primary)
                     .clickable { onPlayPauseToggle() },
                 contentAlignment = Alignment.Center
             ) {
@@ -292,13 +292,13 @@ internal fun FloatingTtsPlayer(
                     androidx.compose.material3.CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
-                        color = Color.Black
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
                     Icon(
                         imageVector = iconVector,
                         contentDescription = "Play or Pause",
-                        tint = Color.Black,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -313,13 +313,13 @@ internal fun FloatingTtsPlayer(
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium
                 ),
-                color = Color.White
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             Spacer(Modifier.width(4.dp))
 
             // Spacer divider line or dots
-            Text(text = " • ", color = Color(0x66FFFFFF), fontSize = 12.sp)
+            Text(text = " • ", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 12.sp)
 
             Spacer(Modifier.width(4.dp))
 
@@ -351,7 +351,7 @@ internal fun FloatingTtsPlayer(
                         modifier = Modifier
                             .width(2.dp)
                             .height(baseHeight * animatedHeight)
-                            .background(Color.White, RoundedCornerShape(1.dp))
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(1.dp))
                     )
                 }
             }

@@ -50,6 +50,13 @@ class AppSettingsDataStore(private val context: Context) {
         private val GLOBAL_PREPEND_PROMPT = stringPreferencesKey("global_prepend_prompt")
         private val GLOBAL_POSTPEND_PROMPT = stringPreferencesKey("global_postpend_prompt")
         private val HAS_SEEN_MEMORY_IMPORT_PROMPT = booleanPreferencesKey("has_seen_memory_import_prompt")
+        private val COLOR_MODE = stringPreferencesKey("color_mode")
+        private val DYNAMIC_COLOR_ENABLED = booleanPreferencesKey("dynamic_color_enabled")
+        private val THINKING_MODE_ENABLED = booleanPreferencesKey("thinking_mode_enabled")
+        private val THEME_PRESET_ID = stringPreferencesKey("theme_preset_id")
+        private val FONT_FAMILY = stringPreferencesKey("font_family")
+        private val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
+        private val FONT_SCALE = androidx.datastore.preferences.core.floatPreferencesKey("font_scale")
     }
 
     val localServerEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
@@ -61,7 +68,7 @@ class AppSettingsDataStore(private val context: Context) {
     }
 
     val localServerPort: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
-        prefs[LOCAL_SERVER_PORT] ?: 8080
+        prefs[LOCAL_SERVER_PORT] ?: 7070
     }
 
     suspend fun updateLocalServerPort(port: Int) {
@@ -126,6 +133,14 @@ class AppSettingsDataStore(private val context: Context) {
 
     val codeHighlightEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
         prefs[CODE_HIGHLIGHT_ENABLED] ?: true
+    }
+
+    val thinkingModeEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[THINKING_MODE_ENABLED] ?: false
+    }
+
+    suspend fun updateThinkingModeEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[THINKING_MODE_ENABLED] = enabled }
     }
 
     suspend fun updateStreamingEnabled(enabled: Boolean) {
@@ -361,6 +376,54 @@ class AppSettingsDataStore(private val context: Context) {
 
     suspend fun saveWebSearchBaseUrl(url: String) {
         context.appSettingsDataStore.edit { it[WEB_SEARCH_BASE_URL] = url }
+    }
+
+    val colorMode: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[COLOR_MODE] ?: "SYSTEM"
+    }
+
+    suspend fun saveColorMode(mode: String) {
+        context.appSettingsDataStore.edit { it[COLOR_MODE] = mode }
+    }
+
+    val dynamicColorEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[DYNAMIC_COLOR_ENABLED] ?: true
+    }
+
+    suspend fun saveDynamicColorEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { it[DYNAMIC_COLOR_ENABLED] = enabled }
+    }
+
+    val themePresetId: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[THEME_PRESET_ID] ?: "obsidian"
+    }
+
+    suspend fun saveThemePresetId(id: String) {
+        context.appSettingsDataStore.edit { it[THEME_PRESET_ID] = id }
+    }
+
+    val fontFamily: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[FONT_FAMILY] ?: "MANROPE"
+    }
+
+    suspend fun saveFontFamily(font: String) {
+        context.appSettingsDataStore.edit { it[FONT_FAMILY] = font }
+    }
+
+    val customFontPath: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[CUSTOM_FONT_PATH] ?: ""
+    }
+
+    suspend fun saveCustomFontPath(path: String) {
+        context.appSettingsDataStore.edit { it[CUSTOM_FONT_PATH] = path }
+    }
+
+    val fontScale: Flow<Float> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[FONT_SCALE] ?: 1.0f
+    }
+
+    suspend fun saveFontScale(scale: Float) {
+        context.appSettingsDataStore.edit { it[FONT_SCALE] = scale.coerceIn(0.8f, 1.4f) }
     }
 
     suspend fun clear() {

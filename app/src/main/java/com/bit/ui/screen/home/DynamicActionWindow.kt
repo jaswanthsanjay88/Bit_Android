@@ -35,6 +35,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
@@ -165,10 +166,14 @@ fun DynamicActionWindow(
                         }
                         else -> {
                             val modelId = when (dlState) {
+                                is com.bit.service.ModelDownloadService.DownloadState.Downloading -> dlState.modelId
+                                is com.bit.service.ModelDownloadService.DownloadState.Paused -> dlState.modelId
+                                is com.bit.service.ModelDownloadService.DownloadState.Extracting -> dlState.modelId
+                                is com.bit.service.ModelDownloadService.DownloadState.Processing -> dlState.modelId
+                                is com.bit.service.ModelDownloadService.DownloadState.Verifying -> dlState.modelId
                                 is com.bit.service.ModelDownloadService.DownloadState.Success -> dlState.modelId
                                 is com.bit.service.ModelDownloadService.DownloadState.Error -> dlState.modelId
                                 is com.bit.service.ModelDownloadService.DownloadState.Cancelled -> dlState.modelId
-                                else -> "Model"
                             }
                             DownloadDisplayInfo(
                                 title = com.bit.ui.components.getShortModelLabel(modelId),
@@ -461,7 +466,7 @@ fun DynamicActionWindow(
                         SubsystemChip(label = "Memory", icon = Icons.Default.Memory)
                     }
                     if (ttsModelLoaded) {
-                        SubsystemChip(label = "TTS", icon = Icons.Default.VolumeUp)
+                        SubsystemChip(label = "TTS", icon = Icons.AutoMirrored.Filled.VolumeUp)
                     }
                 }
 

@@ -87,7 +87,7 @@ class McpClient(
                 val contentType = response.header("Content-Type") ?: ""
                 if (!contentType.contains("text/event-stream")) return@withContext null
 
-                val stream = response.body?.byteStream() ?: return@withContext null
+                val stream = response.body.byteStream()
                 val reader = BufferedReader(InputStreamReader(stream))
 
                 var currentEvent: String? = null
@@ -163,7 +163,7 @@ class McpClient(
                     activeSessionId = it
                 }
 
-                val body = response.body?.string() ?: ""
+                val body = response.body.string()
 
                 if (response.isSuccessful) {
                     resolvedPostUrl = requestUrl

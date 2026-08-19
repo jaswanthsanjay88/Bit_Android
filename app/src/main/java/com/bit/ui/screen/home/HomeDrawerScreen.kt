@@ -99,17 +99,22 @@ fun HomeDrawerScreen(
             .then(
                 if (isDialogOpen) Modifier.blur(6.dp) else Modifier
             ),
-        containerColor = androidx.compose.ui.graphics.Color(0xFF08080A),
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             Column {
                 TopAppBar(
                     title = {
-                        Text(
-                            "BIT AI",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = com.bit.R.drawable.ic_logo),
+                                contentDescription = "BIT Logo",
+                                modifier = Modifier.size(32.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = androidx.compose.ui.graphics.Color.Transparent,

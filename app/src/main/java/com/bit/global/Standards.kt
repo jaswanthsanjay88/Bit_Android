@@ -2,6 +2,21 @@ package com.bit.global
 
 import androidx.compose.ui.unit.dp
 
+/**
+ * Standard Material Design 3 spacing tokens.
+ * Use these tokens instead of hardcoded dp values.
+ */
+object Spacing {
+    val xxs = 2.dp
+    val xs = 4.dp
+    val sm = 8.dp
+    val md = 16.dp
+    val lg = 24.dp
+    val xl = 32.dp
+    val xxl = 48.dp
+    val screen = 24.dp
+}
+
 object Standards {
     // Action Icon
     val ActionIconSpace = 8.dp
@@ -10,17 +25,18 @@ object Standards {
     val ActionIconPadding = 12.dp
 
     // Cards
-    val CardCornerRadius = 12.dp
-    val CardPadding = 12.dp
+    val CardCornerRadius = 14.dp
+    val CardPadding = 16.dp
     val CardElevation = 1.dp
     val CardSmallCornerRadius = 10.dp
 
-    // Spacing
-    val SpacingXs = 4.dp
-    val SpacingSm = 8.dp
-    val SpacingMd = 12.dp
-    val SpacingLg = 16.dp
-    val SpacingXl = 24.dp
+    // Spacing (8dp grid)
+    val SpacingXs = Spacing.xs
+    val SpacingSm = Spacing.sm
+    val SpacingMd = Spacing.md
+    val SpacingLg = Spacing.lg
+    val SpacingXl = Spacing.xl
+    val SpacingScreen = Spacing.screen
 
     // Component heights
     val SwitchRowHeight = 48.dp
@@ -38,11 +54,11 @@ object Standards {
     val ChipCornerRadius = 16.dp
     val ChipHorizontalPadding = 12.dp
     val ChipIconSize = 14.dp
-    val ChipSpacing = 6.dp
+    val ChipSpacing = 8.dp
 
     // Additional spacing
-    val SpacingXxs = 2.dp
-    val SpacingXxl = 32.dp
+    val SpacingXxs = Spacing.xxs
+    val SpacingXxl = Spacing.xxl
     val SpacingXxxl = 48.dp
 
     // Border radius

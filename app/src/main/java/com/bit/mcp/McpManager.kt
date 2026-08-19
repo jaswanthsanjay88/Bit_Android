@@ -23,7 +23,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class McpManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -270,6 +270,34 @@ class McpManager @Inject constructor(
         _servers.value = updated
         persistServers(updated)
         com.bit.plugins.PluginManager.invalidateToolCache()
+    }
+
+    /**
+     * Generates a structured markdown catalog of all active MCP servers and their capabilities
+     * following the Model Context Protocol specification (https://modelcontextprotocol.io/).
+     */
+    fun getMcpCatalogPrompt(): String {
+        val enabledServers = _servers.value.filter { it.isEnabled }
+        val serversWithTools = enabledServers.filter { srv -> srv.tools.any { it.isEnabled } }
+        if (serversWithTools.isEmpty()) return ""
+
+        return buildString {
+            append("## Model Context Protocol (MCP) Server Infrastructure\n")
+            append("You have direct access to external Model Context Protocol (MCP) servers (adhering to https://modelcontextprotocol.io/).\n")
+            append("Each MCP server encapsulates an external tool ecosystem or service integration.\n")
+            append("When executing tasks, select and invoke the appropriate tool associated with the matching MCP server:\n\n")
+            for (srv in serversWithTools) {
+                val activeTools = srv.tools.filter { it.isEnabled }
+                append("### MCP Server: [${srv.name}]\n")
+                if (srv.url.isNotBlank()) append("- Endpoint: `${srv.url}`\n")
+                append("- Active Tools (${activeTools.size}):\n")
+                for (tool in activeTools) {
+                    val desc = if (tool.description.isNotBlank()) tool.description else "Action provided by MCP server '${srv.name}'"
+                    append("  * `${tool.name}`: $desc\n")
+                }
+                append("\n")
+            }
+        }
     }
 }
 

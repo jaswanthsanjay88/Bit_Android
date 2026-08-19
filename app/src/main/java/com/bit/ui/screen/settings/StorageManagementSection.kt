@@ -51,6 +51,10 @@ fun StorageManagementSection(viewModel: SettingsViewModel) {
     val haptics = LocalBitHaptics.current
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(Unit) {
+        viewModel.refreshStorage()
+    }
+
     var inspectingCategory by remember { mutableStateOf<StorageCategoryUsage?>(null) }
     var inspectingFiles by remember { mutableStateOf<List<StorageFileItem>>(emptyList()) }
     var isLoadingFiles by remember { mutableStateOf(false) }
@@ -758,6 +762,8 @@ private fun getCategoryIcon(id: String): ImageVector {
     return when (id) {
         AppStorageRepository.CATEGORY_MODELS -> Icons.Rounded.SmartToy
         AppStorageRepository.CATEGORY_VOICE -> Icons.Rounded.RecordVoiceOver
+        AppStorageRepository.CATEGORY_WORKSPACE -> Icons.Rounded.Terminal
+        AppStorageRepository.CATEGORY_SKILLS -> Icons.Rounded.Build
         AppStorageRepository.CATEGORY_VAULT -> Icons.Rounded.Memory
         AppStorageRepository.CATEGORY_RAGS -> Icons.AutoMirrored.Rounded.MenuBook
         AppStorageRepository.CATEGORY_DATABASE -> Icons.Rounded.Dataset
@@ -770,6 +776,8 @@ private fun getCategoryColor(id: String): Color {
     return when (id) {
         AppStorageRepository.CATEGORY_MODELS -> Color(0xFF64B5F6)     // Soft Blue
         AppStorageRepository.CATEGORY_VOICE -> Color(0xFF81C784)      // Soft Green
+        AppStorageRepository.CATEGORY_WORKSPACE -> Color(0xFF26A69A)  // Teal Green
+        AppStorageRepository.CATEGORY_SKILLS -> Color(0xFFAB47BC)     // Orchid Purple
         AppStorageRepository.CATEGORY_VAULT -> Color(0xFFFFB74D)      // Soft Orange
         AppStorageRepository.CATEGORY_RAGS -> Color(0xFFBA68C8)       // Soft Purple
         AppStorageRepository.CATEGORY_DATABASE -> Color(0xFF4DB6AC)   // Teal
@@ -782,6 +790,8 @@ private fun getCategorySubtitle(id: String, count: Int): String {
     return when (id) {
         AppStorageRepository.CATEGORY_MODELS -> "GGUF, VLM & diffusion weights ($count files)"
         AppStorageRepository.CATEGORY_VOICE -> "Kokoro, Piper & Whisper engines ($count files)"
+        AppStorageRepository.CATEGORY_WORKSPACE -> "Rootfs filesystems & sandboxes ($count files)"
+        AppStorageRepository.CATEGORY_SKILLS -> "Instruction skills & tool definitions ($count files)"
         AppStorageRepository.CATEGORY_VAULT -> "Episodic memory & vector embeddings ($count files)"
         AppStorageRepository.CATEGORY_RAGS -> "Document chunks & vector indices ($count files)"
         AppStorageRepository.CATEGORY_DATABASE -> "Chat SQLite records & tool traces ($count files)"

@@ -55,13 +55,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import android.net.Uri
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
@@ -83,6 +78,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import com.bit.activity.RagActivity
 import com.bit.global.Standards
+import com.bit.ui.theme.Spacing
+import com.bit.ui.theme.BitShapeScale
 import com.bit.models.ModelType
 import com.bit.models.table_schema.Model
 import com.bit.ui.components.ActionButton
@@ -329,12 +326,13 @@ internal fun BottomBar(
             }
         }
 
-        // ── Main bottom bar container (Transparent floating gradient scrim) ──
+        // ── Main bottom bar container (Transparent floating gradient scrim matching theme) ──
+        val scrimColor = MaterialTheme.colorScheme.background
         val bottomScrim = androidx.compose.ui.graphics.Brush.verticalGradient(
             colors = listOf(
                 Color.Transparent,
-                Color(0xCC000000), // 80% black
-                Color(0xFF000000)  // Solid black
+                scrimColor.copy(alpha = 0.85f),
+                scrimColor
             )
         )
         Box(
@@ -386,10 +384,10 @@ internal fun BottomBar(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            color = Color(0xFF1E1E1E), // M3 filled container dark carbon
-                            shape = RoundedCornerShape(28.dp)
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = BitShapeScale.extraLarge
                         )
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = Spacing.sm, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (isSttRecording || isSttTranscribing) {
@@ -405,8 +403,8 @@ internal fun BottomBar(
                                 contentDescription = "Cancel recording",
                                 modifier = Modifier.size(32.dp),
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = Color(0x1AFFFFFF),
-                                    contentColor = Color.White
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             )
 
@@ -420,25 +418,25 @@ internal fun BottomBar(
                                     CircularProgressIndicator(
                                         modifier = Modifier.size(16.dp),
                                         strokeWidth = 2.dp,
-                                        color = Color.White
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = "Transcribing…",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1
                                     )
                                 } else {
                                     Text(
                                         text = "Listening",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                                        color = Color.White,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1
                                     )
                                     EqualizerBars(
                                         amplitude = sttAmplitude,
                                         modifier = Modifier.weight(1f).height(24.dp),
-                                        activeColor = Color.White
+                                        activeColor = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }
@@ -454,8 +452,8 @@ internal fun BottomBar(
                                 contentDescription = "Stop and transcribe",
                                 modifier = Modifier.size(32.dp),
                                 colors = IconButtonDefaults.filledIconButtonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color.Black
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
                                 ),
                                 enabled = !isSttTranscribing
                             )
@@ -466,8 +464,8 @@ internal fun BottomBar(
                             onClick = { showAttachmentSheet = true },
                             modifier = Modifier.size(36.dp),
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color(0x11FFFFFF),
-                                contentColor = Color.White
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         ) {
                             Icon(
@@ -499,7 +497,7 @@ internal fun BottomBar(
                                             modifier = Modifier
                                                 .size(56.dp)
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(Color(0x33FFFFFF))
+                                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                                         ) {
                                             val resolver = context.contentResolver
                                             val bitmap = remember(uri) {
@@ -526,9 +524,9 @@ internal fun BottomBar(
                                                     .size(16.dp)
                                                     .align(Alignment.TopEnd)
                                                     .clickable { attachedImages = attachedImages - uri }
-                                                    .background(Color(0xCC000000), CircleShape)
+                                                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f), CircleShape)
                                                     .padding(2.dp),
-                                                tint = Color.White
+                                                tint = MaterialTheme.colorScheme.onSurface
                                             )
                                         }
                                     }
@@ -544,8 +542,8 @@ internal fun BottomBar(
                                             modifier = Modifier
                                                 .height(32.dp)
                                                 .clip(RoundedCornerShape(8.dp))
-                                                .background(Color(0x22FFFFFF))
-                                                .border(0.5.dp, Color(0x44FFFFFF), RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                                                 .padding(horizontal = 8.dp),
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -554,12 +552,12 @@ internal fun BottomBar(
                                                 imageVector = TnIcons.FileText,
                                                 contentDescription = null,
                                                 modifier = Modifier.size(16.dp),
-                                                tint = Glass.AccentSecondary
+                                                tint = MaterialTheme.colorScheme.primary
                                             )
                                             Text(
                                                 text = fileName,
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = Glass.TextPrimary,
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.widthIn(max = 100.dp)
@@ -568,7 +566,7 @@ internal fun BottomBar(
                                                 CircularProgressIndicator(
                                                     modifier = Modifier.size(14.dp),
                                                     strokeWidth = 2.dp,
-                                                    color = Glass.AccentPrimary
+                                                    color = MaterialTheme.colorScheme.primary
                                                 )
                                             } else {
                                                 Icon(
@@ -580,7 +578,7 @@ internal fun BottomBar(
                                                             attachedFiles = attachedFiles - uri
                                                             chatViewModel.clearAttachedDocument()
                                                         },
-                                                    tint = Glass.TextSecondary
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                                 )
                                             }
                                         }
@@ -596,8 +594,8 @@ internal fun BottomBar(
                                     .fillMaxWidth()
                                     .heightIn(min = 38.dp, max = 150.dp)
                                     .padding(horizontal = 4.dp),
-                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Glass.TextPrimary),
-                                cursorBrush = androidx.compose.ui.graphics.SolidColor(Glass.AccentPrimary),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
                                 decorationBox = { innerTextField ->
                                     Box(contentAlignment = Alignment.CenterStart) {
                                         if (value.isEmpty()) {
@@ -608,7 +606,7 @@ internal fun BottomBar(
                                             }
                                             Text(
                                                 text = placeholder,
-                                                color = Glass.TextMuted,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 style = MaterialTheme.typography.bodyLarge
                                             )
                                         }
@@ -626,8 +624,8 @@ internal fun BottomBar(
                         AnimatedContent(
                             targetState = Pair(canSend, chatState.isGenerating),
                             transitionSpec = {
-                                fadeIn(animationSpec = tween(250, easing = FastOutSlowInEasing)) togetherWith
-                                fadeOut(animationSpec = tween(250, easing = FastOutSlowInEasing))
+                                (scaleIn(initialScale = 0.75f, animationSpec = androidx.compose.animation.core.spring(dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)) + fadeIn(androidx.compose.animation.core.tween(200, easing = androidx.compose.animation.core.FastOutSlowInEasing))) togetherWith
+                                (scaleOut(targetScale = 0.75f, animationSpec = androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.FastOutSlowInEasing)) + fadeOut(androidx.compose.animation.core.tween(120)))
                             },
                             label = "trailing_buttons_motion"
                         ) { (hasInput, isGenerating) ->
@@ -719,8 +717,8 @@ internal fun BottomBar(
                                     },
                                     modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = Color.White,
-                                        contentColor = Color.Black
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
                                     )
                                 ) {
                                     Icon(
@@ -753,8 +751,8 @@ internal fun BottomBar(
                                         },
                                         modifier = Modifier.size(36.dp),
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                            containerColor = Color(0x1AFFFFFF),
-                                            contentColor = Color.White
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     ) {
                                         Icon(
@@ -783,8 +781,8 @@ internal fun BottomBar(
                                         },
                                         modifier = Modifier.size(36.dp),
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                            containerColor = Color.White,
-                                            contentColor = Color.Black
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary
                                         )
                                     ) {
                                         Icon(
@@ -832,7 +830,7 @@ internal fun BottomBar(
 private fun EqualizerBars(
     amplitude: Float,
     modifier: Modifier = Modifier,
-    activeColor: Color = Color.White,
+    activeColor: Color = MaterialTheme.colorScheme.primary,
     barCount: Int = 20,
     barWindowMs: Long = 80L
 ) {

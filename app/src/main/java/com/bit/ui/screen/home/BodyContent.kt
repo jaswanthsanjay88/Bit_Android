@@ -187,13 +187,19 @@ fun parseThinkingTags(raw: String): ParsedMessage {
         val end = raw.indexOf(closeTag, bodyStart, ignoreCase = true)
 
         if (end < 0) {
-            if (thinking.isNotEmpty()) thinking.append("\n\n")
-            thinking.append(raw, bodyStart, raw.length)
+            val chunk = raw.substring(bodyStart).trim()
+            if (chunk.isNotEmpty() && !thinking.toString().contains(chunk)) {
+                if (thinking.isNotEmpty()) thinking.append("\n\n")
+                thinking.append(chunk)
+            }
             isThinkingInProgress = true
             i = raw.length
         } else {
-            if (thinking.isNotEmpty()) thinking.append("\n\n")
-            thinking.append(raw, bodyStart, end)
+            val chunk = raw.substring(bodyStart, end).trim()
+            if (chunk.isNotEmpty() && !thinking.toString().contains(chunk)) {
+                if (thinking.isNotEmpty()) thinking.append("\n\n")
+                thinking.append(chunk)
+            }
             i = end + closeTag.length
         }
     }
@@ -249,10 +255,6 @@ fun BodyContent(
     val haptics = com.bit.ui.theme.LocalBitHaptics.current
     var wasGenerating by remember { mutableStateOf(chatState.isGenerating) }
     var selectedTraceStep by remember { mutableStateOf<com.bit.ui.components.TraceStep?>(null) }
-    
-    var textToolbarState by remember { mutableStateOf(TextToolbarState()) }
-    val customTextToolbar = remember { CustomTextToolbar { textToolbarState = it } }
-    var selectedMessageForActionSheet by remember { mutableStateOf<Messages?>(null) }
 
     LaunchedEffect(chatState.isGenerating) {
         if (wasGenerating && !chatState.isGenerating) {
@@ -292,81 +294,82 @@ fun BodyContent(
         }
     }
 
-    CompositionLocalProvider(
-        LocalTextToolbar provides customTextToolbar
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(
+                bottom = paddingValues.calculateBottomPadding()
+            )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(
-                    bottom = paddingValues.calculateBottomPadding()
-                )
-        ) {
-            if (messages.isEmpty() && !chatState.isGenerating) {
-                EmptyMessagesState()
-            } else {
-                val deduped = remember(messages.size) { messages.distinctBy { it.msgId } }
-                val lastAssistantIndex = remember(deduped.size) { deduped.indexOfLast { it.role == Role.Assistant } }
-                val groupedItems = remember(deduped) { groupMessages(deduped, lastAssistantIndex) }
+        if (messages.isEmpty() && !chatState.isGenerating) {
+            EmptyMessagesState()
+        } else {
+            val deduped = remember(messages.size) { messages.distinctBy { it.msgId } }
+            val lastAssistantIndex = remember(deduped.size) { deduped.indexOfLast { it.role == Role.Assistant } }
+            val groupedItems = remember(deduped) { groupMessages(deduped, lastAssistantIndex) }
 
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = paddingValues.calculateTopPadding() + Standards.SpacingXl, 
-                        bottom = 120.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
-                ) {
-                    items(
-                        items = messages,
-                        key = { it.msgId }
-                    ) { msg ->
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = paddingValues.calculateTopPadding() + Standards.SpacingXl, 
+                    bottom = 120.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
+            ) {
+                items(
+                    items = messages,
+                    key = { it.msgId }
+                ) { msg ->
+                    Box(modifier = Modifier.animateItem()) {
                         if (msg.role == Role.User) {
                             UserMessageBubble(
-                                message = msg,
-                                onLongClick = { selectedMessageForActionSheet = msg }
+                                message = msg
                             )
                         } else {
-                            val isLast = msg == messages.last()
-                            val parsedMessage = remember(msg.content.content) { parseThinkingTags(msg.content.content) }
-                            Column {
-                                com.bit.ui.screen.home.AssistantMessageHeader(
-                                    message = msg,
-                                    imageBlurEnabled = imageBlurEnabled,
-                                    onTraceStepClick = { selectedTraceStep = it }
-                                )
-                                
-                                if (parsedMessage.thinkingContent != null) {
-                                    ThinkingBlock(
-                                        thinkingText = parsedMessage.thinkingContent,
-                                        isStreaming = false
+                                val isLast = msg == messages.last()
+                                val parsedMessage = remember(msg.content.content) { parseThinkingTags(msg.content.content) }
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    com.bit.ui.screen.home.AssistantMessageHeader(
+                                        message = msg,
+                                        imageBlurEnabled = imageBlurEnabled,
+                                        onTraceStepClick = { selectedTraceStep = it }
                                     )
-                                }
-                                
-                                if (parsedMessage.actualContent.isNotEmpty()) {
-                                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingMd)) {
-                                        androidx.compose.foundation.text.selection.SelectionContainer {
-                                            MarkdownText(
-                                                text = parsedMessage.actualContent,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
+                                    
+                                    if (parsedMessage.thinkingContent != null) {
+                                        ThinkingBlock(
+                                            thinkingText = parsedMessage.thinkingContent,
+                                            isStreaming = false
+                                        )
+                                    }
+                                    
+                                    if (parsedMessage.actualContent.isNotEmpty()) {
+                                        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingMd)) {
+                                            androidx.compose.foundation.text.selection.SelectionContainer {
+                                                MarkdownText(
+                                                    text = parsedMessage.actualContent,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
                                         }
                                     }
+                                    com.bit.ui.components.ContextStackIndicator(message = msg)
+                                    com.bit.ui.screen.home.AssistantMessageFooter(
+                                        message = msg,
+                                        ttsPlayingMsgId = ttsPlayingMsgId,
+                                        ttsIsPlaying = ttsIsPlaying,
+                                        ttsSynthesizing = ttsSynthesizing,
+                                        ttsModelLoaded = ttsModelLoaded,
+                                        onSpeak = { chatViewModel.speakMessage(it) },
+                                        onStopTTS = { chatViewModel.stopTTS() }, // toggle same message to stop
+                                        onRegenerate = if (isLast) { { chatViewModel.regenerateLastMessage() } } else null,
+                                        isRegenerateEnabled = isLast
+                                    )
                                 }
-                                com.bit.ui.components.ContextStackIndicator(message = msg)
-                                com.bit.ui.screen.home.AssistantMessageFooter(
-                                    message = msg,
-                                    ttsPlayingMsgId = ttsPlayingMsgId,
-                                    ttsIsPlaying = ttsIsPlaying,
-                                    ttsSynthesizing = ttsSynthesizing,
-                                    ttsModelLoaded = ttsModelLoaded,
-                                    onSpeak = { chatViewModel.speakMessage(it) },
-                                    onStopTTS = { chatViewModel.stopTTS() }, // toggle same message to stop
-                                    onRegenerate = if (isLast) { { chatViewModel.regenerateLastMessage() } } else null,
-                                    isRegenerateEnabled = isLast
-                                )
                             }
                         }
                     }
@@ -482,7 +485,7 @@ fun BodyContent(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     
-                    val resultText = selectedTraceStep!!.result ?: "No output returned."
+                    val resultText = selectedTraceStep!!.result.ifEmpty { "No output returned." }
                     
                     Surface(
                         modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
@@ -505,21 +508,6 @@ fun BodyContent(
             }
         }
 
-        CustomTextSelectionPopup(
-            state = textToolbarState,
-            onDismiss = { textToolbarState = TextToolbarState() }
-        )
-
-        selectedMessageForActionSheet?.let { msg ->
-            MessageActionBottomSheet(
-                message = msg,
-                show = true,
-                onDismiss = { selectedMessageForActionSheet = null },
-                onEditRequest = if (msg.role == Role.User) { { m: com.bit.models.messages.Messages -> chatViewModel.startEditingPrompt(m) } } else null,
-                onSaveToMemory = if (msg.role == Role.User) { { c: String -> chatViewModel.saveMessageToMemoryVault(c) } } else null
-            )
-        }
-
         promptEditState?.let { state ->
             EditMessageDialog(
                 initialText = state.initialText,
@@ -530,7 +518,6 @@ fun BodyContent(
                     chatViewModel.cancelPromptEdit()
                 }
             )
-        }
         }
     }
 }

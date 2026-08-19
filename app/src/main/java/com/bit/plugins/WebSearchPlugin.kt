@@ -56,6 +56,8 @@ class WebSearchPlugin(private val context: Context) : SuperPlugin {
         private const val TAG = "WebSearchPlugin"
         const val TOOL_WEB_SEARCH = "web_search"
         const val TOOL_WEB_FETCH = "web_fetch"
+        const val TOOL_SEARCH_WEB_ALIAS = "search_web"
+        const val TOOL_SCRAPE_WEB_ALIAS = "scrape_web"
 
         private const val WEB_FETCH_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -80,7 +82,17 @@ class WebSearchPlugin(private val context: Context) : SuperPlugin {
                     "Fetch and read the full text content of a web page. Use this after web_search when you need more detail from a specific page."
                 )
                     .stringParam("url", "The URL of the page to fetch", required = true)
-                    .numberParam("maxChars", "Maximum characters of text to return (default 8000, max 100000)", required = false)
+                    .numberParam("maxChars", "Maximum characters of text to return (default 8000, max 100000)", required = false),
+                ToolDefinitionBuilder(
+                    TOOL_SEARCH_WEB_ALIAS,
+                    "Search the web for real-time information, articles, and documentation."
+                )
+                    .stringParam("query", "Search keywords or question", required = true),
+                ToolDefinitionBuilder(
+                    TOOL_SCRAPE_WEB_ALIAS,
+                    "Scrape and extract clean text content from a web URL."
+                )
+                    .stringParam("url", "The URL to scrape", required = true)
             )
         )
     }
@@ -95,8 +107,8 @@ class WebSearchPlugin(private val context: Context) : SuperPlugin {
     override suspend fun executeTool(toolCall: ToolCall): Result<Any> {
         return try {
             when (toolCall.name) {
-                TOOL_WEB_SEARCH -> executeSearch(toolCall)
-                TOOL_WEB_FETCH -> executeFetch(toolCall)
+                TOOL_WEB_SEARCH, TOOL_SEARCH_WEB_ALIAS -> executeSearch(toolCall)
+                TOOL_WEB_FETCH, TOOL_SCRAPE_WEB_ALIAS -> executeFetch(toolCall)
                 else -> Result.failure(IllegalArgumentException("Unknown tool: ${toolCall.name}"))
             }
         } catch (e: Exception) {
@@ -119,40 +131,67 @@ class WebSearchPlugin(private val context: Context) : SuperPlugin {
         try {
             if (provider == "duckduckgo") {
                 val scraper = DuckDuckGoScraper()
-                val response = when (val r = scraper.search(query, numResults)) {
-                    is DuckDuckGoScraper.SearchResponse.Success -> {
-                        val results = r.results.mapIndexed { index, webResult ->
-                            WebSearchResult(
-                                title = webResult.title,
-                                url = webResult.url,
-                                snippet = webResult.snippet,
-                                content = "",
-                                domain = extractDomain(webResult.url),
-                                scraped = false,
-                                index = index
-                            )
-                        }
-                        WebSearchResponse(
-                            query = query,
-                            results = results,
-                            totalResults = results.size,
-                            searchTimeMs = System.currentTimeMillis() - startTime,
-                            status = "SUCCESS",
-                            provider = "duckduckgo"
+                val r = scraper.search(query, numResults)
+                if (r is DuckDuckGoScraper.SearchResponse.Success && r.results.isNotEmpty()) {
+                    val results = r.results.mapIndexed { index, webResult ->
+                        WebSearchResult(
+                            title = webResult.title,
+                            url = webResult.url,
+                            snippet = webResult.snippet,
+                            content = "",
+                            domain = extractDomain(webResult.url),
+                            scraped = false,
+                            index = index
                         )
                     }
-                    is DuckDuckGoScraper.SearchResponse.Error -> {
-                        WebSearchResponse(
-                            query = query,
-                            results = emptyList(),
-                            totalResults = 0,
-                            searchTimeMs = System.currentTimeMillis() - startTime,
-                            status = "ERROR",
-                            error = r.message,
-                            provider = "duckduckgo"
-                        )
-                    }
+                    val response = WebSearchResponse(
+                        query = query,
+                        results = results,
+                        totalResults = results.size,
+                        searchTimeMs = System.currentTimeMillis() - startTime,
+                        status = "SUCCESS",
+                        provider = "duckduckgo"
+                    )
+                    return@withContext Result.success(response.copy(summary = response.generateSummary()))
                 }
+
+                // Cascade to Bing Web + RSS Fallback when DDG is rate-limited or returns empty
+                Log.i(TAG, "DDG returned 0 results or error for '$query'. Activating Bing fallback.")
+                val bingClient = com.bit.network.BingSearchFallbackClient()
+                val bingRes = bingClient.search(query, numResults)
+                if (bingRes.isSuccess && bingRes.getOrNull()?.isNotEmpty() == true) {
+                    val results = bingRes.getOrNull().orEmpty().mapIndexed { index, bResult ->
+                        WebSearchResult(
+                            title = bResult.title,
+                            url = bResult.url,
+                            snippet = bResult.snippet,
+                            content = "",
+                            domain = extractDomain(bResult.url),
+                            scraped = false,
+                            index = index
+                        )
+                    }
+                    val response = WebSearchResponse(
+                        query = query,
+                        results = results,
+                        totalResults = results.size,
+                        searchTimeMs = System.currentTimeMillis() - startTime,
+                        status = "SUCCESS",
+                        provider = "bing_fallback"
+                    )
+                    return@withContext Result.success(response.copy(summary = response.generateSummary()))
+                }
+
+                // If both fail, return clean error response
+                val response = WebSearchResponse(
+                    query = query,
+                    results = emptyList(),
+                    totalResults = 0,
+                    searchTimeMs = System.currentTimeMillis() - startTime,
+                    status = "ERROR",
+                    error = if (r is DuckDuckGoScraper.SearchResponse.Error) r.message else "No results found across search engines",
+                    provider = "duckduckgo"
+                )
                 return@withContext Result.success(response.copy(summary = response.generateSummary()))
             }
 

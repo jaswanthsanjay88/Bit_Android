@@ -37,6 +37,9 @@ class NVApplication : Application() {
     @javax.inject.Inject
     lateinit var skillManager: com.bit.skills.SkillManager
 
+    @javax.inject.Inject
+    lateinit var workspaceRepository: com.bit.repo.WorkspaceRepository
+
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Application onCreate (process: ${if (isMainProcess()) "main" else "secondary"})")
@@ -72,6 +75,7 @@ class NVApplication : Application() {
         PluginManager.registerPlugin(com.bit.plugins.MemoryPlugin(applicationContext))
         PluginManager.registerPlugin(com.bit.plugins.McpPlugin(applicationContext, mcpManager))
         PluginManager.registerPlugin(com.bit.plugins.SkillPlugin(applicationContext, skillManager))
+        PluginManager.registerPlugin(com.bit.plugins.WorkspacePlugin(applicationContext, workspaceRepository))
         Log.d(TAG, "Plugins registered: ${PluginManager.registeredPlugins.value.size} plugins")
 
         // Initialize TTS Manager without auto-loading (loading controlled by settings)

@@ -1,31 +1,39 @@
 package com.bit.ui.components
 
-import android.view.HapticFeedbackConstants
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bit.global.Standards
-import com.bit.models.messages.ContentType
 import com.bit.models.messages.Messages
 import com.bit.models.messages.ToolChainStepData
 import com.bit.ui.icons.TnIcons
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.border
+import com.bit.ui.theme.Glass
+import org.json.JSONObject
 
 data class TraceStep(
     val toolName: String,
@@ -36,12 +44,23 @@ data class TraceStep(
     val inputParams: String = ""
 )
 
+data class CleanToolResult(
+    val stdout: String = "",
+    val stderr: String = "",
+    val exitCode: Int? = null,
+    val path: String = "",
+    val message: String = "",
+    val status: String = "",
+    val raw: String = ""
+)
+
 fun ToolChainStepData.toTraceStep() = TraceStep(
     toolName = toolName,
     pluginName = pluginName,
     result = result,
     success = success,
-    executionTimeMs = executionTimeMs
+    executionTimeMs = executionTimeMs,
+    inputParams = args
 )
 
 fun Messages.toTraceStep(): TraceStep? {
@@ -54,6 +73,56 @@ fun Messages.toTraceStep(): TraceStep? {
         executionTimeMs = pluginMetrics?.executionTimeMs ?: 0L,
         inputParams = data.inputParams
     )
+}
+
+fun parseToolResult(raw: String): CleanToolResult {
+    if (raw.isBlank()) return CleanToolResult()
+    return try {
+        val json = JSONObject(raw)
+        val stdout = json.optString("stdout", "")
+        val stderr = json.optString("stderr", "")
+        val output = json.optString("output", "")
+        val content = json.optString("content", "")
+        val path = json.optString("path", "")
+        val message = json.optString("message", "")
+        val status = json.optString("status", "")
+        val exitCode = if (json.has("exitCode")) json.optInt("exitCode") else null
+
+        val cleanStderr = filterInternalProotNoise(stderr)
+        val cleanStdout = stdout.ifBlank { output }.ifBlank { content }
+
+        CleanToolResult(
+            stdout = cleanStdout,
+            stderr = cleanStderr,
+            exitCode = exitCode,
+            path = path,
+            message = message,
+            status = status,
+            raw = raw
+        )
+    } catch (e: Exception) {
+        CleanToolResult(stdout = raw, raw = raw)
+    }
+}
+
+fun filterInternalProotNoise(stderr: String): String {
+    if (stderr.isBlank()) return ""
+    val lines = stderr.lines()
+    val cleanLines = lines.filterNot { line ->
+        line.contains("=== proot sanity check ===") ||
+        line.contains("=== rootfs diagnostic ===") ||
+        line.contains("=== proot shell-only test ===") ||
+        line.contains("=== verbose proot output") ||
+        line.contains("Tried proot launch modes:") ||
+        line.contains("Android still failed while proot was entering") ||
+        line.startsWith("bash ELF interpreter:") ||
+        line.trim().startsWith("/lib") ||
+        line.trim().startsWith("/usr/lib") ||
+        line.contains("PROOT_LOADER") ||
+        line.contains("libproot_exec.so") ||
+        line.contains("libproot_loader.so")
+    }
+    return cleanLines.joinToString("\n").trim()
 }
 
 @Composable
@@ -79,13 +148,13 @@ fun ReasoningTraceCard(
     )
 
     val totalTimeMs = steps.sumOf { it.executionTimeMs }
-    val timeStr = if (totalTimeMs > 0) " for ${String.format(java.util.Locale.US, "%.1f", totalTimeMs / 1000f)}s" else ""
-    
+    val timeStr = if (totalTimeMs > 0) " (${String.format(java.util.Locale.US, "%.1f", totalTimeMs / 1000f)}s)" else ""
+
     val totalSteps = steps.size
     val label = if (totalSteps > 0) {
-        "Thought$timeStr, called $totalSteps tool${if (totalSteps != 1) "s" else ""}"
+        "Executed $totalSteps tool${if (totalSteps != 1) "s" else ""}$timeStr"
     } else {
-        "Thought process"
+        "Tool execution process"
     }
 
     val icon = TnIcons.BrainCircuit
@@ -93,63 +162,57 @@ fun ReasoningTraceCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = Standards.SpacingMd, vertical = 4.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
-            .clickable {
-                haptics.selection()
-                isExpanded = !isExpanded
-            }
-            .animateContentSize(animationSpec = com.bit.ui.theme.Motion.content())
+            .padding(horizontal = 16.dp, vertical = 2.dp)
+            .animateContentSize(
+                animationSpec = tween(
+                    durationMillis = com.bit.ui.theme.MotionDuration.stateChange,
+                    easing = com.bit.ui.theme.MotionEasing.standard
+                )
+            )
     ) {
+        // Main Header Row (Containerless Inline Toggle)
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    haptics.selection()
+                    isExpanded = !isExpanded
+                }
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(10.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
             )
             if (isLive && currentRound > 0) {
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(6.dp))
                 Text(
                     text = "(Round $currentRound/$maxRounds)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f)
                 )
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(4.dp))
             Icon(
-                imageVector = TnIcons.ChevronDown,
+                imageVector = if (isExpanded) TnIcons.ChevronDown else TnIcons.ChevronRight,
                 contentDescription = if (isExpanded) "Collapse" else "Expand",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .size(16.dp)
-                    .rotate(rotation)
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                modifier = Modifier.size(15.dp)
             )
         }
 
         if (isExpanded) {
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
+                    .padding(top = 4.dp, bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Plan / Reasoning
                 if (plan != null) {
                     Text(
                         text = plan,
@@ -157,16 +220,14 @@ fun ReasoningTraceCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp)
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
                     )
                 }
-                
-                // Steps
-                steps.forEachIndexed { _, step ->
-                    ReasoningStepRow(step = step, onClick = { onStepClick?.invoke(step) })
+
+                steps.forEachIndexed { idx, step ->
+                    ReasoningStepCard(step = step, index = idx + 1)
                 }
 
-                // Loading next step if live
                 if (isLive) {
                     ReasoningLoadingRow()
                 }
@@ -175,48 +236,248 @@ fun ReasoningTraceCard(
     }
 }
 
-
 @Composable
-private fun ReasoningStepRow(step: TraceStep, onClick: () -> Unit) {
-    val queryStr = remember(step.inputParams) {
+private fun ReasoningStepCard(step: TraceStep, index: Int) {
+    var stepExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+
+    val (cmdOrQuery, rawArgsDisplay) = remember(step.inputParams) {
         try {
-            val json = org.json.JSONObject(step.inputParams)
-            json.optString("query").takeIf { it.isNotBlank() } ?: json.optString("url").takeIf { it.isNotBlank() } ?: ""
-        } catch (e: Exception) { "" }
-    }
-    val actionDesc = when (step.toolName.lowercase()) {
-        "web_search", "search" -> "Searched the web"
-        "read_url", "fetch" -> "Read a webpage"
-        "calculator", "math" -> "Calculated"
-        else -> "Used ${step.toolName.replace('_', ' ')}"
-    }
-    
-    val displayText = buildString {
-        append(if (step.success) "✓ " else "✗ ")
-        append(actionDesc)
-        if (queryStr.isNotBlank()) append(" — \"$queryStr\"")
-        if (step.executionTimeMs > 0) append(" (${String.format(java.util.Locale.US, "%.1f", step.executionTimeMs / 1000f)}s)")
+            val json = JSONObject(step.inputParams)
+            val cmd = json.optString("command").takeIf { it.isNotBlank() }
+                ?: json.optString("query").takeIf { it.isNotBlank() }
+                ?: json.optString("path").takeIf { it.isNotBlank() }
+                ?: json.optString("url").takeIf { it.isNotBlank() }
+                ?: ""
+            cmd to json.toString(2)
+        } catch (e: Exception) {
+            step.inputParams to step.inputParams
+        }
     }
 
-    Text(
-        text = displayText,
-        style = MaterialTheme.typography.bodySmall,
-        color = if (step.success) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-    )
+    val toolDisplayName = when (step.toolName.lowercase()) {
+        "workspace_shell" -> "Workspace Shell"
+        "workspace_read_file" -> "Read File"
+        "workspace_write_file" -> "Write File"
+        "workspace_edit_file" -> "Edit File"
+        "web_search", "search" -> "Web Search"
+        "read_url", "web_fetch" -> "Web Fetch"
+        "calculator", "math" -> "Calculator"
+        else -> step.toolName.replace('_', ' ').replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    }
+
+    val parsedResult = remember(step.result) { parseToolResult(step.result) }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = androidx.compose.foundation.BorderStroke(
+            0.8.dp,
+            if (step.success) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+            else MaterialTheme.colorScheme.error.copy(alpha = 0.35f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        haptics.selection()
+                        stepExpanded = !stepExpanded
+                    }
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Status icon
+                Icon(
+                    imageVector = if (step.success) TnIcons.Check else TnIcons.AlertCircle,
+                    contentDescription = null,
+                    tint = if (step.success) Color(0xFF10B981) else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(16.dp)
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = toolDisplayName,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (cmdOrQuery.isNotBlank()) {
+                            Text(
+                                text = "— $cmdOrQuery",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                if (step.executionTimeMs > 0) {
+                    Text(
+                        text = "${String.format(java.util.Locale.US, "%.1f", step.executionTimeMs / 1000f)}s",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+
+                Spacer(Modifier.width(6.dp))
+
+                Icon(
+                    imageVector = if (stepExpanded) TnIcons.ChevronUp else TnIcons.ChevronDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+
+            // Expanded Output Area (Claude Code / Antigravity Terminal View)
+            if (stepExpanded) {
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f))
+                Spacer(Modifier.height(6.dp))
+
+                // Input Parameters / Command
+                if (cmdOrQuery.isNotBlank() || step.inputParams.isNotBlank()) {
+                    Text(
+                        text = "INPUT / COMMAND",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color(0xFF0F172A)
+                    ) {
+                        SelectionContainer {
+                            Text(
+                                text = if (cmdOrQuery.isNotBlank()) "$ $cmdOrQuery" else rawArgsDisplay,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
+                                ),
+                                color = Color(0xFFE2E8F0),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+
+                // Output / Stdout / Stderr
+                Text(
+                    text = "OUTPUT",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.5.sp
+                )
+                Spacer(Modifier.height(3.dp))
+
+                val outputText = buildString {
+                    if (parsedResult.stdout.isNotBlank()) {
+                        append(parsedResult.stdout.trim())
+                    }
+                    if (parsedResult.stderr.isNotBlank()) {
+                        if (isNotEmpty()) append("\n")
+                        append("STDERR:\n").append(parsedResult.stderr.trim())
+                    }
+                    if (isEmpty() && parsedResult.message.isNotBlank()) {
+                        append(parsedResult.message.trim())
+                    }
+                    if (isEmpty() && parsedResult.path.isNotBlank()) {
+                        append("File path: ").append(parsedResult.path)
+                    }
+                    if (isEmpty()) {
+                        append(if (step.success) "(Command completed with exit code 0 and no output)" else "(Command failed with no output)")
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    border = androidx.compose.foundation.BorderStroke(
+                        0.5.dp,
+                        if (parsedResult.stderr.isNotBlank() || !step.success) MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            parsedResult.exitCode?.let { code ->
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = if (code == 0) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFEF4444).copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "exit $code",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+                                        color = if (code == 0) Color(0xFF34D399) else Color(0xFFF87171),
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Icon(
+                                imageVector = TnIcons.Copy,
+                                contentDescription = "Copy output",
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier
+                                    .size(14.dp)
+                                    .clickable {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("Tool Output", outputText))
+                                        Toast.makeText(context, "Output copied", Toast.LENGTH_SHORT).show()
+                                    }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        SelectionContainer {
+                            Text(
+                                text = outputText,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 16.sp
+                                ),
+                                color = if (parsedResult.stderr.isNotBlank() && parsedResult.stdout.isBlank()) Color(0xFFFCA5A5) else Color(0xFFCBD5E1)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
-
-
 
 @Composable
 fun PulsingDotLoader(
     modifier: Modifier = Modifier,
-    color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     dotSize: androidx.compose.ui.unit.Dp = 6.dp,
     spacing: androidx.compose.ui.unit.Dp = 4.dp
 ) {
@@ -291,18 +552,19 @@ private fun ReasoningLoadingRow() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 4.dp, horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         PulsingDotLoader(
             modifier = Modifier.padding(end = 4.dp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "Thinking...",
+            text = "Executing tool...",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium
         )
     }
 }

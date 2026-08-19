@@ -190,7 +190,7 @@ fun McpServersScreen(
         state = lazyListState,
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -604,7 +604,7 @@ fun McpServerCard(
                             modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = (server.status as McpStatus.Error).message,
+                            text = server.status.message,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                             maxLines = 2,

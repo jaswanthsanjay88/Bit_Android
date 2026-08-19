@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -67,6 +68,9 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Surface
 import com.bit.ui.screen.model_config.ConfigEditorPanel
+import com.bit.ui.screen.workspace.WorkspacePage
+import com.bit.ui.screen.workspace.WorkspaceDetailPage
+import com.bit.ui.screen.workspace.WorkspaceTerminalPage
 
 data class SettingsSearchEntry(
     val title: String,
@@ -78,6 +82,22 @@ data class SettingsSearchEntry(
 )
 
 val SETTINGS_SEARCH_INDEX = listOf(
+    SettingsSearchEntry(
+        title = "Appearance & Theming",
+        description = "Color mode, dynamic Monet colors, preset palettes, fonts, and live font scaling",
+        categoryId = "theme",
+        categoryName = "General Settings",
+        icon = TnIcons.Palette,
+        keywords = listOf("theme", "color", "dark", "light", "dynamic", "monet", "font", "typography", "scale", "manrope", "google sans", "palette")
+    ),
+    SettingsSearchEntry(
+        title = "Linux Workspaces",
+        description = "Manage isolated Linux PRoot containers, file sandboxes, and interactive terminal",
+        categoryId = "workspaces",
+        categoryName = "Agents & Tools",
+        icon = Icons.Default.Terminal,
+        keywords = listOf("workspace", "linux", "proot", "terminal", "rootfs", "ubuntu", "alpine", "shell", "bash", "pty")
+    ),
     SettingsSearchEntry(
         title = "Installed Models",
         description = "Configure LLMs, context lengths, and model parameters",
@@ -163,7 +183,7 @@ val SETTINGS_SEARCH_INDEX = listOf(
         description = "Force the primary LLM to execute tools directly without secondary model",
         categoryId = "intelligence",
         categoryName = "Intelligence & Tools",
-        icon = Icons.Default.AltRoute,
+        icon = Icons.AutoMirrored.Filled.AltRoute,
         keywords = listOf("bypass", "direct", "tools", "qwen", "force")
     ),
     SettingsSearchEntry(
@@ -320,7 +340,7 @@ fun SettingsItem(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
-                color = Color.White
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -352,6 +372,9 @@ fun SettingsScreen(
     configEditorViewModel: ModelConfigEditorViewModel = hiltViewModel()
 ) {
     var selectedCategory by remember { mutableStateOf<String?>(null) }
+    var detailWorkspaceId by remember { mutableStateOf<String?>(null) }
+    var terminalWorkspace by remember { mutableStateOf<com.bit.models.table_schema.WorkspaceEntity?>(null) }
+    var targetTerminalProcessId by remember { mutableStateOf<String?>(null) }
     var editorModel by remember { mutableStateOf<com.bit.models.table_schema.Model?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showCredits by remember { mutableStateOf(false) }
@@ -363,6 +386,11 @@ fun SettingsScreen(
         if (isSearching) {
             isSearching = false
             searchQuery = ""
+        } else if (terminalWorkspace != null) {
+            terminalWorkspace = null
+            targetTerminalProcessId = null
+        } else if (detailWorkspaceId != null) {
+            detailWorkspaceId = null
         } else if (selectedCategory != null) {
             selectedCategory = null
         } else {
@@ -439,11 +467,11 @@ fun SettingsScreen(
     val voices = ttsVoices.ifEmpty { DEFAULT_VOICES }
 
     Scaffold(
-        containerColor = Color.Black,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             if (isSearching) {
                 Surface(
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.background,
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
@@ -496,7 +524,7 @@ fun SettingsScreen(
                             onValueChange = { searchQuery = it },
                             singleLine = true,
                             textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = Color.White
+                                color = MaterialTheme.colorScheme.onSurface
                             ),
                             cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
                             modifier = Modifier
@@ -537,7 +565,7 @@ fun SettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Black)
+                        .background(MaterialTheme.colorScheme.background)
                         .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm)
                         .statusBarsPadding(),
                     verticalAlignment = Alignment.CenterVertically
@@ -545,7 +573,11 @@ fun SettingsScreen(
                     IconButton(
                         onClick = {
                             haptics.selection()
-                            if (selectedCategory != null) {
+                            if (terminalWorkspace != null) {
+                                terminalWorkspace = null
+                            } else if (detailWorkspaceId != null) {
+                                detailWorkspaceId = null
+                            } else if (selectedCategory != null) {
                                 selectedCategory = null
                             } else {
                                 onNavigateBack()
@@ -555,27 +587,31 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                     Spacer(modifier = Modifier.width(Standards.SpacingMd))
                     Text(
-                        text = when (selectedCategory) {
-                            "services" -> "Services & Models"
-                            "web_access" -> "Web Access (BIT in Browser)"
-                            "mcp" -> "MCP Servers"
-                            "skills" -> "Agent Skills"
-                            "chat" -> "Responses & Chat"
-                            "hardware" -> "Hardware Tuning"
-                            "intelligence" -> "Intelligence & Tools"
-                            "voice" -> "Voice Settings"
-                            "storage" -> "Storage & Diagnostics"
-                            "about" -> "About BIT"
+                        text = when {
+                            terminalWorkspace != null -> "Terminal: ${terminalWorkspace!!.name}"
+                            detailWorkspaceId != null -> "Workspace Details"
+                            selectedCategory == "services" -> "Services & Models"
+                            selectedCategory == "web_access" -> "Web Access (BIT in Browser)"
+                            selectedCategory == "mcp" -> "MCP Servers"
+                            selectedCategory == "skills" -> "Agent Skills"
+                            selectedCategory == "workspaces" -> "Linux Workspaces"
+                            selectedCategory == "theme" -> "Appearance & Theming"
+                            selectedCategory == "chat" -> "Responses & Chat"
+                            selectedCategory == "hardware" -> "Hardware Tuning"
+                            selectedCategory == "intelligence" -> "Intelligence & Tools"
+                            selectedCategory == "voice" -> "Voice Settings"
+                            selectedCategory == "storage" -> "Storage & Diagnostics"
+                            selectedCategory == "about" -> "About BIT"
                             else -> "Settings"
                         },
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(1f)
                     )
 
@@ -589,7 +625,7 @@ fun SettingsScreen(
                             Icon(
                                 imageVector = TnIcons.Search,
                                 contentDescription = "Search Settings",
-                                tint = Color.White
+                                tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
                     }
@@ -603,7 +639,7 @@ fun SettingsScreen(
                     .padding(padding)
                     .fillMaxSize()
                     .imePadding()
-                    .background(Color.Black),
+                    .background(MaterialTheme.colorScheme.background),
                 contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
             ) {
@@ -732,34 +768,117 @@ fun SettingsScreen(
             }
         } else {
             AnimatedContent(
-            targetState = selectedCategory,
-            transitionSpec = {
-                if (targetState != null) {
-                    slideInHorizontally { it } + fadeIn() togetherWith slideOutHorizontally { -it } + fadeOut()
-                } else {
-                    slideInHorizontally { -it } + fadeIn() togetherWith slideOutHorizontally { it } + fadeOut()
-                }
-            },
-            modifier = Modifier.padding(padding).background(Color.Black),
-            label = "settings_navigation"
-        ) { category ->
-            when (category) {
-                "skills" -> {
-                    SkillsScreen(skillManager = viewModel.skillManager)
-                }
-                "mcp" -> {
-                    McpServersScreen(mcpManager = viewModel.mcpManager)
-                }
+                targetState = selectedCategory,
+                transitionSpec = {
+                    if (targetState != null) {
+                        (slideInHorizontally(
+                            animationSpec = androidx.compose.animation.core.tween(350, easing = com.bit.ui.theme.Motion.EmphasizedDecelerate),
+                            initialOffsetX = { (it * 0.22f).toInt() }
+                        ) + fadeIn(androidx.compose.animation.core.tween(250, delayMillis = 30, easing = com.bit.ui.theme.Motion.EmphasizedDecelerate))) togetherWith
+                        (slideOutHorizontally(
+                            animationSpec = androidx.compose.animation.core.tween(280, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate),
+                            targetOffsetX = { -(it * 0.12f).toInt() }
+                        ) + fadeOut(androidx.compose.animation.core.tween(180, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate)))
+                    } else {
+                        (slideInHorizontally(
+                            animationSpec = androidx.compose.animation.core.tween(350, easing = com.bit.ui.theme.Motion.EmphasizedDecelerate),
+                            initialOffsetX = { -(it * 0.18f).toInt() }
+                        ) + fadeIn(androidx.compose.animation.core.tween(250, delayMillis = 30, easing = com.bit.ui.theme.Motion.EmphasizedDecelerate))) togetherWith
+                        (slideOutHorizontally(
+                            animationSpec = androidx.compose.animation.core.tween(280, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate),
+                            targetOffsetX = { (it * 0.22f).toInt() }
+                        ) + fadeOut(androidx.compose.animation.core.tween(180, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate)))
+                    }
+                },
+                modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background),
+                label = "settings_navigation"
+            ) { category ->
+                when (category) {
+                    "skills" -> {
+                        SkillsScreen(skillManager = viewModel.skillManager)
+                    }
+                    "mcp" -> {
+                        McpServersScreen(mcpManager = viewModel.mcpManager)
+                    }
+                    "workspaces" -> {
+                        val wsSubScreen = when {
+                            terminalWorkspace != null -> "terminal"
+                            detailWorkspaceId != null -> "detail"
+                            else -> "list"
+                        }
+                        AnimatedContent(
+                            targetState = wsSubScreen,
+                            transitionSpec = {
+                                if (initialState == "list" && (targetState == "detail" || targetState == "terminal") ||
+                                    initialState == "detail" && targetState == "terminal") {
+                                    (slideInHorizontally(
+                                        animationSpec = androidx.compose.animation.core.tween(350, easing = com.bit.ui.theme.Motion.EmphasizedDecelerate),
+                                        initialOffsetX = { (it * 0.22f).toInt() }
+                                    ) + fadeIn(androidx.compose.animation.core.tween(250, delayMillis = 30, easing = com.bit.ui.theme.Motion.EmphasizedDecelerate))) togetherWith
+                                    (slideOutHorizontally(
+                                        animationSpec = androidx.compose.animation.core.tween(280, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate),
+                                        targetOffsetX = { -(it * 0.12f).toInt() }
+                                    ) + fadeOut(androidx.compose.animation.core.tween(180, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate)))
+                                } else {
+                                    (slideInHorizontally(
+                                        animationSpec = androidx.compose.animation.core.tween(350, easing = com.bit.ui.theme.Motion.EmphasizedDecelerate),
+                                        initialOffsetX = { -(it * 0.18f).toInt() }
+                                    ) + fadeIn(androidx.compose.animation.core.tween(250, delayMillis = 30, easing = com.bit.ui.theme.Motion.EmphasizedDecelerate))) togetherWith
+                                    (slideOutHorizontally(
+                                        animationSpec = androidx.compose.animation.core.tween(280, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate),
+                                        targetOffsetX = { (it * 0.22f).toInt() }
+                                    ) + fadeOut(androidx.compose.animation.core.tween(180, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate)))
+                                }
+                            },
+                            label = "workspace_navigation"
+                        ) { subScreen ->
+                            when (subScreen) {
+                                "terminal" -> terminalWorkspace?.let { ws ->
+                                    WorkspaceTerminalPage(
+                                        workspace = ws,
+                                        targetProcessId = targetTerminalProcessId,
+                                        onBack = {
+                                            terminalWorkspace = null
+                                            targetTerminalProcessId = null
+                                        },
+                                    )
+                                }
+                                "detail" -> detailWorkspaceId?.let { id ->
+                                    WorkspaceDetailPage(
+                                        workspaceId = id,
+                                        onBack = { detailWorkspaceId = null },
+                                        onOpenTerminal = { ws, procId ->
+                                            terminalWorkspace = ws
+                                            targetTerminalProcessId = procId
+                                        },
+                                    )
+                                }
+                                else -> {
+                                    WorkspacePage(
+                                        onBack = { selectedCategory = null },
+                                        onOpenWorkspace = { ws -> detailWorkspaceId = ws.id },
+                                        onOpenTerminal = { ws ->
+                                            terminalWorkspace = ws
+                                            targetTerminalProcessId = null
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
                 else -> {
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
                             .imePadding()
-                            .background(Color.Black),
+                            .background(MaterialTheme.colorScheme.background),
                         contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
                         verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
                     ) {
                         when (category) {
+                            "theme" -> {
+                                themeSettingsSection(viewModel = viewModel)
+                            }
                             "services" -> {
                                 // ── Services & Models ──
                                 modelConfigurationSection(
@@ -912,11 +1031,31 @@ fun SettingsScreen(
                                         selectedCategory = "skills"
                                     }
                                 )
+                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
+                                SettingsItem(
+                                    title = "Linux Workspaces",
+                                    description = "On-device Linux sandboxes (Ubuntu, Alpine) and PRoot terminal",
+                                    icon = TnIcons.Terminal,
+                                    onClick = {
+                                        selectedCategory = "workspaces"
+                                        detailWorkspaceId = null
+                                        terminalWorkspace = null
+                                    }
+                                )
                             }
                         }
 
                         item {
                             SettingsGroup(title = "General Settings") {
+                                SettingsItem(
+                                    title = "Appearance & Theming",
+                                    description = "Color mode, dynamic Monet colors, palettes, and fonts",
+                                    icon = TnIcons.Palette,
+                                    onClick = {
+                                        selectedCategory = "theme"
+                                    }
+                                )
+                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
                                 SettingsItem(
                                     title = "Responses & Chat",
                                     description = "System prompts, language models, and chat experience",

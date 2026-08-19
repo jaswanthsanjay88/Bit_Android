@@ -200,28 +200,17 @@ internal fun EmptyMessagesState() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(horizontal = 32.dp)
-        ) {
-            Icon(
-                imageVector = TnIcons.Sparkles,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = colorScheme.primary.copy(0.45f)
-            )
-            Spacer(Modifier.height(20.dp))
-            Text(
-                text = greeting,
-                style = typography.headlineSmall.copy(
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                    fontSize = 20.sp,
-                    lineHeight = 28.sp
-                ),
-                color = colorScheme.onSurface,
-                textAlign = TextAlign.Center
-            )
-        }
+        Text(
+            text = greeting,
+            style = typography.headlineSmall.copy(
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                fontSize = 21.sp,
+                lineHeight = 30.sp
+            ),
+            color = colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 36.dp)
+        )
     }
 }
 

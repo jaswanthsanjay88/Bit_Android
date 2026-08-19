@@ -48,6 +48,8 @@ class AppStorageRepository(
         private const val TAG = "AppStorageRepo"
         const val CATEGORY_MODELS = "models"
         const val CATEGORY_VOICE = "voice"
+        const val CATEGORY_WORKSPACE = "workspace"
+        const val CATEGORY_SKILLS = "skills"
         const val CATEGORY_VAULT = "vault"
         const val CATEGORY_RAGS = "rags"
         const val CATEGORY_DATABASE = "database"
@@ -145,7 +147,49 @@ class AppStorageRepository(
             )
         )
 
-        // 3. Memory Vault & Vectors
+        // 3. Linux Workspaces & Sandboxes
+        val workspacesDir = File(context.filesDir, "workspaces")
+        val rootfsCacheDir = File(context.filesDir, "rootfs_cache")
+        val legacyWorkspaceDir = File(context.filesDir, "workspace")
+        var workspaceBytes = 0L
+        var workspaceCount = 0
+        listOf(workspacesDir, rootfsCacheDir, legacyWorkspaceDir).forEach { dir ->
+            if (dir.exists()) {
+                workspaceBytes += calculateDirectorySize(dir)
+                workspaceCount += countFiles(dir)
+            }
+        }
+        list.add(
+            StorageCategoryUsage(
+                id = CATEGORY_WORKSPACE,
+                label = "Linux Workspaces & Sandboxes",
+                bytes = workspaceBytes,
+                fileCount = workspaceCount,
+                canClear = false,
+                canInspect = true
+            )
+        )
+
+        // 4. Agent Skills & Prompts
+        val skillsDir = File(context.filesDir, "skills")
+        var skillsBytes = 0L
+        var skillsCount = 0
+        if (skillsDir.exists()) {
+            skillsBytes += calculateDirectorySize(skillsDir)
+            skillsCount += countFiles(skillsDir)
+        }
+        list.add(
+            StorageCategoryUsage(
+                id = CATEGORY_SKILLS,
+                label = "Agent Skills & Prompts",
+                bytes = skillsBytes,
+                fileCount = skillsCount,
+                canClear = false,
+                canInspect = true
+            )
+        )
+
+        // 5. Memory Vault & Vectors
         val vaultDir = AppPaths.vaultRoot(context)
         val umsDir = AppPaths.ums(context)
         val legacyVault = AppPaths.memoryVault(context)
@@ -174,7 +218,7 @@ class AppStorageRepository(
             )
         )
 
-        // 4. RAG Knowledge Bases
+        // 6. RAG Knowledge Bases
         val ragsDir = AppPaths.rags(context)
         var ragsBytes = 0L
         var ragsCount = 0
@@ -193,7 +237,7 @@ class AppStorageRepository(
             )
         )
 
-        // 5. Chat Database & SQLite files
+        // 7. Chat Database & SQLite files
         val dbDir = context.getDatabasePath("bit_database").parentFile
         var dbBytes = 0L
         var dbCount = 0
@@ -214,23 +258,19 @@ class AppStorageRepository(
             )
         )
 
-        // 6. Temporary Cache & Downloads
+        // 8. Temporary Cache & Logs
         val cacheDir = context.cacheDir
         val promptCacheDir = AppPaths.promptCache(context)
         val tempDownloadsDir = File(context.filesDir, "temp_downloads")
+        val logsDir = File(context.filesDir, "logs")
+        val ttsOutputDir = File(context.filesDir, "tts_output")
         var cacheBytes = 0L
         var cacheCount = 0
-        if (cacheDir.exists()) {
-            cacheBytes += calculateDirectorySize(cacheDir)
-            cacheCount += countFiles(cacheDir)
-        }
-        if (promptCacheDir.exists()) {
-            cacheBytes += calculateDirectorySize(promptCacheDir)
-            cacheCount += countFiles(promptCacheDir)
-        }
-        if (tempDownloadsDir.exists()) {
-            cacheBytes += calculateDirectorySize(tempDownloadsDir)
-            cacheCount += countFiles(tempDownloadsDir)
+        listOf(cacheDir, promptCacheDir, tempDownloadsDir, logsDir, ttsOutputDir).forEach { dir ->
+            if (dir.exists()) {
+                cacheBytes += calculateDirectorySize(dir)
+                cacheCount += countFiles(dir)
+            }
         }
         list.add(
             StorageCategoryUsage(
@@ -299,6 +339,46 @@ class AppStorageRepository(
                             isDeletable = true
                         )
                     )
+                }
+            }
+            CATEGORY_WORKSPACE -> {
+                val workspacesDir = File(context.filesDir, "workspaces")
+                val rootfsCacheDir = File(context.filesDir, "rootfs_cache")
+                val legacyWorkspaceDir = File(context.filesDir, "workspace")
+                listOf(workspacesDir, rootfsCacheDir, legacyWorkspaceDir).forEach { dir ->
+                    if (dir.exists()) {
+                        dir.listFiles()?.forEach { file ->
+                            items.add(
+                                StorageFileItem(
+                                    id = file.absolutePath,
+                                    path = file.absolutePath,
+                                    displayName = if (dir.name == "rootfs_cache") "Cached Rootfs (${file.name})" else file.name,
+                                    sizeBytes = calculateDirectorySize(file),
+                                    lastModified = file.lastModified(),
+                                    categoryId = categoryId,
+                                    isDeletable = true
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            CATEGORY_SKILLS -> {
+                val skillsDir = File(context.filesDir, "skills")
+                if (skillsDir.exists()) {
+                    skillsDir.listFiles()?.forEach { file ->
+                        items.add(
+                            StorageFileItem(
+                                id = file.absolutePath,
+                                path = file.absolutePath,
+                                displayName = file.name,
+                                sizeBytes = calculateDirectorySize(file),
+                                lastModified = file.lastModified(),
+                                categoryId = categoryId,
+                                isDeletable = true
+                            )
+                        )
+                    }
                 }
             }
             CATEGORY_VAULT -> {

@@ -286,6 +286,7 @@ private class PlatformBitHaptics(
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun vibrateEffect(effect: VibrationEffect) {
         if (!isAllowed()) return
         val v = vibrator?.takeIf { it.hasVibrator() } ?: return

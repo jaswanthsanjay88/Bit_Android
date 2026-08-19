@@ -431,11 +431,11 @@ fun ActionSwitch(
         enabled = enabled,
         modifier = modifier,
         colors = androidx.compose.material3.SwitchDefaults.colors(
-            checkedThumbColor = Color.Black,
-            checkedTrackColor = Color.White,
-            uncheckedThumbColor = Color.LightGray,
-            uncheckedTrackColor = Color.Black,
-            uncheckedBorderColor = Color.DarkGray
+            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+            checkedTrackColor = MaterialTheme.colorScheme.primary,
+            uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            uncheckedBorderColor = MaterialTheme.colorScheme.outlineVariant
         )
     )
 }
@@ -480,7 +480,7 @@ fun <T> ActionToggleGroup(
             .fillMaxWidth()
             .height(Standards.ActionIconSize)
             .onSizeChanged { containerWidth.intValue = it.width },
-        color = Color(0xFF1A1A1A), // Dark container for contrast
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(Standards.RadiusSm)
     ) {
         Box {
@@ -493,7 +493,7 @@ fun <T> ActionToggleGroup(
                         .width(itemWidth - 4.dp)
                         .height(Standards.ActionIconSize - 4.dp)
                         .background(
-                            Color.White, // White background for selected item
+                            MaterialTheme.colorScheme.primary, // Primary background for selected item
                             RoundedCornerShape(Standards.SpacingXs)
                         )
                 )
@@ -511,9 +511,9 @@ fun <T> ActionToggleGroup(
 
                     val contentColor by animateColorAsState(
                         targetValue = when {
-                            !enabled -> Color.DarkGray
-                            isSelected -> Color.Black // Black text on white background
-                            else -> Color.LightGray // Light gray text for unselected
+                            !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            isSelected -> MaterialTheme.colorScheme.onPrimary // onPrimary text on selected indicator
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant // onSurfaceVariant for unselected
                         },
                         animationSpec = Motion.state(),
                         label = "toggleItemColor$index"

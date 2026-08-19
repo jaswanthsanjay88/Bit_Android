@@ -569,7 +569,7 @@ class ModelDownloadService : Service() {
                     throw Exception("Download failed with code: ${response.code}")
                 }
 
-                val body = response.body ?: throw Exception("Empty response body")
+                val body = response.body
                 val contentLength = body.contentLength()
                 val totalBytes = if (isRange) contentLength + startBytes else contentLength
                 var downloadedBytes = if (isRange) startBytes else 0L
@@ -716,7 +716,7 @@ class ModelDownloadService : Service() {
         val tis = TarArchiveInputStream(bis)
 
         tis.use { tarInput ->
-            var entry = tarInput.nextTarEntry
+            var entry = tarInput.nextEntry
             while (entry != null) {
                 if (!downloadJobs.containsKey(modelId) || downloadJobs[modelId]?.isCancelled == true) {
                     throw kotlinx.coroutines.CancellationException("Extraction cancelled")
@@ -752,7 +752,7 @@ class ModelDownloadService : Service() {
                         }
                     }
                 }
-                entry = tarInput.nextTarEntry
+                entry = tarInput.nextEntry
             }
         }
     }
@@ -861,7 +861,7 @@ class ModelDownloadService : Service() {
                     throw Exception("Failed to download $localPath: ${response.code}")
                 }
                 
-                val body = response.body ?: throw Exception("Empty response body")
+                val body = response.body
                 val totalBytes = body.contentLength()
                 var downloadedBytes = 0L
                 var lastUpdateTime = 0L
@@ -916,7 +916,7 @@ class ModelDownloadService : Service() {
                     throw Exception("Failed to download $filePath: ${response.code}")
                 }
                 
-                val body = response.body ?: throw Exception("Empty response body")
+                val body = response.body
                 val totalBytes = body.contentLength()
                 var downloadedBytes = 0L
                 var lastUpdateTime = 0L
@@ -1145,8 +1145,8 @@ class ModelDownloadService : Service() {
             startDownload(
                 modelId = modelId,
                 modelName = meta.optString("modelName", modelName),
-                fileUrl = meta.optString("fileUrl", null),
-                projectorUrl = meta.optString("projectorUrl", null),
+                fileUrl = if (meta.has("fileUrl")) meta.getString("fileUrl") else null,
+                projectorUrl = if (meta.has("projectorUrl")) meta.getString("projectorUrl") else null,
                 isZip = meta.optBoolean("isZip", false),
                 modelType = meta.optString("modelType", "GGUF"),
                 runOnCpu = meta.optBoolean("runOnCpu", false),

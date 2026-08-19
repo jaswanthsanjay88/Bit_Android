@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="36dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.8"
+        android:scaleY="0.8">
+        <!-- Minimalist Modern 'B' and AI Node aesthetic -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 24,18 L 62,18 C 76,18 84,26 84,38 C 84,46 78,51 70,53 C 82,55 88,62 88,72 C 88,86 78,90 60,90 L 24,90 Z M 38,32 L 38,46 L 58,46 C 66,46 68,42 68,39 C 68,36 66,32 58,32 Z M 38,60 L 38,76 L 60,76 C 68,76 72,72 72,68 C 72,64 68,60 60,60 Z" />
+        <!-- Small tech dot accent -->
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 76,20 A 6,6 0 1,1 88,20 A 6,6 0 1,1 76,20 Z" />
+    </group>
+</vector>

@@ -84,11 +84,7 @@ internal fun AssistantMessageHeader(message: Messages, imageBlurEnabled: Boolean
                 }
             }
             else -> {
-                // Thinking block (markdown body is handled by lazyMarkdownItems)
-                val parsed = remember(message.content.content) {
-                    parseThinkingTags(message.content.content)
-                }
-                parsed.thinkingContent?.let { ThinkingBlock(it) }
+                // Thinking block is handled in BodyContent to prevent duplicate cards
             }
         }
     }
@@ -254,7 +250,7 @@ internal fun MessageActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, top = 4.dp, bottom = 4.dp),
+            .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

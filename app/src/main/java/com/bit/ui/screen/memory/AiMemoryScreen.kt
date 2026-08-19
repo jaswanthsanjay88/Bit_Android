@@ -102,17 +102,17 @@ fun AiMemoryScreen(
     }
 
     Scaffold(
-        containerColor = Color.Black,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             CenterAlignedTopAppBar(
-                modifier = Modifier.background(Color.Black),
+                modifier = Modifier.background(MaterialTheme.colorScheme.background),
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "AI Long-Term Memory",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = "${allMemories.size} facts remembered",
@@ -135,7 +135,7 @@ fun AiMemoryScreen(
                         Icon(
                             imageVector = TnIcons.ArrowLeft,
                             contentDescription = "Back",
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
@@ -153,14 +153,14 @@ fun AiMemoryScreen(
                         ) {
                             Icon(
                                 imageVector = TnIcons.Trash,
-                                contentDescription = "Clear Stale",
+                                contentDescription = "Clear Stale Memories",
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Black
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         }
@@ -169,11 +169,11 @@ fun AiMemoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color.Black)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // Material 3 Expressive Search Bar Pill
             Surface(
-                color = Color.Black,
+                color = MaterialTheme.colorScheme.background,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingXs)
@@ -208,7 +208,7 @@ fun AiMemoryScreen(
                         onValueChange = { searchQuery = it },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyMedium.copy(
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier

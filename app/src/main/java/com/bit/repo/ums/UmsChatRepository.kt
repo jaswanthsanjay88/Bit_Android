@@ -113,8 +113,8 @@ class UmsChatRepository(private val ums: UnifiedMemorySystem) {
     suspend fun getMessagesForChat(chatId: String, limit: Int = 1000): List<Messages> =
         withContext(Dispatchers.IO) {
             ums.queryString(messages, Tags.Message.CHAT_ID, chatId)
+                .sortedWith(compareBy<UmsRecord> { it.getTimestamp(Tags.Message.TIMESTAMP) ?: 0L }.thenBy { it.id })
                 .map { it.toMessages() }
-                .sortedBy { it.timestamp ?: 0L }
                 .takeLast(limit)
         }
 
@@ -217,7 +217,8 @@ class UmsChatRepository(private val ums: UnifiedMemorySystem) {
         if (content.imageData != null) b.putString(Tags.Message.IMAGE_DATA, content.imageData)
         if (content.imagePrompt != null) b.putString(Tags.Message.IMAGE_PROMPT, content.imagePrompt)
         if (content.imageSeed != null) b.putTimestamp(Tags.Message.IMAGE_SEED, content.imageSeed)
-        if (timestamp != null) b.putTimestamp(Tags.Message.TIMESTAMP, timestamp)
+        val ts = timestamp ?: System.currentTimeMillis()
+        b.putTimestamp(Tags.Message.TIMESTAMP, ts)
         if (decodingMetrics != null) b.putString(Tags.Message.DECODING_METRICS, json.encodeToString(decodingMetrics))
         if (imageMetrics != null) b.putString(Tags.Message.IMAGE_METRICS, json.encodeToString(imageMetrics))
         if (memoryMetrics != null) b.putString(Tags.Message.MEMORY_METRICS, json.encodeToString(memoryMetrics))
@@ -258,7 +259,7 @@ class UmsChatRepository(private val ums: UnifiedMemorySystem) {
                 imageSeed = getTimestamp(Tags.Message.IMAGE_SEED),
                 pluginResultData = pluginData
             ),
-            timestamp = getTimestamp(Tags.Message.TIMESTAMP),
+            timestamp = getTimestamp(Tags.Message.TIMESTAMP) ?: (id.toLong() * 1000L),
             modelId = getString(Tags.Message.MODEL_ID),
             personaId = getString(Tags.Message.PERSONA_ID),
             decodingMetrics = getString(Tags.Message.DECODING_METRICS)?.let {

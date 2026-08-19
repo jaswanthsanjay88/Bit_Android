@@ -47,6 +47,8 @@ import com.bit.ui.screen.settings.SettingsScreen
 import com.bit.ui.screen.setup.ImageGenSetupScreen
 import com.bit.ui.screen.setup.EmbeddingSetupScreen
 import com.bit.ui.screen.setup.SetupScreen
+import com.bit.ui.theme.MotionDuration
+import com.bit.ui.theme.MotionEasing
 import com.bit.ui.theme.NeuroVerseTheme
 import com.bit.viewmodel.ChatViewModel
 import com.bit.viewmodel.LLMModelViewModel
@@ -170,12 +172,18 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val betaStatus = remember { com.bit.util.BetaExpiryManager.checkStatus(context) }
+
                 AppNavigation(
                     startDestination = Screen.Intro.route,
                     targetDestination = targetDestination,
                     hasModelsInstalled = hasModelsInstalled,
                     needsMigration = needsMigration
                 )
+
+                if (betaStatus is com.bit.util.BetaStatus.Expired) {
+                    com.bit.ui.components.BetaExpiredDialog(status = betaStatus)
+                }
 
                 pendingUpdate?.let { info ->
                     com.bit.update.UpdateBottomSheet(
@@ -249,27 +257,39 @@ fun AppNavigation(
             startDestination = startDestination,
             enterTransition = {
                 slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(300)
-                ) + fadeIn(animationSpec = tween(300))
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard),
+                    initialOffset = { (it * 0.22f).toInt() }
+                ) + fadeIn(
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                )
             },
             exitTransition = {
                 slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(300)
-                ) + fadeOut(animationSpec = tween(300))
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard),
+                    targetOffset = { -(it * 0.12f).toInt() }
+                ) + fadeOut(
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                )
             },
             popEnterTransition = {
                 slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(300)
-                ) + fadeIn(animationSpec = tween(300))
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard),
+                    initialOffset = { -(it * 0.18f).toInt() }
+                ) + fadeIn(
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                )
             },
             popExitTransition = {
                 slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(300)
-                ) + fadeOut(animationSpec = tween(300))
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard),
+                    targetOffset = { (it * 0.22f).toInt() }
+                ) + fadeOut(
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                )
             }
         ) {
 
@@ -336,7 +356,28 @@ fun AppNavigation(
                 )
             }
 
-            composable(Screen.OnboardingSetup.route) {
+            composable(
+                route = Screen.OnboardingSetup.route,
+                enterTransition = {
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                        animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                    ) + fadeIn(tween(MotionDuration.enter))
+                },
+                exitTransition = {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                        animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                    ) + fadeOut(tween(MotionDuration.exit))
+                },
+                popEnterTransition = { fadeIn(tween(MotionDuration.enter)) },
+                popExitTransition = {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                        animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                    ) + fadeOut(tween(MotionDuration.exit))
+                }
+            ) {
                 SetupScreen(
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@composable,
@@ -420,7 +461,28 @@ fun AppNavigation(
             )
         }
 
-        composable(Screen.ImageGenSetup.route) {
+        composable(
+            route = Screen.ImageGenSetup.route,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                ) + fadeIn(tween(MotionDuration.enter))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            },
+            popEnterTransition = { fadeIn(tween(MotionDuration.enter)) },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            }
+        ) {
             ImageGenSetupScreen(
                 onComplete = {
                     llmModelViewModel.onQnnSetupComplete()
@@ -436,7 +498,28 @@ fun AppNavigation(
                 }
             )
         }
-        composable(Screen.EmbeddingSetup.route) {
+        composable(
+            route = Screen.EmbeddingSetup.route,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                ) + fadeIn(tween(MotionDuration.enter))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            },
+            popEnterTransition = { fadeIn(tween(MotionDuration.enter)) },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            }
+        ) {
             EmbeddingSetupScreen(
                 onSetupComplete = {
                     navController.popBackStack()
@@ -468,7 +551,26 @@ fun AppNavigation(
                     type = androidx.navigation.NavType.StringType
                     defaultValue = "note"
                 }
-            )
+            ),
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                ) + fadeIn(tween(MotionDuration.enter))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            },
+            popEnterTransition = { fadeIn(tween(MotionDuration.enter)) },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            }
         ) { backStackEntry ->
             val noteId = backStackEntry.arguments?.getString("noteId")
             val defaultType = backStackEntry.arguments?.getString("defaultType") ?: "note"

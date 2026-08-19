@@ -1,0 +1,32 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <!-- Generic Linux Tux Penguin Icon -->
+  <path
+      android:fillColor="#333333"
+      android:pathData="M12,0 C5.373,0 0,5.373 0,12 C0,18.627 5.373,24 12,24 C18.627,24 24,18.627 24,12 C24,5.373 18.627,0 12,0 Z"/>
+  <!-- Body/Head Outline -->
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M12,4.5 C9.8,4.5 9,6.5 9,9 C9,10.2 9.4,11.2 9.8,12 C8.2,13 7,14.8 7,17 C7,18.5 8,19.5 10,19.5 C10.8,19.5 11.5,19.2 12,19.2 C12.5,19.2 13.2,19.5 14,19.5 C16,19.5 17,18.5 17,17 C17,14.8 15.8,13 14.2,12 C14.6,11.2 15,10.2 15,9 C15,6.5 14.2,4.5 12,4.5 Z"/>
+  <!-- Eyes -->
+  <path
+      android:fillColor="#333333"
+      android:pathData="M10.8,8 C10.8,8.5 10.5,8.8 10.2,8.8 C9.9,8.8 9.6,8.5 9.6,8 C9.6,7.5 9.9,7.2 10.2,7.2 C10.5,7.2 10.8,7.5 10.8,8 Z"/>
+  <path
+      android:fillColor="#333333"
+      android:pathData="M14.4,8 C14.4,8.5 14.1,8.8 13.8,8.8 C13.5,8.8 13.2,8.5 13.2,8 C13.2,7.5 13.5,7.2 13.8,7.2 C14.1,7.2 14.4,7.5 14.4,8 Z"/>
+  <!-- Beak -->
+  <path
+      android:fillColor="#FFA000"
+      android:pathData="M12,9.2 L10.5,10.5 L13.5,10.5 Z"/>
+  <!-- Feet -->
+  <path
+      android:fillColor="#FFA000"
+      android:pathData="M8.5,18.5 C7.5,18.5 7,19.5 7.5,20 C8.2,20.5 9.8,20 10.2,19 C10,18.7 9.3,18.5 8.5,18.5 Z"/>
+  <path
+      android:fillColor="#FFA000"
+      android:pathData="M15.5,18.5 C16.5,18.5 17,19.5 16.5,20 C15.8,20.5 14.2,20 13.8,19 C14,18.7 14.7,18.5 15.5,18.5 Z"/>
+</vector>

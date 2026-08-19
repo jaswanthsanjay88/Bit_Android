@@ -3,6 +3,7 @@ package com.bit.plugins.services
 import android.util.Log
 import com.bit.models.plugins.DuckDuckGoSearchResponse
 import com.bit.models.plugins.SearchResult
+import com.bit.network.BingSearchFallbackClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -17,12 +18,14 @@ import kotlin.random.Random
 
 class WebScrapingSearchService {
 
+    private val bingFallbackClient = BingSearchFallbackClient()
+
     companion object {
         private const val TAG = "WebScrapingSearch"
         private const val DDG_HTML_SEARCH_URL = "https://html.duckduckgo.com/html/?q="
         private const val DDG_LITE_SEARCH_URL = "https://lite.duckduckgo.com/lite/?q="
         private const val MAX_RETRIES = 2
-        private const val INITIAL_RETRY_DELAY_MS = 1000L
+        private const val INITIAL_RETRY_DELAY_MS = 600L
         private const val MIN_QUERY_LENGTH = 1
         private const val MAX_QUERY_LENGTH = 500
     }
@@ -46,6 +49,7 @@ class WebScrapingSearchService {
         val capped = maxResults.coerceIn(1, 10)
         var lastException: Exception? = null
 
+        // 1. Try DuckDuckGo (HTML / Lite)
         repeat(MAX_RETRIES) { attempt ->
             try {
                 // Try DDG HTML first
@@ -60,14 +64,31 @@ class WebScrapingSearchService {
                 }
             } catch (e: Exception) {
                 lastException = e
-                Log.w(TAG, "Attempt ${attempt + 1} failed: ${e.message}")
+                Log.w(TAG, "DDG Attempt ${attempt + 1} failed: ${e.message}")
                 if (attempt < MAX_RETRIES - 1) {
-                    delay(INITIAL_RETRY_DELAY_MS * (1 shl attempt) + Random.nextLong(0, 500))
+                    delay(INITIAL_RETRY_DELAY_MS * (1 shl attempt) + Random.nextLong(0, 300))
                 }
             }
         }
 
-        Result.failure(lastException ?: IOException("DuckDuckGo search failed for: $sanitized"))
+        // 2. Resilient Fallback to Bing Web & Bing RSS (LastChat strategy)
+        Log.i(TAG, "DDG search yielded 0 results or failed. Activating Bing Web & RSS fallback cascade for: $sanitized")
+        val startTime = System.currentTimeMillis()
+        val bingResult = bingFallbackClient.search(sanitized, capped)
+        if (bingResult.isSuccess && bingResult.getOrNull()?.isNotEmpty() == true) {
+            val results = bingResult.getOrNull().orEmpty()
+            return@withContext Result.success(
+                DuckDuckGoSearchResponse(
+                    query = sanitized,
+                    results = results,
+                    totalResults = results.size,
+                    searchTime = System.currentTimeMillis() - startTime,
+                    provider = "bing_fallback"
+                )
+            )
+        }
+
+        Result.failure(lastException ?: IOException("Web search failed across all providers (DDG, Bing Web, Bing RSS) for: $sanitized"))
     }
 
     private suspend fun scrapeDuckDuckGo(

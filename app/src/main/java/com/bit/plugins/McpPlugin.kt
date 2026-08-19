@@ -94,16 +94,25 @@ class McpPlugin(
         Log.i(TAG, "Executing MCP tool: $toolName with arguments: ${toolCall.arguments}")
 
         try {
-            // Locate server and exact tool definition that matches (supporting hyphen & underscore variations)
+            // Locate server and exact tool definition that matches (supporting direct, namespaced, and hyphen/underscore variations)
             val servers = mcpManager.servers.value.filter { it.isEnabled }
             var targetServerId: String? = null
             var canonicalToolName = toolName
 
             for (srv in servers) {
-                val matchedTool = srv.tools.firstOrNull {
-                    it.isEnabled && (
-                        it.name.equals(toolName, ignoreCase = true) ||
-                        it.name.replace("-", "_").equals(toolName.replace("-", "_"), ignoreCase = true)
+                val srvClean = srv.name.trim().lowercase().replace(" ", "_").replace("-", "_")
+                val matchedTool = srv.tools.firstOrNull { tool ->
+                    val toolClean = tool.name.trim().lowercase().replace("-", "_")
+                    val callClean = toolName.trim().lowercase().replace("-", "_")
+
+                    tool.isEnabled && (
+                        tool.name.equals(toolName, ignoreCase = true) ||
+                        toolClean == callClean ||
+                        callClean == "${srvClean}__${toolClean}" ||
+                        callClean == "${srvClean}_${toolClean}" ||
+                        callClean == "mcp__${srvClean}__${toolClean}" ||
+                        callClean.endsWith("__$toolClean") ||
+                        callClean.endsWith("_$toolClean")
                     )
                 }
                 if (matchedTool != null) {

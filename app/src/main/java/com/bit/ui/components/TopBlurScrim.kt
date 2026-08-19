@@ -27,115 +27,24 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun TopBlurScrim(
     modifier: Modifier = Modifier,
-    height: Dp = 135.dp,
+    height: Dp = 120.dp,
     maxBlurRadius: Dp = 48.dp,
     scrimColor: Color = MaterialTheme.colorScheme.background
 ) {
-    val density = LocalDensity.current
-    val maxBlurPx = with(density) { maxBlurRadius.toPx() }
-
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
-    ) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && maxBlurPx > 0f) {
-            // Layer 1: Native hardware frosted blur with progressive alpha mask
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        renderEffect = RenderEffect
-                            .createBlurEffect(
-                                maxBlurPx,
-                                maxBlurPx,
-                                Shader.TileMode.CLAMP
-                            )
-                            .asComposeRenderEffect()
-                        compositingStrategy = CompositingStrategy.Offscreen
-                    }
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to scrimColor.copy(alpha = 0.92f),
-                                0.4f to scrimColor.copy(alpha = 0.75f),
-                                0.75f to scrimColor.copy(alpha = 0.35f),
-                                1.0f to Color.Transparent
-                            )
-                        )
-                    )
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0.0f to Color.Black,
-                                    0.45f to Color.Black.copy(alpha = 0.90f),
-                                    0.80f to Color.Black.copy(alpha = 0.45f),
-                                    1.0f to Color.Transparent
-                                )
-                            ),
-                            blendMode = BlendMode.DstIn
-                        )
-                    }
-            )
-
-            // Layer 2: Secondary soft blur pass for rich progressive diffusion
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        renderEffect = RenderEffect
-                            .createBlurEffect(
-                                maxBlurPx * 0.5f,
-                                maxBlurPx * 0.5f,
-                                Shader.TileMode.CLAMP
-                            )
-                            .asComposeRenderEffect()
-                        compositingStrategy = CompositingStrategy.Offscreen
-                    }
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0.0f to scrimColor.copy(alpha = 0.7f),
-                                0.5f to scrimColor.copy(alpha = 0.5f),
-                                0.85f to scrimColor.copy(alpha = 0.2f),
-                                1.0f to Color.Transparent
-                            )
-                        )
-                    )
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0.0f to Color.Black.copy(alpha = 0.7f),
-                                    0.5f to Color.Black.copy(alpha = 0.85f),
-                                    0.85f to Color.Black.copy(alpha = 0.3f),
-                                    1.0f to Color.Transparent
-                                )
-                            ),
-                            blendMode = BlendMode.DstIn
-                        )
-                    }
-            )
-        }
-
-        // Layer 3: Material 3 Tonal Depth Scrim Gradient
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0.00f to scrimColor.copy(alpha = 0.98f),
-                            0.30f to scrimColor.copy(alpha = 0.92f),
-                            0.60f to scrimColor.copy(alpha = 0.70f),
-                            0.85f to scrimColor.copy(alpha = 0.35f),
-                            1.00f to Color.Transparent
-                        )
+            .background(
+                brush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.00f to scrimColor.copy(alpha = 0.98f),
+                        0.35f to scrimColor.copy(alpha = 0.88f),
+                        0.65f to scrimColor.copy(alpha = 0.55f),
+                        0.85f to scrimColor.copy(alpha = 0.20f),
+                        1.00f to Color.Transparent
                     )
                 )
-        )
-    }
+            )
+    )
 }

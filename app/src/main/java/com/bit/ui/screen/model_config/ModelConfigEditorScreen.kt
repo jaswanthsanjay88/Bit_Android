@@ -123,22 +123,24 @@ fun ModelConfigEditorScreen(
                     transitionSpec = {
                         if (targetState) {
                             // Going to editor
-                            slideInHorizontally(
-                                initialOffsetX = { it },
-                                animationSpec = Motion.content()
-                            ) togetherWith slideOutHorizontally(
-                                targetOffsetX = { -it / 3 },
-                                animationSpec = Motion.content()
-                            )
+                            (slideInHorizontally(
+                                initialOffsetX = { (it * 0.25f).toInt() },
+                                animationSpec = Motion.entrance()
+                            ) + fadeIn(Motion.entrance())) togetherWith
+                            (slideOutHorizontally(
+                                targetOffsetX = { -(it * 0.12f).toInt() },
+                                animationSpec = Motion.exit()
+                            ) + fadeOut(Motion.exit()))
                         } else {
                             // Going back to list
-                            slideInHorizontally(
-                                initialOffsetX = { -it / 3 },
-                                animationSpec = Motion.content()
-                            ) togetherWith slideOutHorizontally(
-                                targetOffsetX = { it },
-                                animationSpec = Motion.content()
-                            )
+                            (slideInHorizontally(
+                                initialOffsetX = { -(it * 0.18f).toInt() },
+                                animationSpec = Motion.entrance()
+                            ) + fadeIn(Motion.entrance())) togetherWith
+                            (slideOutHorizontally(
+                                targetOffsetX = { (it * 0.22f).toInt() },
+                                animationSpec = Motion.exit()
+                            ) + fadeOut(Motion.exit()))
                         }.using(SizeTransform(clip = false))
                     },
                     label = "panelSwitch"

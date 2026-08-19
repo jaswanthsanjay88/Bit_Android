@@ -15,7 +15,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SkillManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private val prefs = context.getSharedPreferences("bit_skills_store", Context.MODE_PRIVATE)
 
@@ -55,15 +55,6 @@ class SkillManager @Inject constructor(
                 icon = "terminal",
                 enabled = true,
                 isBuiltIn = true
-            ),
-            Skill(
-                id = "skill-calculator",
-                name = "Math & Calculator",
-                description = "Evaluates complex mathematical expressions with high precision.",
-                instructions = "Evaluate mathematical statements using precise calculations.",
-                icon = "calculate",
-                enabled = true,
-                isBuiltIn = true
             )
         )
     }
@@ -76,10 +67,16 @@ class SkillManager @Inject constructor(
             val list = mutableListOf<Skill>()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
+                val id = obj.optString("id")
+                val name = obj.optString("name")
+                // Exclude removed calculator skill
+                if (id == "skill-calculator" || name.contains("calculator", ignoreCase = true)) {
+                    continue
+                }
                 list.add(
                     Skill(
-                        id = obj.optString("id"),
-                        name = obj.optString("name"),
+                        id = id,
+                        name = name,
                         description = obj.optString("description"),
                         instructions = obj.optString("instructions"),
                         icon = obj.optString("icon", "sparkles"),

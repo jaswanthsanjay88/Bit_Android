@@ -68,7 +68,7 @@ fun WebAccessSectionCard(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        val port = customPort.toIntOrNull() ?: 8080
+        val port = customPort.toIntOrNull() ?: 7070
         val ok = webAccessManager.startServer(port)
         if (ok) {
             haptics.success()
@@ -198,7 +198,7 @@ fun WebAccessSectionCard(
                         onCheckedChange = { start ->
                             haptics.selection()
                             if (start) {
-                                val port = customPort.toIntOrNull() ?: 8080
+                                val port = customPort.toIntOrNull() ?: 7070
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                                     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                                 ) {
@@ -331,7 +331,7 @@ fun WebAccessSectionCard(
                     value = customPort,
                     onValueChange = { customPort = it.filter { c -> c.isDigit() }.take(5) },
                     label = { Text("Server Port") },
-                    placeholder = { Text("8080") },
+                    placeholder = { Text("7070") },
                     enabled = !isRunning,
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),

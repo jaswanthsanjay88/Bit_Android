@@ -289,10 +289,10 @@ fun M3WavyLinearProgressIndicator(
             var x = 0f
             val step = 2f // px step for smooth sine curve
 
-            wavePath.moveTo(0f, centerY + ampPx * sin((phase).toDouble()).toFloat())
+            wavePath.moveTo(0f, centerY + ampPx * kotlin.math.sin(phase))
 
             while (x <= activeWidth) {
-                val y = centerY + ampPx * sin(((x / waveLenPx) * 2 * PI + phase).toDouble()).toFloat()
+                val y = centerY + ampPx * kotlin.math.sin(((x / waveLenPx) * 2 * kotlin.math.PI.toFloat() + phase))
                 wavePath.lineTo(x, y)
                 x += step
             }

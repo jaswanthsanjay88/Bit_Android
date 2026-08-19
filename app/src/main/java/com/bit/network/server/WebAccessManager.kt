@@ -10,7 +10,7 @@ import javax.inject.Singleton
 
 @Singleton
 class WebAccessManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     val server = BitWebAccessServer(context)
 
@@ -19,7 +19,7 @@ class WebAccessManager @Inject constructor(
     val activePort: StateFlow<Int> = server.activePort
     val clientCount: StateFlow<Int> = server.clientCount
 
-    fun startServer(port: Int = 8080): Boolean {
+    fun startServer(port: Int = 7070): Boolean {
         val started = server.start(port)
         if (started) {
             try {

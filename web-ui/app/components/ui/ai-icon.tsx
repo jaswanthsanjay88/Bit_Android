@@ -25,7 +25,8 @@ function toFallbackText(name: string): string {
   return trimmed.slice(0, 1).toUpperCase();
 }
 
-function isCatalogIconUrl(url: string): boolean {
+function isCatalogIconUrl(url?: string | null): boolean {
+  if (!url) return false;
   const lower = url.toLowerCase();
   return (
     lower.includes("/catalog/icons/") ||
@@ -38,11 +39,13 @@ function isCatalogIconUrl(url: string): boolean {
   );
 }
 
-function isRemoteUrl(url: string): boolean {
+function isRemoteUrl(url?: string | null): boolean {
+  if (!url) return false;
   return url.startsWith("https://") || url.startsWith("http://");
 }
 
-function isLocalFileUrl(url: string): boolean {
+function isLocalFileUrl(url?: string | null): boolean {
+  if (!url) return false;
   return (
     url.startsWith("file://") ||
     url.startsWith("content://") ||

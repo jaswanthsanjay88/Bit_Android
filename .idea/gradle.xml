@@ -17,6 +17,7 @@
             <option value="$PROJECT_DIR$/neuron-packet" />
             <option value="$PROJECT_DIR$/system_encryptor" />
             <option value="$PROJECT_DIR$/ums" />
+            <option value="$PROJECT_DIR$/workspace" />
           </set>
         </option>
       </GradleProjectSettings>

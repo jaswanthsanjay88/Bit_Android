@@ -40,7 +40,7 @@ class SkillPlugin(
             TOOL_MANAGE_SKILLS,
             "Activate available specialized agent skills into the context. Use this tool only when the user request clearly requires one of the available skill specializations."
         )
-            .stringParam("skill", "The name or ID of the skill to activate (e.g. 'Math & Calculator', 'File Operations')", false)
+            .stringParam("skill", "The name or ID of the skill to activate (e.g. 'Web Search & Scraping', 'File Operations')", false)
             .stringParam("skills", "Comma-separated names of multiple skills to activate", false)
 
         val loadSkillBuilder = ToolDefinitionBuilder(

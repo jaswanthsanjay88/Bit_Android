@@ -26,6 +26,8 @@ android {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
         buildConfigField("String", "ALIAS", getProperty("ALIAS"))
+        buildConfigField("Long", "BUILD_TIMESTAMP", "${System.currentTimeMillis()}L")
+        buildConfigField("int", "BETA_EXPIRY_DAYS", "0")
     }
 
     splits {
@@ -74,7 +76,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("int", "BETA_EXPIRY_DAYS", "30") // Debug builds expire after 30 days
+        }
         release {
+            buildConfigField("int", "BETA_EXPIRY_DAYS", "0") // 0 = Never expires (production)
             isMinifyEnabled = true
             isShrinkResources = true
             val relConfig = signingConfigs.findByName("release")
@@ -109,7 +115,8 @@ android {
                 "lib/x86_64/libc++_shared.so",
                 "**/libonnxruntime.so",
                 "**/libonnxruntime4j_jni.so",
-                "**/libai_sherpa.so"
+                "**/libai_sherpa.so",
+                "**/libtermux.so"
             )
         }
         resources {
@@ -199,6 +206,9 @@ dependencies {
     implementation(project(":system_encryptor"))
     implementation(project(":file_ops"))
     implementation(project(":ums"))
+    implementation(project(":workspace"))
+    implementation("com.termux.termux-app:terminal-view:0.118.0")
+    implementation("com.termux.termux-app:terminal-emulator:0.118.0")
     //implementation(project(":character-engine"))
 
     // AndroidX Core & Lifecycle

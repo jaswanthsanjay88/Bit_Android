@@ -41,6 +41,10 @@ import com.bit.tts.TTSManager
 import com.bit.tts.TTSSettings
 import com.bit.ui.components.TopBlurScrim
 import com.bit.ui.icons.TnIcons
+import com.bit.ui.theme.Motion
+import com.bit.ui.theme.MotionDuration
+import com.bit.ui.theme.MotionEasing
+import com.bit.ui.theme.bouncyClick
 import com.bit.viewmodel.ChatViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -523,6 +527,10 @@ fun LiveVoiceOverlay(
                 // Caption text
                 AnimatedContent(
                     targetState = state,
+                    transitionSpec = {
+                        (fadeIn(tween(MotionDuration.enter, easing = MotionEasing.standard)) + scaleIn(initialScale = 0.92f, animationSpec = Motion.interactive())) togetherWith
+                        (fadeOut(tween(MotionDuration.exit, easing = MotionEasing.standard)) + scaleOut(targetScale = 0.92f, animationSpec = Motion.exit()))
+                    },
                     label = "live_caption"
                 ) { currentState ->
                     val caption = when (currentState) {
@@ -605,12 +613,22 @@ fun LiveVoiceOverlay(
                                 .size(56.dp)
                                 .background(Color.White, CircleShape)
                         ) {
-                            Icon(
-                                imageVector = if (state is LiveModeState.Speaking || state is LiveModeState.Thinking) TnIcons.PlayerStop else TnIcons.LiveWaveform,
-                                contentDescription = "Stop or Start",
-                                tint = Color.Black,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            val isActionStop = state is LiveModeState.Speaking || state is LiveModeState.Thinking
+                            AnimatedContent(
+                                targetState = isActionStop,
+                                transitionSpec = {
+                                    (scaleIn(initialScale = 0.7f, animationSpec = Motion.interactive()) + fadeIn(tween(MotionDuration.stateChange))) togetherWith
+                                    (scaleOut(targetScale = 0.7f, animationSpec = Motion.exit()) + fadeOut(tween(MotionDuration.exit)))
+                                },
+                                label = "live_center_btn_icon"
+                            ) { stopIcon ->
+                                Icon(
+                                    imageVector = if (stopIcon) TnIcons.PlayerStop else TnIcons.LiveWaveform,
+                                    contentDescription = "Stop or Start",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
 
                         // Close (X) button

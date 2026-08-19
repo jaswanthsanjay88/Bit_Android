@@ -15,6 +15,7 @@ import com.bit.database.dao.ModelConfigDao
 import com.bit.database.dao.ModelDao
 import com.bit.database.dao.PersonaDao
 import com.bit.database.dao.RagDao
+import com.bit.database.dao.WorkspaceDao
 import com.bit.models.converters.Converters
 import com.bit.models.table_schema.AiMemory
 import com.bit.models.table_schema.InstalledRag
@@ -24,12 +25,13 @@ import com.bit.models.table_schema.MemoryNote
 import com.bit.models.table_schema.Model
 import com.bit.models.table_schema.ModelConfig
 import com.bit.models.table_schema.Persona
+import com.bit.models.table_schema.WorkspaceEntity
 
 import java.util.UUID
 
 @Database(
-    entities = [Model::class, ModelConfig::class, InstalledRag::class, Persona::class, AiMemory::class, KnowledgeEntity::class, KnowledgeRelation::class, MemoryNote::class],
-    version = 25,
+    entities = [Model::class, ModelConfig::class, InstalledRag::class, Persona::class, AiMemory::class, KnowledgeEntity::class, KnowledgeRelation::class, MemoryNote::class, WorkspaceEntity::class],
+    version = 26,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -42,6 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun memoryNoteDao(): MemoryNoteDao
     abstract fun knowledgeEntityDao(): KnowledgeEntityDao
     abstract fun knowledgeRelationDao(): KnowledgeRelationDao
+    abstract fun workspaceDao(): WorkspaceDao
 
 
     companion object {
@@ -740,6 +743,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_25_26 = object : Migration(25, 26) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS workspaces (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        name TEXT NOT NULL,
+                        root TEXT NOT NULL,
+                        shell_status TEXT NOT NULL DEFAULT 'DISABLED',
+                        created_at INTEGER NOT NULL,
+                        updated_at INTEGER NOT NULL,
+                        last_access_at INTEGER,
+                        tool_approvals TEXT NOT NULL DEFAULT '{}'
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_workspaces_root ON workspaces (root)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_workspaces_updated_at ON workspaces (updated_at)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -750,7 +772,7 @@ abstract class AppDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25
+                        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21, MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24, MIGRATION_24_25, MIGRATION_25_26
                     )
                     .fallbackToDestructiveMigrationOnDowngrade()
                     .addCallback(object : Callback() {

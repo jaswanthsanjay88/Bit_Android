@@ -53,7 +53,7 @@ endif()
 
 set(TARGET llama-common)
 
-add_library(${TARGET}
+add_library(${TARGET} STATIC
     arg.cpp
     arg.h
     base64.hpp
@@ -133,9 +133,9 @@ if (LLAMA_SUBPROCESS)
     target_compile_definitions(${TARGET} PUBLIC LLAMA_SUBPROCESS)
 endif()
 
-if (BUILD_SHARED_LIBS)
-    set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(${TARGET} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+if (BUILD_SHARED_LIBS)
     # TODO: make fine-grained exports in the future
     set_target_properties(${TARGET} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()

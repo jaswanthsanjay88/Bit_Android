@@ -1,93 +1,101 @@
 package com.bit.ui.theme
 
+import android.app.Activity
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
-import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bit.data.AppSettingsDataStore
 
-// ── Obsidian Kernel Color Scheme ───────────────────────────
-
-private val ObsidianColorScheme = darkColorScheme(
-    primary = Color(0xFFFFFFFF), // Pure White
-    onPrimary = Color(0xFF000000), // Pure Black
-    primaryContainer = Color(0xFF262626), // CarbonSurfaceHighest
-    onPrimaryContainer = Color(0xFFFFFFFF),
-    secondary = Color(0xFFE5E5E5), // Silver
-    onSecondary = Color(0xFF000000),
-    secondaryContainer = Color(0xFF1E1E1E), // CarbonSurfaceHigh
-    onSecondaryContainer = Color(0xFFE5E5E5),
-    tertiary = Color(0xFFD4D4D4), // Neutral Gray
-    onTertiary = Color(0xFF000000),
-    tertiaryContainer = Color(0xFF1E1E1E),
-    onTertiaryContainer = Color(0xFFD4D4D4),
-
-    background = Color(0xFF000000), // OLED Black
-    onBackground = Color(0xFFFFFFFF),
-
-    surface = Color(0xFF121212), // Dark Surface
-    onSurface = Color(0xFFFFFFFF),
-    surfaceVariant = Color(0xFF1E1E1E),
-    onSurfaceVariant = Color(0xFFD0D0D0),
-    surfaceTint = Color(0xFFFFFFFF),
-    inverseSurface = Color(0xFFE5E5E5),
-    inverseOnSurface = Color(0xFF121212),
-    outline = Color(0xFF666666),
-    outlineVariant = Color(0xFF3D3D3D),
-    scrim = Color(0xFF000000),
-
-    error = Color(0xFFFF6E6E),
-    onError = Color(0xFF000000),
-    errorContainer = Color(0xFF351717),
-    onErrorContainer = Color(0xFFFFC8C8),
-
-    inversePrimary = Color(0xFFE0E0E0)
-)
-
-// ── Typography ──
-// Single instance with Manrope applied to all text styles.
-
-private val ManropeTypography: Typography by lazy {
-    val base = Typography()
-    base.copy(
-        displayLarge = base.displayLarge.copy(fontFamily = ManropeFontFamily),
-        displayMedium = base.displayMedium.copy(fontFamily = ManropeFontFamily),
-        displaySmall = base.displaySmall.copy(fontFamily = ManropeFontFamily),
-        headlineLarge = base.headlineLarge.copy(fontFamily = ManropeFontFamily),
-        headlineMedium = base.headlineMedium.copy(fontFamily = ManropeFontFamily),
-        headlineSmall = base.headlineSmall.copy(fontFamily = ManropeFontFamily),
-        titleLarge = base.titleLarge.copy(fontFamily = ManropeFontFamily),
-        titleMedium = base.titleMedium.copy(fontFamily = ManropeFontFamily),
-        titleSmall = base.titleSmall.copy(fontFamily = ManropeFontFamily),
-        bodyLarge = base.bodyLarge.copy(fontFamily = ManropeFontFamily),
-        bodyMedium = base.bodyMedium.copy(fontFamily = ManropeFontFamily),
-        bodySmall = base.bodySmall.copy(fontFamily = ManropeFontFamily),
-        labelLarge = base.labelLarge.copy(fontFamily = ManropeFontFamily),
-        labelMedium = base.labelMedium.copy(fontFamily = ManropeFontFamily),
-        labelSmall = base.labelSmall.copy(fontFamily = ManropeFontFamily),
-    )
-}
-
-val LocalGlass = androidx.compose.runtime.staticCompositionLocalOf { Glass }
+val LocalGlass = androidx.compose.runtime.compositionLocalOf { DarkGlassTokens }
+val LocalDarkMode = compositionLocalOf { true }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NeuroVerseTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    // UI redesign requirement: keep the experience consistently dark.
-    val colorScheme = ObsidianColorScheme
+    val context = LocalContext.current
+    val dataStore = remember(context) { AppSettingsDataStore(context.applicationContext) }
 
-    androidx.compose.runtime.CompositionLocalProvider(
-        LocalGlass provides Glass
+    val colorModeStr by dataStore.colorMode.collectAsStateWithLifecycle(initialValue = "SYSTEM")
+    val dynamicColorEnabled by dataStore.dynamicColorEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val themePresetId by dataStore.themePresetId.collectAsStateWithLifecycle(initialValue = "obsidian")
+    val fontFamilyStr by dataStore.fontFamily.collectAsStateWithLifecycle(initialValue = "MANROPE")
+    val customFontPath by dataStore.customFontPath.collectAsStateWithLifecycle(initialValue = "")
+    val fontScale by dataStore.fontScale.collectAsStateWithLifecycle(initialValue = 1.0f)
+
+    val systemIsDark = isSystemInDarkTheme()
+    val colorMode = remember(colorModeStr) {
+        runCatching { ColorMode.valueOf(colorModeStr) }.getOrDefault(ColorMode.SYSTEM)
+    }
+
+    val darkTheme = when (colorMode) {
+        ColorMode.SYSTEM -> systemIsDark
+        ColorMode.LIGHT -> false
+        ColorMode.DARK -> true
+    }
+
+    val colorScheme = when {
+        dynamicColorEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        else -> {
+            val preset = findBitPresetTheme(themePresetId)
+            if (darkTheme) preset.darkScheme else preset.lightScheme
+        }
+    }
+
+    val builtinFont = remember(fontFamilyStr) {
+        runCatching { BuiltinFont.valueOf(fontFamilyStr) }.getOrDefault(BuiltinFont.MANROPE)
+    }
+    val resolvedFamily = remember(builtinFont, customFontPath) {
+        resolveFontFamily(builtinFont, customFontPath)
+    }
+    val typography = remember(resolvedFamily, fontScale) {
+        createBitTypography(resolvedFamily, fontScale)
+    }
+
+    // Update status bar & navigation bar appearance
+    val view = LocalView.current
+    if (!view.isInEditMode && view.context is Activity) {
+        val window = (view.context as Activity).window
+        val statusBarColor = colorScheme.surface
+        SideEffect {
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = statusBarColor.luminance() > 0.5f
+                isAppearanceLightNavigationBars = !darkTheme
+            }
+            @Suppress("DEPRECATION")
+            window.statusBarColor = statusBarColor.toArgb()
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = colorScheme.surface.toArgb()
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalGlass provides if (darkTheme) DarkGlassTokens else LightGlassTokens,
+        LocalDarkMode provides darkTheme
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,
-            typography = ManropeTypography,
+            typography = typography,
+            shapes = BitShapes,
             motionScheme = MotionScheme.expressive(),
             content = content
         )

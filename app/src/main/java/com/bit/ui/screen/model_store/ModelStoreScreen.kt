@@ -1,9 +1,7 @@
 package com.bit.ui.screen.model_store
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -203,9 +201,29 @@ fun ModelStoreScreen(
 
             // Tab Content
             AnimatedContent(
-                targetState = selectedTab, transitionSpec = {
-                    fadeIn(Motion.state()) togetherWith fadeOut(Motion.state())
-                }, label = "tab_content",
+                targetState = selectedTab,
+                transitionSpec = {
+                    if (targetState.ordinal > initialState.ordinal) {
+                        (slideInHorizontally(
+                            animationSpec = tween(300, easing = Motion.EmphasizedDecelerate),
+                            initialOffsetX = { (it * 0.20f).toInt() }
+                        ) + fadeIn(tween(200, easing = Motion.EmphasizedDecelerate))) togetherWith
+                        (slideOutHorizontally(
+                            animationSpec = tween(250, easing = Motion.EmphasizedAccelerate),
+                            targetOffsetX = { -(it * 0.12f).toInt() }
+                        ) + fadeOut(tween(150, easing = Motion.EmphasizedAccelerate)))
+                    } else {
+                        (slideInHorizontally(
+                            animationSpec = tween(300, easing = Motion.EmphasizedDecelerate),
+                            initialOffsetX = { -(it * 0.20f).toInt() }
+                        ) + fadeIn(tween(200, easing = Motion.EmphasizedDecelerate))) togetherWith
+                        (slideOutHorizontally(
+                            animationSpec = tween(250, easing = Motion.EmphasizedAccelerate),
+                            targetOffsetX = { (it * 0.12f).toInt() }
+                        ) + fadeOut(tween(150, easing = Motion.EmphasizedAccelerate)))
+                    }
+                },
+                label = "tab_content",
                 modifier = Modifier.weight(1f)
             ) { tab ->
                 when (tab) {

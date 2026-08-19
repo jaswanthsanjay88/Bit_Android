@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.bit.global.Standards
+import com.bit.ui.theme.Spacing
+import com.bit.ui.theme.BitShapeScale
 import com.bit.ui.components.ActionButton
 import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.NeuroVerseTheme
@@ -150,8 +152,8 @@ private fun DiagnosticsScreen(onBack: () -> Unit) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(Standards.CardSmallCornerRadius),
-                    color = Color(0x05FFFFFF),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x0AFFFFFF))
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                 ) {
                     Column(
                         modifier = Modifier.padding(Standards.CardPadding),
@@ -183,7 +185,7 @@ private fun DiagnosticsScreen(onBack: () -> Unit) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(Standards.CardSmallCornerRadius),
-                        color = Color(0x05FFFFFF)
+                        color = MaterialTheme.colorScheme.surfaceContainerLow
                     ) {
                         Text(
                             text = "No policy authorization calls logged yet.",
@@ -202,7 +204,7 @@ private fun DiagnosticsScreen(onBack: () -> Unit) {
                 }
             }
 
-            // --- Process Isolation Test ---
+            // --- Native Crash Test ---
             item {
                 Row(
                     modifier = Modifier
@@ -212,7 +214,7 @@ private fun DiagnosticsScreen(onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Process Isolation Test",
+                        text = "Crash Isolation Test",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -233,8 +235,8 @@ private fun DiagnosticsScreen(onBack: () -> Unit) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(Standards.CardSmallCornerRadius),
-                    color = Color(0x05FFFFFF),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x0AFFFFFF))
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                 ) {
                     Text(
                         text = "Test process isolation by simulating a native engine crash in the isolated :inference process. Tapping this kills the inference process immediately, allowing you to verify that the main application remains active and auto-recovers the loaded model.",
@@ -278,7 +280,7 @@ private fun DiagnosticsScreen(onBack: () -> Unit) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(Standards.CardSmallCornerRadius),
-                        color = Color(0x05FFFFFF)
+                        color = MaterialTheme.colorScheme.surfaceContainerLow
                     ) {
                         Text(
                             text = "No crash reports found. The application is running stable.",
@@ -325,10 +327,10 @@ private fun PolicyLogCard(log: JSONObject) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
-        color = Color(0x05FFFFFF),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (allowed) Color(0x1F4CAF50) else Color(0x1FF44336)
+            if (allowed) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f) else MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
         )
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -339,13 +341,13 @@ private fun PolicyLogCard(log: JSONObject) {
             ) {
                 Text(op, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 Surface(
-                    color = if (allowed) Color(0x194CAF50) else Color(0x19F44336),
+                    color = if (allowed) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(4.dp)
                 ) {
                     Text(
                         text = if (allowed) "ALLOWED" else "DENIED",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (allowed) Color(0xFF4CAF50) else Color(0xFFF44336),
+                        color = if (allowed) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         fontWeight = FontWeight.Bold
                     )
@@ -364,8 +366,8 @@ private fun CrashCard(crash: JSONObject) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
-        color = Color(0x05FFFFFF),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1FF44336))
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f))
     ) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -409,8 +411,8 @@ private fun CrashCard(crash: JSONObject) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0x0A000000), shape = RoundedCornerShape(4.dp))
-                        .padding(8.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest, shape = BitShapeScale.extraSmall)
+                        .padding(Spacing.sm)
                 )
             }
         }

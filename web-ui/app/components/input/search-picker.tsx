@@ -81,7 +81,8 @@ function isGeminiModel(model: ProviderModel | null): boolean {
     return false;
   }
 
-  return model.modelId.toLowerCase().includes("gemini");
+  const id = model.modelId ?? model.id ?? "";
+  return id.toLowerCase().includes("gemini");
 }
 
 function getServiceType(service: SearchServiceOption): string | null {

@@ -80,6 +80,28 @@ fun SkillsScreen(
 
     var selectedSkillForEdit by remember { mutableStateOf<Skill?>(null) }
     var showCreateSheet by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedFilterIndex by remember { mutableIntStateOf(0) } // 0: All, 1: Active, 2: Built-in, 3: Custom
+
+    val filters = listOf("All", "Active", "Built-in", "Custom")
+
+    val filteredSkills = remember(localOrder, searchQuery, selectedFilterIndex) {
+        localOrder.filter { skill ->
+            val matchesSearch = searchQuery.isBlank() ||
+                    skill.name.contains(searchQuery, ignoreCase = true) ||
+                    skill.description.contains(searchQuery, ignoreCase = true) ||
+                    skill.instructions.contains(searchQuery, ignoreCase = true)
+
+            val matchesFilter = when (selectedFilterIndex) {
+                1 -> skill.enabled
+                2 -> skill.isBuiltIn
+                3 -> !skill.isBuiltIn
+                else -> true
+            }
+
+            matchesSearch && matchesFilter
+        }
+    }
 
     val lazyListState = rememberLazyListState()
     val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
@@ -133,24 +155,24 @@ fun SkillsScreen(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Rounded.SmartToy,
+                            Icons.Rounded.Build,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
             },
             title = {
                 Text(
-                    "Tool-Capable Model Required",
+                    "Agent Skills Framework",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
                 Text(
-                    "Agent Skills will only be actively triggered when using instruction-tuned tool models (e.g. Qwen 2.5, Llama 3.1/3.2, Claude, GPT-4o, DeepSeek-V3). Base completion models cannot execute structured tool routines.",
+                    "Agent Skills inject progressive behavioral instructions, prompt guidelines, and domain specializations (following Claude SKILL.md standard) directly into the model context.",
                     style = MaterialTheme.typography.bodyMedium,
                     lineHeight = 20.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -176,11 +198,11 @@ fun SkillsScreen(
         state = lazyListState,
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ── HERO INFO BANNER ──
+        // ── 1. MATERIAL 3 EXPRESSIVE HERO HEADER ──
         item(key = "hero_banner") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -188,107 +210,259 @@ fun SkillsScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
             ) {
-                Row(
+                Column(
                     modifier = Modifier.padding(18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(44.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Rounded.AutoAwesome,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(24.dp)
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Build,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Agent Skills",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Modular instruction skills and prompt capabilities (Claude SKILL.md)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    // Stat Pills Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val activeCount = skills.count { it.enabled }
+                        val customCount = skills.count { !it.isBuiltIn }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                Text(
+                                    text = "TOTAL",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "${skills.size}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                Text(
+                                    text = "ACTIVE",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "$activeCount",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                Text(
+                                    text = "CUSTOM",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                                Text(
+                                    text = "$customCount",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+                        }
+                    }
+
+                    // Action Buttons Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                bitHaptics.pop()
+                                importLauncher.launch(arrayOf("*/*", "text/markdown", "application/json"))
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Import", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        Button(
+                            onClick = {
+                                bitHaptics.pop()
+                                showCreateSheet = true
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("New Skill", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── 2. FILTER CHIPS & SEARCH ──
+        item(key = "filters_section") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Search field if list is large
+                if (localOrder.size > 3) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search skills...") },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Rounded.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                    )
+                }
+
+                // Material 3 Filter Chips Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    filters.forEachIndexed { idx, label ->
+                        FilterChip(
+                            selected = selectedFilterIndex == idx,
+                            onClick = {
+                                bitHaptics.selection()
+                                selectedFilterIndex = idx
+                            },
+                            label = { Text(label) },
+                            shape = RoundedCornerShape(10.dp),
+                            leadingIcon = if (selectedFilterIndex == idx) {
+                                {
+                                    Icon(
+                                        Icons.Rounded.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            } else null
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── 3. SKILL CARDS LIST ──
+        if (filteredSkills.isEmpty()) {
+            item(key = "empty_state") {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(32.dp)
+                            .fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Build,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                        }
                         Text(
-                            text = "Agent Skills (Claude SKILL.md)",
+                            text = if (searchQuery.isNotEmpty()) "No matching skills found" else "No skills configured",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Modular instruction skills and prompt capabilities. Long-press drag handle to reorder, swipe left to delete.",
+                            text = if (searchQuery.isNotEmpty()) "Try a different search term or clear the filter." else "Tap \"New Skill\" or \"Import\" to add a custom SKILL.md capability.",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-
-        // ── TOP ACTION BAR ──
-        item(key = "action_bar") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "CONFIGURED SKILLS (${localOrder.size})",
-                    style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            bitHaptics.pop()
-                            importLauncher.launch(arrayOf("*/*", "text/markdown", "application/json"))
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Import SKILL.md", style = MaterialTheme.typography.labelMedium)
-                    }
-
-                    FilledTonalButton(
-                        onClick = {
-                            bitHaptics.pop()
-                            showCreateSheet = true
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("New Skill", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-            }
-        }
-
-        // ── EMPTY STATE ──
-        if (localOrder.isEmpty()) {
-            item(key = "empty_state") {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
-                ) {
-                    Box(modifier = Modifier.padding(32.dp).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "No skills configured. Tap \"New Skill\" or \"Import SKILL.md\" to add one.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }
                 }
             }
         } else {
-            // ── REORDERABLE SKILL CARDS ──
-            items(localOrder, key = { it.id }) { skill ->
+            items(filteredSkills, key = { it.id }) { skill ->
                 val index = localOrder.indexOf(skill)
                 val position = when {
                     localOrder.size == 1 -> ItemPosition.ONLY
@@ -324,9 +498,9 @@ fun SkillsScreen(
                                 Icon(
                                     Icons.Rounded.DragIndicator,
                                     contentDescription = "Reorder ${skill.name}",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     modifier = Modifier
-                                        .size(48.dp)
+                                        .size(44.dp)
                                         .padding(8.dp)
                                         .longPressDraggableHandle(
                                             onDragStarted = {
@@ -404,24 +578,24 @@ fun SkillCard(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Drag handle — isolated 48dp touch area
+            // Drag handle — isolated 44dp touch area
             dragHandle()
 
-            // Skill Icon
+            // Skill Icon with tonal container
             Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                modifier = Modifier.size(42.dp)
+                shape = RoundedCornerShape(12.dp),
+                color = if (skill.enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.size(44.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = getSkillIcon(skill.icon),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        tint = if (skill.enabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -433,9 +607,10 @@ fun SkillCard(
                     .weight(1f)
                     .clip(RoundedCornerShape(8.dp))
                     .clickable(onClick = onClick)
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = 2.dp)
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -445,31 +620,37 @@ fun SkillCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
                     if (skill.isBuiltIn) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                            modifier = Modifier.wrapContentWidth()
                         ) {
                             Text(
                                 text = "BUILT-IN",
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
                     }
                 }
 
                 if (skill.description.isNotBlank()) {
+                    Spacer(Modifier.height(2.dp))
                     Text(
                         text = skill.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 16.sp
                     )
                 }
             }
@@ -516,7 +697,6 @@ fun SkillEditorSheet(
         "search" to Icons.Rounded.Search,
         "storage" to Icons.Rounded.Storage,
         "terminal" to Icons.Rounded.Terminal,
-        "calculate" to Icons.Rounded.Calculate,
         "code" to Icons.Rounded.Code,
         "security" to Icons.Rounded.Security,
         "translate" to Icons.Rounded.Translate,
@@ -527,7 +707,8 @@ fun SkillEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        tonalElevation = 2.dp
     ) {
         Column(
             modifier = Modifier
@@ -550,9 +731,15 @@ fun SkillEditorSheet(
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Enabled", style = MaterialTheme.typography.labelMedium)
-                    Spacer(Modifier.width(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = if (enabled) "Enabled" else "Disabled",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Switch(checked = enabled, onCheckedChange = { enabled = it })
                 }
             }
@@ -562,10 +749,14 @@ fun SkillEditorSheet(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Skill Name") },
-                placeholder = { Text("e.g. Code Reviewer, Python Expert") },
+                placeholder = { Text("e.g. Code Reviewer, Deep Researcher") },
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
             )
 
             // Description / Trigger
@@ -576,7 +767,11 @@ fun SkillEditorSheet(
                 placeholder = { Text("When and why the AI should apply this skill...") },
                 maxLines = 3,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
             )
 
             // Icon Chips
@@ -586,22 +781,23 @@ fun SkillEditorSheet(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(iconOptions) { (key, imageVector) ->
                         val isSelected = icon == key
                         Surface(
-                            shape = CircleShape,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(44.dp)
                                 .clickable { icon = key }
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = imageVector,
                                     contentDescription = key,
-                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
@@ -619,7 +815,11 @@ fun SkillEditorSheet(
                     .fillMaxWidth()
                     .heightIn(min = 160.dp, max = 320.dp),
                 textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
             )
 
             // Save button
@@ -639,11 +839,12 @@ fun SkillEditorSheet(
                 },
                 enabled = name.isNotBlank(),
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 14.dp)
             ) {
                 Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (isNew) "Create Skill" else "Save Changes")
+                Text(if (isNew) "Create Skill" else "Save Changes", style = MaterialTheme.typography.labelLarge)
             }
 
             Spacer(Modifier.height(24.dp))
@@ -656,12 +857,11 @@ fun getSkillIcon(iconKey: String?): ImageVector {
         "search" -> Icons.Rounded.Search
         "storage" -> Icons.Rounded.Storage
         "terminal" -> Icons.Rounded.Terminal
-        "calculate" -> Icons.Rounded.Calculate
         "code" -> Icons.Rounded.Code
         "security" -> Icons.Rounded.Security
         "translate" -> Icons.Rounded.Translate
         "brush" -> Icons.Rounded.Brush
         "psychology" -> Icons.Rounded.Psychology
-        else -> Icons.Rounded.AutoAwesome
+        else -> Icons.Rounded.Build
     }
 }

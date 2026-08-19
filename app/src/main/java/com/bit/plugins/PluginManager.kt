@@ -51,7 +51,17 @@ object PluginManager {
     @Volatile private var _cachedEnabledToolDefs: List<ToolDefinitionBuilder>? = null
 
     // Set of enabled plugin names
-    private val _enabledPluginNames = MutableStateFlow<Set<String>>(setOf(WEB_SEARCH_PLUGIN_NAME, "Memory Vault", McpPlugin.PLUGIN_NAME, SkillPlugin.PLUGIN_NAME))
+    private val _enabledPluginNames = MutableStateFlow<Set<String>>(
+        setOf(
+            WEB_SEARCH_PLUGIN_NAME,
+            "Memory Vault",
+            "File Manager",
+            "System Info",
+            WorkspacePlugin.PLUGIN_NAME,
+            McpPlugin.PLUGIN_NAME,
+            SkillPlugin.PLUGIN_NAME
+        )
+    )
     val enabledPluginNames: StateFlow<Set<String>> = _enabledPluginNames.asStateFlow()
 
     // Web Search enabled state (independent toggle)
@@ -407,9 +417,28 @@ object PluginManager {
         val startTime = System.currentTimeMillis()
         Log.d(TAG, "Multi-turn tool call: ${toolCall.name} with args: ${toolCall.arguments}")
 
-        // O(1) lookup via cached tool name -> plugin key map
-        val pluginKey = _toolNameToPluginKey[toolCall.name.lowercase()]
-        val plugin = pluginKey?.let { _plugins[it] }
+        // O(1) lookup via cached tool name -> plugin key map, with fallback for namespaced MCP calls
+        val directKey = _toolNameToPluginKey[toolCall.name.lowercase()]
+        var plugin = directKey?.let { _plugins[it] }
+        var pluginKey = directKey ?: plugin?.getPluginInfo()?.name
+
+        if (plugin == null) {
+            // Try matching normalized tool name or delegating to MCP/Skill plugins
+            plugin = _plugins.values.firstOrNull { p ->
+                val pInfo = p.getPluginInfo()
+                pInfo.toolDefinitionBuilder.any { tDef ->
+                    val tName = tDef.name.lowercase()
+                    val callName = toolCall.name.lowercase()
+                    tName == callName ||
+                    tName.replace("-", "_") == callName.replace("-", "_") ||
+                    callName.endsWith("__$tName") ||
+                    callName.endsWith("_$tName")
+                }
+            }
+            if (plugin != null) {
+                pluginKey = plugin.getPluginInfo().name
+            }
+        }
 
         if (plugin == null) {
             Log.e(TAG, "Tool not found: ${toolCall.name}")
