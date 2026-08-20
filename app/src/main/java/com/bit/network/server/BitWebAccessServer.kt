@@ -491,6 +491,192 @@ class BitWebAccessServer(private val context: Context) {
                         break
                     }
 
+                    // ── REST: Health Check ──
+                    method == "GET" && (path == "/health" || path == "/api/health") -> {
+                        val isLoaded = LlmModelWorker.isGgufModelLoaded.value
+                        val modelId = LlmModelWorker.currentGgufModelId.value ?: ActiveModelSession.currentModelId.value
+                        val healthObj = JSONObject().apply {
+                            put("status", "ok")
+                            put("model", modelId.ifBlank { "none" })
+                            put("loaded", isLoaded)
+                            put("version", "2.1.0-beta.1")
+                        }
+                        sendJsonResponse(output, 200, healthObj)
+                    }
+
+                    // ── OpenAI-Compatible: /v1/models ──
+                    method == "GET" && (path == "/v1/models" || path == "/models") -> {
+                        val activeId = LlmModelWorker.currentGgufModelId.value ?: ActiveModelSession.currentModelId.value
+                        val dataArray = JSONArray()
+                        if (activeId.isNotBlank()) {
+                            dataArray.put(JSONObject().apply {
+                                put("id", activeId)
+                                put("object", "model")
+                                put("created", System.currentTimeMillis() / 1000)
+                                put("owned_by", "bit-on-device")
+                            })
+                        } else {
+                            dataArray.put(JSONObject().apply {
+                                put("id", "default-bit-model")
+                                put("object", "model")
+                                put("created", System.currentTimeMillis() / 1000)
+                                put("owned_by", "bit-on-device")
+                            })
+                        }
+                        val response = JSONObject().apply {
+                            put("object", "list")
+                            put("data", dataArray)
+                        }
+                        sendJsonResponse(output, 200, response)
+                    }
+
+                    // ── OpenAI-Compatible: /v1/chat/completions ──
+                    method == "POST" && (path == "/v1/chat/completions" || path == "/chat/completions") -> {
+                        val model = bodyJson.optString("model", LlmModelWorker.currentGgufModelId.value ?: "default")
+                        val messagesArr = bodyJson.optJSONArray("messages") ?: JSONArray()
+                        val isStream = bodyJson.optBoolean("stream", false)
+                        val maxTokens = bodyJson.optInt("max_tokens", 2048).coerceAtLeast(1)
+
+                        val messagesJson = JSONArray().apply {
+                            for (i in 0 until messagesArr.length()) {
+                                val m = messagesArr.optJSONObject(i) ?: continue
+                                put(JSONObject().apply {
+                                    put("role", m.optString("role", "user"))
+                                    put("content", m.optString("content", ""))
+                                })
+                            }
+                        }.toString()
+
+                        val completionId = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "").take(12)
+                        val createdTime = System.currentTimeMillis() / 1000
+
+                        if (!LlmModelWorker.isGgufModelLoaded.value) {
+                            val errObj = JSONObject().apply {
+                                put("error", JSONObject().apply {
+                                    put("message", "No local GGUF model is loaded in BIT. Open the app to load a model.")
+                                    put("type", "model_not_loaded")
+                                    put("code", 503)
+                                })
+                            }
+                            sendJsonResponse(output, 503, errObj)
+                        } else if (isStream) {
+                            keepOpenForSse = true
+                            startSseStream(output)
+
+                            try {
+                                LlmModelWorker.ggufGenerateMultiTurnStreaming(messagesJson, maxTokens = maxTokens).collect { event ->
+                                    when (event) {
+                                        is GenerationEvent.Token -> {
+                                            val chunkObj = JSONObject().apply {
+                                                put("id", completionId)
+                                                put("object", "chat.completion.chunk")
+                                                put("created", createdTime)
+                                                put("model", model)
+                                                put("choices", JSONArray().apply {
+                                                    put(JSONObject().apply {
+                                                        put("index", 0)
+                                                        put("delta", JSONObject().apply {
+                                                            put("content", event.text)
+                                                        })
+                                                        put("finish_reason", JSONObject.NULL)
+                                                    })
+                                                })
+                                            }
+                                            val chunkPayload = "data: $chunkObj\n\n"
+                                            output.write(chunkPayload.toByteArray(StandardCharsets.UTF_8))
+                                            output.flush()
+                                        }
+                                        is GenerationEvent.Done -> {
+                                            val doneChunk = JSONObject().apply {
+                                                put("id", completionId)
+                                                put("object", "chat.completion.chunk")
+                                                put("created", createdTime)
+                                                put("model", model)
+                                                put("choices", JSONArray().apply {
+                                                    put(JSONObject().apply {
+                                                        put("index", 0)
+                                                        put("delta", JSONObject())
+                                                        put("finish_reason", "stop")
+                                                    })
+                                                })
+                                            }
+                                            val donePayload = "data: $doneChunk\n\ndata: [DONE]\n\n"
+                                            output.write(donePayload.toByteArray(StandardCharsets.UTF_8))
+                                            output.flush()
+                                        }
+                                        is GenerationEvent.Error -> {
+                                            val errChunk = JSONObject().apply {
+                                                put("id", completionId)
+                                                put("object", "chat.completion.chunk")
+                                                put("created", createdTime)
+                                                put("model", model)
+                                                put("choices", JSONArray().apply {
+                                                    put(JSONObject().apply {
+                                                        put("index", 0)
+                                                        put("delta", JSONObject().apply {
+                                                            put("content", "\n[Error: ${event.message}]")
+                                                        })
+                                                        put("finish_reason", "error")
+                                                    })
+                                                })
+                                            }
+                                            val errPayload = "data: $errChunk\n\ndata: [DONE]\n\n"
+                                            output.write(errPayload.toByteArray(StandardCharsets.UTF_8))
+                                            output.flush()
+                                        }
+                                        else -> {}
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "OpenAI stream client disconnected: ${e.message}")
+                                LlmModelWorker.ggufStopGeneration()
+                            }
+                        } else {
+                            val fullResponse = StringBuilder()
+                            var finishReason = "stop"
+                            try {
+                                LlmModelWorker.ggufGenerateMultiTurnStreaming(messagesJson, maxTokens = maxTokens).collect { event ->
+                                    when (event) {
+                                        is GenerationEvent.Token -> fullResponse.append(event.text)
+                                        is GenerationEvent.Done -> finishReason = "stop"
+                                        is GenerationEvent.Error -> {
+                                            fullResponse.append("\n[Error: ${event.message}]")
+                                            finishReason = "error"
+                                        }
+                                        else -> {}
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.w(TAG, "OpenAI completion failed", e)
+                                LlmModelWorker.ggufStopGeneration()
+                                finishReason = "interrupted"
+                            }
+
+                            val resObj = JSONObject().apply {
+                                put("id", completionId)
+                                put("object", "chat.completion")
+                                put("created", createdTime)
+                                put("model", model)
+                                put("choices", JSONArray().apply {
+                                    put(JSONObject().apply {
+                                        put("index", 0)
+                                        put("message", JSONObject().apply {
+                                            put("role", "assistant")
+                                            put("content", fullResponse.toString())
+                                        })
+                                        put("finish_reason", finishReason)
+                                    })
+                                })
+                                put("usage", JSONObject().apply {
+                                    put("prompt_tokens", 0)
+                                    put("completion_tokens", fullResponse.length / 4)
+                                    put("total_tokens", fullResponse.length / 4)
+                                })
+                            }
+                            sendJsonResponse(output, 200, resObj)
+                        }
+                    }
+
                     // ── REST: Bootstrap & Status & Settings ──
                     method == "GET" && (path == "/api/status" || path == "/api/settings" || path == "/api/bootstrap") -> {
                         val settings = buildFullSettingsDto()
