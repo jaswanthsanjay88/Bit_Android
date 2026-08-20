@@ -546,12 +546,17 @@ class BitWebAccessServer(private val context: Context) {
 
                     // ── REST: Create Conversation ──
                     method == "POST" && path == "/api/conversations" -> {
-                        val newId = UUID.randomUUID().toString()
+                        val newId = bodyJson.optString("id", UUID.randomUUID().toString())
+                        val repo = VaultManager.chatRepo ?: run {
+                            VaultManager.initPlaintext(context)
+                            VaultManager.chatRepo
+                        }
                         try {
-                            VaultManager.chatRepo?.createChat(newId)
+                            repo?.createChat(newId)
                         } catch (e: Exception) {
                             Log.e(TAG, "Error creating chat $newId", e)
                         }
+                        notifyConversationListChanged()
                         val json = JSONObject().apply {
                             put("id", newId)
                             put("assistantId", "default")
@@ -597,20 +602,53 @@ class BitWebAccessServer(private val context: Context) {
                         }
 
                         if (userText.isNotEmpty()) {
-                            val repo = VaultManager.chatRepo
+                            val repo = VaultManager.chatRepo ?: run {
+                                VaultManager.initPlaintext(context)
+                                VaultManager.chatRepo
+                            }
+                            val existingMsgs = withTimeoutOrNull(2000) { repo?.getMessagesForChat(chatId) } ?: emptyList()
+                            val userNodeIndex = existingMsgs.size
                             val userMsgId = UUID.randomUUID().toString()
+                            val userNodeId = "node-$userMsgId"
                             val userMsg = Messages(
                                 msgId = userMsgId,
                                 role = Role.User,
                                 content = MessageContent(contentType = ContentType.Text, content = userText),
                                 timestamp = System.currentTimeMillis()
                             )
+                            if (existingMsgs.isEmpty()) {
+                                repo?.createChat(chatId)
+                                val title = if (userText.length > 30) userText.take(30) + "..." else userText
+                                repo?.updateChatTitle(chatId, title)
+                            }
                             repo?.addMessage(chatId, userMsg)
 
-                            // Launch live AI inference
-                            startInferenceForWebClient(chatId, userText)
+                            // Emit User message node update to SSE clients immediately!
+                            emitNodeUpdate(
+                                chatId = chatId,
+                                nodeId = userNodeId,
+                                nodeIndex = userNodeIndex,
+                                messageId = userMsgId,
+                                role = "user",
+                                text = userText,
+                                isGenerating = true
+                            )
+
+                            notifyConversationListChanged()
+
+                            // Launch live AI inference at assistant node index
+                            startInferenceForWebClient(chatId, userText, userNodeIndex + 1)
                         }
 
+                        sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
+                    }
+
+                    // ── REST: Delete Single Message ──
+                    method == "DELETE" && path.contains("/messages/") -> {
+                        val messageId = path.substringAfter("/messages/").substringBefore("/")
+                        val repo = VaultManager.chatRepo
+                        repo?.deleteMessage(messageId)
+                        notifyConversationListChanged()
                         sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
                     }
 
@@ -630,7 +668,7 @@ class BitWebAccessServer(private val context: Context) {
                         val msgs = repo?.getMessagesForChat(chatId) ?: emptyList()
                         val lastUserMsg = msgs.lastOrNull { it.role == Role.User }
                         if (lastUserMsg != null) {
-                            startInferenceForWebClient(chatId, lastUserMsg.content.content)
+                            startInferenceForWebClient(chatId, lastUserMsg.content.content, msgs.size)
                         }
                         sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
                     }
@@ -643,6 +681,7 @@ class BitWebAccessServer(private val context: Context) {
                         } catch (e: Exception) {
                             Log.e(TAG, "Error deleting chat $chatId", e)
                         }
+                        notifyConversationListChanged()
                         sendJsonResponse(output, 200, JSONObject().apply { put("status", "ok") })
                     }
 
@@ -704,16 +743,20 @@ class BitWebAccessServer(private val context: Context) {
 
     // ── Real AI Inference for Web Access Clients ──
 
-    private fun startInferenceForWebClient(chatId: String, @Suppress("UNUSED_PARAMETER") userPrompt: String) {
+    private fun startInferenceForWebClient(
+        chatId: String,
+        userPrompt: String,
+        assistantNodeIndex: Int
+    ) {
         activeGenerations[chatId]?.cancel()
 
         val generationJob = scope.launch(Dispatchers.IO) {
-            val repo = VaultManager.chatRepo ?: return@launch
+            val repo = VaultManager.chatRepo ?: run {
+                VaultManager.initPlaintext(context)
+                VaultManager.chatRepo
+            } ?: return@launch
             val assistantMsgId = UUID.randomUUID().toString()
             val assistantNodeId = "node-$assistantMsgId"
-
-            val existingMsgs = repo.getMessagesForChat(chatId)
-            val nodeIndex = existingMsgs.size
 
             val responseBuffer = StringBuilder()
 
@@ -721,11 +764,14 @@ class BitWebAccessServer(private val context: Context) {
             emitNodeUpdate(
                 chatId = chatId,
                 nodeId = assistantNodeId,
-                nodeIndex = nodeIndex,
+                nodeIndex = assistantNodeIndex,
                 messageId = assistantMsgId,
+                role = "assistant",
                 text = "",
                 isGenerating = true
             )
+
+            val existingMsgs = repo.getMessagesForChat(chatId)
 
             try {
                 if (LlmModelWorker.isGgufModelLoaded.value) {
@@ -745,24 +791,25 @@ class BitWebAccessServer(private val context: Context) {
                             is GenerationEvent.Token -> {
                                 responseBuffer.append(event.text)
                                 val now = System.currentTimeMillis()
-                                if (now - lastEmitTime > 60) {
+                                if (now - lastEmitTime > 40) {
                                     lastEmitTime = now
                                     emitNodeUpdate(
                                         chatId = chatId,
                                         nodeId = assistantNodeId,
-                                        nodeIndex = nodeIndex,
+                                        nodeIndex = assistantNodeIndex,
                                         messageId = assistantMsgId,
+                                        role = "assistant",
                                         text = responseBuffer.toString(),
                                         isGenerating = true
                                     )
                                 }
                             }
                             is GenerationEvent.Done -> {
-                                // Final save
+                                val finalText = responseBuffer.toString()
                                 val assistantMsg = Messages(
                                     msgId = assistantMsgId,
                                     role = Role.Assistant,
-                                    content = MessageContent(contentType = ContentType.Text, content = responseBuffer.toString()),
+                                    content = MessageContent(contentType = ContentType.Text, content = finalText),
                                     timestamp = System.currentTimeMillis()
                                 )
                                 repo.addMessage(chatId, assistantMsg)
@@ -770,18 +817,21 @@ class BitWebAccessServer(private val context: Context) {
                                 emitNodeUpdate(
                                     chatId = chatId,
                                     nodeId = assistantNodeId,
-                                    nodeIndex = nodeIndex,
+                                    nodeIndex = assistantNodeIndex,
                                     messageId = assistantMsgId,
-                                    text = responseBuffer.toString(),
+                                    role = "assistant",
+                                    text = finalText,
                                     isGenerating = false
                                 )
+                                notifyConversationListChanged()
                             }
                             is GenerationEvent.Error -> {
                                 responseBuffer.append("\n\n[Error: ${event.message}]")
+                                val finalText = responseBuffer.toString()
                                 val assistantMsg = Messages(
                                     msgId = assistantMsgId,
                                     role = Role.Assistant,
-                                    content = MessageContent(contentType = ContentType.Text, content = responseBuffer.toString()),
+                                    content = MessageContent(contentType = ContentType.Text, content = finalText),
                                     timestamp = System.currentTimeMillis()
                                 )
                                 repo.addMessage(chatId, assistantMsg)
@@ -789,18 +839,20 @@ class BitWebAccessServer(private val context: Context) {
                                 emitNodeUpdate(
                                     chatId = chatId,
                                     nodeId = assistantNodeId,
-                                    nodeIndex = nodeIndex,
+                                    nodeIndex = assistantNodeIndex,
                                     messageId = assistantMsgId,
-                                    text = responseBuffer.toString(),
+                                    role = "assistant",
+                                    text = finalText,
                                     isGenerating = false
                                 )
+                                notifyConversationListChanged()
                             }
                             else -> {}
                         }
                     }
                 } else {
-                    // No model loaded fallback message
-                    val fallbackText = "No on-device GGUF model is currently loaded in RAM on your Android phone.\n\nPlease open the BIT AI app on your phone and load a local model (or activate an API model) to start chatting."
+                    // Fallback when no model is loaded
+                    val fallbackText = "No on-device GGUF model is currently loaded in RAM on your Android phone.\n\nPlease open the BIT app on your phone and load a local model to start chatting."
                     val assistantMsg = Messages(
                         msgId = assistantMsgId,
                         role = Role.Assistant,
@@ -812,23 +864,35 @@ class BitWebAccessServer(private val context: Context) {
                     emitNodeUpdate(
                         chatId = chatId,
                         nodeId = assistantNodeId,
-                        nodeIndex = nodeIndex,
+                        nodeIndex = assistantNodeIndex,
                         messageId = assistantMsgId,
+                        role = "assistant",
                         text = fallbackText,
                         isGenerating = false
                     )
+                    notifyConversationListChanged()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Inference error in web client handler", e)
                 val errText = responseBuffer.toString() + "\n\n[Generation interrupted: ${e.message}]"
+                val assistantMsg = Messages(
+                    msgId = assistantMsgId,
+                    role = Role.Assistant,
+                    content = MessageContent(contentType = ContentType.Text, content = errText),
+                    timestamp = System.currentTimeMillis()
+                )
+                repo.addMessage(chatId, assistantMsg)
+
                 emitNodeUpdate(
                     chatId = chatId,
                     nodeId = assistantNodeId,
-                    nodeIndex = nodeIndex,
+                    nodeIndex = assistantNodeIndex,
                     messageId = assistantMsgId,
+                    role = "assistant",
                     text = errText,
                     isGenerating = false
                 )
+                notifyConversationListChanged()
             } finally {
                 activeGenerations.remove(chatId)
             }
@@ -842,6 +906,7 @@ class BitWebAccessServer(private val context: Context) {
         nodeId: String,
         nodeIndex: Int,
         messageId: String,
+        role: String = "assistant",
         text: String,
         isGenerating: Boolean
     ) {
@@ -850,7 +915,7 @@ class BitWebAccessServer(private val context: Context) {
 
         val msgDto = JSONObject().apply {
             put("id", messageId)
-            put("role", "assistant")
+            put("role", role)
             put("parts", JSONArray().apply {
                 put(JSONObject().apply {
                     put("type", "text")
@@ -892,6 +957,26 @@ class BitWebAccessServer(private val context: Context) {
             }
         }
         clients.removeAll(deadClients)
+    }
+
+    private fun notifyConversationListChanged() {
+        val eventObj = JSONObject().apply {
+            put("type", "invalidate")
+            put("assistantId", "default")
+            put("timestamp", System.currentTimeMillis())
+        }
+        val payload = "event: invalidate\ndata: $eventObj\n\n"
+        val bytes = payload.toByteArray(StandardCharsets.UTF_8)
+        val deadClients = mutableListOf<OutputStream>()
+        for (client in conversationListSseClients) {
+            try {
+                client.write(bytes)
+                client.flush()
+            } catch (_: Exception) {
+                deadClients.add(client)
+            }
+        }
+        conversationListSseClients.removeAll(deadClients)
     }
 
     private fun startSseStream(output: OutputStream) {
