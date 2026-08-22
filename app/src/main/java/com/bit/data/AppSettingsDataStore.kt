@@ -57,6 +57,12 @@ class AppSettingsDataStore(private val context: Context) {
         private val FONT_FAMILY = stringPreferencesKey("font_family")
         private val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
         private val FONT_SCALE = androidx.datastore.preferences.core.floatPreferencesKey("font_scale")
+        private val WEBDAV_URL = stringPreferencesKey("webdav_url")
+        private val WEBDAV_USERNAME = stringPreferencesKey("webdav_username")
+        private val WEBDAV_PASSWORD = stringPreferencesKey("webdav_password")
+        private val WEBDAV_PATH = stringPreferencesKey("webdav_path")
+        private val WEBDAV_AUTO_BACKUP = booleanPreferencesKey("webdav_auto_backup")
+        private val WEBDAV_AUTO_BACKUP_HOURS = androidx.datastore.preferences.core.intPreferencesKey("webdav_auto_backup_hours")
     }
 
     val localServerEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
@@ -424,6 +430,28 @@ class AppSettingsDataStore(private val context: Context) {
 
     suspend fun saveFontScale(scale: Float) {
         context.appSettingsDataStore.edit { it[FONT_SCALE] = scale.coerceIn(0.8f, 1.4f) }
+    }
+
+    val webDavConfig: Flow<com.bit.sync.WebDavConfig> = context.appSettingsDataStore.data.map { prefs ->
+        com.bit.sync.WebDavConfig(
+            url = prefs[WEBDAV_URL] ?: "",
+            username = prefs[WEBDAV_USERNAME] ?: "",
+            password = prefs[WEBDAV_PASSWORD] ?: "",
+            path = prefs[WEBDAV_PATH] ?: "BIT_Backups",
+            autoBackupEnabled = prefs[WEBDAV_AUTO_BACKUP] ?: false,
+            autoBackupIntervalHours = prefs[WEBDAV_AUTO_BACKUP_HOURS] ?: 24
+        )
+    }
+
+    suspend fun saveWebDavConfig(config: com.bit.sync.WebDavConfig) {
+        context.appSettingsDataStore.edit { prefs ->
+            prefs[WEBDAV_URL] = config.url
+            prefs[WEBDAV_USERNAME] = config.username
+            prefs[WEBDAV_PASSWORD] = config.password
+            prefs[WEBDAV_PATH] = config.path
+            prefs[WEBDAV_AUTO_BACKUP] = config.autoBackupEnabled
+            prefs[WEBDAV_AUTO_BACKUP_HOURS] = config.autoBackupIntervalHours
+        }
     }
 
     suspend fun clear() {

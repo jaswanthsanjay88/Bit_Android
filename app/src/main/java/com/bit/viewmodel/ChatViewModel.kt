@@ -85,7 +85,7 @@ class ChatViewModel @Inject constructor(
     private val appContext = context
     private val appSettings = AppSettingsDataStore(context)
     private val ttsDataStore = com.bit.tts.TTSDataStore(context)
-    private val skillManager = com.bit.skills.SkillManager(context)
+    private val skillManager = com.bit.skills.SkillManager.getInstance(context)
     // ControlVectorManager removed — will be re-added when new lib supports it
 
     // ── TTFT optimization: cache vault memory notes to avoid re-walking filesystem every message ──
@@ -583,6 +583,8 @@ class ChatViewModel @Inject constructor(
             try {
                 _currentChatId.value = chatId
                 _promptEditState.value = null
+                _currentRagContext.value = null
+                _currentRagResults.value = emptyList()
                 chatManager.getChatMessages(chatId).onSuccess { loadedMessages ->
                     _messages.clear()
                     _messages.addAll(loadedMessages)
@@ -681,11 +683,13 @@ class ChatViewModel @Inject constructor(
                 }
 
                 // ── TTFT optimization: parallelize pre-generation IO work ──
-                // RAG query, maxTokens read, and chat creation all run concurrently
                 val maxTokensDeferred = async(Dispatchers.IO) { getCurrentModelMaxTokens() }
-                val ragDeferred = async(Dispatchers.IO) {
-                    globalRagOrchestrator.queryGlobalKnowledge(prompt, topK = 5)
-                }
+                val isRagEligible = shouldQueryRag(prompt)
+                val ragDeferred = if (isRagEligible) {
+                    async(Dispatchers.IO) {
+                        globalRagOrchestrator.queryGlobalKnowledge(prompt, topK = 5)
+                    }
+                } else null
 
                 // Create chat in DB while other async work is running
                 val chatId = if (isNewChat) {
@@ -720,15 +724,34 @@ class ChatViewModel @Inject constructor(
 
                 // ── Await parallelized results ──
                 val maxTokens = maxTokensDeferred.await()
-                val attachedResult = ragDeferred.await()
+                val attachedResult = ragDeferred?.await()
+
+                val activeModelId = currentModelId ?: ""
+                val isSmall = activeModelId.contains("350m", ignoreCase = true) ||
+                        activeModelId.contains("125m", ignoreCase = true) ||
+                        activeModelId.contains("160m", ignoreCase = true) ||
+                        activeModelId.contains("0.5b", ignoreCase = true) ||
+                        activeModelId.contains("0.6b", ignoreCase = true) ||
+                        activeModelId.contains("0.8b", ignoreCase = true) ||
+                        activeModelId.contains("1b", ignoreCase = true) ||
+                        activeModelId.contains("tiny", ignoreCase = true) ||
+                        activeModelId.contains("mini", ignoreCase = true)
 
                 var ragContext = _currentRagContext.value
-                if (attachedResult != null && attachedResult.results.isNotEmpty() && attachedResult.confidence != com.bit.neuron_example.RetrievalConfidence.LOW) {
-                    Log.d(TAG, "Global RAG returned ${attachedResult.results.size} chunks with confidence ${attachedResult.confidence}")
-                    val attachedContextStr = attachedResult.results.joinToString("\n\n") {
-                        "<chunk>\n${it.node.content}\n</chunk>"
+                val meetsConfidence = if (isSmall) {
+                    attachedResult?.confidence == com.bit.neuron_example.RetrievalConfidence.HIGH
+                } else {
+                    attachedResult?.confidence != null && attachedResult.confidence != com.bit.neuron_example.RetrievalConfidence.LOW
+                }
+
+                if (attachedResult != null && attachedResult.results.isNotEmpty() && meetsConfidence) {
+                    val rawChunks = if (isSmall) attachedResult.results.take(1) else attachedResult.results.take(3)
+                    Log.d(TAG, "Global RAG injected ${rawChunks.size} chunks with confidence ${attachedResult.confidence} (isSmall=$isSmall)")
+                    val attachedContextStr = rawChunks.joinToString("\n\n") {
+                        val content = if (isSmall && it.node.content.length > 250) it.node.content.take(250) + "..." else it.node.content
+                        "<chunk>\n$content\n</chunk>"
                     }
-                    val instruction = "\n[SYSTEM INSTRUCTION: You are provided with retrieved document chunks above. Use them to answer the user's query if relevant.]"
+                    val instruction = "\n[SYSTEM INSTRUCTION: If relevant to the user query, reference the context above. If the query is a simple greeting or general conversation, ignore the context completely.]"
                     ragContext = if (ragContext != null) ragContext + "\n\n" + attachedContextStr + instruction else attachedContextStr + instruction
                 }
 
@@ -751,6 +774,23 @@ class ChatViewModel @Inject constructor(
 
     // Keep old name as alias for backward compatibility with callers
     fun sendTextMessage(prompt: String) = sendChat(prompt)
+
+    private fun shouldQueryRag(query: String): Boolean {
+        val clean = query.trim().lowercase()
+        if (clean.length < 5) return false
+        val words = clean.split("\\s+".toRegex()).filter { it.isNotBlank() }
+        if (words.size <= 1 && clean.length < 8) return false
+
+        val greetings = setOf(
+            "hi", "hey", "heyy", "heyyy", "hello", "yo", "sup", "howdy", "hola",
+            "good morning", "good evening", "good afternoon", "good night",
+            "thanks", "thank you", "ok", "okay", "bye", "goodbye", "who are you",
+            "what is your name", "help", "test", "ping"
+        )
+        if (clean in greetings) return false
+        if (words.size <= 2 && words.first() in greetings) return false
+        return true
+    }
 
     private fun resizeImage(imageData: ByteArray, maxDimension: Int = 1024): ByteArray {
         val options = android.graphics.BitmapFactory.Options()
@@ -2462,9 +2502,7 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        val mcpPrompt = if (hasTools && PluginManager.hasEnabledTools()) {
-            mcpManager.getMcpCatalogPrompt()
-        } else ""
+        val mcpPrompt = mcpManager.getMcpCatalogPrompt()
         if (mcpPrompt.isNotBlank()) {
             compiledPrompt = if (compiledPrompt.isNotBlank()) {
                 "$compiledPrompt\n\n$mcpPrompt"

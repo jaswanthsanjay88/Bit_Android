@@ -58,6 +58,12 @@ bit-dependencies/
 # Database dumps and local logs
 bit_db
 *.db
+
+# Python temp
+__pycache__/
+*.pyc
+temp_*.py
+
 *.db-shm
 *.db-wal
 log*.txt

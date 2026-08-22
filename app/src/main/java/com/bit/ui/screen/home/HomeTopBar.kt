@@ -7,6 +7,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,6 +58,8 @@ internal fun TopBar(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                     ),
                     modifier = Modifier
+                        .wrapContentSize()
+                        .widthIn(max = 240.dp)
                         .sharedBounds(
                             sharedTransitionScope.rememberSharedContentState(key = "chat_header"),
                             animatedVisibilityScope = animatedVisibilityScope

@@ -49,18 +49,29 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val modelRepository = AppContainer.getModelRepository()
 
     // ── Web Access Manager (BIT in Browser) ──
-    val webAccessManager = com.bit.network.server.WebAccessManager(application)
+    val webAccessManager = com.bit.network.server.WebAccessManager.getInstance(application)
 
     // ── MCP Manager (Model Context Protocol) ──
-    val mcpManager = com.bit.mcp.McpManager(application)
+    val mcpManager = com.bit.mcp.McpManager.getInstance(application)
 
     // ── Skill Manager (Agent Skills & Prompt Capabilities) ──
-    val skillManager = com.bit.skills.SkillManager(application)
+    val skillManager = com.bit.skills.SkillManager.getInstance(application)
 
     // ── App Storage & Diagnostics ──
     val storageRepository = com.bit.repo.AppStorageRepository(application)
     val storageSnapshot: StateFlow<com.bit.repo.AppStorageSnapshot> = storageRepository.snapshot
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.repo.AppStorageSnapshot(isScanning = true))
+
+    // ── WebDAV Cloud Sync ──
+    val webDavSyncManager = com.bit.sync.WebDavSyncManager(application)
+    val webDavConfig: StateFlow<com.bit.sync.WebDavConfig> = appSettingsDataStore.webDavConfig
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.sync.WebDavConfig())
+
+    private val _webDavSyncState = MutableStateFlow<com.bit.sync.WebDavSyncState>(com.bit.sync.WebDavSyncState.Idle)
+    val webDavSyncState: StateFlow<com.bit.sync.WebDavSyncState> = _webDavSyncState
+
+    private val _webDavBackups = MutableStateFlow<List<com.bit.sync.WebDavBackupItem>>(emptyList())
+    val webDavBackups: StateFlow<List<com.bit.sync.WebDavBackupItem>> = _webDavBackups
 
     fun refreshStorage() {
         viewModelScope.launch {
@@ -582,6 +593,101 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun clearBackupProgress() {
         _backupProgress.value = null
+    }
+
+    // ── WebDAV Methods ──
+
+    fun updateWebDavConfig(config: com.bit.sync.WebDavConfig) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveWebDavConfig(config)
+        }
+    }
+
+    fun testWebDavConnection(config: com.bit.sync.WebDavConfig = webDavConfig.value, onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Testing connection...")
+            val result = webDavSyncManager.testConnection(config)
+            if (result.isSuccess) {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Success("Connected successfully!")
+                listWebDavBackups(config)
+                withContext(Dispatchers.Main) { onResult(true, null) }
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Connection failed"
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error(error)
+                withContext(Dispatchers.Main) { onResult(false, error) }
+            }
+        }
+    }
+
+    fun listWebDavBackups(config: com.bit.sync.WebDavConfig = webDavConfig.value) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = webDavSyncManager.listBackups(config)
+            if (result.isSuccess) {
+                _webDavBackups.value = result.getOrDefault(emptyList())
+            }
+        }
+    }
+
+    fun backupToWebDav(password: String, config: com.bit.sync.WebDavConfig = webDavConfig.value) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Creating and encrypting backup...")
+            val sdf = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault())
+            val tempBackupFile = java.io.File(getApplication<Application>().cacheDir, "BIT_backup_${sdf.format(java.util.Date())}.bitbackup")
+
+            val manager = SystemBackupManager(getApplication())
+            val success = manager.createBackupToFile(tempBackupFile, password, _backupOptions.value) { progress ->
+                _backupProgress.value = progress
+            }
+
+            if (success && tempBackupFile.exists()) {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Uploading to WebDAV...")
+                val uploadResult = webDavSyncManager.uploadBackup(config, tempBackupFile)
+                tempBackupFile.delete()
+
+                if (uploadResult.isSuccess) {
+                    _webDavSyncState.value = com.bit.sync.WebDavSyncState.Success("Cloud backup completed!")
+                    listWebDavBackups(config)
+                } else {
+                    _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error(uploadResult.exceptionOrNull()?.message ?: "Upload failed")
+                }
+            } else {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error("Failed to create local backup package")
+            }
+        }
+    }
+
+    fun restoreFromWebDav(item: com.bit.sync.WebDavBackupItem, password: String, config: com.bit.sync.WebDavConfig = webDavConfig.value) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Downloading remote backup...")
+            val tempFile = java.io.File(getApplication<Application>().cacheDir, item.displayName)
+
+            val downloadResult = webDavSyncManager.downloadBackup(config, item, tempFile)
+            if (downloadResult.isSuccess) {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Restoring database and settings...")
+                val manager = SystemBackupManager(getApplication())
+                val success = manager.restoreBackupFromFile(tempFile, password) { progress ->
+                    _backupProgress.value = progress
+                }
+                tempFile.delete()
+
+                if (success) {
+                    _webDavSyncState.value = com.bit.sync.WebDavSyncState.Success("Restore complete! Restarting app...")
+                } else {
+                    _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error("Restore failed: Incorrect password or corrupt archive")
+                }
+            } else {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error(downloadResult.exceptionOrNull()?.message ?: "Download failed")
+            }
+        }
+    }
+
+    fun deleteWebDavBackup(item: com.bit.sync.WebDavBackupItem, config: com.bit.sync.WebDavConfig = webDavConfig.value) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = webDavSyncManager.deleteBackup(config, item)
+            if (result.isSuccess) {
+                listWebDavBackups(config)
+            }
+        }
     }
 
     fun selectTtsModel(modelId: String) {

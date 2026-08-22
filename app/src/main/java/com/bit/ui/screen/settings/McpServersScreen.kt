@@ -777,8 +777,8 @@ fun AddMcpServerSheet(
             OutlinedTextField(
                 value = headersText,
                 onValueChange = { headersText = it },
-                label = { Text("Custom Headers (Optional JSON)") },
-                placeholder = { Text("{\"Authorization\": \"Bearer token\"}") },
+                label = { Text("Auth Token or Custom Headers (Optional)") },
+                placeholder = { Text("Paste token (e.g. github_pat_...) or JSON headers") },
                 maxLines = 3,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -788,15 +788,29 @@ fun AddMcpServerSheet(
                 onClick = {
                     if (name.isNotBlank() && url.isNotBlank()) {
                         val parsedHeaders = mutableMapOf<String, String>()
-                        if (headersText.isNotBlank()) {
-                            try {
-                                val json = JSONObject(headersText)
-                                val keys = json.keys()
-                                while (keys.hasNext()) {
-                                    val k = keys.next()
-                                    parsedHeaders[k] = json.getString(k)
+                        val trimmedHeaders = headersText.trim()
+                        if (trimmedHeaders.isNotBlank()) {
+                            if (trimmedHeaders.startsWith("{") && trimmedHeaders.endsWith("}")) {
+                                try {
+                                    val json = JSONObject(trimmedHeaders)
+                                    val keys = json.keys()
+                                    while (keys.hasNext()) {
+                                        val k = keys.next()
+                                        parsedHeaders[k] = json.getString(k)
+                                    }
+                                } catch (_: Exception) {
+                                    parsedHeaders["Authorization"] = if (trimmedHeaders.startsWith("Bearer ", ignoreCase = true)) trimmedHeaders else "Bearer $trimmedHeaders"
                                 }
-                            } catch (_: Exception) {}
+                            } else {
+                                // Raw token or key-value format
+                                if (trimmedHeaders.contains(":") && !trimmedHeaders.startsWith("http")) {
+                                    val parts = trimmedHeaders.split(":", limit = 2)
+                                    parsedHeaders[parts[0].trim()] = parts[1].trim()
+                                } else {
+                                    val authVal = if (trimmedHeaders.startsWith("Bearer ", ignoreCase = true)) trimmedHeaders else "Bearer $trimmedHeaders"
+                                    parsedHeaders["Authorization"] = authVal
+                                }
+                            }
                         }
                         onAdd(name.trim(), url.trim(), parsedHeaders)
                     }

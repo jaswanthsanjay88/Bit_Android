@@ -26,6 +26,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -57,6 +58,7 @@ fun WebAccessSectionCard(
     val isRunning by webAccessManager.isRunning.collectAsStateWithLifecycle()
     val serverUrl by webAccessManager.serverUrl.collectAsStateWithLifecycle()
     val activePort by webAccessManager.activePort.collectAsStateWithLifecycle()
+    val requestLogs by webAccessManager.requestLogs.collectAsStateWithLifecycle()
 
     var customPort by remember { mutableStateOf(activePort.toString()) }
     var accessPassword by remember { mutableStateOf("") }
@@ -392,6 +394,156 @@ fun WebAccessSectionCard(
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("Configure", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+
+            // ── Live Server Logs Section ──
+            if (isRunning || requestLogs.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Terminal,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "Live Server Logs",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                ) {
+                                    Text(
+                                        text = "${requestLogs.size}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            if (requestLogs.isNotEmpty()) {
+                                TextButton(
+                                    onClick = {
+                                        haptics.pop()
+                                        webAccessManager.clearRequestLogs()
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = "Clear",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        if (requestLogs.isEmpty()) {
+                            Text(
+                                text = "Waiting for incoming requests... Logs will appear here in real time.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            val timeFormat = remember { java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()) }
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                requestLogs.take(15).forEach { log ->
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = timeFormat.format(java.util.Date(log.timestampMs)),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+
+                                            Surface(
+                                                shape = RoundedCornerShape(4.dp),
+                                                color = when (log.method) {
+                                                    "GET" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                                    "POST" -> Color(0xFF22C55E).copy(alpha = 0.15f)
+                                                    "DELETE" -> MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+                                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                                }
+                                            ) {
+                                                Text(
+                                                    text = log.method,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = when (log.method) {
+                                                        "GET" -> MaterialTheme.colorScheme.primary
+                                                        "POST" -> Color(0xFF22C55E)
+                                                        "DELETE" -> MaterialTheme.colorScheme.error
+                                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                    },
+                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                                )
+                                            }
+
+                                            Text(
+                                                text = log.path,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+
+                                            Text(
+                                                text = "${log.status}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = when {
+                                                    log.status in 200..299 -> Color(0xFF22C55E)
+                                                    log.status in 400..499 -> Color(0xFFEAB308)
+                                                    log.status >= 500 -> MaterialTheme.colorScheme.error
+                                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                                }
+                                            )
+
+                                            Text(
+                                                text = "${log.durationMs}ms",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -50,20 +50,21 @@ class McpClient(
         val trimmed = base.trim().trimEnd('/')
         val candidates = mutableListOf<String>()
 
+        // 1. Always prioritize the exact user-specified URL first
+        candidates.add(trimmed)
+
         if (trimmed.endsWith("/sse")) {
             val root = trimmed.removeSuffix("/sse").trimEnd('/')
             candidates.add("$root/mcp")
-            candidates.add(trimmed)
             candidates.add(root)
         } else if (trimmed.endsWith("/mcp")) {
             val root = trimmed.removeSuffix("/mcp").trimEnd('/')
-            candidates.add(trimmed)
             candidates.add("$root/sse")
             candidates.add(root)
         } else {
             candidates.add("$trimmed/mcp")
-            candidates.add(trimmed)
             candidates.add("$trimmed/sse")
+            candidates.add("$trimmed/v1/mcp")
         }
 
         return candidates.distinct()
@@ -154,7 +155,20 @@ class McpClient(
                     if (!activeSessionId.isNullOrBlank()) {
                         header(MCP_SESSION_ID_HEADER, activeSessionId!!)
                     }
-                    serverConfig.headers.forEach { (k, v) -> header(k, v) }
+                    serverConfig.headers.forEach { (k, v) ->
+                        if (k.equals("authorization", ignoreCase = true)) {
+                            val authVal = if (v.startsWith("Bearer ", ignoreCase = true)) {
+                                v
+                            } else if (v.startsWith("token ", ignoreCase = true)) {
+                                "Bearer " + v.substring(6).trim()
+                            } else {
+                                "Bearer $v"
+                            }
+                            header("Authorization", authVal)
+                        } else {
+                            header(k, v)
+                        }
+                    }
                 }
 
             try {

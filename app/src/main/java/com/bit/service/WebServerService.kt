@@ -35,6 +35,7 @@ class WebServerService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var stateObserverJob: Job? = null
     private var wifiLock: WifiManager.WifiLock? = null
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
 
     companion object {
         const val ACTION_START = "com.bit.action.WEB_SERVER_START"
@@ -72,6 +73,7 @@ class WebServerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        webAccessManager = WebAccessManager.getInstance(applicationContext)
         createNotificationChannel()
     }
 
@@ -81,6 +83,7 @@ class WebServerService : Service() {
                 val port = intent.getIntExtra(EXTRA_PORT, 7070)
                 startForegroundCompat(buildNotification("BIT Web Server Active on port $port"))
                 acquireWifiLock()
+                acquireWakeLock()
                 if (!webAccessManager.isRunning.value) {
                     webAccessManager.server.start(port)
                 }
@@ -90,12 +93,15 @@ class WebServerService : Service() {
             ACTION_STOP -> {
                 webAccessManager.server.stop()
                 releaseWifiLock()
+                releaseWakeLock()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
 
             else -> {
                 startForegroundCompat(buildNotification("BIT Web Server Active"))
+                acquireWifiLock()
+                acquireWakeLock()
                 startObservingState()
             }
         }
@@ -105,6 +111,7 @@ class WebServerService : Service() {
     override fun onDestroy() {
         stateObserverJob?.cancel()
         releaseWifiLock()
+        releaseWakeLock()
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -214,6 +221,26 @@ class WebServerService : Service() {
             wifiLock = null
         } catch (e: Exception) {
             Log.e(TAG, "Error releasing wifi lock", e)
+        }
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock == null) {
+            val pm = getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            wakeLock = pm?.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "bit:web_server_wakelock")
+            wakeLock?.setReferenceCounted(false)
+        }
+        wakeLock?.acquire(12 * 60 * 60 * 1000L) // 12 hours timeout max
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+            wakeLock = null
+        } catch (e: Exception) {
+            Log.e(TAG, "Error releasing wake lock", e)
         }
     }
 }

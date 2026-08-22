@@ -33,6 +33,7 @@ class McpManager @Inject constructor(
     val servers: StateFlow<List<McpServerConfig>> = _servers.asStateFlow()
 
     init {
+        instance = this
         // Automatically introspect and sync tools from all enabled MCP servers on startup
         scope.launch {
             syncAll()
@@ -41,6 +42,15 @@ class McpManager @Inject constructor(
 
     companion object {
         private const val TAG = "McpManager"
+
+        @Volatile
+        private var instance: McpManager? = null
+
+        fun getInstance(context: Context): McpManager {
+            return instance ?: synchronized(this) {
+                instance ?: McpManager(context.applicationContext).also { instance = it }
+            }
+        }
     }
 
     private fun loadSavedServers(): List<McpServerConfig> {
@@ -64,12 +74,20 @@ class McpManager @Inject constructor(
                         )
                     )
                 }
+                val headersObj = obj.optJSONObject("headers") ?: JSONObject()
+                val headersMap = mutableMapOf<String, String>()
+                val keys = headersObj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    headersMap[k] = headersObj.optString(k)
+                }
                 list.add(
                     McpServerConfig(
                         id = obj.optString("id", UUID.randomUUID().toString()),
                         name = obj.optString("name"),
                         url = obj.optString("url"),
                         isEnabled = obj.optBoolean("isEnabled", true),
+                        headers = headersMap,
                         tools = toolsList,
                         status = McpStatus.Idle
                     )
@@ -91,6 +109,9 @@ class McpManager @Inject constructor(
                     put("name", srv.name)
                     put("url", srv.url)
                     put("isEnabled", srv.isEnabled)
+                    val headersObj = JSONObject()
+                    srv.headers.forEach { (k, v) -> headersObj.put(k, v) }
+                    put("headers", headersObj)
                     val toolsArr = JSONArray()
                     for (t in srv.tools) {
                         toolsArr.put(JSONObject().apply {

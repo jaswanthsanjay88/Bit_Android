@@ -24,9 +24,22 @@ class SkillManager @Inject constructor(
     private val _skills = MutableStateFlow<List<Skill>>(loadSavedSkills())
     val skills: StateFlow<List<Skill>> = _skills.asStateFlow()
 
+    init {
+        instance = this
+    }
+
     companion object {
         private const val TAG = "SkillManager"
         private const val KEY_SKILLS_JSON = "skills_json"
+
+        @Volatile
+        private var instance: SkillManager? = null
+
+        fun getInstance(context: Context): SkillManager {
+            return instance ?: synchronized(this) {
+                instance ?: SkillManager(context.applicationContext).also { instance = it }
+            }
+        }
 
         val DEFAULT_BUILTIN_SKILLS = listOf(
             Skill(
