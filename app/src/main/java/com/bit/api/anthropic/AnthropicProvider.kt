@@ -120,7 +120,9 @@ internal data class AnthropicMessageInfo(
 @Serializable
 internal data class AnthropicUsage(
     @SerialName("input_tokens") val inputTokens: Int? = null,
-    @SerialName("output_tokens") val outputTokens: Int? = null
+    @SerialName("output_tokens") val outputTokens: Int? = null,
+    @SerialName("cache_creation_input_tokens") val cacheCreationInputTokens: Int? = null,
+    @SerialName("cache_read_input_tokens") val cacheReadInputTokens: Int? = null
 )
 
 private enum class ClaudeFamily { NO_THINKING, BUDGET_THINKING, TRANSITIONAL_4_6, CURRENT_ADAPTIVE }
@@ -245,7 +247,7 @@ class AnthropicProvider : LlmProvider {
             system = config.systemPrompt,
             thinking = thinking,
             outputConfig = outputConfig,
-            maxTokens = config.maxTokens ?: when {
+            maxTokens = config.maxTokens?.takeIf { it > 0 } ?: when {
                 thinking?.budgetTokens != null -> maxOf(thinking.budgetTokens + 8192, 16384)
                 thinking?.type == "adaptive" -> 32768
                 else -> 8192
@@ -366,8 +368,20 @@ class AnthropicProvider : LlmProvider {
                                     }
                                     "message_delta" -> {
                                         event.usage?.let { u ->
-                                            val total = messageInputTokens + (u.outputTokens ?: 0)
-                                            emit(StreamEvent.UsageUpdate(total))
+                                            val outputTokens = u.outputTokens ?: 0
+                                            val promptTokens = messageInputTokens + (u.inputTokens ?: 0)
+                                            val total = promptTokens + outputTokens
+                                            val cached = u.cacheReadInputTokens ?: 0
+                                            Log.d("AgoraAPI", "Anthropic Usage: prompt=$promptTokens, completion=$outputTokens, cached=$cached, total=$total")
+                                            emit(
+                                                StreamEvent.UsageUpdate(
+                                                    promptTokens = promptTokens,
+                                                    completionTokens = outputTokens,
+                                                    totalTokens = total,
+                                                    cachedTokens = cached,
+                                                    tokenCount = outputTokens
+                                                )
+                                            )
                                         }
                                     }
                                 }

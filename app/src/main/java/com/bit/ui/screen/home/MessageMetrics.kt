@@ -21,12 +21,14 @@ internal fun MetricsDisplay(metrics: DecodingMetrics, memoryMetrics: MemoryMetri
     var isExpanded by remember { mutableStateOf(false) }
 
     val formattedSpeed = remember(metrics.tokensPerSecond) {
-        "%.1f".format(metrics.tokensPerSecond)
+        if (metrics.tokensPerSecond > 0f) "%.1f".format(metrics.tokensPerSecond) else null
     }
     val formattedTime = remember(metrics.totalTimeMs) {
         if (metrics.totalTimeMs > 0f) "%.1f".format(metrics.totalTimeMs / 1000f) else null
     }
-    val totalTokens = metrics.tokensEvaluated + metrics.tokensPredicted
+    val totalTokens = remember(metrics) {
+        if (metrics.totalTokens > 0) metrics.totalTokens else (metrics.tokensEvaluated + metrics.tokensPredicted + metrics.reasoningTokens)
+    }
 
     Column(
         modifier = Modifier
@@ -43,16 +45,31 @@ internal fun MetricsDisplay(metrics: DecodingMetrics, memoryMetrics: MemoryMetri
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = "$formattedSpeed t/s  •  $totalTokens tokens",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
+            val mainTokenText = if (metrics.tokensPredicted > 0) {
+                "${metrics.tokensPredicted} tokens"
+            } else if (totalTokens > 0) {
+                "$totalTokens tokens"
+            } else null
+
+            if (formattedSpeed != null) {
+                Text(
+                    text = "$formattedSpeed t/s",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                )
+            }
+            if (mainTokenText != null) {
+                Text(
+                    text = if (formattedSpeed != null) "•  $mainTokenText" else mainTokenText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                )
+            }
             if (formattedTime != null) {
                 Text(
                     text = "•  ${formattedTime}s",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
                 )
             }
         }
@@ -69,24 +86,39 @@ internal fun MetricsDisplay(metrics: DecodingMetrics, memoryMetrics: MemoryMetri
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 if (metrics.tokensEvaluated > 0) {
+                    val cachedSuffix = if (metrics.cachedTokens > 0) " (${metrics.cachedTokens} cached)" else ""
                     Text(
-                        text = "Prompt: ${metrics.tokensEvaluated} tokens",
+                        text = "Prompt: ${metrics.tokensEvaluated} tokens$cachedSuffix",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+                if (metrics.reasoningTokens > 0) {
+                    Text(
+                        text = "Reasoning: ${metrics.reasoningTokens} tokens",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
                 if (metrics.tokensPredicted > 0) {
                     Text(
-                        text = "Generated: ${metrics.tokensPredicted} tokens",
+                        text = "Response: ${metrics.tokensPredicted} tokens",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+                if (totalTokens > 0 && (metrics.tokensEvaluated > 0 || metrics.reasoningTokens > 0)) {
+                    Text(
+                        text = "Total Processed: $totalTokens tokens",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
                 if (metrics.timeToFirstTokenMs > 0f) {
                     Text(
                         text = "TTFT: ${"%.0f".format(metrics.timeToFirstTokenMs)} ms",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 }
                 memoryMetrics?.let { mem ->
@@ -94,7 +126,7 @@ internal fun MetricsDisplay(metrics: DecodingMetrics, memoryMetrics: MemoryMetri
                         Text(
                             text = "Peak Memory: ${mem.peakMemoryMB} MB",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                 }

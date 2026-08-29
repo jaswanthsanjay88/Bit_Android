@@ -244,7 +244,7 @@ internal fun LazyListScope.systemPromptSection(
                 androidx.compose.material3.PrimaryTabRow(
                     selectedTabIndex = selectedTabIndex,
                     containerColor = Color.Transparent,
-                    contentColor = Color.White,
+                    contentColor = MaterialTheme.colorScheme.primary,
                     indicator = {
                         androidx.compose.material3.TabRowDefaults.PrimaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(selectedTabIndex, matchContentSize = false),
@@ -255,17 +255,17 @@ internal fun LazyListScope.systemPromptSection(
                     androidx.compose.material3.Tab(
                         selected = selectedTabIndex == 0,
                         onClick = { selectedTabIndex = 0 },
-                        text = { Text("System") }
+                        text = { Text("System", color = if (selectedTabIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                     )
                     androidx.compose.material3.Tab(
                         selected = selectedTabIndex == 1,
                         onClick = { selectedTabIndex = 1 },
-                        text = { Text("Prepend") }
+                        text = { Text("Prepend", color = if (selectedTabIndex == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                     )
                     androidx.compose.material3.Tab(
                         selected = selectedTabIndex == 2,
                         onClick = { selectedTabIndex = 2 },
-                        text = { Text("Postpend") }
+                        text = { Text("Postpend", color = if (selectedTabIndex == 2) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) }
                     )
                 }
 
@@ -290,12 +290,15 @@ internal fun LazyListScope.systemPromptSection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(Standards.SpacingSm),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                     minLines = 3,
                     maxLines = 10,
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.primary,
                         focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
                         focusedContainerColor = Color.Transparent,
                         unfocusedContainerColor = Color.Transparent
                     )
@@ -867,9 +870,12 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                                 label = { Text("Your Name") },
                                 placeholder = { Text("e.g. Alex R.") },
                                 singleLine = true,
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
                                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                                     unfocusedBorderColor = Glass.BorderSubtle,
                                     focusedContainerColor = Color.Transparent,
@@ -882,9 +888,12 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                                 label = { Text("Occupation / Role (Optional)") },
                                 placeholder = { Text("e.g. Entrepreneur, Designer") },
                                 singleLine = true,
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
                                     focusedBorderColor = MaterialTheme.colorScheme.primary,
                                     unfocusedBorderColor = Glass.BorderSubtle,
                                     focusedContainerColor = Color.Transparent,
@@ -943,9 +952,12 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                         placeholder = { Text("What do you think of BIT AI?") },
                         minLines = 3,
                         maxLines = 5,
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                         modifier = Modifier.fillMaxWidth(),
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            cursorColor = MaterialTheme.colorScheme.primary,
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
                             unfocusedBorderColor = Glass.BorderSubtle,
                             focusedContainerColor = Color.Transparent,

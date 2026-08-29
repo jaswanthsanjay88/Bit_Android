@@ -186,22 +186,32 @@ class SkillManager @Inject constructor(
         }
     }
 
+    fun getSkillsDir(): java.io.File {
+        val dir = context.filesDir.resolve("skills")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
     /**
      * Builds lightweight progressive disclosure catalog for tool-capable models.
-     * Contains only skill names, triggers, and descriptions. Full instructions
-     * are loaded on demand via `manage_skills`.
+     * Contains only skill names, triggers, and descriptions in standard Anthropic <available_skills> XML format.
      */
     fun getSkillCatalogPrompt(): String {
         val active = _skills.value.filter { it.enabled && it.instructions.isNotBlank() }
         if (active.isEmpty()) return ""
 
         return buildString {
-            appendLine("## Available Agent Skills (Progressive Disclosure)")
-            appendLine("The following skills are available. They are NOT loaded into your context by default. When a user request clearly requires one of these skills, invoke `manage_skills(skill = \"<skill_name>\")` to load its full instructions:")
+            appendLine("**Skills**")
+            appendLine("You have access to the following skills. Use the `use_skill` tool to load a skill's instructions when the user's request matches.")
+            appendLine("<available_skills>")
             active.forEach { skill ->
                 val desc = skill.description.ifBlank { "Specialized skill routine" }
-                appendLine("- **${skill.name}**: $desc")
+                appendLine("  <skill>")
+                appendLine("    <name>${skill.name}</name>")
+                appendLine("    <description>$desc</description>")
+                appendLine("  </skill>")
             }
+            appendLine("</available_skills>")
         }
     }
 

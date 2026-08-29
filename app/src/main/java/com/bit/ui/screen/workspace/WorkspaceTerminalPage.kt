@@ -31,6 +31,7 @@ import com.bit.repo.WorkspaceRepository
 import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.LocalBitHaptics
 import com.bit.viewmodel.WorkspaceDetailViewModel
+import androidx.activity.compose.BackHandler
 import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalView
 import me.rerere.workspace.RootfsInstallStage
@@ -42,6 +43,10 @@ fun WorkspaceTerminalPage(
     onBack: () -> Unit,
     viewModel: WorkspaceDetailViewModel = hiltViewModel(),
 ) {
+    BackHandler {
+        onBack()
+    }
+
     val context = LocalContext.current
     val bitHaptics = LocalBitHaptics.current
 
@@ -108,6 +113,7 @@ fun WorkspaceTerminalPage(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceContainer)
+                .statusBarsPadding()
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -133,7 +139,7 @@ fun WorkspaceTerminalPage(
 
                 Surface(
                     shape = CircleShape,
-                    color = if (rootfsReady && (currentHolder?.session?.isRunning == true)) Color(0xFF2E7D32) else Color(0xFFC62828),
+                    color = if (rootfsReady && (currentHolder?.session?.isRunning == true)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(10.dp)
                 ) {}
                 Text(
@@ -329,7 +335,7 @@ fun WorkspaceTerminalPage(
                                 Surface(
                                     color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
                                     shape = RoundedCornerShape(14.dp),
-                                    border = BorderStroke(1.dp, if (distro.isDownloaded) Color(0x5522C55E) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                    border = BorderStroke(1.dp, if (distro.isDownloaded) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
@@ -369,14 +375,14 @@ fun WorkspaceTerminalPage(
                                                     )
                                                     if (distro.isDownloaded) {
                                                         Surface(
-                                                            color = Color(0x2222C55E),
+                                                            color = MaterialTheme.colorScheme.primaryContainer,
                                                             shape = RoundedCornerShape(100.dp)
                                                         ) {
                                                             Text(
                                                                 text = "DOWNLOADED",
                                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                                 style = MaterialTheme.typography.labelSmall,
-                                                                color = Color(0xFF4ADE80),
+                                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                                                 fontWeight = FontWeight.Bold
                                                             )
                                                         }
@@ -397,7 +403,7 @@ fun WorkspaceTerminalPage(
                                                     viewModel.installRootfs(distro.downloadUrl)
                                                 },
                                                 shape = RoundedCornerShape(10.dp),
-                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF166534)),
+                                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                                             ) {
                                                 Text("Instant Install", fontWeight = FontWeight.SemiBold)

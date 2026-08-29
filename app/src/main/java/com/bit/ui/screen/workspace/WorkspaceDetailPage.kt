@@ -47,6 +47,7 @@ import com.bit.ui.theme.bouncyClick
 import com.bit.viewmodel.WorkspaceDetailViewModel
 import kotlinx.coroutines.launch
 import me.rerere.workspace.RootfsInstallStage
+import androidx.activity.compose.BackHandler
 import me.rerere.workspace.WorkspaceFileEntry
 import me.rerere.workspace.WorkspaceShellStatus
 import me.rerere.workspace.WorkspaceStorageArea
@@ -56,6 +57,7 @@ fun WorkspaceDetailPage(
     workspaceId: String,
     onBack: () -> Unit,
     onOpenTerminal: (WorkspaceEntity, String?) -> Unit,
+    onEditingFileChanged: (Boolean) -> Unit = {},
     viewModel: WorkspaceDetailViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -78,8 +80,15 @@ fun WorkspaceDetailPage(
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var editingFile by remember { mutableStateOf<WorkspaceFileEntry?>(null) }
-    var fileContent by remember { mutableStateOf("") }
-    var isSavingFile by remember { mutableStateOf(false) }
+
+    LaunchedEffect(editingFile) {
+        onEditingFileChanged(editingFile != null)
+    }
+
+    BackHandler(enabled = editingFile != null) {
+        editingFile = null
+        onEditingFileChanged(false)
+    }
 
     var showCreateFileDialog by remember { mutableStateOf(false) }
     var showCustomUrlDialog by remember { mutableStateOf(false) }
@@ -133,6 +142,21 @@ fun WorkspaceDetailPage(
         ) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
+        return
+    }
+
+    val currentEditing = editingFile
+    if (currentEditing != null) {
+        WorkspaceFileEditorPage(
+            workspaceId = workspaceId,
+            area = currentArea,
+            path = currentEditing.path,
+            onBack = {
+                editingFile = null
+                onEditingFileChanged(false)
+            },
+            viewModel = viewModel
+        )
         return
     }
 
@@ -297,13 +321,15 @@ fun WorkspaceDetailPage(
                         },
                         onOpenFile = { entry ->
                             bitHaptics.selection()
-                            scope.launch {
-                                runCatching {
-                                    val text = viewModel.readText(entry.path, currentArea)
-                                    fileContent = text
+                            when (entry.detectFileType()) {
+                                WorkspaceFileType.TEXT -> {
                                     editingFile = entry
-                                }.onFailure {
-                                    Toast.makeText(context, "Cannot open: ${it.message}", Toast.LENGTH_SHORT).show()
+                                }
+                                WorkspaceFileType.IMAGE -> {
+                                    Toast.makeText(context, "Image file: ${entry.name}", Toast.LENGTH_SHORT).show()
+                                }
+                                WorkspaceFileType.OTHER -> {
+                                    editingFile = entry
                                 }
                             }
                         },
@@ -470,103 +496,7 @@ fun WorkspaceDetailPage(
         )
     }
 
-    // Text File Editor Dialog
-    editingFile?.let { entry ->
-        Dialog(
-            onDismissRequest = { editingFile = null },
-            properties = DialogProperties(usePlatformDefaultWidth = false),
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-                tonalElevation = 6.dp,
-            ) {
-                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = entry.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Text(
-                                text = "/workspace/${entry.path}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        IconButton(onClick = { editingFile = null }) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Close")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = fileContent,
-                        onValueChange = { fileContent = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        textStyle = LocalTextStyle.current.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 13.sp,
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        TextButton(onClick = { editingFile = null }) {
-                            Text("Cancel")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                isSavingFile = true
-                                scope.launch {
-                                    runCatching {
-                                        viewModel.writeText(entry.path, fileContent)
-                                        Toast.makeText(context, "Saved ${entry.name}", Toast.LENGTH_SHORT).show()
-                                        editingFile = null
-                                    }.onFailure {
-                                        Toast.makeText(context, "Save failed: ${it.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                    isSavingFile = false
-                                }
-                            },
-                            enabled = !isSavingFile,
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            if (isSavingFile) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White)
-                            } else {
-                                Text("Save")
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (showProcessesSheet && ws != null) {
+    if (showProcessesSheet) {
         WorkspaceProcessesSheet(
             workspace = ws,
             onDismiss = { showProcessesSheet = false },
@@ -602,7 +532,7 @@ private fun EnvironmentTabContent(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         // ── 1. ACTIVE RUNNING ENVIRONMENT HERO CARD ──
-        if (isReady && installedDistro != null) {
+        if (isReady) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
@@ -1301,7 +1231,7 @@ private fun FilesTabContent(
 @Composable
 private fun FileEntryRow(
     entry: WorkspaceFileEntry,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(12.dp),
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(14.dp),
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onExport: () -> Unit,
@@ -1313,23 +1243,31 @@ private fun FileEntryRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
-            .bouncyClick(onClick = onClick),
+            .clickable(onClick = onClick),
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.6f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = if (entry.isDirectory) TnIcons.Folder else TnIcons.Code,
-                contentDescription = null,
-                tint = if (entry.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp),
-            )
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = if (entry.isDirectory) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.size(38.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (entry.isDirectory) TnIcons.Folder else TnIcons.Code,
+                        contentDescription = null,
+                        tint = if (entry.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -1337,7 +1275,7 @@ private fun FileEntryRow(
                 Text(
                     text = entry.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (entry.isDirectory) FontWeight.SemiBold else FontWeight.Normal,
+                    fontWeight = if (entry.isDirectory) FontWeight.SemiBold else FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1352,7 +1290,7 @@ private fun FileEntryRow(
             }
 
             Box {
-                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = { showMenu = true }, modifier = Modifier.size(36.dp)) {
                     Icon(Icons.Rounded.MoreVert, contentDescription = "More", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 DropdownMenu(

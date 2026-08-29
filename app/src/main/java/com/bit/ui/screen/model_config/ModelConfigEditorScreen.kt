@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ModelConfigEditorScreen(
+    initialModelId: String? = null,
     onBackClick: () -> Unit,
     viewModel: ModelConfigEditorViewModel = hiltViewModel()
 ) {
@@ -49,7 +50,18 @@ fun ModelConfigEditorScreen(
     val saveSuccess by viewModel.saveSuccess.collectAsStateWithLifecycle()
 
     // Track which panel is showing (list or editor)
-    var showingEditor by remember { mutableStateOf(false) }
+    var showingEditor by remember { mutableStateOf(!initialModelId.isNullOrBlank()) }
+
+    // Auto-select initial model when passed
+    LaunchedEffect(initialModelId, models) {
+        if (!initialModelId.isNullOrBlank() && models.isNotEmpty()) {
+            val target = models.find { it.id == initialModelId }
+            if (target != null) {
+                viewModel.selectModel(target)
+                showingEditor = true
+            }
+        }
+    }
 
     // Auto-show editor when model is selected
     LaunchedEffect(selectedModel) {
@@ -76,7 +88,7 @@ fun ModelConfigEditorScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            if (showingEditor && selectedModel != null) {
+                            if (showingEditor && initialModelId.isNullOrBlank()) {
                                 // Go back to list
                                 showingEditor = false
                             } else {
@@ -310,7 +322,10 @@ internal fun ConfigEditorPanel(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(Standards.SpacingLg)
+        modifier = modifier
+            .navigationBarsPadding()
+            .padding(horizontal = Standards.SpacingLg)
+            .padding(top = Standards.SpacingMd)
     ) {
         // Header
         Row(
@@ -332,12 +347,12 @@ internal fun ConfigEditorPanel(
             }
         }
 
-        Spacer(modifier = Modifier.height(Standards.SpacingLg))
+        Spacer(modifier = Modifier.height(Standards.SpacingMd))
 
         // Config content based on model type
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 96.dp),
+            contentPadding = PaddingValues(bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
         ) {
             item {
@@ -352,7 +367,7 @@ internal fun ConfigEditorPanel(
             }
             
             item {
-                Spacer(modifier = Modifier.height(Standards.SpacingLg))
+                Spacer(modifier = Modifier.height(Standards.SpacingSm))
                 Button(
                     onClick = { viewModel.saveConfiguration() },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -374,7 +389,7 @@ internal fun ConfigEditorPanel(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                Spacer(modifier = Modifier.height(Standards.SpacingXxl))
+                Spacer(modifier = Modifier.height(Standards.SpacingLg))
             }
         }
     }
@@ -1001,7 +1016,7 @@ private fun IntField(
             value = value.toFloat(),
             onValueChange = { onValueChange(it.toInt()) },
             valueRange = range.first.toFloat()..range.last.toFloat(),
-            steps = (range.last - range.first) / step,
+            steps = ((range.last - range.first) / step - 1).coerceAtLeast(0),
             enabled = enabled
         )
     }
@@ -1054,7 +1069,7 @@ private fun FloatField(
             value = value,
             onValueChange = onValueChange,
             valueRange = range,
-            steps = ((range.endInclusive - range.start) / step).toInt() - 1
+            steps = (((range.endInclusive - range.start) / step).toInt() - 1).coerceAtLeast(0)
         )
     }
 }

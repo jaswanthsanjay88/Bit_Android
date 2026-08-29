@@ -214,14 +214,7 @@ fun ReasoningTraceCard(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (plan != null) {
-                    Text(
-                        text = plan,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+                    PlanDagTodoListSection(planText = plan)
                 }
 
                 steps.forEachIndexed { idx, step ->
@@ -415,11 +408,11 @@ private fun ReasoningStepCard(step: TraceStep, index: Int) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    color = Color(0xFF0F172A),
                     border = androidx.compose.foundation.BorderStroke(
                         0.5.dp,
                         if (parsedResult.stderr.isNotBlank() || !step.success) MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
-                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        else Color(0xFF334155)
                     )
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
@@ -464,7 +457,7 @@ private fun ReasoningStepCard(step: TraceStep, index: Int) {
                                     fontSize = 11.5.sp,
                                     lineHeight = 16.sp
                                 ),
-                                color = if (parsedResult.stderr.isNotBlank() && parsedResult.stdout.isBlank()) Color(0xFFFCA5A5) else Color(0xFFCBD5E1)
+                                color = if (parsedResult.stderr.isNotBlank() && parsedResult.stdout.isBlank()) Color(0xFFFCA5A5) else Color(0xFFE2E8F0)
                             )
                         }
                     }
@@ -566,5 +559,156 @@ private fun ReasoningLoadingRow() {
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Medium
         )
+    }
+}
+
+private data class DagTodoItem(
+    val status: String,
+    val text: String,
+    val toolTag: String? = null
+)
+
+@Composable
+fun PlanDagTodoListSection(planText: String, modifier: Modifier = Modifier) {
+    val items = remember(planText) {
+        planText.lines().mapNotNull { line ->
+            val trimmed = line.trim()
+            if (!trimmed.startsWith("- [")) return@mapNotNull null
+            val status = when {
+                trimmed.startsWith("- [x]", ignoreCase = true) -> "DONE"
+                trimmed.startsWith("- [⏳]") || trimmed.startsWith("- [running]", ignoreCase = true) -> "RUNNING"
+                trimmed.startsWith("- [!]") || trimmed.startsWith("- [error]", ignoreCase = true) -> "ERROR"
+                else -> "PENDING"
+            }
+            val content = trimmed.substringAfter("] ").trim()
+            val toolTag = if (content.contains("`")) {
+                content.substringAfter("`").substringBefore("`")
+            } else null
+            val cleanText = content.replace("`$toolTag`", "").replace("**", "").trim()
+            DagTodoItem(status, cleanText, toolTag)
+        }
+    }
+
+    if (items.isEmpty()) {
+        Text(
+            text = planText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
+        )
+        return
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = TnIcons.BrainCircuit,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = "Task Execution Plan (DAG)",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        items.forEachIndexed { _, item ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+            ) {
+                when (item.status) {
+                    "DONE" -> {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF4CAF50).copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "✓",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
+                    }
+                    "RUNNING" -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 1.5.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    "ERROR" -> {
+                        Box(
+                            modifier = Modifier
+                                .size(16.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "!",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                    else -> {
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f), CircleShape)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                    color = if (item.status == "DONE") {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    fontWeight = if (item.status == "RUNNING") FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (item.toolTag != null) {
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = item.toolTag,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontFamily = FontFamily.Monospace),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
+        }
     }
 }

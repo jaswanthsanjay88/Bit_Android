@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
  * - Automatic `/mcp` and `/sse` route discovery on 404 "use /mcp" fallback
  * - SSE Handshake (`event: endpoint`) POST endpoint resolution
  * - `mcp-session-id` session header propagation
+ * - OAuth 2.1 Bearer Token injection & custom headers
  */
 class McpClient(
     val serverConfig: McpServerConfig,
@@ -75,15 +76,15 @@ class McpClient(
      */
     private suspend fun trySseEndpointDiscovery(targetUrl: String): String? = withContext(Dispatchers.IO) {
         try {
-            val request = Request.Builder()
+            val reqBuilder = Request.Builder()
                 .url(targetUrl)
                 .get()
                 .header("Accept", "text/event-stream")
-                .header("User-Agent", "BIT-AI-MCP/1.0")
-                .apply { serverConfig.headers.forEach { (k, v) -> header(k, v) } }
-                .build()
+                .header("User-Agent", "BIT-AI-MCP/2.0")
 
-            client.newCall(request).execute().use { response ->
+            applyHeaders(reqBuilder)
+
+            client.newCall(reqBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) return@withContext null
                 val contentType = response.header("Content-Type") ?: ""
                 if (!contentType.contains("text/event-stream")) return@withContext null
@@ -122,6 +123,30 @@ class McpClient(
         null
     }
 
+    private fun applyHeaders(builder: Request.Builder) {
+        // 1. Injected custom headers
+        serverConfig.headers.forEach { (k, v) ->
+            if (k.equals("authorization", ignoreCase = true)) {
+                val authVal = if (v.startsWith("Bearer ", ignoreCase = true)) {
+                    v
+                } else if (v.startsWith("token ", ignoreCase = true)) {
+                    "Bearer " + v.substring(6).trim()
+                } else {
+                    "Bearer $v"
+                }
+                builder.header("Authorization", authVal)
+            } else {
+                builder.header(k, v)
+            }
+        }
+
+        // 2. OAuth Token overrides if present and authorized
+        val oauth = serverConfig.commonOptions.oauth
+        if (oauth != null && oauth.enabled && !oauth.accessToken.isNullOrBlank()) {
+            builder.header("Authorization", "Bearer ${oauth.accessToken}")
+        }
+    }
+
     /**
      * Executes a JSON-RPC request against candidate URLs, handling 404 and auto-discovering endpoints.
      */
@@ -135,8 +160,7 @@ class McpClient(
         var lastError: Exception? = null
 
         for (candidateUrl in candidates) {
-            // First check if SSE discovery applies to this candidate
-            if (resolvedPostUrl == null && (candidateUrl.endsWith("/sse") || candidateUrl.contains("sse"))) {
+            if (resolvedPostUrl == null && (candidateUrl.endsWith("/sse") || candidateUrl.contains("sse") || serverConfig is McpServerConfig.SseTransportServer)) {
                 val ssePostEndpoint = trySseEndpointDiscovery(candidateUrl)
                 if (!ssePostEndpoint.isNullOrBlank()) {
                     resolvedPostUrl = ssePostEndpoint
@@ -150,25 +174,12 @@ class McpClient(
                 .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json, text/event-stream")
-                .header("User-Agent", "BIT-AI-MCP/1.0")
+                .header("User-Agent", "BIT-AI-MCP/2.0")
                 .apply {
                     if (!activeSessionId.isNullOrBlank()) {
                         header(MCP_SESSION_ID_HEADER, activeSessionId!!)
                     }
-                    serverConfig.headers.forEach { (k, v) ->
-                        if (k.equals("authorization", ignoreCase = true)) {
-                            val authVal = if (v.startsWith("Bearer ", ignoreCase = true)) {
-                                v
-                            } else if (v.startsWith("token ", ignoreCase = true)) {
-                                "Bearer " + v.substring(6).trim()
-                            } else {
-                                "Bearer $v"
-                            }
-                            header("Authorization", authVal)
-                        } else {
-                            header(k, v)
-                        }
-                    }
+                    applyHeaders(this)
                 }
 
             try {
@@ -184,9 +195,12 @@ class McpClient(
                     return@withContext parseJsonRpcResponse(body)
                 }
 
-                // If 404 and message mentions /mcp, continue to next candidate (/mcp)
-                if (response.code == 404 || body.contains("/mcp") || body.contains("not_found")) {
-                    Log.w(TAG, "Endpoint $requestUrl returned 404 ($body), probing next candidate...")
+                if (response.code == 401 || response.code == 403) {
+                    throw IOException("HTTP ${response.code} Unauthorized: $body")
+                }
+
+                if (response.code == 404) {
+                    Log.w(TAG, "Endpoint $requestUrl returned 404, probing next candidate...")
                     lastError = IOException("HTTP ${response.code}: $body")
                     continue
                 }
@@ -224,7 +238,7 @@ class McpClient(
      * Connects to the MCP server, sends `initialize` request, and queries `tools/list`.
      * Returns the list of discovered tools.
      */
-    suspend fun listTools(): List<McpToolConfig> = withContext(Dispatchers.IO) {
+    suspend fun listTools(): List<McpTool> = withContext(Dispatchers.IO) {
         // 1. Initialize Handshake
         val initPayload = JSONObject().apply {
             put("jsonrpc", "2.0")
@@ -238,7 +252,7 @@ class McpClient(
                 })
                 put("clientInfo", JSONObject().apply {
                     put("name", "BIT AI Android")
-                    put("version", "1.0.0")
+                    put("version", "2.1.0")
                 })
             })
         }
@@ -261,7 +275,7 @@ class McpClient(
         val result = json.optJSONObject("result") ?: json
         val toolsArray = result.optJSONArray("tools") ?: JSONArray()
 
-        val discoveredTools = mutableListOf<McpToolConfig>()
+        val discoveredTools = mutableListOf<McpTool>()
         for (i in 0 until toolsArray.length()) {
             val toolObj = toolsArray.optJSONObject(i) ?: continue
             val name = toolObj.optString("name", "tool_$i")
@@ -269,11 +283,12 @@ class McpClient(
             val schema = toolObj.optJSONObject("inputSchema")?.toString() ?: "{}"
 
             discoveredTools.add(
-                McpToolConfig(
+                McpTool(
                     name = name,
                     description = desc,
-                    isEnabled = true,
-                    inputSchemaJson = schema
+                    enable = true,
+                    inputSchemaJson = schema,
+                    needsApproval = false
                 )
             )
         }

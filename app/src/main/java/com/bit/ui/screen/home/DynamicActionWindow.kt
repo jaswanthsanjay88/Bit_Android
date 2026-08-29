@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -164,7 +165,20 @@ fun DynamicActionWindow(
                                 isIndeterminate = false
                             )
                         }
-                        else -> {
+                        else -> null
+                    }
+
+                    if (info != null) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             val modelId = when (dlState) {
                                 is com.bit.service.ModelDownloadService.DownloadState.Downloading -> dlState.modelId
                                 is com.bit.service.ModelDownloadService.DownloadState.Paused -> dlState.modelId
@@ -175,48 +189,64 @@ fun DynamicActionWindow(
                                 is com.bit.service.ModelDownloadService.DownloadState.Error -> dlState.modelId
                                 is com.bit.service.ModelDownloadService.DownloadState.Cancelled -> dlState.modelId
                             }
-                            DownloadDisplayInfo(
-                                title = com.bit.ui.components.getShortModelLabel(modelId),
-                                subtitle = "Ready",
-                                progress = 1f,
-                                isIndeterminate = false
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = info.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TextButton(
+                                    onClick = {
+                                        val cancelIntent = android.content.Intent(context, com.bit.service.ModelDownloadService::class.java).apply {
+                                            action = com.bit.service.ModelDownloadService.ACTION_CANCEL_DOWNLOAD
+                                            putExtra(com.bit.service.ModelDownloadService.EXTRA_MODEL_ID, modelId)
+                                        }
+                                        context.startService(cancelIntent)
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        "Cancel",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+
+                            if (info.isIndeterminate) {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                LinearProgressIndicator(
+                                    progress = { info.progress },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp)
+                                        .clip(RoundedCornerShape(2.dp)),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            }
+
+                            Text(
+                                text = info.subtitle,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-
-                    val title = info.title
-                    val subtitle = info.subtitle
-                    val progress = info.progress
-                    val isIndeterminate = info.isIndeterminate
-
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = subtitle,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-
-                        com.bit.ui.components.M3WavyLinearProgressIndicator(
-                            progress = progress,
-                            isIndeterminate = isIndeterminate,
-                            activeColor = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }
@@ -233,37 +263,48 @@ fun DynamicActionWindow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp)
             ) {
-
-                Column {
-                    Text(
-                        text = activeModel?.modelName ?: "No Model Active",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = if (activeModel != null) "Ready for inference" else "Select a model below to load",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = activeModel?.modelName ?: "No Model Active",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (activeModel != null) "Ready for inference" else "Select a model below to load",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
 
             if (activeModel != null) {
-                TextButton(
+                FilledTonalButton(
                     onClick = {
                         haptics.thud()
                         modelViewModel.unloadModel()
                     },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.8f),
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
                     ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                 ) {
-                    Text("Unload", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Unload",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false
+                    )
                 }
             }
         }

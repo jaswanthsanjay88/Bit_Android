@@ -141,9 +141,8 @@ class ChunkSearchIndex {
 
             if (tf <= 0f || df <= 0f) continue
 
-            // IDF: log((N - df + 0.5) / (df + 0.5))
-            val idf = ln((n - df + 0.5f) / (df + 0.5f))
-            if (idf <= 0f) continue
+            // Non-negative Robertson-Spärck Jones IDF: ln(1 + (N - df + 0.5) / (df + 0.5))
+            val idf = maxOf(0.01f, ln(1.0f + (n - df + 0.5f) / (df + 0.5f)))
 
             // TF normalization: (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * dl/avgdl))
             val avgDl = if (avgDlContent > 0f) avgDlContent else 1f

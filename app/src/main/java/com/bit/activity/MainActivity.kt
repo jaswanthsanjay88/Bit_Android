@@ -216,7 +216,10 @@ sealed class Screen(val route: String) {
     // Main app
     object Chat : Screen("chat")
     object Store : Screen("store")
-    object Editor : Screen("editor")
+    object Editor : Screen("editor?modelId={modelId}") {
+        fun createRoute(modelId: String? = null) =
+            if (!modelId.isNullOrBlank()) "editor?modelId=$modelId" else "editor?modelId="
+    }
     object Settings : Screen("settings")
     object AiMemory : Screen("ai_memory")
     object Update : Screen("update")
@@ -233,6 +236,9 @@ sealed class Screen(val route: String) {
     object TaskList : Screen("task_list")
     object ConflictReview : Screen("conflict_review")
     object BackupSettings : Screen("backup_settings")
+    object SubagentSession : Screen("subagent_session?id={id}") {
+        fun createRoute(id: String) = "subagent_session?id=$id"
+    }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -252,6 +258,11 @@ fun AppNavigation(
     val llmModelViewModel: LLMModelViewModel = hiltViewModel()
 
     SharedTransitionLayout {
+        androidx.compose.runtime.CompositionLocalProvider(
+            com.bit.ui.screen.subagent.LocalSubagentNav provides { id ->
+                navController.navigate(Screen.SubagentSession.createRoute(id))
+            }
+        ) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
@@ -420,10 +431,23 @@ fun AppNavigation(
             )
         }
 
-        composable(Screen.Editor.route) {
-            ModelConfigEditorScreen(onBackClick = {
-                navController.popBackStack()
-            })
+        composable(
+            route = Screen.Editor.route,
+            arguments = listOf(
+                androidx.navigation.navArgument("modelId") {
+                    type = androidx.navigation.NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val modelId = backStackEntry.arguments?.getString("modelId")
+            ModelConfigEditorScreen(
+                initialModelId = modelId,
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
         }
 
         composable(
@@ -446,9 +470,11 @@ fun AppNavigation(
             val context = LocalContext.current
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onModelEditor = { navController.navigate(Screen.Editor.route) },
+                onModelEditor = { navController.navigate(Screen.Editor.createRoute()) },
+                onModelSelected = { model -> navController.navigate(Screen.Editor.createRoute(model.id)) },
                 onAiMemoryClick = { navController.navigate(Screen.AiMemory.route) },
                 onEmbeddingSetupClick = { navController.navigate(Screen.EmbeddingSetup.route) },
+                onNavigateToModelStore = { navController.navigate(Screen.Store.route) },
                 onDiagnosticsClick = { context.startActivity(Intent(context, DiagnosticsActivity::class.java)) },
                 onCheckForUpdates = { navController.navigate(Screen.Update.route) }
             )
@@ -621,6 +647,15 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
+
+        // ============ SUBAGENT SESSION DRILL-DOWN ============
+        composable(Screen.SubagentSession.route) { backStackEntry ->
+            com.bit.ui.screen.subagent.SubagentSessionScreen(
+                subagentId = backStackEntry.arguments?.getString("id").orEmpty(),
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
+        }
     }
 }

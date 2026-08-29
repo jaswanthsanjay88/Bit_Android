@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -17,24 +19,58 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Pure Dynamic MCP Server Manager with Disk Persistence.
- * Tools are dynamically introspected from the MCP server and saved to disk
- * so added servers and configured tools never disappear across app restarts.
+ * Pure Dynamic MCP Server Manager with Disk Persistence and OAuth 2.1 lifecycle coordination.
+ * Tools and server configurations are dynamically introspected from external MCP servers
+ * and persisted to disk so servers and tool preferences never disappear across app restarts.
  */
 @Singleton
 class McpManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) {
-
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val prefs = context.getSharedPreferences("bit_mcp_servers_store", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("bit_mcp_servers_store_v2", Context.MODE_PRIVATE)
+
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        encodeDefaults = true
+        prettyPrint = true
+    }
 
     private val _servers = MutableStateFlow<List<McpServerConfig>>(loadSavedServers())
     val servers: StateFlow<List<McpServerConfig>> = _servers.asStateFlow()
 
+    private val statusStore = McpStatusStore()
+
+    private val oauthClient = McpOAuthClient()
+
+    private val oauthCoordinator = McpOAuthCoordinator(
+        oauthClient = oauthClient,
+        updateStatus = statusStore::update,
+        onOAuthUpdated = { serverId, oauthState ->
+            updateServerOAuth(serverId, oauthState)
+        },
+        getCurrentConfig = { serverId ->
+            _servers.value.find { it.id == serverId }
+        },
+        scope = scope,
+    )
+
+    private val sessionRegistry = McpSessionRegistry(
+        oauthCoordinator = oauthCoordinator,
+        statusStore = statusStore,
+        onToolsDiscovered = { serverId, newTools ->
+            updateServerTools(serverId, newTools)
+        },
+        scope = scope,
+    )
+
+    val syncingStatus: StateFlow<Map<String, McpStatus>>
+        get() = statusStore.status
+
     init {
         instance = this
-        // Automatically introspect and sync tools from all enabled MCP servers on startup
+        sessionRegistry.reconcile(_servers.value)
         scope.launch {
             syncAll()
         }
@@ -54,147 +90,213 @@ class McpManager @Inject constructor(
     }
 
     private fun loadSavedServers(): List<McpServerConfig> {
-        val rawJson = prefs.getString("servers_json", null) ?: return emptyList()
+        val rawJson = prefs.getString("servers_json_v2", null)
+        val loaded = if (!rawJson.isNullOrBlank()) {
+            runCatching {
+                json.decodeFromString<List<McpServerConfig>>(rawJson)
+            }.getOrElse {
+                Log.w(TAG, "Failed to decode v2 servers json, attempting v1 migration: ${it.message}")
+                migrateV1Servers()
+            }
+        } else {
+            migrateV1Servers()
+        }
+
+        // Guarantee unique IDs across all loaded servers
+        val seenIds = mutableSetOf<String>()
+        val uniqueList = loaded.map { server ->
+            if (seenIds.add(server.id)) {
+                server
+            } else {
+                server.clone(id = UUID.randomUUID().toString())
+            }
+        }
+        if (uniqueList != loaded) {
+            persistServers(uniqueList)
+        }
+        return uniqueList
+    }
+
+    private fun migrateV1Servers(): List<McpServerConfig> {
+        val oldJson = prefs.getString("servers_json", null)
+            ?: context.getSharedPreferences("bit_mcp_servers_store", Context.MODE_PRIVATE)
+                .getString("servers_json", null)
+            ?: return emptyList()
 
         return try {
-            val arr = JSONArray(rawJson)
+            val arr = JSONArray(oldJson)
             val list = mutableListOf<McpServerConfig>()
             for (i in 0 until arr.length()) {
                 val obj = arr.getJSONObject(i)
-                val toolsArr = obj.optJSONArray("tools") ?: JSONArray()
-                val toolsList = mutableListOf<McpToolConfig>()
-                for (j in 0 until toolsArr.length()) {
-                    val t = toolsArr.getJSONObject(j)
-                    toolsList.add(
-                        McpToolConfig(
-                            name = t.optString("name"),
-                            description = t.optString("description"),
-                            isEnabled = t.optBoolean("isEnabled", true),
-                            inputSchemaJson = t.optString("inputSchemaJson", "{}")
-                        )
-                    )
-                }
+                val id = obj.optString("id", UUID.randomUUID().toString())
+                val name = obj.optString("name", "MCP Server")
+                val url = obj.optString("url", "")
+                val isEnabled = obj.optBoolean("isEnabled", true)
+
                 val headersObj = obj.optJSONObject("headers") ?: JSONObject()
-                val headersMap = mutableMapOf<String, String>()
+                val headersList = mutableListOf<Pair<String, String>>()
                 val keys = headersObj.keys()
                 while (keys.hasNext()) {
                     val k = keys.next()
-                    headersMap[k] = headersObj.optString(k)
+                    headersList.add(k to headersObj.optString(k))
                 }
+
+                val toolsArr = obj.optJSONArray("tools") ?: JSONArray()
+                val toolsList = mutableListOf<McpTool>()
+                for (j in 0 until toolsArr.length()) {
+                    val t = toolsArr.getJSONObject(j)
+                    toolsList.add(
+                        McpTool(
+                            name = t.optString("name"),
+                            description = t.optString("description"),
+                            enable = t.optBoolean("isEnabled", true),
+                            inputSchemaJson = t.optString("inputSchemaJson", "{}"),
+                            needsApproval = t.optBoolean("needsApproval", false)
+                        )
+                    )
+                }
+
                 list.add(
-                    McpServerConfig(
-                        id = obj.optString("id", UUID.randomUUID().toString()),
-                        name = obj.optString("name"),
-                        url = obj.optString("url"),
-                        isEnabled = obj.optBoolean("isEnabled", true),
-                        headers = headersMap,
-                        tools = toolsList,
-                        status = McpStatus.Idle
+                    McpServerConfig.StreamableHTTPServer(
+                        id = id,
+                        commonOptions = McpCommonOptions(
+                            enable = isEnabled,
+                            name = name,
+                            headers = headersList,
+                            tools = toolsList,
+                            oauth = null
+                        ),
+                        url = url
                     )
                 )
             }
+            persistServers(list)
             list
         } catch (e: Exception) {
-            Log.e(TAG, "Error loading saved MCP servers", e)
+            Log.e(TAG, "Error migrating old MCP servers", e)
             emptyList()
         }
     }
 
     private fun persistServers(serversList: List<McpServerConfig>) {
         try {
-            val arr = JSONArray()
-            for (srv in serversList) {
-                val srvObj = JSONObject().apply {
-                    put("id", srv.id)
-                    put("name", srv.name)
-                    put("url", srv.url)
-                    put("isEnabled", srv.isEnabled)
-                    val headersObj = JSONObject()
-                    srv.headers.forEach { (k, v) -> headersObj.put(k, v) }
-                    put("headers", headersObj)
-                    val toolsArr = JSONArray()
-                    for (t in srv.tools) {
-                        toolsArr.put(JSONObject().apply {
-                            put("name", t.name)
-                            put("description", t.description)
-                            put("isEnabled", t.isEnabled)
-                            put("inputSchemaJson", t.inputSchemaJson)
-                        })
-                    }
-                    put("tools", toolsArr)
-                }
-                arr.put(srvObj)
-            }
-            prefs.edit().putString("servers_json", arr.toString()).apply()
+            val serialized = json.encodeToString(serversList)
+            prefs.edit().putString("servers_json_v2", serialized).apply()
         } catch (e: Exception) {
             Log.e(TAG, "Error persisting MCP servers", e)
         }
     }
 
-    /**
-     * Connects to the given server, performs JSON-RPC handshake, dynamically queries `tools/list`,
-     * and updates the server's tool registry.
-     */
-    suspend fun syncServer(serverId: String): Result<List<McpToolConfig>> {
-        val server = _servers.value.find { it.id == serverId }
-            ?: return Result.failure(IllegalArgumentException("Server not found: $serverId"))
-
-        updateServerStatus(serverId, McpStatus.Connecting)
-
-        return try {
-            val client = McpClient(server)
-            val fetchedTools = client.listTools()
-            updateServerTools(serverId, fetchedTools, McpStatus.Connected)
-            Log.i(TAG, "Successfully synced ${fetchedTools.size} dynamic tools from server: ${server.name}")
-            Result.success(fetchedTools)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to sync MCP server ${server.name}", e)
-            val errorMsg = e.message ?: "Connection failed"
-            updateServerStatus(serverId, McpStatus.Error(errorMsg))
-            Result.failure(e)
+    fun addServer(
+        name: String,
+        url: String,
+        isStreamableHttp: Boolean = true,
+        headers: List<Pair<String, String>> = emptyList(),
+        oauth: McpOAuthState? = null
+    ): McpServerConfig {
+        val newConfig = if (isStreamableHttp) {
+            McpServerConfig.StreamableHTTPServer(
+                commonOptions = McpCommonOptions(
+                    enable = true,
+                    name = name.trim(),
+                    headers = headers,
+                    tools = emptyList(),
+                    oauth = oauth
+                ),
+                url = url.trim()
+            )
+        } else {
+            McpServerConfig.SseTransportServer(
+                commonOptions = McpCommonOptions(
+                    enable = true,
+                    name = name.trim(),
+                    headers = headers,
+                    tools = emptyList(),
+                    oauth = oauth
+                ),
+                url = url.trim()
+            )
         }
-    }
 
-    /**
-     * Syncs tools from all enabled servers concurrently.
-     */
-    suspend fun syncAll() {
-        _servers.value.filter { it.isEnabled }.forEach { server ->
-            try {
-                syncServer(server.id)
-            } catch (e: Exception) {
-                Log.w(TAG, "Initial sync skipped for ${server.name}: ${e.message}")
-            }
-        }
-    }
-
-    fun addServer(name: String, url: String, headers: Map<String, String> = emptyMap()) {
-        val newConfig = McpServerConfig(
-            name = name.trim(),
-            url = url.trim(),
-            isEnabled = true,
-            headers = headers,
-            tools = emptyList(),
-            status = McpStatus.Idle
-        )
         val updated = _servers.value + newConfig
         _servers.value = updated
         persistServers(updated)
+        sessionRegistry.reconcile(updated)
         scope.launch {
             syncServer(newConfig.id)
         }
+        return newConfig
     }
 
     fun addServers(newServers: List<McpServerConfig>) {
         if (newServers.isEmpty()) return
-        val updated = _servers.value + newServers
-        _servers.value = updated
-        persistServers(updated)
-        scope.launch {
-            newServers.forEach { srv ->
-                syncServer(srv.id)
+        val current = _servers.value.toMutableList()
+        val currentIds = current.map { it.id }.toMutableSet()
+        val sanitized = newServers.map { server ->
+            if (currentIds.add(server.id)) {
+                server
+            } else {
+                server.clone(id = UUID.randomUUID().toString())
             }
         }
+        val updated = current + sanitized
+        _servers.value = updated
+        persistServers(updated)
+        sessionRegistry.reconcile(updated)
+        scope.launch {
+            sessionRegistry.syncAll(sanitized)
+        }
+    }
+
+    fun updateServer(config: McpServerConfig) {
+        val updated = _servers.value.map {
+            if (it.id == config.id) config else it
+        }
+        _servers.value = updated
+        persistServers(updated)
+        sessionRegistry.reconcile(updated)
+    }
+
+    fun removeServer(serverId: String) {
+        val updated = _servers.value.filter { it.id != serverId }
+        _servers.value = updated
+        persistServers(updated)
+        sessionRegistry.reconcile(updated)
+    }
+
+    fun toggleServer(serverId: String, isEnabled: Boolean) {
+        val updated = _servers.value.map {
+            if (it.id == serverId) it.clone(commonOptions = it.commonOptions.copy(enable = isEnabled)) else it
+        }
+        _servers.value = updated
+        persistServers(updated)
+        sessionRegistry.reconcile(updated)
+    }
+
+    fun toggleTool(serverId: String, toolName: String, isEnabled: Boolean) {
+        val updated = _servers.value.map { server ->
+            if (server.id == serverId) {
+                val updatedTools = server.commonOptions.tools.map { tool ->
+                    if (tool.name == toolName) tool.copy(enable = isEnabled) else tool
+                }
+                server.clone(commonOptions = server.commonOptions.copy(tools = updatedTools))
+            } else server
+        }
+        _servers.value = updated
+        persistServers(updated)
+    }
+
+    fun toggleToolNeedsApproval(serverId: String, toolName: String, needsApproval: Boolean) {
+        val updated = _servers.value.map { server ->
+            if (server.id == serverId) {
+                val updatedTools = server.commonOptions.tools.map { tool ->
+                    if (tool.name == toolName) tool.copy(needsApproval = needsApproval) else tool
+                }
+                server.clone(commonOptions = server.commonOptions.copy(tools = updatedTools))
+            } else server
+        }
+        _servers.value = updated
+        persistServers(updated)
     }
 
     fun reorderServers(fromIndex: Int, toIndex: Int) {
@@ -204,70 +306,48 @@ class McpManager @Inject constructor(
             list.add(toIndex, item)
             _servers.value = list
             persistServers(list)
-            com.bit.plugins.PluginManager.invalidateToolCache()
         }
     }
 
     fun setOrderedServers(orderedList: List<McpServerConfig>) {
         _servers.value = orderedList
         persistServers(orderedList)
-        com.bit.plugins.PluginManager.invalidateToolCache()
     }
 
-    fun removeServer(serverId: String) {
-        val updated = _servers.value.filter { it.id != serverId }
-        _servers.value = updated
-        persistServers(updated)
-        com.bit.plugins.PluginManager.invalidateToolCache()
+    suspend fun syncServer(serverId: String): Result<List<McpTool>> {
+        val server = _servers.value.find { it.id == serverId }
+            ?: return Result.failure(IllegalArgumentException("Server not found: $serverId"))
+        return sessionRegistry.syncServer(server)
     }
 
-    fun toggleServer(serverId: String, isEnabled: Boolean) {
-        val updated = _servers.value.map {
-            if (it.id == serverId) it.copy(isEnabled = isEnabled) else it
-        }
-        _servers.value = updated
-        persistServers(updated)
-        if (isEnabled) {
-            scope.launch { syncServer(serverId) }
-        } else {
-            com.bit.plugins.PluginManager.invalidateToolCache()
-        }
+    suspend fun syncAll() {
+        sessionRegistry.syncAll(_servers.value)
     }
 
-    fun toggleTool(serverId: String, toolName: String, isEnabled: Boolean) {
-        val updated = _servers.value.map { server ->
-            if (server.id == serverId) {
-                val updatedTools = server.tools.map { tool ->
-                    if (tool.name == toolName) tool.copy(isEnabled = isEnabled) else tool
-                }
-                server.copy(tools = updatedTools)
-            } else {
-                server
-            }
-        }
-        _servers.value = updated
-        persistServers(updated)
-        com.bit.plugins.PluginManager.invalidateToolCache()
+    fun startAuthorization(config: McpServerConfig, context: Context) {
+        oauthCoordinator.startAuthorization(config, context)
+    }
+
+    fun cancelAuthorization(config: McpServerConfig) {
+        oauthCoordinator.cancelAuthorization(config.id)
+    }
+
+    suspend fun clearAuthorization(config: McpServerConfig) {
+        val fresh = oauthCoordinator.clearAuthorization(config)
+        updateServer(fresh)
     }
 
     suspend fun executeTool(serverId: String, toolName: String, args: JSONObject): String {
         val server = _servers.value.find { it.id == serverId }
             ?: throw IllegalArgumentException("Server not found: $serverId")
-        val client = McpClient(server)
-        return client.callTool(toolName, args)
+        return sessionRegistry.callTool(server, toolName, args)
     }
 
-    private fun updateServerStatus(serverId: String, status: McpStatus) {
-        _servers.value = _servers.value.map {
-            if (it.id == serverId) it.copy(status = status) else it
-        }
-    }
-
-    private fun updateServerTools(serverId: String, newTools: List<McpToolConfig>, status: McpStatus) {
+    private fun updateServerTools(serverId: String, newTools: List<McpTool>) {
         val updated = _servers.value.map { server ->
             if (server.id == serverId) {
-                val existingTools = server.tools.toMutableList()
-                val merged = mutableListOf<McpToolConfig>()
+                val existingTools = server.commonOptions.tools
+                val merged = mutableListOf<McpTool>()
 
                 newTools.forEach { fetched ->
                     val existing = existingTools.find { it.name == fetched.name }
@@ -283,37 +363,43 @@ class McpManager @Inject constructor(
                     )
                 }
 
-                server.copy(tools = merged, status = status)
-            } else {
-                server
-            }
+                server.clone(commonOptions = server.commonOptions.copy(tools = merged))
+            } else server
         }
         _servers.value = updated
         persistServers(updated)
-        com.bit.plugins.PluginManager.invalidateToolCache()
+    }
+
+    private fun updateServerOAuth(serverId: String, oauthState: McpOAuthState?) {
+        val updated = _servers.value.map { server ->
+            if (server.id == serverId) {
+                server.clone(commonOptions = server.commonOptions.copy(oauth = oauthState))
+            } else server
+        }
+        _servers.value = updated
+        persistServers(updated)
     }
 
     /**
      * Generates a structured markdown catalog of all active MCP servers and their capabilities
-     * following the Model Context Protocol specification (https://modelcontextprotocol.io/).
+     * following the Model Context Protocol specification.
      */
     fun getMcpCatalogPrompt(): String {
         val enabledServers = _servers.value.filter { it.isEnabled }
-        val serversWithTools = enabledServers.filter { srv -> srv.tools.any { it.isEnabled } }
+        val serversWithTools = enabledServers.filter { srv -> srv.tools.any { it.enable } }
         if (serversWithTools.isEmpty()) return ""
 
         return buildString {
             append("## Model Context Protocol (MCP) Server Infrastructure\n")
-            append("You have direct access to external Model Context Protocol (MCP) servers (adhering to https://modelcontextprotocol.io/).\n")
-            append("Each MCP server encapsulates an external tool ecosystem or service integration.\n")
+            append("You have access to external Model Context Protocol (MCP) servers (https://modelcontextprotocol.io/).\n")
             append("When executing tasks, select and invoke the appropriate tool associated with the matching MCP server:\n\n")
             for (srv in serversWithTools) {
-                val activeTools = srv.tools.filter { it.isEnabled }
+                val activeTools = srv.tools.filter { it.enable }
                 append("### MCP Server: [${srv.name}]\n")
                 if (srv.url.isNotBlank()) append("- Endpoint: `${srv.url}`\n")
                 append("- Active Tools (${activeTools.size}):\n")
                 for (tool in activeTools) {
-                    val desc = if (tool.description.isNotBlank()) tool.description else "Action provided by MCP server '${srv.name}'"
+                    val desc = if (!tool.description.isNullOrBlank()) tool.description else "Action provided by MCP server '${srv.name}'"
                     append("  * `${tool.name}`: $desc\n")
                 }
                 append("\n")
@@ -339,40 +425,54 @@ fun parseMcpServersFromJson(jsonText: String): List<McpServerConfig> {
                     val srvObj = mcpServersObj.getJSONObject(key)
                     val url = srvObj.optString("url", "").trim()
                     if (url.isNotBlank()) {
-                        val headersMap = mutableMapOf<String, String>()
+                        val headersList = mutableListOf<Pair<String, String>>()
                         val headersObj = srvObj.optJSONObject("headers")
                         headersObj?.keys()?.forEach { hKey ->
-                            headersMap[hKey] = headersObj.optString(hKey)
+                            headersList.add(hKey to headersObj.optString(hKey))
                         }
-                        results.add(
-                            McpServerConfig(
-                                name = key,
-                                url = url,
-                                headers = headersMap,
-                                isEnabled = true,
-                                tools = emptyList(),
-                                status = McpStatus.Idle
+                        val transportType = srvObj.optString("type", "streamable_http")
+                        val config = if (transportType == "sse") {
+                            McpServerConfig.SseTransportServer(
+                                commonOptions = McpCommonOptions(
+                                    enable = true,
+                                    name = key,
+                                    headers = headersList,
+                                    tools = emptyList()
+                                ),
+                                url = url
                             )
-                        )
+                        } else {
+                            McpServerConfig.StreamableHTTPServer(
+                                commonOptions = McpCommonOptions(
+                                    enable = true,
+                                    name = key,
+                                    headers = headersList,
+                                    tools = emptyList()
+                                ),
+                                url = url
+                            )
+                        }
+                        results.add(config)
                     }
                 }
             } else {
                 val url = obj.optString("url", "").trim()
                 if (url.isNotBlank()) {
                     val name = obj.optString("name", "MCP Server")
-                    val headersMap = mutableMapOf<String, String>()
+                    val headersList = mutableListOf<Pair<String, String>>()
                     val headersObj = obj.optJSONObject("headers")
                     headersObj?.keys()?.forEach { hKey ->
-                        headersMap[hKey] = headersObj.optString(hKey)
+                        headersList.add(hKey to headersObj.optString(hKey))
                     }
                     results.add(
-                        McpServerConfig(
-                            name = name,
-                            url = url,
-                            headers = headersMap,
-                            isEnabled = true,
-                            tools = emptyList(),
-                            status = McpStatus.Idle
+                        McpServerConfig.StreamableHTTPServer(
+                            commonOptions = McpCommonOptions(
+                                enable = true,
+                                name = name,
+                                headers = headersList,
+                                tools = emptyList()
+                            ),
+                            url = url
                         )
                     )
                 }
@@ -384,19 +484,20 @@ fun parseMcpServersFromJson(jsonText: String): List<McpServerConfig> {
                 val url = item.optString("url", "").trim()
                 if (url.isNotBlank()) {
                     val name = item.optString("name", "Server $i")
-                    val headersMap = mutableMapOf<String, String>()
+                    val headersList = mutableListOf<Pair<String, String>>()
                     val headersObj = item.optJSONObject("headers")
                     headersObj?.keys()?.forEach { hKey ->
-                        headersMap[hKey] = headersObj.optString(hKey)
+                        headersList.add(hKey to headersObj.optString(hKey))
                     }
                     results.add(
-                        McpServerConfig(
-                            name = name,
-                            url = url,
-                            headers = headersMap,
-                            isEnabled = true,
-                            tools = emptyList(),
-                            status = McpStatus.Idle
+                        McpServerConfig.StreamableHTTPServer(
+                            commonOptions = McpCommonOptions(
+                                enable = true,
+                                name = name,
+                                headers = headersList,
+                                tools = emptyList()
+                            ),
+                            url = url
                         )
                     )
                 }

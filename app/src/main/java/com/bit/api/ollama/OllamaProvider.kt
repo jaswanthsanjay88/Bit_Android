@@ -253,8 +253,18 @@ class OllamaProvider : LlmProvider {
                                 toolParser.flush(
                                     onText = { emit(StreamEvent.TextChunk(it)) }
                                 )
-                                val total = (response.promptEvalCount ?: 0) + (response.evalCount ?: 0)
-                                emit(StreamEvent.UsageUpdate(total))
+                                val prompt = response.promptEvalCount ?: 0
+                                val completion = response.evalCount ?: 0
+                                val total = prompt + completion
+                                Log.d("AgoraAPI", "Ollama Usage: prompt=$prompt, completion=$completion, total=$total")
+                                emit(
+                                    StreamEvent.UsageUpdate(
+                                        promptTokens = prompt,
+                                        completionTokens = completion,
+                                        totalTokens = total,
+                                        tokenCount = completion
+                                    )
+                                )
                             }
                         } catch (e: Exception) {
                             Log.e("AgoraAPI", "Parse error: ${e.message}")

@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.animation.core.*
@@ -19,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalTextToolbar
@@ -34,6 +36,7 @@ import com.bit.ui.components.lazyMarkdownItems
 import com.bit.ui.components.ReasoningTraceCard
 import com.bit.ui.components.toTraceStep
 import com.bit.ui.components.CustomTextToolbar
+import com.bit.ui.icons.TnIcons
 import com.bit.ui.components.TextToolbarState
 import com.bit.ui.components.CustomTextSelectionPopup
 import com.bit.ui.components.EditMessageDialog
@@ -168,11 +171,13 @@ fun parseThinkingTags(raw: String): ParsedMessage {
     while (i < raw.length) {
         var minIdx = -1
         var selectedOpenTag = ""
-        for ((open, _) in THINK_TAGS) {
+        var selectedCloseTag = ""
+        for ((open, close) in THINK_TAGS) {
             val idx = raw.indexOf(open, i, ignoreCase = true)
             if (idx >= 0 && (minIdx < 0 || idx < minIdx)) {
                 minIdx = idx
                 selectedOpenTag = open
+                selectedCloseTag = close
             }
         }
 
@@ -182,13 +187,12 @@ fun parseThinkingTags(raw: String): ParsedMessage {
         }
 
         content.append(raw, i, minIdx)
-        val closeTag = THINK_TAGS.first { it.first == selectedOpenTag }.second
         val bodyStart = minIdx + selectedOpenTag.length
-        val end = raw.indexOf(closeTag, bodyStart, ignoreCase = true)
+        val end = raw.indexOf(selectedCloseTag, bodyStart, ignoreCase = true)
 
         if (end < 0) {
             val chunk = raw.substring(bodyStart).trim()
-            if (chunk.isNotEmpty() && !thinking.toString().contains(chunk)) {
+            if (chunk.isNotEmpty()) {
                 if (thinking.isNotEmpty()) thinking.append("\n\n")
                 thinking.append(chunk)
             }
@@ -196,11 +200,11 @@ fun parseThinkingTags(raw: String): ParsedMessage {
             i = raw.length
         } else {
             val chunk = raw.substring(bodyStart, end).trim()
-            if (chunk.isNotEmpty() && !thinking.toString().contains(chunk)) {
+            if (chunk.isNotEmpty()) {
                 if (thinking.isNotEmpty()) thinking.append("\n\n")
                 thinking.append(chunk)
             }
-            i = end + closeTag.length
+            i = end + selectedCloseTag.length
         }
     }
 
@@ -239,6 +243,12 @@ fun BodyContent(
     val streaming by chatViewModel.streamingState.collectAsStateWithLifecycle()
     val chatState by chatViewModel.chatUiState.collectAsStateWithLifecycle()
     val agent by chatViewModel.agentState.collectAsStateWithLifecycle()
+    val pendingApproval by chatViewModel.pendingApproval.collectAsStateWithLifecycle()
+    val subagentSessions by com.bit.agent.harness.engine.SubagentSessionBus.sessions.collectAsStateWithLifecycle()
+    val runningSubagents = remember(subagentSessions) {
+        subagentSessions.values.filter { it.isRunning }.sortedBy { it.startedAtMs }
+    }
+    val openSubagent = com.bit.ui.screen.subagent.LocalSubagentNav.current
     val rag by chatViewModel.ragState.collectAsStateWithLifecycle()
     val config by chatViewModel.chatConfigState.collectAsStateWithLifecycle()
     val promptEditState by chatViewModel.promptEditState.collectAsStateWithLifecycle()
@@ -275,6 +285,18 @@ fun BodyContent(
             try {
                 listState.animateScrollToItem(itemCount - 1)
             } catch (_: Exception) {}
+        }
+    }
+
+    // Snap to the approval card as soon as a step requests consent
+    LaunchedEffect(pendingApproval?.activeStep?.id) {
+        if (pendingApproval != null) {
+            val itemCount = listState.layoutInfo.totalItemsCount
+            if (itemCount > 0) {
+                try {
+                    listState.animateScrollToItem(itemCount - 1)
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -318,10 +340,10 @@ fun BodyContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
             ) {
-                items(
+                itemsIndexed(
                     items = messages,
-                    key = { it.msgId }
-                ) { msg ->
+                    key = { index, msg -> "${msg.msgId}_${index}" }
+                ) { _, msg ->
                     Box(modifier = Modifier.animateItem()) {
                         if (msg.role == Role.User) {
                             UserMessageBubble(
@@ -376,6 +398,107 @@ fun BodyContent(
 
                     if (chatState.isGenerating) {
                         val isImageGen = chatState.generationType == ModelType.IMAGE_GENERATION
+                        // Live subagent presence: tappable cards showing agents working for the user
+                        if (!isImageGen && runningSubagents.isNotEmpty()) {
+                            items(
+                                count = runningSubagents.size,
+                                key = { idx -> "subagent-live-${runningSubagents[idx].id}" }
+                            ) { idx ->
+                                val sub = runningSubagents[idx]
+                                Surface(
+                                    onClick = {
+                                        haptics.selection()
+                                        openSubagent(sub.id)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(Standards.RadiusMd),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(Standards.SpacingMd),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                                    ) {
+                                        val pulse = rememberInfiniteTransition(label = "subPulse")
+                                        val pulseAlpha by pulse.animateFloat(
+                                            initialValue = 0.35f, targetValue = 1f,
+                                            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                                androidx.compose.animation.core.tween(800),
+                                                androidx.compose.animation.core.RepeatMode.Reverse
+                                            ), label = "subAlpha"
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha))
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Subagent [${sub.role}] is working for you",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "Round ${sub.currentRound}/${sub.maxSteps} · tap to watch it think",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = TnIcons.ChevronRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        // Live agent harness trace (plan + executed tool rounds)
+                        if (!isImageGen && (agent.plan != null || agent.toolChainSteps.isNotEmpty())) {
+                            item(key = "live-agent-trace") {
+                                ReasoningTraceCard(
+                                    steps = agent.toolChainSteps.map { it.toTraceStep() },
+                                    plan = agent.plan,
+                                    summary = null,
+                                    isLive = true,
+                                    currentRound = agent.currentRound,
+                                    maxRounds = 256
+                                )
+                            }
+                        }
+                        // Human-in-the-loop gates: typed answers for ask_user, Approve/Deny for restricted tools
+                        val approval = pendingApproval
+                        if (!isImageGen && approval != null) {
+                            item(key = "agent-step-approval") {
+                                if (approval.toolName.equals("ask_user", ignoreCase = true)) {
+                                    val question = try {
+                                        org.json.JSONObject(approval.toolArguments).optString("question")
+                                            .ifBlank { approval.activeStep.description }
+                                    } catch (_: Exception) {
+                                        approval.activeStep.description
+                                    }
+                                    com.bit.ui.components.AgentQuestionCard(
+                                        question = question,
+                                        onAnswer = { chatViewModel.answerAgentQuestion(it) },
+                                        onSkip = { chatViewModel.denyPendingAgentStep() }
+                                    )
+                                } else {
+                                    com.bit.ui.components.AgentApprovalCard(
+                                        toolName = approval.toolName,
+                                        description = approval.activeStep.description,
+                                        toolArguments = approval.toolArguments,
+                                        onApprove = { chatViewModel.approvePendingAgentStep() },
+                                        onDeny = { chatViewModel.denyPendingAgentStep() }
+                                    )
+                                }
+                            }
+                        }
                         if (isImageGen) {
                             item(key = "streaming-image-response") {
                                 ImageGenerationStreamingBubble(

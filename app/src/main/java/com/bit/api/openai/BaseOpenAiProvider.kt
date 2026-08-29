@@ -70,6 +70,7 @@ abstract class BaseOpenAiProvider : LlmProvider {
             includeImages = config.includeImages
         )
 
+        val safeMaxTokens = config.maxTokens?.takeIf { it > 0 }?.coerceAtLeast(1) ?: 4096
         var request = OpenAiChatRequest(
             model = config.modelId,
             messages = apiMessages,
@@ -77,7 +78,7 @@ abstract class BaseOpenAiProvider : LlmProvider {
             streamOptions = if (name == Constants.PROVIDER_OPENAI || name == Constants.PROVIDER_OPEN_ROUTER) OpenAiStreamOptions(includeUsage = true) else null,
             tools = config.tools,
             temperature = config.temperature,
-            maxTokens = config.maxTokens,
+            maxTokens = safeMaxTokens,
             topP = config.topP,
             frequencyPenalty = config.frequencyPenalty,
             presencePenalty = config.presencePenalty
@@ -232,10 +233,16 @@ abstract class BaseOpenAiProvider : LlmProvider {
                 }
 
                 response.usage?.let { usage ->
+                    val reasoning = usage.completionTokensDetails?.reasoningTokens ?: 0
+                    Log.d("AgoraAPI", "Usage: prompt=${usage.promptTokens}, completion=${usage.completionTokens}, reasoning=$reasoning, total=${usage.totalTokens}")
                     emit(
                         StreamEvent.UsageUpdate(
-                            tokenCount = usage.totalTokens,
-                            thoughtsTokenCount = usage.completionTokensDetails?.reasoningTokens ?: 0
+                            promptTokens = usage.promptTokens,
+                            completionTokens = usage.completionTokens,
+                            totalTokens = usage.totalTokens,
+                            reasoningTokens = reasoning,
+                            tokenCount = usage.completionTokens,
+                            thoughtsTokenCount = reasoning
                         )
                     )
                 }

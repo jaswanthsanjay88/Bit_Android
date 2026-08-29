@@ -1,30 +1,46 @@
 package com.bit.activity
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import com.bit.ui.components.PasswordTextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.bit.R
-import com.bit.ui.components.ActionButton
+import androidx.compose.ui.unit.sp
 import com.bit.engine.EmbeddingEngine
 import com.bit.neuron_example.GraphSettings
 import com.bit.neuron_example.NeuronGraph
 import com.bit.neuron_example.NeuronNode
+import com.bit.neuron_example.SourceType
+import com.bit.ui.components.NeuronGraphCanvas
+import com.bit.ui.components.PasswordTextField
+import com.bit.ui.icons.TnIcons
+import com.bit.ui.theme.LocalBitHaptics
 import com.bit.ui.theme.NeuroVerseTheme
 import com.neuronpacket.NeuronPacketManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -33,7 +49,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
-import com.bit.ui.icons.TnIcons
 
 @AndroidEntryPoint
 class RagDataReaderActivity : ComponentActivity() {
@@ -53,7 +68,7 @@ class RagDataReaderActivity : ComponentActivity() {
 
         val filePath = intent.getStringExtra(EXTRA_RAG_FILE_PATH)
         val password = intent.getStringExtra("rag_password")
-        val ragName = intent.getStringExtra(EXTRA_RAG_NAME) ?: "Unknown RAG"
+        val ragName = intent.getStringExtra(EXTRA_RAG_NAME) ?: "Knowledge Document"
         val isEncrypted = intent.getBooleanExtra(EXTRA_IS_ENCRYPTED, false)
 
         setContent {
@@ -69,7 +84,7 @@ class RagDataReaderActivity : ComponentActivity() {
                     )
                 } else {
                     ErrorScreen(
-                        message = "No RAG file path provided",
+                        message = "No RAG knowledge document path provided",
                         onBackClick = { finish() }
                     )
                 }
@@ -78,7 +93,13 @@ class RagDataReaderActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+enum class RagViewTab(val label: String) {
+    GRAPH("Neuron Graph"),
+    CHUNKS("Document Chunks"),
+    STATS("Statistics")
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RagDataReaderScreen(
     filePath: String,
@@ -88,6 +109,9 @@ fun RagDataReaderScreen(
     embeddingEngine: EmbeddingEngine,
     onBackClick: () -> Unit
 ) {
+    val haptics = LocalBitHaptics.current
+    val context = LocalContext.current
+
     var loadingState by remember { mutableStateOf<RagLoadingState>(RagLoadingState.Loading) }
     var graph by remember { mutableStateOf<NeuronGraph?>(null) }
     var nodes by remember { mutableStateOf<List<NeuronNode>>(emptyList()) }
@@ -95,6 +119,7 @@ fun RagDataReaderScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showPasswordDialog by remember { mutableStateOf(false) }
     var enteredPassword by remember { mutableStateOf(password) }
+    var currentTab by remember { mutableStateOf(RagViewTab.GRAPH) }
 
     val scope = rememberCoroutineScope()
 
@@ -125,7 +150,6 @@ fun RagDataReaderScreen(
         }
     }
 
-    // Password Dialog
     if (showPasswordDialog) {
         PasswordInputDialog(
             onDismiss = {
@@ -140,23 +164,39 @@ fun RagDataReaderScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = {
-                    Column {
-                        Text(ragName)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = ragName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "${nodes.size} neurons • ${nodes.sumOf { it.edges.size }} synapses",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 },
                 navigationIcon = {
-                    ActionButton(
-                        onClickListener = onBackClick,
-                        icon = TnIcons.ArrowLeft,
-                        contentDescription = "Back",
-                        shape = RoundedCornerShape(12.dp)
-                    )
+                    IconButton(onClick = {
+                        haptics.pop()
+                        onBackClick()
+                    }) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         }
@@ -173,8 +213,8 @@ fun RagDataReaderScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        LoadingIndicator()
-                        Text("Loading RAG data...")
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        Text("Reading neural graph...", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -187,122 +227,134 @@ fun RagDataReaderScreen(
             }
 
             is RagLoadingState.Success -> {
-                val filteredNodes = if (searchQuery.isBlank()) {
-                    nodes
-                } else {
-                    nodes.filter {
+                val filteredNodes = remember(nodes, searchQuery) {
+                    if (searchQuery.isBlank()) nodes
+                    else nodes.filter {
                         it.content.contains(searchQuery, ignoreCase = true) ||
-                        it.id.contains(searchQuery, ignoreCase = true) ||
-                        it.metadata.sourceName.contains(searchQuery, ignoreCase = true) ||
-                        it.metadata.sourceId.contains(searchQuery, ignoreCase = true)
+                                it.id.contains(searchQuery, ignoreCase = true) ||
+                                it.metadata.sourceName.contains(searchQuery, ignoreCase = true)
                     }
                 }
 
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(padding)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Node List
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
+                    // ── Tab Bar Chips ──
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Search Bar
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            placeholder = { Text("Search nodes...") },
-                            leadingIcon = { Icon(TnIcons.Search, null) },
-                            trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery = "" }) {
-                                        Icon(TnIcons.XCircle, null)
-                                    }
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        // Graph Stats Card
-                        graph?.let { g ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                                ),
+                        RagViewTab.values().forEach { tab ->
+                            FilterChip(
+                                selected = currentTab == tab,
+                                onClick = {
+                                    haptics.selection()
+                                    currentTab = tab
+                                },
+                                label = { Text(tab.label) },
                                 shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Text(
-                                        "Graph Statistics",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                            )
+                        }
+                    }
 
-                                    StatRow("Model", g.getEmbeddingModelName())
-                                    StatRow("Dimension", "${g.getEmbeddingDimension()}D")
-                                    StatRow("Nodes", "${g.nodeCount}")
-                                    StatRow("Connections", "${g.getAllNodes().sumOf { it.edges.size }}")
+                    // ── Search Bar ──
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text("Search neural chunks & documents...", color = MaterialTheme.colorScheme.outline) },
+                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(Icons.Rounded.Clear, contentDescription = "Clear")
                                 }
                             }
-                        }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                        )
+                    )
 
-                        HorizontalDivider()
+                    // ── Tab Content ──
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    ) {
+                        when (currentTab) {
+                            RagViewTab.GRAPH -> {
+                                NeuronGraphCanvas(
+                                    nodes = filteredNodes,
+                                    selectedNode = selectedNode,
+                                    onNodeSelected = { selectedNode = it },
+                                    searchQuery = searchQuery,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
 
-                        // Node List
-                        LazyColumn(
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (filteredNodes.isEmpty()) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(32.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                            RagViewTab.CHUNKS -> {
+                                if (filteredNodes.isEmpty()) {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                         Text(
-                                            "No nodes found",
-                                            style = MaterialTheme.typography.bodyLarge,
+                                            "No document chunks found",
+                                            style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize(),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                                        contentPadding = PaddingValues(bottom = 24.dp)
+                                    ) {
+                                        items(filteredNodes, key = { it.id }) { node ->
+                                            DocumentChunkCard(
+                                                node = node,
+                                                isSelected = selectedNode?.id == node.id,
+                                                onClick = { selectedNode = node }
+                                            )
+                                        }
+                                    }
                                 }
-                            } else {
-                                items(filteredNodes) { node ->
-                                    NodeCard(
-                                        node = node,
-                                        isSelected = selectedNode?.id == node.id,
-                                        onClick = { selectedNode = node }
+                            }
+
+                            RagViewTab.STATS -> {
+                                graph?.let { g ->
+                                    GraphStatsView(
+                                        graph = g,
+                                        nodes = nodes,
+                                        ragName = ragName,
+                                        filePath = filePath
                                     )
                                 }
                             }
                         }
                     }
+                }
 
-                    // Node Detail View
-                    val node = selectedNode
-                    val g = graph
-                    if (node != null && g != null) {
-                        VerticalDivider()
-
-                        NodeDetailView(
+                // ── Selected Node Detail Modal Sheet ──
+                selectedNode?.let { node ->
+                    ModalBottomSheet(
+                        onDismissRequest = { selectedNode = null },
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                    ) {
+                        NodeDetailSheetContent(
                             node = node,
-                            graph = g,
-                            onClose = { selectedNode = null }
+                            allNodes = nodes,
+                            onClose = { selectedNode = null },
+                            onSelectConnectedNode = { targetId ->
+                                val target = nodes.find { it.id == targetId }
+                                if (target != null) selectedNode = target
+                            }
                         )
                     }
                 }
@@ -311,212 +363,250 @@ fun RagDataReaderScreen(
     }
 }
 
+// ── Document Chunk Card ──
+
 @Composable
-fun NodeCard(
+private fun DocumentChunkCard(
     node: NeuronNode,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val haptics = LocalBitHaptics.current
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable {
+                haptics.selection()
+                onClick()
+            },
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-            else
-                MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        shape = RoundedCornerShape(12.dp)
+        border = BorderStroke(
+            1.dp,
+            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        )
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    "Node ${node.id.take(8)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isSelected)
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = TnIcons.Brain,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Text(
+                        text = node.metadata.sourceName.ifBlank { "Chunk ${node.id.take(8)}" },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
 
                 if (node.edges.isNotEmpty()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(6.dp)
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
-                        Text(
-                            "${node.edges.size} connections",
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text("${node.edges.size} synapses")
                     }
                 }
             }
 
             Text(
-                node.content,
+                text = node.content,
                 style = MaterialTheme.typography.bodyMedium,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                color = if (isSelected)
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis
             )
 
-            if (node.metadata.sourceName.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    node.metadata.sourceName,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (isSelected)
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    text = "ID: ${node.id.take(12)}...",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Text(
+                    text = "Tap to inspect",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
     }
 }
 
+// ── Node Detail Sheet Content ──
+
 @Composable
-fun NodeDetailView(
+private fun NodeDetailSheetContent(
     node: NeuronNode,
-    graph: NeuronGraph,
-    onClose: () -> Unit
+    allNodes: List<NeuronNode>,
+    onClose: () -> Unit,
+    onSelectConnectedNode: (String) -> Unit
 ) {
+    val context = LocalContext.current
+    val haptics = LocalBitHaptics.current
+
     Column(
         modifier = Modifier
-            .width(400.dp)
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Header
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "Node Details",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            ActionButton(
-                onClickListener = onClose,
-                icon = TnIcons.X,
-                contentDescription = "Close",
-                shape = RoundedCornerShape(12.dp)
-            )
+            Column {
+                Text(
+                    text = node.metadata.sourceName.ifBlank { "Neural Node" },
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "ID: ${node.id}",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            IconButton(onClick = onClose) {
+                Icon(Icons.Rounded.Close, contentDescription = "Close")
+            }
         }
 
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        // Content Area Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
         ) {
-            // Node ID
-            item {
-                DetailSection(title = "Node ID") {
-                    Text(
-                        node.id,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "CHUNK CONTENT",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Text(
+                    text = node.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Button(
+                    onClick = {
+                        haptics.pop()
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Chunk", node.content))
+                        Toast.makeText(context, "Copied chunk content", Toast.LENGTH_SHORT).show()
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.align(Alignment.End)
+                ) {
+                    Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Copy Text")
                 }
             }
+        }
 
-            // Content
-            item {
-                DetailSection(title = "Content") {
-                    Text(
-                        node.content,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
+        // Synaptic Connections
+        if (node.edges.isNotEmpty()) {
+            Text(
+                text = "SYNAPTIC CONNECTIONS (${node.edges.size})",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
 
-            // Metadata
-            item {
-                DetailSection(title = "Metadata") {
-                    if (node.metadata.sourceName.isNotEmpty()) {
-                        Text(
-                            "Source: ${node.metadata.sourceName}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (node.metadata.sourceId.isNotEmpty()) {
-                        Text(
-                            "Source ID: ${node.metadata.sourceId}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
-                    }
-                    Text(
-                        "Position: ${node.metadata.position}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (node.metadata.extras.isNotEmpty()) {
-                        Text(
-                            "Extras: ${node.metadata.extras}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Embedding Info
-            if (node.embedding != null) {
-                item {
-                    DetailSection(title = "Embedding") {
-                        Text(
-                            "Dimension: ${node.embedding!!.size}",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            "First 5 values: ${node.embedding!!.take(5).joinToString(", ") { "%.4f".format(it) }}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
-                    }
-                }
-            }
-
-            // Connected Nodes
-            if (node.edges.isNotEmpty()) {
-                item {
-                    DetailSection(title = "Connected Nodes (${node.edges.size})") {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            node.edges.forEach { edge ->
-                                val connectedNode = graph.getNode(edge.targetId)
-                                if (connectedNode != null) {
-                                    ConnectedNodeCard(
-                                        edge = edge,
-                                        node = connectedNode
-                                    )
-                                }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 220.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(node.edges) { edge ->
+                    val targetNode = allNodes.find { it.id == edge.targetId }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                haptics.selection()
+                                onSelectConnectedNode(edge.targetId)
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = targetNode?.metadata?.sourceName?.ifBlank { "Node ${edge.targetId.take(8)}" } ?: "Node ${edge.targetId.take(8)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = targetNode?.content?.take(80) ?: "Target node content",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            ) {
+                                Text("${(edge.weight * 100).toInt()}% sim")
                             }
                         }
                     }
@@ -526,151 +616,99 @@ fun NodeDetailView(
     }
 }
 
+// ── Graph Stats View ──
+
 @Composable
-fun ConnectedNodeCard(
-    edge: com.bit.neuron_example.NeuronEdge,
-    node: NeuronNode
+private fun GraphStatsView(
+    graph: NeuronGraph,
+    nodes: List<NeuronNode>,
+    ragName: String,
+    filePath: String
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-        ),
-        shape = RoundedCornerShape(10.dp)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
+        item {
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
             ) {
-                Text(
-                    "→ ${edge.targetId.take(8)}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Surface(
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                    shape = RoundedCornerShape(6.dp)
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        "${edge.type.name} • ${(edge.weight * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.SemiBold
+                        text = "Neural Graph Architecture",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+
+                    StatRow("Embedding Model", graph.getEmbeddingModelName())
+                    StatRow("Vector Dimensions", "${graph.getEmbeddingDimension()}D")
+                    StatRow("Total Neurons", "${nodes.size}")
+                    StatRow("Total Synaptic Edges", "${nodes.sumOf { it.edges.size }}")
+                    StatRow("Document Sources", "${nodes.map { it.metadata.sourceName }.distinct().size}")
+                    StatRow("Local File", File(filePath).name)
                 }
             }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                node.content,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
         }
     }
 }
 
 @Composable
-fun DetailSection(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ),
-            shape = RoundedCornerShape(12.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                content = content
-            )
-        }
-    }
-}
-
-@Composable
-fun StatRow(label: String, value: String) {
+private fun StatRow(label: String, value: String) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            label,
+            text = label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            value,
+            text = value,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ErrorScreen(
+private fun ErrorScreen(
     message: String,
     onBackClick: () -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Error") },
-                navigationIcon = {
-                    ActionButton(
-                        onClickListener = onBackClick,
-                        icon = TnIcons.ArrowLeft,
-                        contentDescription = "Back",
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            )
-        }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentAlignment = Alignment.Center
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.padding(24.dp)
-            ) {
-                Icon(
-                    TnIcons.AlertTriangle,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.error
-                )
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.error
-                )
-                FilledTonalButton(
-                    onClick = onBackClick,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primary.copy(0.1f),
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Text("Go Back")
-                }
+            Icon(
+                TnIcons.AlertTriangle,
+                contentDescription = null,
+                modifier = Modifier.size(56.dp),
+                tint = MaterialTheme.colorScheme.error
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+            Button(onClick = onBackClick) {
+                Text("Go Back")
             }
         }
     }
@@ -709,23 +747,15 @@ fun PasswordInputDialog(
             }
         },
         confirmButton = {
-            FilledTonalButton(
+            Button(
                 onClick = { if (password.isNotBlank()) onConfirm(password) },
-                enabled = password.isNotBlank(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(0.1f),
-                    contentColor = MaterialTheme.colorScheme.primary
-                )
+                enabled = password.isNotBlank()
             ) {
                 Text("Unlock")
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                shape = RoundedCornerShape(12.dp)
-            ) {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }
@@ -742,42 +772,27 @@ suspend fun loadRagFile(
 ): NeuronGraph? = withContext(Dispatchers.IO) {
     try {
         val file = File(filePath)
-        if (!file.exists()) {
-            return@withContext null
-        }
-
-        // Guard against OOM — RAG files are loaded entirely into memory
-        if (file.length() > MAX_RAG_FILE_SIZE) {
-            android.util.Log.e("RagDataReader", "RAG file too large: ${file.length()} bytes (max $MAX_RAG_FILE_SIZE)")
+        if (!file.exists() || file.length() > MAX_RAG_FILE_SIZE) {
             return@withContext null
         }
 
         val graph = NeuronGraph(embeddingEngine, GraphSettings.DEFAULT)
 
         if (isEncrypted && password != null) {
-            // Load encrypted RAG
             val packetManager = NeuronPacketManager()
             packetManager.open(file)
             val authResult = packetManager.authenticate(password)
-            if (authResult.isFailure) {
-                return@withContext null
-            }
+            if (authResult.isFailure) return@withContext null
             val payloadResult = packetManager.decryptPayload(authResult.getOrThrow())
-            if (payloadResult.isFailure) {
-                return@withContext null
-            }
+            if (payloadResult.isFailure) return@withContext null
             graph.deserialize(payloadResult.getOrThrow())
             packetManager.close()
         } else {
-            // Load unencrypted RAG
             val payload = file.readBytes()
             graph.deserialize(payload)
         }
 
         graph
-    } catch (e: OutOfMemoryError) {
-        android.util.Log.e("RagDataReader", "OOM loading RAG file (${File(filePath).length()} bytes)", e)
-        null
     } catch (e: Exception) {
         android.util.Log.e("RagDataReader", "Failed to load RAG: ${e.message}", e)
         null

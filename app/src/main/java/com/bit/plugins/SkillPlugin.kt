@@ -30,12 +30,20 @@ class SkillPlugin(
     companion object {
         private const val TAG = "SkillPlugin"
         const val PLUGIN_NAME = "Agent Skills"
+        const val TOOL_USE_SKILL = "use_skill"
         const val TOOL_MANAGE_SKILLS = "manage_skills"
         const val TOOL_LOAD_SKILL = "load_skill"
         const val TOOL_ACTIVATE_SKILL = "activate_skill"
     }
 
     override fun getPluginInfo(): PluginInfo {
+        val useSkillBuilder = ToolDefinitionBuilder(
+            TOOL_USE_SKILL,
+            "Load and apply an agent skill to get specialized instructions, domain patterns, or supporting assets. Call this tool when the user's request matches an available skill."
+        )
+            .stringParam("name", "The name of the skill to use (e.g. 'Web Search & Scraping', 'File Operations', 'python-patterns', 'tdd-workflow')", true)
+            .stringParam("path", "Optional relative path to a file inside the skill directory (e.g. supporting scripts or reference docs). Omit to read the default instructions.", false)
+
         val manageSkillsBuilder = ToolDefinitionBuilder(
             TOOL_MANAGE_SKILLS,
             "Activate available specialized agent skills into the context. Use this tool only when the user request clearly requires one of the available skill specializations."
@@ -57,8 +65,8 @@ class SkillPlugin(
             name = PLUGIN_NAME,
             description = "Progressive disclosure engine for Anthropic Claude Agent Skills",
             author = "Anthropic Agent Skills Standard",
-            version = "2.0.0",
-            toolDefinitionBuilder = listOf(manageSkillsBuilder, loadSkillBuilder, activateSkillBuilder)
+            version = "2.1.0",
+            toolDefinitionBuilder = listOf(useSkillBuilder, manageSkillsBuilder, loadSkillBuilder, activateSkillBuilder)
         )
     }
 

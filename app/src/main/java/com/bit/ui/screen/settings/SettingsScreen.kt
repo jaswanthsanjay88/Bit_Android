@@ -364,8 +364,10 @@ fun SettingsItem(
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     onModelEditor: () -> Unit = {},
+    onModelSelected: ((com.bit.models.table_schema.Model) -> Unit)? = null,
     onAiMemoryClick: () -> Unit = {},
     onEmbeddingSetupClick: () -> Unit = {},
+    onNavigateToModelStore: () -> Unit = {},
     onDiagnosticsClick: () -> Unit = {},
     onCheckForUpdates: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel(),
@@ -375,11 +377,14 @@ fun SettingsScreen(
     var detailWorkspaceId by remember { mutableStateOf<String?>(null) }
     var terminalWorkspace by remember { mutableStateOf<com.bit.models.table_schema.WorkspaceEntity?>(null) }
     var targetTerminalProcessId by remember { mutableStateOf<String?>(null) }
+    var isEditingWorkspaceFile by remember { mutableStateOf(false) }
     var editorModel by remember { mutableStateOf<com.bit.models.table_schema.Model?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showCredits by remember { mutableStateOf(false) }
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+
+    val hideSettingsTopBar = selectedCategory == "workspaces" && (terminalWorkspace != null || isEditingWorkspaceFile)
 
     // Intercept back actions to close search or go back to category list
     BackHandler {
@@ -391,6 +396,7 @@ fun SettingsScreen(
             targetTerminalProcessId = null
         } else if (detailWorkspaceId != null) {
             detailWorkspaceId = null
+            isEditingWorkspaceFile = false
         } else if (selectedCategory != null) {
             selectedCategory = null
         } else {
@@ -469,14 +475,15 @@ fun SettingsScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            if (isSearching) {
-                Surface(
-                    color = MaterialTheme.colorScheme.background,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .statusBarsPadding()
-                        .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm)
-                ) {
+            if (!hideSettingsTopBar) {
+                if (isSearching) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.background,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm)
+                    ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -632,11 +639,13 @@ fun SettingsScreen(
                 }
             }
         }
-    ) { padding ->
+    }
+) { padding ->
+        val effectivePadding = if (hideSettingsTopBar) PaddingValues(0.dp) else padding
         if (isSearching) {
             LazyColumn(
                 modifier = Modifier
-                    .padding(padding)
+                    .padding(effectivePadding)
                     .fillMaxSize()
                     .imePadding()
                     .background(MaterialTheme.colorScheme.background),
@@ -790,7 +799,7 @@ fun SettingsScreen(
                         ) + fadeOut(androidx.compose.animation.core.tween(180, easing = com.bit.ui.theme.Motion.EmphasizedAccelerate)))
                     }
                 },
-                modifier = Modifier.padding(padding).background(MaterialTheme.colorScheme.background),
+                modifier = Modifier.padding(effectivePadding).background(MaterialTheme.colorScheme.background),
                 label = "settings_navigation"
             ) { category ->
                 when (category) {
@@ -846,11 +855,17 @@ fun SettingsScreen(
                                 "detail" -> detailWorkspaceId?.let { id ->
                                     WorkspaceDetailPage(
                                         workspaceId = id,
-                                        onBack = { detailWorkspaceId = null },
+                                        onBack = { 
+                                            detailWorkspaceId = null 
+                                            isEditingWorkspaceFile = false
+                                        },
                                         onOpenTerminal = { ws, procId ->
                                             terminalWorkspace = ws
                                             targetTerminalProcessId = procId
                                         },
+                                        onEditingFileChanged = { isEditing ->
+                                            isEditingWorkspaceFile = isEditing
+                                        }
                                     )
                                 }
                                 else -> {
@@ -880,20 +895,23 @@ fun SettingsScreen(
                                 themeSettingsSection(viewModel = viewModel)
                             }
                             "services" -> {
-                                // ── Services & Models ──
-                                modelConfigurationSection(
+                                // ── Material 3 Services & Models ──
+                                servicesAndModelsSection(
                                     hardwareTuningEnabled = hardwareTuningEnabled,
                                     installedModels = installedModels,
-                                    onModelSelected = { model -> 
-                                        configEditorViewModel.selectModel(model)
-                                        editorModel = model 
-                                    },
-                                    onEmbeddingSetup = onEmbeddingSetupClick,
-                                    onModelEditor = onModelEditor
-                                )
-                                huggingFaceTokenSection(
                                     tokenState = hfTokenState,
                                     testResult = hfTestResult,
+                                    onModelSelected = { model -> 
+                                        if (onModelSelected != null) {
+                                            onModelSelected(model)
+                                        } else {
+                                            configEditorViewModel.selectModel(model)
+                                            editorModel = model 
+                                        }
+                                    },
+                                    onEmbeddingSetup = onEmbeddingSetupClick,
+                                    onModelEditor = onModelEditor,
+                                    onNavigateToModelStore = onNavigateToModelStore,
                                     onSaveToken = viewModel::saveHfToken,
                                     onClearToken = viewModel::clearHfToken,
                                     onTestConnection = viewModel::testHfConnection
@@ -1017,7 +1035,7 @@ fun SettingsScreen(
                                 SettingsItem(
                                     title = "MCP Servers",
                                     description = "Model Context Protocol remote tools & SSE servers",
-                                    icon = TnIcons.Terminal,
+                                    icon = TnIcons.McpServer,
                                     onClick = {
                                         selectedCategory = "mcp"
                                     }

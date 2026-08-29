@@ -80,7 +80,7 @@ internal fun UserMessageBubble(
             
             Box(
                 modifier = Modifier
-                    .widthIn(max = 280.dp)
+                    .widthIn(min = 40.dp, max = 340.dp)
                     .clip(bubbleShape)
                     .background(bubbleColor)
                     .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), bubbleShape)
@@ -315,12 +315,14 @@ internal fun ThinkingBlock(
     thinkingText: String,
     isStreaming: Boolean = false
 ) {
-    // Auto-expand while streaming, auto-collapse when done
-    var userToggled by remember { mutableStateOf(false) }
-    var userExpandState by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(isStreaming) }
     val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
-    val isExpanded = if (userToggled) userExpandState else isStreaming
+    LaunchedEffect(isStreaming) {
+        if (isStreaming) {
+            isExpanded = true
+        }
+    }
 
     // Live elapsed timer tracking
     val startTime = remember { System.currentTimeMillis() }
@@ -337,18 +339,6 @@ internal fun ThinkingBlock(
 
     val elapsedSeconds = (elapsedMs / 1000f)
 
-    // Pulsing dot animation for streaming state
-    val infiniteTransition = rememberInfiniteTransition(label = "thinkPulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "thinkPulseAlpha"
-    )
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -361,8 +351,7 @@ internal fun ThinkingBlock(
                     indication = null
                 ) {
                     haptics.selection()
-                    userToggled = true
-                    userExpandState = !isExpanded
+                    isExpanded = !isExpanded
                 }
                 .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically

@@ -123,6 +123,21 @@
             android:windowSoftInputMode="adjustResize"
             tools:targetApi="33" />
 
+        <activity
+            android:name=".activity.McpOAuthCallbackActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleTask"
+            tools:targetApi="33">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="bit" android:host="oauth" android:path="/callback" />
+                <data android:scheme="bit" android:host="mcp-oauth-callback" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".service.LLMService"
             android:enabled="true"

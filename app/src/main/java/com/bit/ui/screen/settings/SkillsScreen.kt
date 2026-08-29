@@ -48,6 +48,7 @@ import com.bit.ui.components.ItemPosition
 import com.bit.ui.components.PhysicsSwipeToDelete
 import com.bit.ui.theme.LocalBitHaptics
 import com.bit.util.SkillExportImport
+import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -78,8 +79,10 @@ fun SkillsScreen(
     val skills by skillManager.skills.collectAsStateWithLifecycle()
     var localOrder by remember(skills) { mutableStateOf(skills) }
 
+    val coroutineScope = rememberCoroutineScope()
     var selectedSkillForEdit by remember { mutableStateOf<Skill?>(null) }
     var showCreateSheet by remember { mutableStateOf(false) }
+    var showImportUrlDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterIndex by remember { mutableIntStateOf(0) } // 0: All, 1: Active, 2: Built-in, 3: Custom
 
@@ -133,6 +136,29 @@ fun SkillsScreen(
                 }
             }
         }
+    }
+
+    if (showImportUrlDialog) {
+        ImportSkillUrlDialog(
+            onDismiss = { showImportUrlDialog = false },
+            onConfirm = { url ->
+                coroutineScope.launch {
+                    val result = SkillExportImport.importFromUrl(url)
+                    showImportUrlDialog = false
+                    when (result) {
+                        is SkillExportImport.ImportResult.Success -> {
+                            bitHaptics.success()
+                            skillManager.addSkill(result.skill)
+                            Toast.makeText(context, "Imported \"${result.skill.name}\" from ${result.format}", Toast.LENGTH_SHORT).show()
+                        }
+                        is SkillExportImport.ImportResult.Error -> {
+                            bitHaptics.thud()
+                            Toast.makeText(context, "Import failed: ${result.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+        )
     }
 
     // First-time tool notice dialog
@@ -324,7 +350,7 @@ fun SkillsScreen(
                     // Action Buttons Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedButton(
                             onClick = {
@@ -333,11 +359,25 @@ fun SkillsScreen(
                             },
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                         ) {
-                            Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Import", style = MaterialTheme.typography.labelMedium)
+                            Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("File", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                bitHaptics.pop()
+                                showImportUrlDialog = true
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1.2f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                        ) {
+                            Icon(Icons.Rounded.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("URL / Git", style = MaterialTheme.typography.labelMedium)
                         }
 
                         Button(
@@ -346,11 +386,11 @@ fun SkillsScreen(
                                 showCreateSheet = true
                             },
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+                            modifier = Modifier.weight(1.2f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
                         ) {
-                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
+                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
                             Text("New Skill", style = MaterialTheme.typography.labelMedium)
                         }
                     }
@@ -864,4 +904,69 @@ fun getSkillIcon(iconKey: String?): ImageVector {
         "psychology" -> Icons.Rounded.Psychology
         else -> Icons.Rounded.Build
     }
+}
+
+@Composable
+private fun ImportSkillUrlDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (url: String) -> Unit
+) {
+    var url by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!loading) onDismiss() },
+        icon = {
+            Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        },
+        title = {
+            Text("Import Skill from URL / Git", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Paste a GitHub repository / directory URL (e.g. `https://github.com/anthropics/skills/...`), raw `SKILL.md` link, or JSON export.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("Skill URL") },
+                    placeholder = { Text("https://github.com/...", fontFamily = FontFamily.Monospace) },
+                    singleLine = true,
+                    enabled = !loading,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (loading) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text("Downloading and parsing SKILL.md...", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    loading = true
+                    onConfirm(url)
+                },
+                enabled = url.isNotBlank() && !loading,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Import")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !loading) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
 }

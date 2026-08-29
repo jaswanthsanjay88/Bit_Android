@@ -6,8 +6,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -29,10 +28,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
@@ -42,15 +38,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.global.Standards
+import com.bit.mcp.McpCommonOptions
 import com.bit.mcp.McpManager
+import com.bit.mcp.McpOAuthState
 import com.bit.mcp.McpServerConfig
 import com.bit.mcp.McpStatus
-import com.bit.mcp.McpToolConfig
+import com.bit.mcp.McpTool
+import com.bit.mcp.headers
+import com.bit.mcp.isEnabled
+import com.bit.mcp.name
 import com.bit.mcp.parseMcpServersFromJson
+import com.bit.mcp.tools
+import com.bit.mcp.url
 import com.bit.ui.components.ItemPosition
 import com.bit.ui.components.PhysicsSwipeToDelete
+import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.LocalBitHaptics
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
@@ -83,9 +89,11 @@ fun McpServersScreen(
     val scope = rememberCoroutineScope()
 
     val servers by mcpManager.servers.collectAsStateWithLifecycle()
-    var localOrder by remember(servers) { mutableStateOf(servers) }
+    val serverStatusMap by mcpManager.syncingStatus.collectAsStateWithLifecycle()
+    var localOrder by remember(servers) { mutableStateOf(servers.distinctBy { it.id }) }
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var editingServer by remember { mutableStateOf<McpServerConfig?>(null) }
     var showBulkImportDialog by remember { mutableStateOf(false) }
     var isSyncingAll by remember { mutableStateOf(false) }
 
@@ -97,369 +105,270 @@ fun McpServersScreen(
             localOrder = localOrder.toMutableList().apply {
                 add(toIdx, removeAt(fromIdx))
             }
-            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
 
-    // File picker for JSON config
     val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
+        contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        if (uri != null) {
+        uri?.let {
             try {
-                val stream = context.contentResolver.openInputStream(uri)
-                if (stream != null) {
-                    val content = BufferedReader(InputStreamReader(stream)).readText()
-                    val parsed = parseMcpServersFromJson(content)
+                context.contentResolver.openInputStream(it)?.use { stream ->
+                    val text = BufferedReader(InputStreamReader(stream)).readText()
+                    val parsed = parseMcpServersFromJson(text)
                     if (parsed.isNotEmpty()) {
-                        bitHaptics.success()
                         mcpManager.addServers(parsed)
                         Toast.makeText(context, "Imported ${parsed.size} MCP servers", Toast.LENGTH_SHORT).show()
                     } else {
-                        bitHaptics.reject()
-                        Toast.makeText(context, "No valid MCP server configuration found in file", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "No valid MCP servers found in file", Toast.LENGTH_SHORT).show()
                     }
                 }
             } catch (e: Exception) {
-                bitHaptics.reject()
-                Toast.makeText(context, "Failed to read file: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Failed to import: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    // First-time tool notice dialog
-    val prefs = remember { context.getSharedPreferences("bit_ui_prefs", Context.MODE_PRIVATE) }
-    var showFirstTimeDialog by remember {
-        mutableStateOf(!prefs.getBoolean("has_seen_mcp_notice", false))
-    }
-
-    if (showFirstTimeDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showFirstTimeDialog = false
-                prefs.edit().putBoolean("has_seen_mcp_notice", true).apply()
-            },
-            icon = {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Rounded.SmartToy,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-            },
-            title = {
-                Text(
-                    "Tool-Capable Model Required",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    "Model Context Protocol (MCP) servers and tools require instruction-tuned tool calling models (e.g. Qwen 2.5, Llama 3.1/3.2, Claude 3.5, GPT-4o, DeepSeek-V3). Base completion models cannot generate structured tool calls.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = 20.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        bitHaptics.pop()
-                        showFirstTimeDialog = false
-                        prefs.edit().putBoolean("has_seen_mcp_notice", true).apply()
-                    },
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text("Got It")
-                }
-            },
-            shape = RoundedCornerShape(24.dp)
-        )
-    }
-
-    LazyColumn(
-        state = lazyListState,
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        // ── TOP ACTION BAR ──
-        item(key = "action_bar") {
+        // Top Toolbar
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            shape = RoundedCornerShape(Standards.RadiusLg),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            )
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Text(
-                        text = "MCP SERVERS",
-                        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Icon(
+                            imageVector = TnIcons.McpServer,
+                            contentDescription = "MCP Logo",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
                         Text(
-                            text = "${localOrder.size}",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = "Model Context Protocol",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${servers.count { it.isEnabled }} active • ${servers.sumOf { srv -> srv.tools.count { it.enable } }} tools",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (localOrder.isNotEmpty()) {
-                        IconButton(
-                            onClick = {
-                                bitHaptics.pop()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = {
+                            if (!isSyncingAll) {
+                                isSyncingAll = true
                                 scope.launch {
-                                    isSyncingAll = true
                                     mcpManager.syncAll()
                                     isSyncingAll = false
-                                    Toast.makeText(context, "All MCP servers synchronized", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "All MCP servers synced", Toast.LENGTH_SHORT).show()
                                 }
-                            },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            if (isSyncingAll) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Rounded.Sync,
-                                    contentDescription = "Sync All",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
-                                )
                             }
+                        }
+                    ) {
+                        if (isSyncingAll) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = "Sync All",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
 
-                    // Bulk Import JSON Button
-                    IconButton(
-                        onClick = {
-                            bitHaptics.pop()
-                            showBulkImportDialog = true
-                        },
-                        modifier = Modifier.size(36.dp)
-                    ) {
+                    IconButton(onClick = { showBulkImportDialog = true }) {
                         Icon(
-                            Icons.Rounded.FileUpload,
-                            contentDescription = "Bulk Import",
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(20.dp)
+                            imageVector = Icons.Rounded.UploadFile,
+                            contentDescription = "Import JSON",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     FilledTonalButton(
-                        onClick = {
-                            bitHaptics.pop()
-                            showAddDialog = true
-                        },
-                        shape = RoundedCornerShape(12.dp),
+                        onClick = { showAddDialog = true },
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Add Server", style = MaterialTheme.typography.labelMedium)
+                        Icon(imageVector = Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Add", style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
         }
 
-        // ── EMPTY STATE OR REORDERABLE MCP SERVER CARDS ──
-        if (localOrder.isEmpty()) {
-            item(key = "empty_state") {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        if (servers.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.size(56.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Rounded.Terminal,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        }
-                        Text(
-                            text = "No MCP Servers Added",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Connect local or remote MCP servers (Streamable HTTP, SSE, Context7) or import a Claude desktop config.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            lineHeight = 18.sp
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = {
-                                    bitHaptics.pop()
-                                    showBulkImportDialog = true
-                                },
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Bulk Import JSON")
-                            }
-                            Button(
-                                onClick = {
-                                    bitHaptics.pop()
-                                    showAddDialog = true
-                                },
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("Add Server")
-                            }
-                        }
+                    Icon(
+                        imageVector = TnIcons.Mcp,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.outlineVariant
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No MCP Servers Configured",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Add Streamable HTTP or SSE remote tool endpoints or import Claude Desktop config.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = { showAddDialog = true }) {
+                        Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Add First Server")
                     }
                 }
             }
         } else {
-            items(localOrder, key = { it.id }) { srv ->
-                val index = localOrder.indexOf(srv)
-                val position = when {
-                    localOrder.size == 1 -> ItemPosition.ONLY
-                    index == 0 -> ItemPosition.FIRST
-                    index == localOrder.lastIndex -> ItemPosition.LAST
-                    else -> ItemPosition.MIDDLE
-                }
-
-                ReorderableItem(state = reorderableState, key = srv.id) { isDragging ->
-                    val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "elevation")
-                    val scale by animateFloatAsState(if (isDragging) 1.02f else 1f, label = "scale")
-                    val alpha by animateFloatAsState(if (isDragging) 0.92f else 1f, label = "alpha")
-
-                    PhysicsSwipeToDelete(
-                        onDelete = {
-                            bitHaptics.thud()
-                            mcpManager.removeServer(srv.id)
-                            Toast.makeText(context, "Deleted \"${srv.name}\"", Toast.LENGTH_SHORT).show()
-                        },
-                        position = position,
-                        modifier = Modifier
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                shadowElevation = elevation.toPx()
-                                this.alpha = alpha
-                            }
-                    ) { shape ->
-                        McpServerCard(
-                            server = srv,
-                            shape = shape,
-                            dragHandle = {
-                                Icon(
-                                    Icons.Rounded.DragIndicator,
-                                    contentDescription = "Reorder ${srv.name}",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .padding(8.dp)
-                                        .longPressDraggableHandle(
-                                            onDragStarted = {
-                                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            },
-                                            onDragStopped = {
-                                                mcpManager.setOrderedServers(localOrder)
-                                            }
-                                        )
-                                )
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(bottom = 96.dp)
+            ) {
+                items(localOrder, key = { it.id }) { server ->
+                    ReorderableItem(reorderableState, key = server.id) { isDragging ->
+                        val status = serverStatusMap[server.id] ?: McpStatus.Idle
+                        PhysicsSwipeToDelete(
+                            onDelete = {
+                                mcpManager.removeServer(server.id)
+                                Toast.makeText(context, "Removed '${server.name}'", Toast.LENGTH_SHORT).show()
                             },
-                            onToggle = { isEnabled ->
-                                bitHaptics.selection()
-                                mcpManager.toggleServer(srv.id, isEnabled)
-                            },
-                            onSync = {
-                                bitHaptics.pop()
-                                scope.launch {
-                                    val res = mcpManager.syncServer(srv.id)
-                                    if (res.isSuccess) {
-                                        Toast.makeText(context, "Synced ${res.getOrNull()?.size ?: 0} tools", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "Sync failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                            position = ItemPosition.ONLY
+                        ) {
+                            McpServerCard(
+                                server = server,
+                                status = status,
+                                isDragging = isDragging,
+                                onToggleServer = { mcpManager.toggleServer(server.id, it) },
+                                onToggleTool = { toolName, enabled -> mcpManager.toggleTool(server.id, toolName, enabled) },
+                                onToggleToolApproval = { toolName, needsApproval ->
+                                    mcpManager.toggleToolNeedsApproval(server.id, toolName, needsApproval)
+                                },
+                                onSyncServer = {
+                                    scope.launch {
+                                        val res = mcpManager.syncServer(server.id)
+                                        if (res.isSuccess) {
+                                            Toast.makeText(context, "Discovered ${res.getOrNull()?.size ?: 0} tools", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Sync failed: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                        }
                                     }
-                                }
-                            },
-                            onToggleTool = { toolName, isEnabled ->
-                                bitHaptics.selection()
-                                mcpManager.toggleTool(srv.id, toolName, isEnabled)
-                            }
-                        )
+                                },
+                                onStartOAuth = {
+                                    mcpManager.startAuthorization(server, context)
+                                },
+                                onClearOAuth = {
+                                    scope.launch {
+                                        mcpManager.clearAuthorization(server)
+                                        Toast.makeText(context, "OAuth credentials cleared", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                onEditServer = { editingServer = server },
+                                onDeleteServer = { mcpManager.removeServer(server.id) }
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
-    // ── ADD SERVER BOTTOM SHEET ──
     if (showAddDialog) {
-        AddMcpServerSheet(
+        McpServerEditDialog(
+            server = null,
             onDismiss = { showAddDialog = false },
-            onAdd = { name, url, headers ->
-                mcpManager.addServer(name, url, headers)
+            onSave = { name, url, isStreamable, headers, oauth ->
+                mcpManager.addServer(name, url, isStreamable, headers, oauth)
                 showAddDialog = false
-                Toast.makeText(context, "Added & Introspecting Tools...", Toast.LENGTH_SHORT).show()
             }
         )
     }
 
-    // ── BULK IMPORT JSON BOTTOM SHEET ──
+    editingServer?.let { srv ->
+        McpServerEditDialog(
+            server = srv,
+            onDismiss = { editingServer = null },
+            onSave = { name, url, isStreamable, headers, oauth ->
+                val updated = if (isStreamable) {
+                    McpServerConfig.StreamableHTTPServer(
+                        id = srv.id,
+                        commonOptions = srv.commonOptions.copy(name = name, headers = headers, oauth = oauth),
+                        url = url
+                    )
+                } else {
+                    McpServerConfig.SseTransportServer(
+                        id = srv.id,
+                        commonOptions = srv.commonOptions.copy(name = name, headers = headers, oauth = oauth),
+                        url = url
+                    )
+                }
+                mcpManager.updateServer(updated)
+                editingServer = null
+            }
+        )
+    }
+
     if (showBulkImportDialog) {
-        McpBulkImportSheet(
+        McpBulkImportDialog(
             onDismiss = { showBulkImportDialog = false },
-            onPickFile = {
-                filePickerLauncher.launch(arrayOf("application/json", "text/*", "*/*"))
-                showBulkImportDialog = false
-            },
-            onImport = { newConfigs ->
-                mcpManager.addServers(newConfigs)
-                showBulkImportDialog = false
-                Toast.makeText(context, "Imported ${newConfigs.size} MCP servers", Toast.LENGTH_SHORT).show()
+            onOpenFilePicker = { filePickerLauncher.launch("application/json") },
+            onImportJsonText = { jsonText ->
+                val parsed = parseMcpServersFromJson(jsonText)
+                if (parsed.isNotEmpty()) {
+                    mcpManager.addServers(parsed)
+                    Toast.makeText(context, "Imported ${parsed.size} MCP servers", Toast.LENGTH_SHORT).show()
+                    showBulkImportDialog = false
+                } else {
+                    Toast.makeText(context, "No valid MCP servers found", Toast.LENGTH_SHORT).show()
+                }
             }
         )
     }
@@ -468,467 +377,605 @@ fun McpServersScreen(
 @Composable
 fun McpServerCard(
     server: McpServerConfig,
-    shape: androidx.compose.ui.graphics.Shape,
-    dragHandle: @Composable () -> Unit = {},
-    onToggle: (Boolean) -> Unit,
-    onSync: () -> Unit,
-    onToggleTool: (String, Boolean) -> Unit
+    status: McpStatus,
+    isDragging: Boolean,
+    onToggleServer: (Boolean) -> Unit,
+    onToggleTool: (String, Boolean) -> Unit,
+    onToggleToolApproval: (String, Boolean) -> Unit,
+    onSyncServer: () -> Unit,
+    onStartOAuth: () -> Unit,
+    onClearOAuth: () -> Unit,
+    onEditServer: () -> Unit,
+    onDeleteServer: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val arrowRotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "arrow")
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
+        shape = RoundedCornerShape(Standards.RadiusLg),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDragging) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainer
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (server.isEnabled) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f) else Color.Transparent
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(14.dp)
         ) {
             // Header Row
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (server.isEnabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Isolated drag handle
-                    dragHandle()
+                    Icon(
+                        imageVector = TnIcons.Mcp,
+                        contentDescription = null,
+                        tint = if (server.isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
 
-                    Surface(
-                        shape = CircleShape,
-                        color = when (server.status) {
-                            is McpStatus.Connected -> MaterialTheme.colorScheme.primaryContainer
-                            is McpStatus.Connecting -> MaterialTheme.colorScheme.tertiaryContainer
-                            is McpStatus.Error -> MaterialTheme.colorScheme.errorContainer
-                            is McpStatus.Idle -> MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                        modifier = Modifier.size(40.dp)
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = server.name.ifBlank { "Untitled Server" },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        McpStatusBadge(status = status)
+                    }
+
+                    Text(
+                        text = server.url.ifBlank { "No URL" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+
+                Switch(
+                    checked = server.isEnabled,
+                    onCheckedChange = onToggleServer,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+
+            // Expandable Details
+            AnimatedVisibility(
+                visible = expanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 14.dp)
+                ) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Transport type badge & headers
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            when (server.status) {
-                                is McpStatus.Connected -> Icon(
-                                    Icons.Rounded.CheckCircle,
-                                    contentDescription = "Connected",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                is McpStatus.Connecting -> CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.tertiary
-                                )
-                                is McpStatus.Error -> Icon(
-                                    Icons.Rounded.ErrorOutline,
-                                    contentDescription = "Error",
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                is McpStatus.Idle -> Icon(
-                                    Icons.Rounded.CloudQueue,
-                                    contentDescription = "Idle",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(22.dp)
+                        Text(
+                            text = "Transport: ${if (server is McpServerConfig.StreamableHTTPServer) "Streamable HTTP" else "Server-Sent Events (SSE)"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "${server.headers.size} custom headers",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    // OAuth 2.1 Section
+                    val oauth = server.commonOptions.oauth
+                    if (oauth != null && oauth.enabled || status is McpStatus.NeedsAuthorization) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                            shape = RoundedCornerShape(Standards.RadiusMd)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "OAuth 2.1 Authorization",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (oauth?.isAuthorized == true) "Authorized • Bearer Token Active" else "Needs Authorization",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (oauth?.isAuthorized == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                    )
+                                }
+
+                                if (oauth?.isAuthorized == true) {
+                                    TextButton(onClick = onClearOAuth) {
+                                        Text("Disconnect", color = MaterialTheme.colorScheme.error)
+                                    }
+                                } else {
+                                    Button(onClick = onStartOAuth) {
+                                        Text("Connect")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Discovered Tools List
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Discovered Tools (${server.tools.size})",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (server.tools.isEmpty()) {
+                        Text(
+                            text = "No tools discovered yet. Tap 'Sync Server' to introspect tools/list.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            server.tools.forEach { tool ->
+                                McpToolItem(
+                                    tool = tool,
+                                    onToggleEnable = { onToggleTool(tool.name, it) },
+                                    onToggleApproval = { onToggleToolApproval(tool.name, it) }
                                 )
                             }
                         }
                     }
 
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = server.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = server.url,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    IconButton(
-                        onClick = onSync,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.Refresh,
-                            contentDescription = "Sync",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    Switch(
-                        checked = server.isEnabled,
-                        onCheckedChange = onToggle
-                    )
-                }
-            }
-
-            // Error info if present
-            if (server.status is McpStatus.Error) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                    // Action buttons
+                    Spacer(modifier = Modifier.height(14.dp))
                     Row(
-                        modifier = Modifier.padding(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            Icons.Rounded.Warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        TextButton(onClick = onSyncServer) {
+                            Icon(imageVector = Icons.Rounded.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Sync Server")
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        TextButton(onClick = onEditServer) {
+                            Icon(imageVector = Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Edit")
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        TextButton(
+                            onClick = onDeleteServer,
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(imageVector = Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Delete")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun McpToolItem(
+    tool: McpTool,
+    onToggleEnable: (Boolean) -> Unit,
+    onToggleApproval: (Boolean) -> Unit
+) {
+    var showSchema by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(Standards.RadiusMd),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = tool.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    if (!tool.description.isNullOrBlank()) {
                         Text(
-                            text = server.status.message,
+                            text = tool.description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
+                Switch(
+                    checked = tool.enable,
+                    onCheckedChange = onToggleEnable
+                )
             }
 
-            // Tools Expander Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable { expanded = !expanded }
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.clickable { onToggleApproval(!tool.needsApproval) }
                 ) {
-                    Icon(
-                        Icons.Rounded.Handyman,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(16.dp)
+                    Checkbox(
+                        checked = tool.needsApproval,
+                        onCheckedChange = onToggleApproval,
+                        modifier = Modifier.size(24.dp)
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "${server.tools.size} Dynamic Tools Introspected",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-
-                Icon(
-                    Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .size(20.dp)
-                        .rotate(arrowRotation)
-                )
-            }
-
-            // Dynamic Tools List
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (server.tools.isEmpty()) {
-                        Text(
-                            text = "No tools discovered yet. Tap the refresh icon to query tools/list.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    } else {
-                        server.tools.forEach { tool ->
-                            ToolItemRow(
-                                tool = tool,
-                                onToggle = { onToggleTool(tool.name, it) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ToolItemRow(
-    tool: McpToolConfig,
-    onToggle: (Boolean) -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = tool.name,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                if (tool.description.isNotBlank()) {
-                    Text(
-                        text = tool.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Switch(
-                checked = tool.isEnabled,
-                onCheckedChange = onToggle,
-                modifier = Modifier.padding(start = 8.dp)
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddMcpServerSheet(
-    onDismiss: () -> Unit,
-    onAdd: (String, String, Map<String, String>) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
-    var headersText by remember { mutableStateOf("") }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Text(
-                text = "Add MCP Server",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Server Name") },
-                placeholder = { Text("e.g. Context7 Docs / Local Dev MCP") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
-                label = { Text("Server Endpoint URL") },
-                placeholder = { Text("https://mcp.context7.ai/mcp or http://10.73.4.8:3000") },
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = headersText,
-                onValueChange = { headersText = it },
-                label = { Text("Auth Token or Custom Headers (Optional)") },
-                placeholder = { Text("Paste token (e.g. github_pat_...) or JSON headers") },
-                maxLines = 3,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Button(
-                onClick = {
-                    if (name.isNotBlank() && url.isNotBlank()) {
-                        val parsedHeaders = mutableMapOf<String, String>()
-                        val trimmedHeaders = headersText.trim()
-                        if (trimmedHeaders.isNotBlank()) {
-                            if (trimmedHeaders.startsWith("{") && trimmedHeaders.endsWith("}")) {
-                                try {
-                                    val json = JSONObject(trimmedHeaders)
-                                    val keys = json.keys()
-                                    while (keys.hasNext()) {
-                                        val k = keys.next()
-                                        parsedHeaders[k] = json.getString(k)
-                                    }
-                                } catch (_: Exception) {
-                                    parsedHeaders["Authorization"] = if (trimmedHeaders.startsWith("Bearer ", ignoreCase = true)) trimmedHeaders else "Bearer $trimmedHeaders"
-                                }
-                            } else {
-                                // Raw token or key-value format
-                                if (trimmedHeaders.contains(":") && !trimmedHeaders.startsWith("http")) {
-                                    val parts = trimmedHeaders.split(":", limit = 2)
-                                    parsedHeaders[parts[0].trim()] = parts[1].trim()
-                                } else {
-                                    val authVal = if (trimmedHeaders.startsWith("Bearer ", ignoreCase = true)) trimmedHeaders else "Bearer $trimmedHeaders"
-                                    parsedHeaders["Authorization"] = authVal
-                                }
-                            }
-                        }
-                        onAdd(name.trim(), url.trim(), parsedHeaders)
-                    }
-                },
-                enabled = name.isNotBlank() && url.isNotBlank(),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Add & Introspect Tools")
-            }
-
-            Spacer(Modifier.height(16.dp))
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun McpBulkImportSheet(
-    onDismiss: () -> Unit,
-    onPickFile: () -> Unit,
-    onImport: (List<McpServerConfig>) -> Unit
-) {
-    var jsonText by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "Bulk Import MCP Servers",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Paste Claude desktop config or JSON array",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = "Require Approval",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
-                OutlinedButton(
-                    onClick = onPickFile,
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                TextButton(
+                    onClick = { showSchema = !showSchema },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
-                    Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Select File")
-                }
-            }
-
-            OutlinedTextField(
-                value = jsonText,
-                onValueChange = {
-                    jsonText = it
-                    errorMessage = null
-                },
-                placeholder = {
                     Text(
-                        "{\n  \"mcpServers\": {\n    \"context7\": {\n      \"url\": \"https://mcp.context7.ai/mcp\"\n    }\n  }\n}",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 12.sp
+                        text = if (showSchema) "Hide Schema" else "View Schema",
+                        style = MaterialTheme.typography.labelSmall
                     )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 160.dp, max = 260.dp),
-                isError = errorMessage != null,
-                supportingText = errorMessage?.let { msg -> { Text(msg, color = MaterialTheme.colorScheme.error) } },
-                shape = RoundedCornerShape(14.dp)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)
-            ) {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-
-                Button(
-                    onClick = {
-                        val parsed = parseMcpServersFromJson(jsonText.trim())
-                        if (parsed.isEmpty()) {
-                            errorMessage = "No valid MCP server definitions found. Ensure JSON contains {\"mcpServers\": {...}} or an array of {name, url} objects."
-                        } else {
-                            onImport(parsed)
-                        }
-                    },
-                    enabled = jsonText.isNotBlank(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Import All")
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            AnimatedVisibility(visible = showSchema) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = tool.inputSchemaJson,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
     }
+}
+
+@Composable
+fun McpStatusBadge(status: McpStatus) {
+    val (color, text) = when (status) {
+        is McpStatus.Connected -> MaterialTheme.colorScheme.primary to "Connected"
+        is McpStatus.Connecting -> MaterialTheme.colorScheme.tertiary to "Connecting"
+        is McpStatus.Reconnecting -> MaterialTheme.colorScheme.tertiary to "Reconnecting"
+        is McpStatus.NeedsAuthorization -> MaterialTheme.colorScheme.error to "Needs OAuth"
+        is McpStatus.Authorizing -> MaterialTheme.colorScheme.primary to "Authorizing"
+        is McpStatus.Error -> MaterialTheme.colorScheme.error to "Error"
+        is McpStatus.Stopped -> MaterialTheme.colorScheme.outline to "Stopped"
+        is McpStatus.Idle -> MaterialTheme.colorScheme.outline to "Idle"
+    }
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.15f))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun McpServerEditDialog(
+    server: McpServerConfig?,
+    onDismiss: () -> Unit,
+    onSave: (name: String, url: String, isStreamable: Boolean, headers: List<Pair<String, String>>, oauth: McpOAuthState?) -> Unit
+) {
+    var name by remember(server) { mutableStateOf(server?.name.orEmpty()) }
+    var url by remember(server) { mutableStateOf(server?.url.orEmpty()) }
+    var isStreamable by remember(server) { mutableStateOf(server is McpServerConfig.StreamableHTTPServer || server == null) }
+    var enableOAuth by remember(server) { mutableStateOf(server?.commonOptions?.oauth?.enabled == true) }
+    var customHeaders by remember(server) {
+        mutableStateOf(
+            server?.commonOptions?.headers?.joinToString("\n") { "${it.first}: ${it.second}" }.orEmpty()
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(if (server == null) "Add MCP Server" else "Edit MCP Server")
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Server Name") },
+                    placeholder = { Text("e.g. GitHub Copilot MCP") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("Server URL / Endpoint") },
+                    placeholder = { Text("https://api.githubcopilot.com/mcp") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Transport Protocol", style = MaterialTheme.typography.bodyMedium)
+                    SingleChoiceSegmentedButtonRow {
+                        SegmentedButton(
+                            selected = isStreamable,
+                            onClick = { isStreamable = true },
+                            shape = SegmentedButtonDefaults.itemShape(0, 2)
+                        ) {
+                            Text("HTTP")
+                        }
+                        SegmentedButton(
+                            selected = !isStreamable,
+                            onClick = { isStreamable = false },
+                            shape = SegmentedButtonDefaults.itemShape(1, 2)
+                        ) {
+                            Text("SSE")
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = customHeaders,
+                    onValueChange = { customHeaders = it },
+                    label = { Text("Custom Headers (Key: Value per line)") },
+                    placeholder = { Text("Authorization: Bearer ghp_your_token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 4
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("OAuth 2.1 Authentication", style = MaterialTheme.typography.bodyMedium)
+                        Text("Auto-discover PRM / AS endpoints", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = enableOAuth, onCheckedChange = { enableOAuth = it })
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val parsedHeaders = customHeaders.lines()
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .mapNotNull { line ->
+                            when {
+                                line.contains(":") -> {
+                                    val parts = line.split(":", limit = 2)
+                                    parts[0].trim() to parts[1].trim()
+                                }
+                                line.contains("=") -> {
+                                    val parts = line.split("=", limit = 2)
+                                    parts[0].trim() to parts[1].trim()
+                                }
+                                line.startsWith("Bearer ", ignoreCase = true) -> {
+                                    "Authorization" to line.trim()
+                                }
+                                line.startsWith("token ", ignoreCase = true) -> {
+                                    "Authorization" to "Bearer " + line.substring(6).trim()
+                                }
+                                line.startsWith("ghp_") || line.startsWith("github_pat_") -> {
+                                    "Authorization" to "Bearer $line"
+                                }
+                                else -> "Authorization" to "Bearer $line"
+                            }
+                        }
+                    val oauthState = if (enableOAuth) {
+                        server?.commonOptions?.oauth ?: McpOAuthState(enabled = true)
+                    } else null
+                    onSave(name.trim(), url.trim(), isStreamable, parsedHeaders, oauthState)
+                },
+                enabled = name.isNotBlank() && url.isNotBlank()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun McpBulkImportDialog(
+    onDismiss: () -> Unit,
+    onOpenFilePicker: () -> Unit,
+    onImportJsonText: (String) -> Unit
+) {
+    var inputContent by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!loading) onDismiss() },
+        title = {
+            Text("Import MCP Server Configuration", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Select a .json file, paste MCP configuration JSON, or enter a configuration URL:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Button(
+                    onClick = onOpenFilePicker,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !loading
+                ) {
+                    Icon(imageVector = Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Select JSON File")
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                OutlinedTextField(
+                    value = inputContent,
+                    onValueChange = { inputContent = it },
+                    label = { Text("MCP JSON or URL") },
+                    placeholder = { Text("https://... or {\n  \"mcpServers\": {\n    ...\n  }\n}") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp),
+                    enabled = !loading,
+                    shape = RoundedCornerShape(12.dp),
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                )
+
+                if (loading) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text("Downloading configuration...", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val trimmed = inputContent.trim()
+                    if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+                        loading = true
+                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            try {
+                                val url = java.net.URL(trimmed)
+                                val conn = url.openConnection() as java.net.HttpURLConnection
+                                conn.connectTimeout = 10_000
+                                conn.readTimeout = 15_000
+                                val text = conn.inputStream.bufferedReader().use { it.readText() }
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    loading = false
+                                    onImportJsonText(text)
+                                }
+                            } catch (e: Exception) {
+                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    loading = false
+                                    onImportJsonText("")
+                                }
+                            }
+                        }
+                    } else {
+                        onImportJsonText(trimmed)
+                    }
+                },
+                enabled = inputContent.isNotBlank() && !loading,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Import")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !loading) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
 }

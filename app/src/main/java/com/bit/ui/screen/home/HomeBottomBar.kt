@@ -693,6 +693,7 @@ internal fun BottomBar(
                                                 attachedFiles = emptyList()
                                             } else {
                                                 val hasRags = loadedRags.isNotEmpty() && isRagEnabledForChat
+                                                val hasAttachedDoc = attachedFiles.isNotEmpty() || chatViewModel.attachedFileName.value != null
                                                 if (hasRags) {
                                                     value = ""
                                                     attachedImages = emptyList()
@@ -706,7 +707,9 @@ internal fun BottomBar(
                                                         chatViewModel.sendTextMessage(finalPrompt)
                                                     }
                                                 } else {
-                                                    chatViewModel.clearRagContext()
+                                                    if (!hasAttachedDoc) {
+                                                        chatViewModel.clearRagContext()
+                                                    }
                                                     chatViewModel.sendTextMessage(finalPrompt)
                                                     value = ""
                                                     attachedImages = emptyList()

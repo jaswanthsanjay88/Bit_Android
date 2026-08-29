@@ -35,6 +35,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -351,21 +352,35 @@ fun MemoryVaultScreen(
                             }
                         }
 
-                        Button(
-                            onClick = {
-                                haptics.pop()
-                                docPickerLauncher.launch("*/*")
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(TnIcons.Plus, contentDescription = "Add Document", modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Add", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            FilledTonalButton(
+                                onClick = {
+                                    haptics.pop()
+                                    context.startActivity(Intent(context, RagActivity::class.java))
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(TnIcons.Brain, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Graph", style = MaterialTheme.typography.labelMedium)
+                            }
+
+                            Button(
+                                onClick = {
+                                    haptics.pop()
+                                    docPickerLauncher.launch("*/*")
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(TnIcons.Plus, contentDescription = "Add Document", modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Add", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }

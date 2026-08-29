@@ -89,7 +89,7 @@ class StreamingMarkdownRenderState {
     }
 
     private fun parseIntoSnapshot(preprocessed: String, rawText: String, isStreaming: Boolean): StreamingSnapshot {
-        val paragraphs = preprocessed.split("\n\n").filter { it.isNotBlank() }
+        val paragraphs = splitMarkdownBlocks(preprocessed)
 
         return if (paragraphs.isEmpty()) {
             StreamingSnapshot(fullText = rawText, isStreaming = isStreaming)
@@ -110,6 +110,33 @@ class StreamingMarkdownRenderState {
                 isStreaming = isStreaming
             )
         }
+    }
+
+    private fun splitMarkdownBlocks(text: String): List<String> {
+        val lines = text.lines()
+        val blocks = mutableListOf<String>()
+        val current = StringBuilder()
+        var insideCode = false
+
+        for (line in lines) {
+            val trimmed = line.trimStart()
+            if (trimmed.startsWith("```")) {
+                insideCode = !insideCode
+            }
+            if (!insideCode && line.isBlank()) {
+                if (current.isNotBlank()) {
+                    blocks.add(current.toString().trim())
+                    current.clear()
+                }
+            } else {
+                if (current.isNotEmpty()) current.append("\n")
+                current.append(line)
+            }
+        }
+        if (current.isNotBlank()) {
+            blocks.add(current.toString().trim())
+        }
+        return blocks
     }
 }
 

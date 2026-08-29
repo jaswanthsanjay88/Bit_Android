@@ -553,11 +553,11 @@ class RagRepository(
             }
         }
 
-        // Overall confidence = minimum confidence across all queried graphs
+        // Overall confidence = maximum confidence across matching queried graphs
         val overallConfidence = if (ragResults.isEmpty()) {
             RetrievalConfidence.LOW
         } else {
-            ragResults.minOf { it.second.confidence }
+            ragResults.maxOf { it.second.confidence }
         }
 
         // Concatenated compressed contexts

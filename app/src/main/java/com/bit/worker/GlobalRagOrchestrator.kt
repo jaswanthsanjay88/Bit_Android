@@ -12,13 +12,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import com.bit.neuron_example.NeuronGraph
 import com.bit.neuron_example.RetrievalResult
 import com.bit.util.DocumentParser
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -34,20 +35,26 @@ class GlobalRagOrchestrator @Inject constructor(
 ) {
     private val TAG = "GlobalRagOrchestrator"
 
-    private val graphDeferred = CompletableDeferred<NeuronGraph>()
+    private var globalGraph: NeuronGraph? = null
+    private val graphMutex = Mutex()
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private val _isProcessing = MutableStateFlow(false)
     val isProcessing: StateFlow<Boolean> = _isProcessing.asStateFlow()
 
     init {
-        // Initialize the global graph asynchronously on startup
+        // Initialize the global graph asynchronously on startup if possible
         scope.launch {
-            initializeGlobalGraph()
+            try {
+                getOrInitGraph()
+            } catch (e: Exception) {
+                Log.w(TAG, "Initial global graph load deferred: ${e.message}")
+            }
         }
     }
 
-    private suspend fun initializeGlobalGraph() {
+    private suspend fun getOrInitGraph(): NeuronGraph = graphMutex.withLock {
+        globalGraph?.let { return it }
         _isProcessing.value = true
         try {
             embeddingEngine.ensureInitialized(context)
@@ -56,11 +63,9 @@ class GlobalRagOrchestrator @Inject constructor(
             for (note in notes) {
                 graph.addText(note.content, note.title, note.id)
             }
-            graphDeferred.complete(graph)
+            globalGraph = graph
             Log.d(TAG, "Global graph initialized with ${notes.size} notes.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error initializing global graph", e)
-            graphDeferred.completeExceptionally(e)
+            graph
         } finally {
             _isProcessing.value = false
         }
@@ -72,12 +77,12 @@ class GlobalRagOrchestrator @Inject constructor(
      */
     suspend fun reloadNoteIntoGraph(note: MemoryNote) {
         try {
-            val graph = graphDeferred.await()
+            val graph = getOrInitGraph()
             embeddingEngine.ensureInitialized(context)
             graph.removeSource(note.id)
             graph.addText(note.content, note.title, note.id)
         } catch (e: Exception) {
-            Log.e(TAG, "Error reloading note", e)
+            Log.e(TAG, "Error reloading note into graph", e)
         }
     }
 
@@ -86,7 +91,7 @@ class GlobalRagOrchestrator @Inject constructor(
      */
     suspend fun removeNoteFromGraph(noteId: String) {
         try {
-            val graph = graphDeferred.await()
+            val graph = getOrInitGraph()
             graph.removeSource(noteId)
         } catch (e: Exception) {
             Log.e(TAG, "Error removing note from graph", e)
@@ -100,10 +105,13 @@ class GlobalRagOrchestrator @Inject constructor(
             val parseResult = DocumentParser.parseDocument(uri, context, mimeType)
             
             if (parseResult.isFailure) {
-                return@withContext Result.failure(parseResult.exceptionOrNull() ?: Exception("Failed to parse"))
+                return@withContext Result.failure(parseResult.exceptionOrNull() ?: Exception("Failed to parse document"))
             }
 
             val content = parseResult.getOrThrow()
+            if (content.isBlank()) {
+                return@withContext Result.failure(Exception("Extracted document text is empty"))
+            }
             
             // Extract filename from URI
             var name = "Attached Document"
@@ -132,10 +140,17 @@ class GlobalRagOrchestrator @Inject constructor(
             val dao = com.bit.database.AppDatabase.getDatabase(context).memoryNoteDao()
             try { dao.insertNote(writtenNote) } catch (_: Exception) {}
 
-            val graph = graphDeferred.await()
+            val graph = getOrInitGraph()
             embeddingEngine.ensureInitialized(context)
-            graph.addText(text = content, sourceName = name, sourceId = docId)
+            val addResult = graph.addText(text = content, sourceName = name, sourceId = docId)
             
+            if (addResult.isFailure) {
+                val err = addResult.exceptionOrNull() ?: Exception("Vectorization failed")
+                Log.e(TAG, "Failed to vectorize document: ${err.message}", err)
+                return@withContext Result.failure(err)
+            }
+            
+            Log.d(TAG, "Document '$name' successfully attached with ${addResult.getOrNull()?.size ?: 0} chunks.")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Error attaching document", e)
@@ -152,7 +167,7 @@ class GlobalRagOrchestrator @Inject constructor(
      */
     suspend fun rebuildFromDisk() {
         try {
-            val graph = graphDeferred.await()
+            val graph = getOrInitGraph()
             embeddingEngine.ensureInitialized(context)
             val notes = vaultStore.listAllNotes()
             graph.clear()
@@ -167,14 +182,14 @@ class GlobalRagOrchestrator @Inject constructor(
 
     suspend fun queryGlobalKnowledge(query: String, topK: Int = 5): RetrievalResult? = withContext(Dispatchers.IO) {
         try {
-            val graph = graphDeferred.await()
+            val graph = getOrInitGraph()
             if (!embeddingEngine.ensureInitialized(context)) {
                 Log.w(TAG, "Embedding model not initialized/valid, skipping global RAG query.")
                 return@withContext null
             }
             graph.queryWithPipeline(query, topK)
         } catch (e: Exception) {
-            Log.e(TAG, "Error querying attached document", e)
+            Log.e(TAG, "Error querying global knowledge graph", e)
             null
         }
     }

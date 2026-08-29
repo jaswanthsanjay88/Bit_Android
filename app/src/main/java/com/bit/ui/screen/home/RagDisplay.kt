@@ -131,7 +131,11 @@ internal fun RagResultCard(
     result: com.bit.viewmodel.RagQueryDisplayResult,
     index: Int
 ) {
-    val scorePercent = (result.score * 100).toInt()
+    val scorePercent = if (result.score <= 0.1f) {
+        ((result.score / 0.0166f).coerceIn(0.1f, 1.0f) * 98f).toInt().coerceIn(50, 99)
+    } else {
+        (result.score * 100).toInt().coerceIn(1, 100)
+    }
     val scoreColor = when {
         scorePercent >= 80 -> MaterialTheme.colorScheme.primary
         scorePercent >= 60 -> MaterialTheme.colorScheme.tertiary
@@ -303,7 +307,11 @@ internal fun SavedRagResultItemRow(
     result: RagResultItem,
     index: Int
 ) {
-    val scorePercent = (result.score * 100).toInt()
+    val scorePercent = if (result.score <= 0.1f) {
+        ((result.score / 0.0166f).coerceIn(0.1f, 1.0f) * 98f).toInt().coerceIn(50, 99)
+    } else {
+        (result.score * 100).toInt().coerceIn(1, 100)
+    }
     val scoreColor = when {
         scorePercent >= 80 -> MaterialTheme.colorScheme.primary
         scorePercent >= 60 -> MaterialTheme.colorScheme.tertiary

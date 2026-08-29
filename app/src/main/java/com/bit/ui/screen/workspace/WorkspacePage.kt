@@ -381,14 +381,14 @@ private fun WorkspaceItemCard(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = if (isReady) Color(0xFF1B5E20).copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant,
+                        color = if (isReady) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceContainerHigh,
                         modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = if (isReady) TnIcons.Terminal else TnIcons.Folder,
                                 contentDescription = null,
-                                tint = if (isReady) Color(0xFF81C784) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (isReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -414,14 +414,14 @@ private fun WorkspaceItemCard(
 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Surface(
-                        color = if (isReady) Color(0xFF2E7D32) else MaterialTheme.colorScheme.surfaceVariant,
+                        color = if (isReady) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
                         shape = CircleShape
                     ) {
                         Text(
                             text = if (isReady) "READY" else workspace.shellStatus,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (isReady) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isReady) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -461,7 +461,7 @@ private fun WorkspaceItemCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
+                FilledTonalButton(
                     onClick = onClick,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp)

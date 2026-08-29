@@ -330,20 +330,7 @@ print("Or ask AI to execute scripts in this workspace.")
             if (ready) {
                 // Auto-provision Python 3 & essential dev tools
                 onProgress(RootfsInstallProgress(stage = RootfsInstallStage.CONFIGURING))
-                runCatching {
-                    val linuxDir = manager.linuxDir(workspace.root)
-                    val isAlpine = File(linuxDir, "sbin/apk").exists()
-                    val bootstrapCmd = if (isAlpine) {
-                        "apk update && apk add --no-cache python3 py3-pip bash curl git"
-                    } else {
-                        "dpkg --configure -a && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 python3-pip python3-venv curl git"
-                    }
-                    manager.executeCommand(
-                        root = workspace.root,
-                        command = bootstrapCmd,
-                        timeoutMillis = 180_000L
-                    )
-                }
+                ensurePythonInstalled(workspace.id)
             }
             val newStatus = if (ready) WorkspaceShellStatus.READY.name else WorkspaceShellStatus.BROKEN.name
             updateShellState(workspace.id, newStatus)
@@ -357,6 +344,36 @@ print("Or ask AI to execute scripts in this workspace.")
             }
             updateShellState(workspace.id, newStatus)
             throw e
+        }
+    }
+
+    suspend fun ensurePythonInstalled(id: String): Boolean = withContext(Dispatchers.IO) {
+        val workspace = dao.getById(id) ?: return@withContext false
+        if (!manager.hasRootfs(workspace.root)) return@withContext false
+
+        val linuxDir = manager.linuxDir(workspace.root)
+        val isAlpine = File(linuxDir, "sbin/apk").exists()
+        val isUbuntuOrDebian = File(linuxDir, "usr/bin/apt-get").exists() || File(linuxDir, "usr/bin/apt").exists()
+
+        val bootstrapCmd = if (isAlpine) {
+            "apk update && apk add --no-cache python3 py3-pip bash curl git ca-certificates && ln -sf /usr/bin/python3 /usr/bin/python && ln -sf /usr/bin/pip3 /usr/bin/pip"
+        } else if (isUbuntuOrDebian) {
+            "export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a; apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv python-is-python3 curl git ca-certificates || (apt-get update --fix-missing && apt-get install -y --no-install-recommends python3 python3-pip python3-venv curl git ca-certificates && ln -sf /usr/bin/python3 /usr/bin/python)"
+        } else {
+            "which python3 || (which apk && apk add --no-cache python3 py3-pip) || (which apt-get && apt-get update && apt-get install -y python3)"
+        }
+
+        try {
+            val result = manager.executeCommand(
+                root = workspace.root,
+                command = bootstrapCmd,
+                timeoutMillis = 300_000L
+            )
+            Log.i(TAG, "Python provision exitCode=${result.exitCode}: stdout=${result.stdout.takeLast(200)}, stderr=${result.stderr.takeLast(200)}")
+            result.exitCode == 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Error installing Python 3", e)
+            false
         }
     }
 

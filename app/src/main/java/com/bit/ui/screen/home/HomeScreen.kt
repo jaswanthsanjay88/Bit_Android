@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bit.agent.harness.state.AgentHarnessState
 import com.bit.data.AppSettingsDataStore
 import kotlinx.coroutines.isActive
 import com.bit.models.table_schema.Model

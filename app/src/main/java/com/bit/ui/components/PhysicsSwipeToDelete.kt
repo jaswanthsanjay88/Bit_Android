@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -136,11 +137,17 @@ fun PhysicsSwipeToDelete(
     Box(
         modifier = modifier.fillMaxWidth()
     ) {
+        val buttonsAlpha = ((totalOffset.absoluteValue - 8f) / (revealDistancePx * 0.4f)).coerceIn(0f, 1f)
+
         // Swipe action background buttons
         Row(
             modifier = Modifier
                 .matchParentSize()
-                .padding(end = 16.dp),
+                .padding(end = 16.dp)
+                .graphicsLayer {
+                    alpha = buttonsAlpha
+                    translationX = (1f - buttonsAlpha) * 24f
+                },
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
             verticalAlignment = Alignment.CenterVertically
         ) {

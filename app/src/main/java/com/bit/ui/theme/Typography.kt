@@ -2,33 +2,30 @@ package com.bit.ui.theme
 
 import android.graphics.Typeface
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.bit.R
 import java.io.File
 
-@OptIn(ExperimentalTextApi::class)
+// Variable fonts (fvar/gvar tables) are registered as plain per-weight Font entries.
+// Do NOT load them with FontVariation.Settings — explicit variation settings trigger a
+// minikin shaping bug on some devices where narrow glyphs (i, x, y, |, –) render with
+// zero advance and visually disappear inside code blocks.
 val ManropeFontFamily = FontFamily(
-    Font(
-        resId = R.font.manrope,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(FontWeight.Normal.weight)
-        )
-    )
+    Font(resId = R.font.manrope, weight = FontWeight.Normal),
+    Font(resId = R.font.manrope, weight = FontWeight.Medium),
+    Font(resId = R.font.manrope, weight = FontWeight.SemiBold),
+    Font(resId = R.font.manrope, weight = FontWeight.Bold),
 )
 
-@OptIn(ExperimentalTextApi::class)
 val MapleMonoFontFamily = FontFamily(
-    Font(
-        resId = R.font.maple_mono,
-        variationSettings = FontVariation.Settings(
-            FontVariation.weight(FontWeight.Normal.weight)
-        )
-    )
+    Font(resId = R.font.maple_mono, weight = FontWeight.Normal),
+    Font(resId = R.font.maple_mono_medium, weight = FontWeight.Medium),
+    Font(resId = R.font.maple_mono_semibold, weight = FontWeight.SemiBold),
+    Font(resId = R.font.maple_mono_bold, weight = FontWeight.Bold),
+    Font(resId = R.font.maple_mono_bold, weight = FontWeight.Black),
 )
 
 val GoogleSansFontFamily = FontFamily(

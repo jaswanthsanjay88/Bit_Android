@@ -4,6 +4,10 @@ import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.Composable
 import com.bit.mcp.McpManager
+import com.bit.mcp.McpTool
+import com.bit.mcp.isEnabled
+import com.bit.mcp.name
+import com.bit.mcp.tools
 import com.bit.models.plugins.PluginInfo
 import com.bit.plugins.api.SuperPlugin
 import com.dark.gguf_lib.toolcalling.ToolCall
@@ -34,7 +38,7 @@ class McpPlugin(
             for (tool in server.tools.filter { it.isEnabled }) {
                 val builder = ToolDefinitionBuilder(
                     tool.name,
-                    if (tool.description.isNotBlank()) "[MCP: ${server.name}] ${tool.description}"
+                    if (!tool.description.isNullOrBlank()) "[MCP: ${server.name}] ${tool.description}"
                     else "[MCP: ${server.name}] External MCP Tool"
                 )
 

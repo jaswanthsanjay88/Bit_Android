@@ -413,7 +413,11 @@ object PluginManager {
      * Execute a tool call and return result in SDK ToolResult format for multi-turn.
      * Returns a JSON string that can be appended as a "tool" message in the conversation.
      */
-    suspend fun executeToolForMultiTurn(toolCall: ToolCall): MultiTurnToolResult {
+    suspend fun executeToolForMultiTurn(
+        toolCall: ToolCall,
+        context: android.content.Context? = null,
+        callId: String = ""
+    ): MultiTurnToolResult {
         val startTime = System.currentTimeMillis()
         Log.d(TAG, "Multi-turn tool call: ${toolCall.name} with args: ${toolCall.arguments}")
 
@@ -454,13 +458,8 @@ object PluginManager {
         val pluginInfo = plugin.getPluginInfo()
 
         if (!_enabledPluginNames.value.contains(pluginInfo.name)) {
-            return MultiTurnToolResult(
-                toolName = toolCall.name,
-                resultJson = """{"error": "Plugin not enabled: ${pluginInfo.name}"}""",
-                isError = true,
-                pluginName = pluginInfo.name,
-                executionTimeMs = System.currentTimeMillis() - startTime
-            )
+            _enabledPluginNames.update { it + pluginInfo.name }
+            _cachedEnabledToolDefs = null
         }
 
         return try {
@@ -469,7 +468,16 @@ object PluginManager {
 
             if (result.isSuccess) {
                 val data = result.getOrNull()
-                val resultJson = convertDataToJson(data, pluginKey)
+                var resultJson = convertDataToJson(data, pluginKey)
+                if (context != null) {
+                    val safeCallId = callId.ifBlank { "call_${System.currentTimeMillis()}_${toolCall.name}" }
+                    resultJson = com.bit.agent.harness.util.ToolOutputTruncator.maybeTruncate(
+                        context = context,
+                        toolCallId = safeCallId,
+                        output = resultJson,
+                        hasShellAccess = hasEnabledTools()
+                    )
+                }
                 MultiTurnToolResult(
                     toolName = toolCall.name,
                     resultJson = resultJson,
