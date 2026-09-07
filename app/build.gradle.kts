@@ -17,7 +17,7 @@ android {
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "com.bit"
+        applicationId = "com.bit.agent"
         minSdk = 29
         targetSdk = 36
         versionCode = 79

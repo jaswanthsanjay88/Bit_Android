@@ -111,7 +111,9 @@ set(GIT_DATE           ""        CACHE STRING "" FORCE)
 set(GIT_COMMIT_SUBJECT ""        CACHE STRING "" FORCE)
 
 add_subdirectory(${LLAMA_DIR} ${CMAKE_CURRENT_BINARY_DIR}/llama)
-add_subdirectory(${LLAMA_DIR}/vendor/cpp-httplib ${CMAKE_CURRENT_BINARY_DIR}/cpp-httplib)
+if (NOT TARGET cpp-httplib)
+    add_subdirectory(${LLAMA_DIR}/vendor/cpp-httplib ${CMAKE_CURRENT_BINARY_DIR}/cpp-httplib)
+endif()
 
 set(RAG_INGEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rag_ingest)
 set(PDFIUM_DIR     ${RAG_INGEST_DIR}/third_party/pdfium)
