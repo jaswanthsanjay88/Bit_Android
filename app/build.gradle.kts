@@ -17,7 +17,7 @@ android {
     ndkVersion = "28.2.13676358"
 
     defaultConfig {
-        applicationId = "com.bit"
+        applicationId = "com.bit.agent"
         minSdk = 29
         targetSdk = 36
         versionCode = 78
@@ -28,9 +28,10 @@ android {
         buildConfigField("String", "ALIAS", getProperty("ALIAS"))
     }
 
+    val isBuildingBundle = gradle.startParameter.taskNames.any { it.contains("bundle", ignoreCase = true) }
     splits {
         abi {
-            isEnable = true
+            isEnable = !isBuildingBundle
             reset()
             include("arm64-v8a", "x86_64")
             isUniversalApk = true
