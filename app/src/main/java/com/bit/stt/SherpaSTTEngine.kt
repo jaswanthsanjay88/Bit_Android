@@ -181,7 +181,7 @@ object SherpaSTTEngine {
             stream.acceptWaveform(sampleRate = 16000, samples = samples)
             activeRecognizer.decode(stream)
             val result = activeRecognizer.getResult(stream)
-            val text = result?.text ?: ""
+            val text = result.text
             stream.close()
 
             cleanTranscribedText(text)

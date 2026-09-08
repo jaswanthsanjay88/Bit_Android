@@ -1,0 +1,5 @@
+• Material 3 Intelligence & Tools: Sampler-level GBNF grammar constraints for reliable tool execution.
+• Native VLM Engine: Multi-modal vision projector support for on-device image analysis.
+• Silicon Acceleration: Arm KleidiAI SIMD and thread polling optimizations for faster local inference.
+• Hybrid RAG & Memory: Improved local document search and episodic memory retrieval.
+• Zero Telemetry: 100% private, offline inference running exclusively on local device hardware.

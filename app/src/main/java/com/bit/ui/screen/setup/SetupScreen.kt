@@ -379,15 +379,16 @@ private fun ModelPickerContent(
     }
     
     val ramGuidance = when {
-        ramGb < 4.0 -> "Low memory detected (${String.format("%.1f", ramGb)}GB RAM). 1B models recommended."
-        ramGb < 8.0 -> "Standard memory detected (${String.format("%.1f", ramGb)}GB RAM). Optimized for 1B or 3B models."
-        else -> "Premium memory detected (${String.format("%.1f", ramGb)}GB RAM). Highly recommended to use 3B models."
+        ramGb < 4.0 -> "Low memory detected (${String.format("%.1f", ramGb)}GB RAM). LFM2 350M (400 MB) recommended for fast, lag-free performance."
+        ramGb < 8.0 -> "Standard memory detected (${String.format("%.1f", ramGb)}GB RAM). Gemma 1B (750 MB) or LFM2 350M recommended."
+        else -> "High performance memory detected (${String.format("%.1f", ramGb)}GB RAM). Gemma 1B (750 MB) recommended for superior mobile intelligence."
     }
 
     data class PickerItem(
         val option: SetupOption,
         val title: String,
         val size: String,
+        val badge: String? = null,
         val description: String
     )
 
@@ -395,27 +396,26 @@ private fun ModelPickerContent(
         val list = mutableListOf<PickerItem>()
         list.add(PickerItem(
             SetupOption.TEXT,
-            "Llama-3.2 1B Instruct",
-            "640 MB",
-            "Highly responsive, optimized for low memory usage."
+            "LFM2 350M",
+            "400 MB",
+            badge = if (recommendedTextModel.id == "lfm2-350m-q8") "RECOMMENDED" else "ULTRA-FAST",
+            description = "Liquid AI's tiny model. Instant startup, lowest RAM & battery usage. Runs smoothly on any device."
         ))
         
-        if (recommendedTextModel.id != "unsloth-llama-3_2-1b-instruct-q4_k_m") {
-            list.add(PickerItem(
-                SetupOption.TEXT_RECOMMENDED,
-                recommendedTextModel.name,
-                recommendedTextModel.approximateSize,
-                "Stronger reasoning capacity. Optimal choice for this device."
-            ))
-        }
-        
-
+        list.add(PickerItem(
+            SetupOption.TEXT_RECOMMENDED,
+            "Gemma 3 1B IT",
+            "750 MB",
+            badge = if (recommendedTextModel.id != "lfm2-350m-q8") "RECOMMENDED" else "BALANCED",
+            description = "Google's lightweight 1B model. Superior reasoning & precision with a minimal mobile footprint."
+        ))
 
         list.add(PickerItem(
             SetupOption.POWER_MODE,
             "Skip & Go to Chat",
             "0 MB",
-            "Minimal startup. Bring your own models or use API keys."
+            badge = null,
+            description = "Start immediately without downloading. Bring your own models or explore 3B+ models later in the Model Store."
         ))
         list
     }
@@ -522,6 +522,32 @@ private fun ModelPickerContent(
                                         fontWeight = FontWeight.Medium
                                     )
                                 )
+                            }
+
+                            if (item.badge != null) {
+                                val isRec = item.badge == "RECOMMENDED"
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            if (isRec) BitColors.SurfaceAlt else BitColors.Surface,
+                                            RoundedCornerShape(100.dp)
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isRec) BitColors.TextPrimary else BitColors.Border,
+                                            RoundedCornerShape(100.dp)
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = item.badge,
+                                        style = androidx.compose.ui.text.TextStyle(
+                                            color = if (isRec) BitColors.TextPrimary else BitColors.TextSecondary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    )
+                                }
                             }
                         }
                         

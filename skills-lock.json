@@ -7,6 +7,12 @@
       "skillPath": "skills/app-store-screenshots/SKILL.md",
       "computedHash": "961685350664744a2dff7a308602aab1986e841e68d58b4e48f3905ab38e002d"
     },
+    "goldie": {
+      "source": "kacperkapusciak/goldie",
+      "sourceType": "github",
+      "skillPath": "skills/goldie/SKILL.md",
+      "computedHash": "641388b15b4db53206e4b08614f212823c324da3ca99c2acff5c17d9e5a7beb6"
+    },
     "mobile-design": {
       "source": "sickn33/antigravity-awesome-skills",
       "sourceType": "github",

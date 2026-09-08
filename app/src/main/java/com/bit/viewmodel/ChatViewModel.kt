@@ -879,7 +879,6 @@ class ChatViewModel @Inject constructor(
                                         messagesJsonList.add(JSONObject().put("role", "assistant").put("content", msg.content.content))
                                     }
                                 }
-                                else -> {}
                             }
                         }
                     }

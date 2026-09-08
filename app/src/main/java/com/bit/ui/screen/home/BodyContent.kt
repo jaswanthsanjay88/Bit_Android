@@ -481,7 +481,7 @@ fun BodyContent(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     
-                    val resultText = selectedTraceStep!!.result ?: "No output returned."
+                    val resultText = selectedTraceStep!!.result.ifEmpty { "No output returned." }
                     
                     Surface(
                         modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),

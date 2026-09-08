@@ -8,6 +8,7 @@ import com.bit.plugins.PluginManager
 import com.bit.ui.icons.TnIcons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.ui.res.vectorResource
 
 sealed class AppState {
@@ -62,7 +63,7 @@ fun AppState.getIcon(): ImageVector = when (this) {
     is AppState.LoadingModel -> TnIcons.Settings
     is AppState.GeneratingText -> Icons.Filled.AutoAwesome // Sparkles filled (active generation)
     is AppState.GeneratingImage -> Icons.Filled.Image
-    is AppState.GeneratingAudio -> Icons.Filled.VolumeUp
+    is AppState.GeneratingAudio -> Icons.AutoMirrored.Filled.VolumeUp
     is AppState.ExecutingPlugin -> Icons.Filled.Build // Wrench filled (active tool)
     is AppState.PluginExecutionComplete -> TnIcons.Wrench // Wrench outline (complete/idle)
     is AppState.Error -> TnIcons.AlertTriangle

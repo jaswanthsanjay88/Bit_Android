@@ -177,13 +177,13 @@ class GeminiProvider : LlmProvider {
                     entries.add(ApiRequestContent(role = "model", parts = parts))
                 } else if (msg.toolCall != null) {
                     val args = try {
-                        json.parseToJsonElement(msg.toolCall!!.arguments) as? JsonObject
+                        json.parseToJsonElement(msg.toolCall.arguments) as? JsonObject
                     } catch (_: Exception) { JsonObject(emptyMap()) }
                     entries.add(ApiRequestContent(
                         role = "model",
                         parts = listOf(ApiRequestPart(
                             functionCall = GeminiFunctionCall(
-                                name = msg.toolCall!!.toolName, args = args ?: JsonObject(emptyMap())
+                                name = msg.toolCall.toolName, args = args ?: JsonObject(emptyMap())
                             ),
                             thoughtSignature = sig
                         ))
@@ -204,11 +204,11 @@ class GeminiProvider : LlmProvider {
                     }
                     entries.add(ApiRequestContent(role = "user", parts = parts))
                 } else if (msg.toolCall != null) {
-                    val response = buildGeminiFunctionResponse(msg.toolCall!!.result)
+                    val response = buildGeminiFunctionResponse(msg.toolCall.result)
                     entries.add(ApiRequestContent(
                         role = "user",
                         parts = listOf(ApiRequestPart(functionResponse = GeminiFunctionResponse(
-                            name = msg.toolCall!!.toolName,
+                            name = msg.toolCall.toolName,
                             response = response
                         )))
                     ))

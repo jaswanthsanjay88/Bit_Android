@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AltRoute
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
@@ -163,7 +164,7 @@ val SETTINGS_SEARCH_INDEX = listOf(
         description = "Force the primary LLM to execute tools directly without secondary model",
         categoryId = "intelligence",
         categoryName = "Intelligence & Tools",
-        icon = Icons.Default.AltRoute,
+        icon = Icons.AutoMirrored.Filled.AltRoute,
         keywords = listOf("bypass", "direct", "tools", "qwen", "force")
     ),
     SettingsSearchEntry(
