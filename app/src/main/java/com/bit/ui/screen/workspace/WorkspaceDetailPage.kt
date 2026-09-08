@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -92,6 +93,8 @@ fun WorkspaceDetailPage(
 
     var showCreateFileDialog by remember { mutableStateOf(false) }
     var showCustomUrlDialog by remember { mutableStateOf(false) }
+    var pendingConsentDistro by remember { mutableStateOf<com.bit.repo.LinuxDistro?>(null) }
+    var pendingConsentCustomUrl by remember { mutableStateOf<Pair<String, String?>?>(null) }
     var showProcessesSheet by remember { mutableStateOf(false) }
     var pendingDeleteFile by remember { mutableStateOf<WorkspaceFileEntry?>(null) }
 
@@ -280,7 +283,11 @@ fun WorkspaceDetailPage(
                         installError = installError,
                         onInstallDistro = { distro ->
                             bitHaptics.pop()
-                            viewModel.installRootfs(distro.downloadUrl)
+                            if (distro.isDownloaded) {
+                                viewModel.installRootfs(distro.downloadUrl, distro.sha256)
+                            } else {
+                                pendingConsentDistro = distro
+                            }
                         },
                         onCustomUrl = {
                             bitHaptics.pop()
@@ -401,21 +408,29 @@ fun WorkspaceDetailPage(
     // Custom URL Dialog
     if (showCustomUrlDialog) {
         var customUrl by remember { mutableStateOf("") }
+        var customSha by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showCustomUrlDialog = false },
             title = { Text("Install Custom Rootfs") },
             text = {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "Enter direct HTTP/HTTPS link to a .tar.xz or .tar.gz rootfs archive.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = customUrl,
                         onValueChange = { customUrl = it },
                         label = { Text("Rootfs URL") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    OutlinedTextField(
+                        value = customSha,
+                        onValueChange = { customSha = it },
+                        label = { Text("Expected SHA-256 (Optional)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
@@ -426,19 +441,54 @@ fun WorkspaceDetailPage(
                 Button(
                     onClick = {
                         if (customUrl.isNotBlank()) {
+                            val url = customUrl.trim()
+                            val sha = customSha.trim().ifBlank { null }
                             showCustomUrlDialog = false
-                            viewModel.installRootfs(customUrl.trim())
+                            pendingConsentCustomUrl = url to sha
                         }
                     },
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Install")
+                    Text("Next")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showCustomUrlDialog = false }) {
                     Text("Cancel")
                 }
+            }
+        )
+    }
+
+    // Rootfs Download Consent Dialog for Catalog Distro
+    pendingConsentDistro?.let { distro ->
+        RootfsDownloadConsentDialog(
+            distroName = "${distro.name} ${distro.version}",
+            downloadSizeText = distro.sizeText,
+            sha256 = distro.sha256,
+            onConfirm = {
+                val d = distro
+                pendingConsentDistro = null
+                viewModel.installRootfs(d.downloadUrl, d.sha256)
+            },
+            onDismiss = {
+                pendingConsentDistro = null
+            }
+        )
+    }
+
+    // Rootfs Download Consent Dialog for Custom URL
+    pendingConsentCustomUrl?.let { (url, sha) ->
+        RootfsDownloadConsentDialog(
+            distroName = "Custom Linux Distribution",
+            downloadSizeText = "External Mirror",
+            sha256 = sha,
+            onConfirm = {
+                pendingConsentCustomUrl = null
+                viewModel.installRootfs(url, sha)
+            },
+            onDismiss = {
+                pendingConsentCustomUrl = null
             }
         )
     }
@@ -708,8 +758,9 @@ private fun EnvironmentTabContent(
 
                     val stageName = when (installProgress?.stage) {
                         RootfsInstallStage.DOWNLOADING -> "Downloading rootfs archive..."
+                        RootfsInstallStage.VERIFYING -> "Verifying cryptographic SHA-256 signature..."
                         RootfsInstallStage.EXTRACTING -> "Extracting filesystem (${installProgress.entriesExtracted} files)..."
-                        RootfsInstallStage.CONFIGURING -> "Configuring sandbox & pre-installing Python 3..."
+                        RootfsInstallStage.CONFIGURING -> "Configuring sandbox & isolating Python environment..."
                         RootfsInstallStage.INSTALLED -> "Installation complete! Finalizing..."
                         null -> "Preparing environment..."
                     }
@@ -919,12 +970,23 @@ private fun LinuxDistroItemCard(
                                 )
                             }
                         }
-                        Text(
-                            text = distro.tag,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = brandColor,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = distro.tag,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = brandColor,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            if (distro.sha256 != null) {
+                                Text("•", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                                Text(
+                                    text = "SHA-256 Verified",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF22C55E),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -1336,4 +1398,132 @@ private fun queryFileName(context: Context, uri: Uri): String? {
             if (nameIndex >= 0) it.getString(nameIndex) else null
         } else null
     }
+}
+
+@Composable
+private fun RootfsDownloadConsentDialog(
+    distroName: String,
+    downloadSizeText: String,
+    sha256: String?,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val bitHaptics = LocalBitHaptics.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.Security,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+        },
+        title = {
+            Text(
+                text = "Linux Environment Installation",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Prominent Google Play disclosure notice
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Installs an open-source Linux environment for running code — binaries are downloaded directly from official open-source distribution mirrors and are not distributed via Google Play.",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(12.dp),
+                        lineHeight = 18.sp
+                    )
+                }
+
+                // Distribution details
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Distribution", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(distroName, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Download Size", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(downloadSizeText, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Integrity", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = if (!sha256.isNullOrBlank()) "SHA-256 Verified" else "Custom (Unverified)",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (!sha256.isNullOrBlank()) Color(0xFF22C55E) else MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
+                // Sandboxing guarantee
+                Text(
+                    text = "Runs 100% on-device inside an unprivileged PRoot user-space sandbox strictly within BIT's private app storage. No root access, and no access to external files, photos, or device partitions.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 15.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    bitHaptics.pop()
+                    onConfirm()
+                },
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("I Understand, Download & Install")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    bitHaptics.selection()
+                    onDismiss()
+                }
+            ) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(24.dp)
+    )
 }

@@ -305,8 +305,9 @@ fun WorkspaceTerminalPage(
                         ) {
                             val stageName = when (installProgress?.stage) {
                                 RootfsInstallStage.DOWNLOADING -> "Downloading rootfs archive..."
+                                RootfsInstallStage.VERIFYING -> "Verifying cryptographic SHA-256 signature..."
                                 RootfsInstallStage.EXTRACTING -> "Extracting Linux rootfs (${installProgress?.entriesExtracted ?: 0} files)..."
-                                RootfsInstallStage.CONFIGURING -> "Configuring sandbox & pre-installing Python 3..."
+                                RootfsInstallStage.CONFIGURING -> "Configuring sandbox & isolating Python environment..."
                                 RootfsInstallStage.INSTALLED -> "Starting terminal session..."
                                 null -> "Preparing environment..."
                             }

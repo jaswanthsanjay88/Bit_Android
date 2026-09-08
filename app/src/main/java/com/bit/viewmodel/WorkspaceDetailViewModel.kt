@@ -106,13 +106,13 @@ class WorkspaceDetailViewModel @Inject constructor(
         }
     }
 
-    fun installRootfs(url: String) {
+    fun installRootfs(url: String, expectedSha256: String? = null) {
         val id = _workspaceId.value ?: return
         _isInstalling.value = true
         _installError.value = null
         viewModelScope.launch {
             try {
-                repository.installRootfs(id, url) { progress ->
+                repository.installRootfs(id, url, expectedSha256) { progress ->
                     _installProgress.value = progress
                 }
                 _isInstalling.value = false

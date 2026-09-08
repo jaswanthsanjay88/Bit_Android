@@ -28,6 +28,8 @@ local.properties
 /smollm/src/main/jniLibs/
 /repo/*.apk
 *.apk
+*.aab
+/google_play_assets/
 
 /app/release/
 ISSUES_TRACKER.txt

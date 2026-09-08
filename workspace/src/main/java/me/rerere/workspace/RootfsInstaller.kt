@@ -12,24 +12,48 @@ import java.util.Locale
 import java.util.zip.GZIPInputStream
 import org.tukaani.xz.XZInputStream
 
+import java.security.MessageDigest
+
 class RootfsInstaller(
     private val manager: WorkspaceManager,
     private val patcher: RootfsPatcher = RootfsPatcher(),
     private val cacheDir: File? = null,
 ) {
-    fun getCachedArchive(url: String): File? {
+    fun calculateSha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().buffered(64 * 1024).use { input ->
+            val buffer = ByteArray(64 * 1024)
+            var bytesRead: Int
+            while (input.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    fun getCachedArchive(url: String, expectedSha256: String? = null): File? {
         val dir = cacheDir ?: return null
         val format = ArchiveFormat.fromUrl(url)
         val hash = url.hashCode().toString(16)
         val file = File(dir, "rootfs_$hash.${format.extension}")
-        return if (file.exists() && file.length() > 500_000L) file else null
+        if (!file.exists() || file.length() <= 500_000L) return null
+
+        if (!expectedSha256.isNullOrBlank()) {
+            val actualHash = runCatching { calculateSha256(file) }.getOrNull()
+            if (!expectedSha256.trim().equals(actualHash, ignoreCase = true)) {
+                file.delete()
+                return null
+            }
+        }
+        return file
     }
 
-    fun isCached(url: String): Boolean = getCachedArchive(url) != null
+    fun isCached(url: String, expectedSha256: String? = null): Boolean = getCachedArchive(url, expectedSha256) != null
 
     fun install(
         root: String,
         url: String,
+        expectedSha256: String? = null,
         onProgress: (RootfsInstallProgress) -> Unit = {},
     ) {
         require(url.isNotBlank()) { "Rootfs download url is required" }
@@ -39,7 +63,7 @@ class RootfsInstaller(
         val stagingDir = File(tempDir, "rootfs-staging")
         val linuxDir = manager.linuxDir(root)
 
-        val cachedArchive = getCachedArchive(url)
+        val cachedArchive = getCachedArchive(url, expectedSha256)
         val archive = cachedArchive ?: File(tempDir, "rootfs.${format.extension}")
 
         try {
@@ -54,7 +78,32 @@ class RootfsInstaller(
                 ))
             } else {
                 download(url, archive, onProgress)
-                // Cache the archive for subsequent workspaces
+            }
+
+            // Cryptographic SHA-256 verification before extraction
+            if (!expectedSha256.isNullOrBlank()) {
+                onProgress(RootfsInstallProgress(
+                    stage = RootfsInstallStage.VERIFYING,
+                    bytesRead = archive.length(),
+                    totalBytes = archive.length()
+                ))
+                val actualSha256 = calculateSha256(archive)
+                if (!expectedSha256.trim().equals(actualSha256, ignoreCase = true)) {
+                    archive.delete()
+                    cacheDir?.let { cDir ->
+                        val hash = url.hashCode().toString(16)
+                        File(cDir, "rootfs_$hash.${format.extension}").delete()
+                    }
+                    throw SecurityException(
+                        "Rootfs archive cryptographic integrity check failed for $url!\n" +
+                        "Expected SHA-256: ${expectedSha256.trim()}\n" +
+                        "Computed SHA-256: $actualSha256"
+                    )
+                }
+            }
+
+            // Cache the verified archive for subsequent workspaces
+            if (cachedArchive == null) {
                 cacheDir?.let { cDir ->
                     runCatching {
                         cDir.mkdirs()

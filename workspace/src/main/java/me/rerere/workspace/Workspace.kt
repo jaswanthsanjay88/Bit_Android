@@ -24,6 +24,7 @@ enum class WorkspaceStorageArea {
 
 enum class RootfsInstallStage {
     DOWNLOADING,
+    VERIFYING,
     EXTRACTING,
     CONFIGURING,
     INSTALLED,

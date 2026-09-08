@@ -6,4 +6,5 @@ Features:
 - GBNF Sampler Tool Router: Token-level grammar constraints forcing valid structured JSON tool calls.
 - Memory Vault & Hybrid RAG: Cross-session episodic preference memory with decay curves and local document search (Vector + BM25 keyword matching).
 - HuggingFace Model Store: Browse, download, and switch quantized model weights directly on device storage.
-- 100% Privacy & Zero Network Dependency: All inference, speech processing, and document indexing run entirely offline on local silicon.
+- Developer Workspaces & Sandboxes: Optional on-device, unprivileged Linux environments (Ubuntu Base / Alpine Linux) powered by PRoot. Enables local execution of code, Python scripts, and agent tools inside an isolated private app sandbox with zero root privileges and no access to external device storage. Open-source distribution archives are downloaded directly from official project mirrors only upon explicit user request.
+- 100% Privacy & Zero Network Dependency: All AI inference, speech processing, and document indexing run entirely offline on local silicon.

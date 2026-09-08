@@ -337,25 +337,18 @@ class RootfsPatcher {
     }
 
     private fun ensurePipConfig(linuxDir: File) {
-        val etcDir = File(linuxDir, "etc")
-        if (etcDir.isDirectory) {
-            val pipConf = File(etcDir, "pip.conf")
-            pipConf.writeText("[global]\nbreak-system-packages = true\n")
+        // Architectural Decision (PEP 668 & Google Play Compliance):
+        // Rather than blanket-bypassing Debian/Ubuntu's PEP 668 via 'break-system-packages = true'
+        // which exposes base system Python and apt to arbitrary native extension overwrites,
+        // we preserve EXTERNALLY-MANAGED. Package installations are routed into an isolated
+        // virtual environment (/opt/bit-env) configured during workspace provisioning.
+        val etcPipConf = File(linuxDir, "etc/pip.conf")
+        if (etcPipConf.exists() && etcPipConf.readText().contains("break-system-packages")) {
+            runCatching { etcPipConf.delete() }
         }
-
-        val rootPipDir = File(linuxDir, "root/.config/pip")
-        rootPipDir.mkdirs()
-        File(rootPipDir, "pip.conf").writeText("[global]\nbreak-system-packages = true\n")
-
-        // Remove EXTERNALLY-MANAGED markers across python versions so pip install works seamlessly
-        val usrLib = File(linuxDir, "usr/lib")
-        if (usrLib.isDirectory) {
-            usrLib.listFiles()?.filter { it.name.startsWith("python3") && it.isDirectory }?.forEach { pyDir ->
-                val marker = File(pyDir, "EXTERNALLY-MANAGED")
-                if (marker.exists()) {
-                    runCatching { marker.delete() }
-                }
-            }
+        val rootPipConf = File(linuxDir, "root/.config/pip/pip.conf")
+        if (rootPipConf.exists() && rootPipConf.readText().contains("break-system-packages")) {
+            runCatching { rootPipConf.delete() }
         }
     }
 

@@ -47,11 +47,14 @@ html_content = '''<!DOCTYPE html>
     <p class="legal-subtitle">Version 3.1 &bull; Please read carefully before using BIT Local AI Assistant</p>
 '''
 
+import textwrap
+
 for title, text in sections:
+    clean_text = textwrap.dedent(text).strip()
     html_content += f'''
     <div class="legal-section">
       <h2>{title}</h2>
-      <p>{text.strip()}</p>
+      <p>{clean_text}</p>
     </div>
 '''
 

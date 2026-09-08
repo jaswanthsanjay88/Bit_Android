@@ -35,6 +35,7 @@ data class LinuxDistro(
     val sizeText: String,
     val packageManager: String,
     val tag: String,
+    val sha256: String? = null,
     val isRecommended: Boolean = false,
     val isDownloaded: Boolean = false,
     val cachedSizeBytes: Long = 0L,
@@ -61,10 +62,23 @@ class WorkspaceRepository @Inject constructor(
     companion object {
         private const val TAG = "WorkspaceRepository"
 
+        // Official published Canonical Ubuntu Base 24.04.4 LTS SHA256SUMS
+        const val UBUNTU_24_04_ARM64_SHA256 = "04207713ece899c3740823d33690441ad3a7f0ded1101aca744e2b0f37ac7ff2"
+        const val UBUNTU_24_04_AMD64_SHA256 = "c1e67ef7b17a6300e136118bd1dc04725009cb376c1aad10abcf8cd453628d58"
+
+        // Official published Alpine Linux 3.20.0 Minirootfs SHA256SUMS
+        const val ALPINE_3_20_AARCH64_SHA256 = "83a79199bf3112c65e62ddf1732b051daf62ed2ddf5a8413c440dc25956116f0"
+        const val ALPINE_3_20_X86_64_SHA256 = "602efda518516787c716320bd46a3f50e83a74bb749e55483c2f4a9c9f8b9a38"
+
         fun getUbuntuUrl(): String {
             val isArm = android.os.Build.SUPPORTED_ABIS.firstOrNull()?.contains("arm") ?: true
             val arch = if (isArm) "arm64" else "amd64"
             return "https://cdimage.ubuntu.com/ubuntu-base/releases/24.04/release/ubuntu-base-24.04.4-base-$arch.tar.gz"
+        }
+
+        fun getUbuntuSha256(): String {
+            val isArm = android.os.Build.SUPPORTED_ABIS.firstOrNull()?.contains("arm") ?: true
+            return if (isArm) UBUNTU_24_04_ARM64_SHA256 else UBUNTU_24_04_AMD64_SHA256
         }
 
         fun getAlpineUrl(): String {
@@ -73,10 +87,9 @@ class WorkspaceRepository @Inject constructor(
             return "https://dl-cdn.alpinelinux.org/alpine/v3.20/releases/$arch/alpine-minirootfs-3.20.0-$arch.tar.gz"
         }
 
-        fun getDebianUrl(): String {
+        fun getAlpineSha256(): String {
             val isArm = android.os.Build.SUPPORTED_ABIS.firstOrNull()?.contains("arm") ?: true
-            val arch = if (isArm) "arm64" else "amd64"
-            return "https://images.linuxcontainers.org/images/debian/bookworm/$arch/default/rootfs.tar.xz"
+            return if (isArm) ALPINE_3_20_AARCH64_SHA256 else ALPINE_3_20_X86_64_SHA256
         }
     }
 
@@ -97,31 +110,32 @@ class WorkspaceRepository @Inject constructor(
         RootfsInstaller(manager = manager, cacheDir = rootfsCacheDir)
     }
 
-    fun isDistroCached(url: String): Boolean = rootfsInstaller.isCached(url)
+    fun isDistroCached(url: String, expectedSha256: String? = null): Boolean =
+        rootfsInstaller.isCached(url, expectedSha256)
 
     fun getAvailableDistros(): List<LinuxDistro> {
         val ubuntuUrl = getUbuntuUrl()
+        val ubuntuSha = getUbuntuSha256()
         val alpineUrl = getAlpineUrl()
-        val debianUrl = getDebianUrl()
+        val alpineSha = getAlpineSha256()
 
-        val isUbuntuCached = rootfsInstaller.isCached(ubuntuUrl)
-        val isAlpineCached = rootfsInstaller.isCached(alpineUrl)
-        val isDebianCached = rootfsInstaller.isCached(debianUrl)
+        val isUbuntuCached = rootfsInstaller.isCached(ubuntuUrl, ubuntuSha)
+        val isAlpineCached = rootfsInstaller.isCached(alpineUrl, alpineSha)
 
-        val ubuntuCachedFile = rootfsInstaller.getCachedArchive(ubuntuUrl)
-        val alpineCachedFile = rootfsInstaller.getCachedArchive(alpineUrl)
-        val debianCachedFile = rootfsInstaller.getCachedArchive(debianUrl)
+        val ubuntuCachedFile = rootfsInstaller.getCachedArchive(ubuntuUrl, ubuntuSha)
+        val alpineCachedFile = rootfsInstaller.getCachedArchive(alpineUrl, alpineSha)
 
         return listOf(
             LinuxDistro(
                 id = "ubuntu",
                 name = "Ubuntu",
                 version = "24.04 LTS (Noble)",
-                description = "Full developer environment with apt, Python 3, GCC, pip, curl & Git.",
+                description = "Full developer environment with apt, Python 3, GCC, pip, curl & Git. Verified Canonical release.",
                 downloadUrl = ubuntuUrl,
                 sizeText = if (isUbuntuCached) "Downloaded (${formatBytes(ubuntuCachedFile?.length() ?: 0)})" else "~35 MB",
                 packageManager = "apt",
                 tag = "Full Developer Suite",
+                sha256 = ubuntuSha,
                 isRecommended = true,
                 isDownloaded = isUbuntuCached,
                 cachedSizeBytes = ubuntuCachedFile?.length() ?: 0L
@@ -130,27 +144,15 @@ class WorkspaceRepository @Inject constructor(
                 id = "alpine",
                 name = "Alpine Linux",
                 version = "3.20",
-                description = "Ultra-lightweight, minimal memory footprint with apk package manager.",
+                description = "Ultra-lightweight, minimal memory footprint with apk package manager. Verified Alpine release.",
                 downloadUrl = alpineUrl,
                 sizeText = if (isAlpineCached) "Downloaded (${formatBytes(alpineCachedFile?.length() ?: 0)})" else "~4 MB",
                 packageManager = "apk",
                 tag = "Lightweight & Fast",
+                sha256 = alpineSha,
                 isRecommended = false,
                 isDownloaded = isAlpineCached,
                 cachedSizeBytes = alpineCachedFile?.length() ?: 0L
-            ),
-            LinuxDistro(
-                id = "debian",
-                name = "Debian",
-                version = "12 (Bookworm)",
-                description = "Rock-solid stability with standard Debian repositories and tools.",
-                downloadUrl = debianUrl,
-                sizeText = if (isDebianCached) "Downloaded (${formatBytes(debianCachedFile?.length() ?: 0)})" else "~30 MB",
-                packageManager = "apt",
-                tag = "Rock Solid",
-                isRecommended = false,
-                isDownloaded = isDebianCached,
-                cachedSizeBytes = debianCachedFile?.length() ?: 0L
             )
         )
     }
@@ -317,18 +319,29 @@ print("Or ask AI to execute scripts in this workspace.")
     suspend fun installRootfs(
         id: String,
         url: String,
+        expectedSha256: String? = null,
         onProgress: (RootfsInstallProgress) -> Unit = {},
     ): Boolean = withContext(Dispatchers.IO) {
         val workspace = dao.getById(id) ?: return@withContext false
         updateShellState(workspace.id, WorkspaceShellStatus.INSTALLING.name)
         try {
+            val sha = expectedSha256 ?: when (url) {
+                getUbuntuUrl() -> getUbuntuSha256()
+                getAlpineUrl() -> getAlpineSha256()
+                else -> null
+            }
             runInterruptible(Dispatchers.IO) {
-                rootfsInstaller.install(workspace.root, url, onProgress)
+                rootfsInstaller.install(
+                    root = workspace.root,
+                    url = url,
+                    expectedSha256 = sha,
+                    onProgress = onProgress,
+                )
                 onProgress(RootfsInstallProgress(stage = RootfsInstallStage.CONFIGURING))
             }
             val ready = manager.hasRootfs(workspace.root)
             if (ready) {
-                // Auto-provision Python 3 & essential dev tools
+                // Auto-provision Python 3 & isolated virtual environment
                 onProgress(RootfsInstallProgress(stage = RootfsInstallStage.CONFIGURING))
                 ensurePythonInstalled(workspace.id)
             }
@@ -355,10 +368,22 @@ print("Or ask AI to execute scripts in this workspace.")
         val isAlpine = File(linuxDir, "sbin/apk").exists()
         val isUbuntuOrDebian = File(linuxDir, "usr/bin/apt-get").exists() || File(linuxDir, "usr/bin/apt").exists()
 
+        // Architectural Decision (PEP 668 & Google Play Compliance):
+        // Create an isolated virtual environment (/opt/bit-env) with system site packages.
+        // This avoids modifying system python or overriding Debian/Ubuntu's EXTERNALLY-MANAGED flag,
+        // scoping dynamic pip installs and preventing base filesystem corruption.
         val bootstrapCmd = if (isAlpine) {
-            "apk update && apk add --no-cache python3 py3-pip bash curl git ca-certificates && ln -sf /usr/bin/python3 /usr/bin/python && ln -sf /usr/bin/pip3 /usr/bin/pip"
+            "apk update && apk add --no-cache python3 py3-pip bash curl git ca-certificates && " +
+            "python3 -m venv --system-site-packages /opt/bit-env 2>/dev/null || true; " +
+            "ln -sf /opt/bit-env/bin/python /usr/bin/python 2>/dev/null || ln -sf /usr/bin/python3 /usr/bin/python; " +
+            "ln -sf /opt/bit-env/bin/pip /usr/bin/pip 2>/dev/null || ln -sf /usr/bin/pip3 /usr/bin/pip"
         } else if (isUbuntuOrDebian) {
-            "export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a; apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv python-is-python3 curl git ca-certificates || (apt-get update --fix-missing && apt-get install -y --no-install-recommends python3 python3-pip python3-venv curl git ca-certificates && ln -sf /usr/bin/python3 /usr/bin/python)"
+            "export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a; " +
+            "(apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv python-is-python3 curl git ca-certificates || " +
+            "apt-get update --fix-missing && apt-get install -y --no-install-recommends python3 python3-pip python3-venv curl git ca-certificates) && " +
+            "python3 -m venv --system-site-packages /opt/bit-env 2>/dev/null || true; " +
+            "ln -sf /opt/bit-env/bin/python /usr/bin/python 2>/dev/null || true; " +
+            "ln -sf /opt/bit-env/bin/pip /usr/bin/pip 2>/dev/null || true"
         } else {
             "which python3 || (which apk && apk add --no-cache python3 py3-pip) || (which apt-get && apt-get update && apt-get install -y python3)"
         }
