@@ -51,8 +51,31 @@ object RetrievalPipeline {
         val fusedResults = reciprocalRankFusion(vectorResults, bm25Results)
         Log.d(TAG, "RRF produced ${fusedResults.size} fused results")
 
+        // 3b. Stanford Generative Agents Cognitive Memory Ranking (Recency, Frequency, Importance)
+        val now = System.currentTimeMillis()
+        val cognitivelyRankedResults = fusedResults.map { (nodeId, rrfScore) ->
+            val node = allNodes[nodeId]
+            if (node != null) {
+                val ageHours = (now - node.metadata.timestamp).coerceAtLeast(0L).toFloat() / (1000f * 60f * 60f)
+                val recencyScore = kotlin.math.exp(-0.693f * (ageHours / settings.recencyHalfLifeHours.coerceAtLeast(1.0f))).coerceIn(0.1f, 1.0f)
+                val accessCount = node.metadata.extras["access_count"]?.toIntOrNull() ?: 1
+                val frequencyScore = (kotlin.math.ln(1.0f + accessCount) / kotlin.math.ln(21.0f)).coerceIn(0.1f, 1.0f)
+                val entityCount = node.metadata.entities.size
+                val importanceScore = (0.5f + (entityCount * 0.05f)).coerceIn(0.5f, 1.0f)
+
+                val cognitiveBoost = 1.0f +
+                    (recencyScore * settings.recencyWeight) +
+                    (frequencyScore * settings.frequencyWeight) +
+                    (importanceScore * settings.importanceWeight)
+
+                nodeId to (rrfScore * cognitiveBoost)
+            } else {
+                nodeId to rrfScore
+            }
+        }.sortedByDescending { it.second }
+
         // 4. MMR diversity selection — pick top-K diverse results
-        val diverseResults = mmrSelect(fusedResults, queryEmbedding, allNodes, topK)
+        val diverseResults = mmrSelect(cognitivelyRankedResults, queryEmbedding, allNodes, topK)
         Log.d(TAG, "MMR selected ${diverseResults.size} diverse results")
 
         // 5. Assess confidence

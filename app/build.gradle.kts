@@ -20,12 +20,14 @@ android {
         applicationId = "com.bit.agent"
         minSdk = 29
         targetSdk = 36
-        versionCode = 82
-        versionName = "2.1.1"
+        versionCode = 86
+        versionName = "2.1.2"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
         buildConfigField("String", "ALIAS", getProperty("ALIAS"))
+        buildConfigField("Long", "BUILD_TIMESTAMP", "${System.currentTimeMillis()}L")
+        buildConfigField("int", "BETA_EXPIRY_DAYS", "0")
     }
 
     val isBuildingBundle = gradle.startParameter.taskNames.any { it.contains("bundle", ignoreCase = true) }
@@ -36,6 +38,10 @@ android {
             include("arm64-v8a", "x86_64")
             isUniversalApk = true
         }
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     androidResources {
@@ -75,7 +81,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("int", "BETA_EXPIRY_DAYS", "30") // Debug builds expire after 30 days
+        }
         release {
+            buildConfigField("int", "BETA_EXPIRY_DAYS", "0") // 0 = Never expires (production)
             isMinifyEnabled = true
             isShrinkResources = true
             val relConfig = signingConfigs.findByName("release")
@@ -110,7 +120,8 @@ android {
                 "lib/x86_64/libc++_shared.so",
                 "**/libonnxruntime.so",
                 "**/libonnxruntime4j_jni.so",
-                "**/libai_sherpa.so"
+                "**/libai_sherpa.so",
+                "**/libtermux.so"
             )
         }
         resources {
@@ -176,6 +187,9 @@ dependencies {
     implementation("io.noties.markwon:ext-strikethrough:4.6.2")
     implementation("io.noties.markwon:ext-tasklist:4.6.2")
 
+    // Reorderable LazyList for Drag-to-Reorder
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+
     // Database & Storage
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.runtime)
@@ -197,6 +211,9 @@ dependencies {
     implementation(project(":system_encryptor"))
     implementation(project(":file_ops"))
     implementation(project(":ums"))
+    implementation(project(":workspace"))
+    implementation("com.termux.termux-app:terminal-view:0.118.0")
+    implementation("com.termux.termux-app:terminal-emulator:0.118.0")
     //implementation(project(":character-engine"))
 
     // AndroidX Core & Lifecycle
@@ -221,12 +238,15 @@ dependencies {
     implementation(libs.androidx.material)
     implementation(libs.androidx.material3)
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+    implementation("com.google.zxing:core:3.5.3")
 
     // Debug
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 

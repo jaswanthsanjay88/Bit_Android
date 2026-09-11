@@ -25,22 +25,27 @@ import kotlin.math.sqrt
 
 @Serializable
 data class GraphSettings(
-    val edgeThreshold: Float = 0.75f,
-    val maxEdgesPerNode: Int = 10,
-    val traversalDepth: Int = 2,  // Increased from 1 to get more context
+    val edgeThreshold: Float = 0.52f,           // Adaptive threshold for cross-document discovery
+    val maxEdgesPerNode: Int = 12,              // Balance between density and graph clarity
+    val traversalDepth: Int = 2,                // Graph multi-hop retrieval depth
     val chunkSizeTokens: Int = 256,
-    val chunkOverlapTokens: Int = 40,  // Will use sentence overlap instead
-    val minChunkLength: Int = 20
+    val chunkOverlapTokens: Int = 40,
+    val minChunkLength: Int = 20,
+    val recencyHalfLifeHours: Float = 168.0f,   // 7 days half-life for Stanford recency decay
+    val semanticWeight: Float = 0.55f,          // Cognitive score weights
+    val recencyWeight: Float = 0.20f,
+    val frequencyWeight: Float = 0.15f,
+    val importanceWeight: Float = 0.10f
 ) {
     companion object {
         val DEFAULT = GraphSettings()
 
         // Optimized for medical/technical documents with lots of IDs and data
         val TECHNICAL = GraphSettings(
-            edgeThreshold = 0.70f,  // Slightly lower for technical content
-            maxEdgesPerNode = 15,   // More connections for related data
-            traversalDepth = 2,     // Get more context
-            chunkSizeTokens = 200,  // Smaller chunks for precise matching
+            edgeThreshold = 0.48f,
+            maxEdgesPerNode = 16,
+            traversalDepth = 2,
+            chunkSizeTokens = 200,
             chunkOverlapTokens = 40,
             minChunkLength = 15
         )
@@ -59,7 +64,8 @@ enum class SourceType {
 enum class EdgeType {
     SEMANTIC,      // Based on embedding similarity
     SEQUENTIAL,    // Next/prev in original document
-    EXPLICIT       // User-defined link (future)
+    EXPLICIT,      // User-defined link (future)
+    ENTITY         // Shared entities / topics / IDs across documents
 }
 
 @Serializable
@@ -73,9 +79,11 @@ data class NeuronEdge(
 data class NodeMetadata(
     val sourceId: String = "",           // Original document/chat ID
     val sourceName: String = "",         // Display name
+    val chunkTitle: String = "",         // Per-chunk title for node label & chunk browser
     val position: Int = 0,               // Position in source
     val timestamp: Long = System.currentTimeMillis(),
-    val extras: Map<String, String> = emptyMap()
+    val extras: Map<String, String> = emptyMap(),
+    val entities: List<String> = emptyList()
 )
 
 data class NeuronNode(
@@ -107,8 +115,63 @@ data class GraphStats(
     val nodeCount: Int,
     val edgeCount: Int,
     val sourceCount: Int,
-    val avgEdgesPerNode: Float
+    val avgEdgesPerNode: Float,
+    val entityEdgeCount: Int = 0,
+    val crossDocumentEdgeCount: Int = 0
 )
+
+// ============================================================================
+// Entity Extractor (Cognitive Knowledge Extraction)
+// ============================================================================
+
+object EntityExtractor {
+    // Matches capitalized entity terms (Names, Projects, Locations, Concepts)
+    private val NAMED_ENTITY_REGEX = Regex("""\b([A-Z][a-z0-9]+(?:\s+[A-Z][a-z0-9]+)*)\b""")
+    // Matches structured identifiers like Account: 1234, Branch: 521, Date: 2026-09-11
+    private val KEY_VALUE_REGEX = Regex("""\b(Account|Branch|Invoice|Transaction|Balance|Project|User|Author|Date|Status|ID|Tax|Code|Ref|Amount|Total)[\s:#]+([A-Za-z0-9\-_./]+)""", RegexOption.IGNORE_CASE)
+    // Matches hashtags or tags
+    private val HASHTAG_REGEX = Regex("""#([A-Za-z0-9_]+)""")
+
+    private val STOPWORDS = setOf(
+        "The", "A", "An", "This", "That", "These", "Those", "It", "They", "We", "You", "He", "She",
+        "In", "On", "At", "To", "For", "With", "By", "From", "About", "As", "Into", "Like", "Through",
+        "After", "Over", "Between", "Out", "Against", "During", "Without", "Before", "Under", "Around",
+        "Among", "And", "Or", "But", "If", "Because", "So", "However", "While", "Although", "Since",
+        "Is", "Are", "Was", "Were", "Be", "Been", "Being", "Have", "Has", "Had", "Do", "Does", "Did",
+        "Page", "File", "Chunk", "Node", "Document", "Text", "Note"
+    )
+
+    fun extract(text: String, tags: String = ""): List<String> {
+        val entities = linkedSetOf<String>()
+
+        // 1. Structured Key-Value entities (highest specificity)
+        KEY_VALUE_REGEX.findAll(text).forEach { match ->
+            val key = match.groupValues[1].lowercase().replaceFirstChar { it.uppercase() }
+            val value = match.groupValues[2]
+            if (value.length in 2..30) {
+                entities.add("$key:$value")
+            }
+        }
+
+        // 2. Explicit tags / hashtags
+        if (tags.isNotBlank()) {
+            tags.split(",", ";", " ").map { it.trim().removePrefix("#") }.filter { it.isNotBlank() }.forEach { entities.add(it) }
+        }
+        HASHTAG_REGEX.findAll(text).forEach { match ->
+            entities.add(match.groupValues[1])
+        }
+
+        // 3. Named Entities (Capitalized tokens)
+        NAMED_ENTITY_REGEX.findAll(text).forEach { match ->
+            val word = match.groupValues[1].trim()
+            if (word.length >= 3 && !STOPWORDS.contains(word)) {
+                entities.add(word)
+            }
+        }
+
+        return entities.take(12).toList()
+    }
+}
 
 // ============================================================================
 // Semantic Chunker
@@ -202,6 +265,15 @@ object SemanticChunker {
             val content = message.content.content
             if (content.isNotBlank() && content.length >= settings.minChunkLength) {
                 val rolePrefix = if (message.role == Role.User) "[User] " else "[Assistant] "
+                val extractedEntities = EntityExtractor.extract(content)
+                val chunkTitle = deriveChunkTitle(content, index)
+                val extras = buildMap {
+                    put("role", message.role.name)
+                    put("chunk_title", chunkTitle)
+                    if (extractedEntities.isNotEmpty()) {
+                        put("entities", extractedEntities.joinToString(","))
+                    }
+                }
                 nodes.add(
                     NeuronNode(
                         id = message.msgId,
@@ -210,9 +282,11 @@ object SemanticChunker {
                         metadata = NodeMetadata(
                             sourceId = chatId,
                             sourceName = chatName,
+                            chunkTitle = chunkTitle,
                             position = index,
                             timestamp = System.currentTimeMillis(),
-                            extras = mapOf("role" to message.role.name)
+                            extras = extras,
+                            entities = extractedEntities
                         )
                     )
                 )
@@ -343,6 +417,18 @@ object SemanticChunker {
         return ((words * 1.5) + (punctuation * 0.5)).toInt()
     }
 
+    fun deriveChunkTitle(content: String, position: Int): String {
+        // First meaningful line/sentence of the chunk
+        val firstLine = content.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotBlank() }
+            ?: content.trim()
+
+        val firstSentence = firstLine.split(Regex("(?<=[.!?])\\s+")).firstOrNull() ?: firstLine
+        return firstSentence.take(60).let { if (it.length < firstSentence.length) "$it…" else it }
+            .ifBlank { "Chunk ${position + 1}" }
+    }
+
     private fun createNode(
         content: String,
         sourceType: SourceType,
@@ -350,13 +436,24 @@ object SemanticChunker {
         sourceName: String,
         position: Int
     ): NeuronNode {
+        val extractedEntities = EntityExtractor.extract(content)
+        val chunkTitle = deriveChunkTitle(content, position)
+        val extras = buildMap {
+            put("chunk_title", chunkTitle)
+            if (extractedEntities.isNotEmpty()) {
+                put("entities", extractedEntities.joinToString(","))
+            }
+        }
         return NeuronNode(
             content = content,
             sourceType = sourceType,
             metadata = NodeMetadata(
                 sourceId = sourceId,
                 sourceName = sourceName,
-                position = position
+                chunkTitle = chunkTitle,
+                position = position,
+                extras = extras,
+                entities = extractedEntities
             )
         )
     }
@@ -382,12 +479,22 @@ class NeuronGraph(
 
     fun getStats(): GraphStats {
         val sources = nodes.values.map { it.metadata.sourceId }.distinct().size
-        val totalEdges = nodes.values.sumOf { it.edges.size }
+        val allEdges = nodes.values.flatMap { it.edges }
+        val entityEdges = allEdges.count { it.type == EdgeType.ENTITY } / 2
+        val crossDocEdges = nodes.values.sumOf { node ->
+            node.edges.count { edge ->
+                val target = nodes[edge.targetId]
+                target != null && target.metadata.sourceId.isNotBlank() && target.metadata.sourceId != node.metadata.sourceId
+            }
+        } / 2
+        val totalEdges = allEdges.size
         return GraphStats(
             nodeCount = nodes.size,
             edgeCount = totalEdges / 2,
             sourceCount = sources,
-            avgEdgesPerNode = if (nodes.isEmpty()) 0f else totalEdges.toFloat() / nodes.size
+            avgEdgesPerNode = if (nodes.isEmpty()) 0f else totalEdges.toFloat() / nodes.size,
+            entityEdgeCount = entityEdges,
+            crossDocumentEdgeCount = crossDocEdges
         )
     }
 
@@ -467,10 +574,6 @@ class NeuronGraph(
         sourceId: String = UUID.randomUUID().toString()
     ): Result<List<NeuronNode>> = withContext(Dispatchers.IO) {
         try {
-            if (!embeddingEngine.isInitialized()) {
-                return@withContext Result.failure(Exception("Embedding provider not initialized"))
-            }
-
             // Chunk the text
             val newNodes = SemanticChunker.chunkText(
                 text = text,
@@ -484,8 +587,17 @@ class NeuronGraph(
                 return@withContext Result.success(emptyList())
             }
 
-            // Embed and add nodes
-            val addedNodes = addNodesWithEmbeddings(newNodes)
+            // Embed and add nodes (or add directly if embeddings are not ready)
+            val addedNodes = if (embeddingEngine.isInitialized()) {
+                addNodesWithEmbeddings(newNodes)
+            } else {
+                mutex.withLock {
+                    for (node in newNodes) {
+                        nodes[node.id] = node
+                    }
+                }
+                newNodes
+            }
 
             // Add sequential edges between chunks from same source
             addSequentialEdges(addedNodes)
@@ -605,34 +717,77 @@ class NeuronGraph(
 
     private fun buildEdgesForNode(newNode: NeuronNode) {
         val newEmbedding = newNode.embedding ?: return
+        val newEntities = newNode.metadata.entities.toSet()
 
-        val similarities = mutableListOf<Pair<String, Float>>()
+        val semanticCandidates = mutableListOf<Pair<String, Float>>()
+        val entityCandidates = mutableListOf<Pair<String, Float>>()
 
-        // Calculate similarity with all existing nodes
+        // 1. Compare against existing nodes
         for ((id, existingNode) in nodes) {
-            val existingEmbedding = existingNode.embedding ?: continue
-            val similarity = cosineSimilarity(newEmbedding, existingEmbedding)
+            if (id == newNode.id) continue
 
-            if (similarity >= settings.edgeThreshold) {
-                similarities.add(id to similarity)
+            // Semantic cosine similarity
+            existingNode.embedding?.let { existingEmb ->
+                val similarity = cosineSimilarity(newEmbedding, existingEmb)
+                if (similarity >= settings.edgeThreshold) {
+                    semanticCandidates.add(id to similarity)
+                }
+            }
+
+            // Entity conceptual overlap (inter-document bridging)
+            if (newEntities.isNotEmpty() && existingNode.metadata.entities.isNotEmpty()) {
+                val existingEntities = existingNode.metadata.entities.toSet()
+                val shared = newEntities.intersect(existingEntities)
+                if (shared.isNotEmpty()) {
+                    val union = newEntities.size + existingEntities.size - shared.size
+                    val jaccard = shared.size.toFloat() / union.coerceAtLeast(1)
+                    val entityWeight = (0.60f + (jaccard * 0.40f)).coerceIn(0.60f, 1.0f)
+                    entityCandidates.add(id to entityWeight)
+                }
             }
         }
 
-        // Sort by similarity and take top K
-        val topEdges = similarities
-            .sortedByDescending { it.second }
-            .take(settings.maxEdgesPerNode)
+        // 2. Prioritize cross-document semantic edges
+        val crossDocSemantic = semanticCandidates.filter {
+            nodes[it.first]?.metadata?.sourceId != newNode.metadata.sourceId
+        }.sortedByDescending { it.second }.take(settings.maxEdgesPerNode / 2)
 
-        // Add bidirectional edges
-        for ((targetId, weight) in topEdges) {
+        val sameDocSemantic = semanticCandidates.filter {
+            nodes[it.first]?.metadata?.sourceId == newNode.metadata.sourceId
+        }.sortedByDescending { it.second }
+
+        val topSemantic = (crossDocSemantic + sameDocSemantic)
+            .distinctBy { it.first }
+            .sortedByDescending { it.second }
+            .take((settings.maxEdgesPerNode - 2).coerceAtLeast(2))
+
+        // 3. Select top entity edges
+        val topEntity = entityCandidates
+            .sortedByDescending { it.second }
+            .take(settings.maxEdgesPerNode / 3)
+
+        // 4. Add bidirectional semantic edges
+        for ((targetId, weight) in topSemantic) {
             newNode.edges.add(NeuronEdge(targetId, weight, EdgeType.SEMANTIC))
             nodes[targetId]?.edges?.add(NeuronEdge(newNode.id, weight, EdgeType.SEMANTIC))
         }
 
-        // Prune existing nodes if they exceed max edges
-        for ((targetId, _) in topEdges) {
+        // 5. Add bidirectional entity edges
+        for ((targetId, weight) in topEntity) {
+            if (newNode.edges.none { it.targetId == targetId }) {
+                newNode.edges.add(NeuronEdge(targetId, weight, EdgeType.ENTITY))
+            }
+            val targetNode = nodes[targetId]
+            if (targetNode != null && targetNode.edges.none { it.targetId == newNode.id }) {
+                targetNode.edges.add(NeuronEdge(newNode.id, weight, EdgeType.ENTITY))
+            }
+        }
+
+        // 6. Prune connections if needed
+        for ((targetId, _) in (topSemantic + topEntity).distinctBy { it.first }) {
             pruneEdges(nodes[targetId])
         }
+        pruneEdges(newNode)
     }
 
     private fun addSequentialEdges(orderedNodes: List<NeuronNode>) {
@@ -652,15 +807,19 @@ class NeuronGraph(
         node ?: return
         if (node.edges.size <= settings.maxEdgesPerNode) return
 
-        // Keep sequential edges, prune semantic by weight
         val sequential = node.edges.filter { it.type == EdgeType.SEQUENTIAL }
+        val entity = node.edges.filter { it.type == EdgeType.ENTITY }
+            .sortedByDescending { it.weight }
+            .take((settings.maxEdgesPerNode / 3).coerceAtLeast(2))
+        val remainingSlots = (settings.maxEdgesPerNode - sequential.size - entity.size).coerceAtLeast(2)
         val semantic = node.edges
             .filter { it.type == EdgeType.SEMANTIC }
             .sortedByDescending { it.weight }
-            .take(settings.maxEdgesPerNode - sequential.size)
+            .take(remainingSlots)
 
         node.edges.clear()
         node.edges.addAll(sequential)
+        node.edges.addAll(entity)
         node.edges.addAll(semantic)
     }
 
@@ -704,7 +863,8 @@ class NeuronGraph(
         val threshold = 0.25f
         android.util.Log.d("NeuronGraph", "Using similarity threshold: $threshold")
 
-        // Calculate hybrid scores (semantic + keyword)
+        // Calculate hybrid scores (semantic + keyword) and Stanford Generative Agents cognitive ranking
+        val now = System.currentTimeMillis()
         val allScores = nodes.values
             .mapNotNull { node ->
                 node.embedding?.let { emb ->
@@ -713,8 +873,7 @@ class NeuronGraph(
                     // Calculate keyword match score (0.0 to 1.0)
                     val keywordScore = calculateKeywordScore(node.content, keywords)
 
-                    // Hybrid score: 70% semantic + 30% keyword
-                    // If exact keyword match, boost significantly
+                    // Base hybrid score: combines vector similarity + lexical match
                     val hybridScore = if (keywordScore > 0.5f) {
                         // Strong keyword match - boost semantic score
                         (semanticScore * 0.6f) + (keywordScore * 0.4f)
@@ -723,7 +882,26 @@ class NeuronGraph(
                         (semanticScore * 0.8f) + (keywordScore * 0.2f)
                     }
 
-                    Triple(node, hybridScore, semanticScore)
+                    // Stanford Generative Agents Cognitive Ranking:
+                    // 1. Recency Decay: e^(-lambda * delta_t_hours), half-life = settings.recencyHalfLifeHours (default 168h = 7 days)
+                    val ageHours = (now - node.metadata.timestamp).coerceAtLeast(0L).toFloat() / (1000f * 60f * 60f)
+                    val recencyScore = kotlin.math.exp(-0.693f * (ageHours / settings.recencyHalfLifeHours.coerceAtLeast(1.0f))).coerceIn(0.1f, 1.0f)
+
+                    // 2. Access Frequency: ln(1 + accessCount) / ln(21)
+                    val accessCount = node.metadata.extras["access_count"]?.toIntOrNull() ?: 1
+                    val frequencyScore = (kotlin.math.ln(1.0f + accessCount) / kotlin.math.ln(21.0f)).coerceIn(0.1f, 1.0f)
+
+                    // 3. Importance: entity density + structured key-value richness
+                    val entityCount = node.metadata.entities.size
+                    val importanceScore = (0.5f + (entityCount * 0.05f)).coerceIn(0.5f, 1.0f)
+
+                    // Unified cognitive score
+                    val cognitiveScore = (hybridScore * settings.semanticWeight) +
+                            (recencyScore * settings.recencyWeight) +
+                            (frequencyScore * settings.frequencyWeight) +
+                            (importanceScore * settings.importanceWeight)
+
+                    Triple(node, cognitiveScore, semanticScore)
                 }
             }
 
@@ -764,13 +942,34 @@ class NeuronGraph(
         queryText: String,
         topK: Int = 5
     ): RetrievalResult = withContext(Dispatchers.IO) {
-        if (!embeddingEngine.isInitialized() || nodes.isEmpty()) {
+        if (nodes.isEmpty()) {
             return@withContext RetrievalResult(emptyList(), RetrievalConfidence.LOW, "")
         }
 
-        val queryEmbedding = embeddingEngine.embed(queryText)
+        val queryEmbedding = if (embeddingEngine.isInitialized()) embeddingEngine.embed(queryText) else null
         if (queryEmbedding == null) {
-            return@withContext RetrievalResult(emptyList(), RetrievalConfidence.LOW, "")
+            // Keyword / FTS5 fallback retrieval when semantic embedding is uninitialized
+            if (searchIndex != null) {
+                val ftsHits = searchIndex?.search(queryText, topK) ?: emptyList()
+                val matchedNodes = ftsHits.mapNotNull { hit ->
+                    nodes[hit.nodeId]?.let { node ->
+                        QueryResult(node = node, score = hit.score, connectedNodes = emptyList())
+                    }
+                }
+                if (matchedNodes.isNotEmpty()) {
+                    val context = matchedNodes.joinToString("\n\n") { it.node.content }
+                    return@withContext RetrievalResult(matchedNodes, RetrievalConfidence.MEDIUM, context)
+                }
+            }
+            // Simple keyword overlap fallback across nodes
+            val keywords = extractKeywords(queryText)
+            val scoredNodes = nodes.values.mapNotNull { node ->
+                val score = calculateKeywordScore(node.content, keywords)
+                if (score > 0.1f) QueryResult(node, score, emptyList()) else null
+            }.sortedByDescending { it.score }.take(topK)
+            val context = scoredNodes.joinToString("\n\n") { it.node.content }
+            val confidence = if (scoredNodes.isNotEmpty()) RetrievalConfidence.MEDIUM else RetrievalConfidence.LOW
+            return@withContext RetrievalResult(scoredNodes, confidence, context)
         }
 
         // If search index is available, use the full pipeline
@@ -949,8 +1148,17 @@ class NeuronGraph(
         dos.writeLargeString(node.metadata.sourceName)
         dos.writeInt(node.metadata.position)
         dos.writeLong(node.metadata.timestamp)
-        dos.writeInt(node.metadata.extras.size)
-        for ((key, value) in node.metadata.extras) {
+        val extrasToWrite = mutableMapOf<String, String>().apply {
+            putAll(node.metadata.extras)
+            if (node.metadata.chunkTitle.isNotBlank() && !containsKey("chunk_title")) {
+                put("chunk_title", node.metadata.chunkTitle)
+            }
+            if (node.metadata.entities.isNotEmpty() && !containsKey("entities")) {
+                put("entities", node.metadata.entities.joinToString(","))
+            }
+        }
+        dos.writeInt(extrasToWrite.size)
+        for ((key, value) in extrasToWrite) {
             dos.writeLargeString(key)
             dos.writeLargeString(value)
         }
@@ -1043,7 +1251,18 @@ class NeuronGraph(
             val value = if (isNgr2) dis.readLargeString() else dis.readUTF()
             extras[key] = value
         }
-        val metadata = NodeMetadata(sourceId, sourceName, position, timestamp, extras)
+        val chunkTitle = extras["chunk_title"] ?: SemanticChunker.deriveChunkTitle(content, position)
+        val entities = extras["entities"]?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
+            ?: EntityExtractor.extract(content)
+        val metadata = NodeMetadata(
+            sourceId = sourceId,
+            sourceName = sourceName,
+            chunkTitle = chunkTitle,
+            position = position,
+            timestamp = timestamp,
+            extras = extras,
+            entities = entities
+        )
 
         // Embedding
         val hasEmbedding = dis.readBoolean()
@@ -1058,7 +1277,8 @@ class NeuronGraph(
         repeat(edgeCount) {
             val targetId = if (isNgr2) dis.readLargeString() else dis.readUTF()
             val weight = dis.readFloat()
-            val edgeType = EdgeType.valueOf(if (isNgr2) dis.readLargeString() else dis.readUTF())
+            val edgeTypeStr = if (isNgr2) dis.readLargeString() else dis.readUTF()
+            val edgeType = runCatching { EdgeType.valueOf(edgeTypeStr) }.getOrDefault(EdgeType.SEMANTIC)
             edges.add(NeuronEdge(targetId, weight, edgeType))
         }
 

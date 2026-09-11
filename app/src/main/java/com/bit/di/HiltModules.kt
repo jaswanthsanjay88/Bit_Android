@@ -51,6 +51,12 @@
         fun provideKnowledgeRelationDao(database: AppDatabase): com.bit.database.dao.KnowledgeRelationDao {
             return database.knowledgeRelationDao()
         }
+
+        @Provides
+        @Singleton
+        fun provideWorkspaceDao(database: AppDatabase): com.bit.database.dao.WorkspaceDao {
+            return database.workspaceDao()
+        }
     }
 
     @Module
@@ -88,6 +94,18 @@
         ): RagRepository {
             return RagRepository(
                 ragDao = database.ragDao(),
+                context = context
+            )
+        }
+
+        @Provides
+        @Singleton
+        fun provideWorkspaceRepository(
+            workspaceDao: com.bit.database.dao.WorkspaceDao,
+            @ApplicationContext context: Context
+        ): com.bit.repo.WorkspaceRepository {
+            return com.bit.repo.WorkspaceRepository(
+                dao = workspaceDao,
                 context = context
             )
         }

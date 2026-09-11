@@ -105,10 +105,23 @@ fun NoteDetailScreen(
     var markdownContent by remember(existingNote) { mutableStateOf(existingNote?.content ?: "") }
     var editTextRef by remember { mutableStateOf<EditText?>(null) }
 
-    var isPreviewMode by remember { mutableStateOf(false) }
+    var isDeleted by remember { mutableStateOf(false) }
+
+    // Check if an original PDF binary file exists for this document
+    val pdfFile = remember(existingNote, currentFilePath, currentNoteId, title) {
+        val candidates = listOfNotNull(
+            currentNoteId?.let { File(com.bit.global.AppPaths.documentsVault(context), "$it.pdf") },
+            existingNote?.id?.let { File(com.bit.global.AppPaths.documentsVault(context), "$it.pdf") },
+            if (currentFilePath.endsWith(".pdf", ignoreCase = true)) File(currentFilePath) else null,
+            if (existingNote?.filePath?.endsWith(".pdf", ignoreCase = true) == true) File(existingNote.filePath) else null,
+            if (title.endsWith(".pdf", ignoreCase = true)) File(com.bit.global.AppPaths.documentsVault(context), title) else null
+        )
+        candidates.firstOrNull { it.exists() && it.length() > 0 }
+    }
+
+    var isPreviewMode by remember(pdfFile) { mutableStateOf(pdfFile != null) }
     var showSlashMenu by remember { mutableStateOf(false) }
     var slashQuery by remember { mutableStateOf("") }
-    var isDeleted by remember { mutableStateOf(false) }
 
     // When existingNote updates/loads, sync content & title
     LaunchedEffect(existingNote) {
@@ -212,29 +225,40 @@ fun NoteDetailScreen(
     val textSecondary = MaterialTheme.colorScheme.onSurfaceVariant
     val surfaceBg = MaterialTheme.colorScheme.surface
 
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {},
                 navigationIcon = {
-                    IconButton(onClick = { if (!isDeleted) performSave(); onBackClick() }) {
-                        Icon(TnIcons.ArrowLeft, contentDescription = "Back", tint = textPrimary)
+                    IconButton(onClick = {
+                        haptics.pop()
+                        onBackClick()
+                    }) {
+                        Icon(TnIcons.ArrowLeft, contentDescription = "Back", tint = textSecondary)
                     }
                 },
                 actions = {
-                    // Material 3 Edit/Preview Mode FilterChip
+                    // Preview / Edit Toggle Chip
                     FilterChip(
                         selected = isPreviewMode,
-                        onClick = { isPreviewMode = !isPreviewMode },
+                        onClick = {
+                            haptics.selection()
+                            isPreviewMode = !isPreviewMode
+                        },
                         label = {
                             Text(
-                                text = if (isPreviewMode) "Preview" else "Edit",
-                                style = MaterialTheme.typography.labelMedium
+                                if (isPreviewMode) {
+                                    if (pdfFile != null) "PDF View" else "Preview"
+                                } else "Edit",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium
                             )
                         },
                         leadingIcon = {
                             Icon(
-                                imageVector = if (isPreviewMode) TnIcons.Code else TnIcons.Edit,
+                                if (isPreviewMode) TnIcons.Eye else TnIcons.Edit,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
@@ -247,6 +271,7 @@ fun NoteDetailScreen(
                     Spacer(Modifier.width(8.dp))
                     // Save Action
                     IconButton(onClick = {
+                        haptics.success()
                         performSave()
                         Toast.makeText(context, "Saved", Toast.LENGTH_SHORT).show()
                     }) {
@@ -256,6 +281,7 @@ fun NoteDetailScreen(
                     val activeNoteId = currentNoteId ?: existingNote?.id
                     if (activeNoteId != null) {
                         IconButton(onClick = {
+                            haptics.thud()
                             isDeleted = true
                             val noteToDelete = existingNote ?: MemoryNote(
                                 id = activeNoteId,
@@ -309,16 +335,28 @@ fun NoteDetailScreen(
             Spacer(Modifier.height(16.dp))
 
             if (isPreviewMode) {
-                // Material 3 AST Markdown Preview
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    MarkdownText(
-                        text = markdownContent.ifBlank { "*No content yet. Tap Edit to start typing.*" },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                if (pdfFile != null) {
+                    // Genuine multi-page PDF Rendering
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        com.bit.ui.components.PdfPageViewer(
+                            file = pdfFile,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                    }
+                } else {
+                    // Material 3 AST Markdown Preview
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        MarkdownText(
+                            text = markdownContent.ifBlank { "*No content yet. Tap Edit to start typing.*" },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             } else {
                 // Markwon Live Syntax-Highlighted Editor

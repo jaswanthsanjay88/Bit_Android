@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bit.ui.theme.bouncyClick
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.global.formatRelativeTime
@@ -167,6 +168,7 @@ fun AiMemoryListScreen(
                     items(aiFacts, key = { it.id }) { fact ->
                         AiFactCard(
                             fact = fact,
+                            modifier = Modifier.animateItem(),
                             onClick = { onNoteClick(fact.id, fact.noteType) },
                             onPin = { viewModel.pinNote(fact) },
                             onMoveToNotes = { viewModel.moveAiFactToNotes(fact) },
@@ -182,6 +184,7 @@ fun AiMemoryListScreen(
 @Composable
 private fun AiFactCard(
     fact: MemoryNote,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onPin: () -> Unit,
     onMoveToNotes: () -> Unit,
@@ -193,9 +196,9 @@ private fun AiFactCard(
     val dotAlpha = remember(fact.accessCount) { (0.3f + (fact.accessCount * 0.15f)).coerceIn(0.3f, 1.0f) }
 
     Card(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() },
+            .bouncyClick { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {

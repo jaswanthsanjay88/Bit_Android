@@ -46,7 +46,7 @@ fun FeatureSetupScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colorScheme.background)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -54,7 +54,7 @@ fun FeatureSetupScreen(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = Color.White,
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(64.dp)
         )
         
@@ -63,7 +63,7 @@ fun FeatureSetupScreen(
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
@@ -74,40 +74,38 @@ fun FeatureSetupScreen(
         Text(
             text = description,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
             textAlign = TextAlign.Center
         )
         
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(32.dp))
         
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxWidth()
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+            ),
+            shape = RoundedCornerShape(16.dp)
         ) {
-            items(components) { component ->
-                SetupComponentCard(component)
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                components.forEach { component ->
+                    SetupComponentItem(component)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SetupComponentCard(component: SetupComponent) {
-    val borderColor = when (component.state) {
-        is ComponentState.Ready -> Color(0xFF2E2E2E)
-        is ComponentState.Downloading -> Color.White
-        is ComponentState.Processing -> Color.White
-        is ComponentState.Missing -> Color(0xFF2E2E2E)
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(1.dp, borderColor, RoundedCornerShape(Standards.CardCornerRadius))
-            .background(Color(0xFF121212), RoundedCornerShape(Standards.CardCornerRadius))
-            .padding(20.dp)
-    ) {
+private fun SetupComponentItem(
+    component: SetupComponent,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -117,15 +115,13 @@ private fun SetupComponentCard(component: SetupComponent) {
                 Text(
                     text = component.title,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = component.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
-                    lineHeight = 18.sp
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
@@ -136,7 +132,7 @@ private fun SetupComponentCard(component: SetupComponent) {
                     Icon(
                         imageVector = TnIcons.CircleCheck,
                         contentDescription = "Ready",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -146,7 +142,7 @@ private fun SetupComponentCard(component: SetupComponent) {
                 is ComponentState.Processing -> {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.primary,
                         strokeWidth = 2.dp
                     )
                 }
@@ -154,8 +150,8 @@ private fun SetupComponentCard(component: SetupComponent) {
                     Button(
                         onClick = component.onAction,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         ),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),

@@ -243,6 +243,35 @@ class SystemBackupManager(private val context: Context) {
         options: BackupOptions = BackupOptions(),
         onProgress: (BackupProgress) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
+        val stream = context.contentResolver.openOutputStream(outputUri)
+            ?: run {
+                onProgress(BackupProgress.Error("Failed to open output stream"))
+                return@withContext false
+            }
+        stream.use { output ->
+            createBackupToStream(output, password, options, onProgress)
+        }
+    }
+
+    suspend fun createBackupToFile(
+        targetFile: File,
+        password: String,
+        options: BackupOptions = BackupOptions(),
+        onProgress: (BackupProgress) -> Unit = {}
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (targetFile.exists()) targetFile.delete()
+        targetFile.parentFile?.mkdirs()
+        targetFile.outputStream().use { output ->
+            createBackupToStream(output, password, options, onProgress)
+        }
+    }
+
+    private suspend fun createBackupToStream(
+        output: java.io.OutputStream,
+        password: String,
+        options: BackupOptions,
+        onProgress: (BackupProgress) -> Unit
+    ): Boolean {
         try {
             onProgress(BackupProgress.Starting)
 
@@ -285,11 +314,15 @@ class SystemBackupManager(private val context: Context) {
                 Log.w(TAG, "Failed to export chats: ${e.message}")
             }
 
-            // DataStore preferences
+            // DataStore and Shared Preferences
             onProgress(BackupProgress.Collecting("Settings", ++componentIndex, componentCount))
             collectDataStoreFiles().forEach { (path, data) ->
                 entries.add(Triple(EntryType.DATASTORE_FILE, path, data))
                 checksums["ds:$path"] = sha256(data)
+            }
+            collectSharedPrefsFiles().forEach { (path, data) ->
+                entries.add(Triple(EntryType.DATASTORE_FILE, "shared_prefs/$path", data))
+                checksums["sp:$path"] = sha256(data)
             }
 
             // RAG files
@@ -364,29 +397,27 @@ class SystemBackupManager(private val context: Context) {
             }
             val metadataBytes = metadata.toString().toByteArray(Charsets.UTF_8)
 
-            // 6. Write archive to output URI
+            // 6. Write archive
             onProgress(BackupProgress.Processing(0.9f, "Writing"))
-            context.contentResolver.openOutputStream(outputUri)?.use { output ->
-                DataOutputStream(output).apply {
-                    writeInt(MAGIC)
-                    writeInt(BACKUP_VERSION)
-                    writeLong(System.currentTimeMillis())
-                    writeInt(metadataBytes.size)
-                    write(metadataBytes)
-                    write(salt)
-                    write(iv)
-                    write(encrypted)
-                    flush()
-                }
-            } ?: throw Exception("Failed to open output stream")
+            DataOutputStream(output).apply {
+                writeInt(MAGIC)
+                writeInt(BACKUP_VERSION)
+                writeLong(System.currentTimeMillis())
+                writeInt(metadataBytes.size)
+                write(metadataBytes)
+                write(salt)
+                write(iv)
+                write(encrypted)
+                flush()
+            }
 
             onProgress(BackupProgress.Complete)
             Log.i(TAG, "Backup v$BACKUP_VERSION created: ${entries.size} entries (models=${options.includeModelFiles})")
-            true
+            return true
         } catch (e: Exception) {
             Log.e(TAG, "Backup failed", e)
             onProgress(BackupProgress.Error(e.message ?: "Backup failed"))
-            false
+            return false
         }
     }
 
@@ -397,12 +428,37 @@ class SystemBackupManager(private val context: Context) {
         password: String,
         onProgress: (BackupProgress) -> Unit = {}
     ): Boolean = withContext(Dispatchers.IO) {
-        try {
+        val archiveData = context.contentResolver.openInputStream(inputUri)?.use { it.readBytes() }
+            ?: run {
+                onProgress(BackupProgress.Error("Failed to read backup file"))
+                return@withContext false
+            }
+        restoreFromBackupBytes(archiveData, password, onProgress)
+    }
+
+    suspend fun restoreBackupFromFile(
+        sourceFile: File,
+        password: String,
+        onProgress: (BackupProgress) -> Unit = {}
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (!sourceFile.exists()) {
+            onProgress(BackupProgress.Error("Backup file does not exist"))
+            return@withContext false
+        }
+        val archiveData = sourceFile.readBytes()
+        restoreFromBackupBytes(archiveData, password, onProgress)
+    }
+
+    private suspend fun restoreFromBackupBytes(
+        archiveData: ByteArray,
+        password: String,
+        onProgress: (BackupProgress) -> Unit = {}
+    ): Boolean {
+        return try {
             onProgress(BackupProgress.Starting)
 
             // ========== PHASE 1: VALIDATE (non-destructive) ==========
             onProgress(BackupProgress.Collecting("Reading backup"))
-            val archiveData = context.contentResolver.openInputStream(inputUri)?.use { it.readBytes() }
                 ?: throw Exception("Failed to read backup file")
 
             val input = DataInputStream(ByteArrayInputStream(archiveData))
@@ -1054,6 +1110,15 @@ class SystemBackupManager(private val context: Context) {
             ?: emptyList()
     }
 
+    private fun collectSharedPrefsFiles(): List<Pair<String, ByteArray>> {
+        val prefsDir = File(context.filesDir.parentFile, "shared_prefs")
+        if (!prefsDir.exists()) return emptyList()
+        return prefsDir.listFiles()
+            ?.filter { it.isFile && it.name.endsWith(".xml") }
+            ?.map { it.name to it.readBytes() }
+            ?: emptyList()
+    }
+
     // ======================== RESTORE HELPERS ========================
 
     private fun restoreEntry(type: EntryType, path: String, data: ByteArray) {
@@ -1070,9 +1135,16 @@ class SystemBackupManager(private val context: Context) {
                 // Skip — device-bound Keystore encryption, not portable
             }
             EntryType.DATASTORE_FILE -> {
-                val dataStoreDir = File(context.filesDir.parentFile, "datastore")
-                dataStoreDir.mkdirs()
-                File(dataStoreDir, path).writeBytes(data)
+                if (path.startsWith("shared_prefs/")) {
+                    val fileName = path.removePrefix("shared_prefs/")
+                    val prefsDir = File(context.filesDir.parentFile, "shared_prefs")
+                    prefsDir.mkdirs()
+                    File(prefsDir, fileName).writeBytes(data)
+                } else {
+                    val dataStoreDir = File(context.filesDir.parentFile, "datastore")
+                    dataStoreDir.mkdirs()
+                    File(dataStoreDir, path).writeBytes(data)
+                }
             }
             EntryType.RAG_FILE -> {
                 val ragDir = AppPaths.rags(context)

@@ -58,38 +58,38 @@ class MemoryPlugin(private val context: Context) : SuperPlugin {
     override fun getPluginInfo(): PluginInfo {
         return PluginInfo(
             name = "Memory Vault",
-            description = "Read, write, and manage memory files in the BIT Vault.",
+            description = "Manage persistent personal knowledge, episodic memory, preferences, and markdown notes in the AI Memory Vault. Do NOT use for programming or code execution.",
             author = "BIT",
             version = "1.0.0",
             toolDefinitionBuilder = listOf(
                 ToolDefinitionBuilder(
                     TOOL_LIST_MEMORY,
-                    "List all files in the memory vault."
+                    "List all personal memory notes and user facts in the Memory Vault. Do NOT use for code files or workspace scripts."
                 ),
                 ToolDefinitionBuilder(
                     TOOL_READ_MEMORY,
-                    "Read the content of a file from the memory vault."
+                    "Read a personal memory note or user fact file (e.g. 'notes.md', 'preferences.md') from the Memory Vault."
                 )
-                    .stringParam("name", "The file name to read (e.g., 'notes.md').", required = true),
+                    .stringParam("name", "The memory note file name to read (e.g., 'notes.md').", required = true),
                 ToolDefinitionBuilder(
                     TOOL_CREATE_MEMORY,
-                    "Create a new file in the memory vault with the given content."
+                    "Create a new personal memory note or store user facts in the Memory Vault. For coding projects or executable scripts, use workspace_write_file instead."
                 )
-                    .stringParam("name", "The file name to create (e.g., 'notes.md').", required = true)
-                    .stringParam("content", "The markdown content for the file.", required = true),
+                    .stringParam("name", "The memory note file name to create (e.g., 'user_preferences.md', 'notes.md').", required = true)
+                    .stringParam("content", "The markdown content describing the memory, note, or facts to remember.", required = true),
                 ToolDefinitionBuilder(
                     TOOL_EDIT_MEMORY,
-                    "Edit a file in the memory vault."
+                    "Edit an existing personal memory note in the Memory Vault."
                 )
-                    .stringParam("name", "The current file name to edit.", required = true)
+                    .stringParam("name", "The memory note file name to edit.", required = true)
                     .stringParam("content", "The new markdown content (full rewrite). Omit to keep existing.", required = false)
                     .stringParam("old_string", "Exact string to find and replace. Mutually exclusive with 'content'.", required = false)
                     .stringParam("new_string", "Replacement string for old_string.", required = false),
                 ToolDefinitionBuilder(
                     TOOL_DELETE_MEMORY,
-                    "Delete a file from the memory vault."
+                    "Delete a personal memory note from the Memory Vault."
                 )
-                    .stringParam("name", "The file name to delete.", required = true)
+                    .stringParam("name", "The memory note file name to delete.", required = true)
             )
         )
     }

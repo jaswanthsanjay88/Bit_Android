@@ -14,6 +14,9 @@
         android:minSdkVersion="34" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
     <permission
         android:name="${applicationId}.permission.BIND_LLM_SERVICE"
@@ -22,6 +25,7 @@
     <application
         android:name=".NVApplication"
         android:allowBackup="true"
+        android:enableOnBackInvokedCallback="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -116,6 +120,21 @@
             android:windowSoftInputMode="adjustResize"
             tools:targetApi="33" />
 
+        <activity
+            android:name=".activity.McpOAuthCallbackActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleTask"
+            tools:targetApi="33">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="bit" android:host="oauth" android:path="/callback" />
+                <data android:scheme="bit" android:host="mcp-oauth-callback" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".service.LLMService"
             android:enabled="true"
@@ -147,6 +166,13 @@
             android:foregroundServiceType="dataSync"
             tools:targetApi="29" />
 
+        <service
+            android:name=".service.WebServerService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            tools:targetApi="29" />
+
 
 
         <provider
@@ -157,6 +183,17 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
+        </provider>
+
+        <provider
+            android:name="com.bit.data.provider.WorkspaceDocumentsProvider"
+            android:authorities="${applicationId}.workspace.documents"
+            android:grantUriPermissions="true"
+            android:exported="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
         </provider>
 
     </application>

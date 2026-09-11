@@ -35,6 +35,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -94,14 +95,43 @@ fun MemoryVaultScreen(
 
     val hasSeenImportPrompt by viewModel.hasSeenMemoryImportPrompt.collectAsStateWithLifecycle()
     var showImportDialog by remember { mutableStateOf(false) }
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+
+    val documentMimeTypes = remember {
+        arrayOf(
+            "application/pdf",
+            "text/plain",
+            "text/markdown",
+            "text/csv",
+            "text/html",
+            "application/json",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    }
 
     val docPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: android.net.Uri? ->
         uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+            val fileName = com.bit.util.DocumentParser.getFileName(context, it)
+            val mimeType = context.contentResolver.getType(it)
+            if (com.bit.util.DocumentParser.isBlockedMediaOrBinary(fileName, mimeType)) {
+                android.widget.Toast.makeText(
+                    context,
+                    "Media files (images/videos) cannot be imported as documents.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return@rememberLauncherForActivityResult
+            }
             viewModel.importDocumentFromUri(it) { success ->
                 if (success) {
-                    android.widget.Toast.makeText(context, "Document added to Vault", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, "Document added to Vault: $fileName", android.widget.Toast.LENGTH_SHORT).show()
                 } else {
                     android.widget.Toast.makeText(context, "Failed to parse document", android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -150,14 +180,20 @@ fun MemoryVaultScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = {
+                        haptics.pop()
+                        onBackClick()
+                    }) {
                         Icon(TnIcons.ArrowLeft, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
                 actions = {
                     // Backup Pill Button
                     OutlinedButton(
-                        onClick = { onBackupSettingsClick() },
+                        onClick = {
+                            haptics.pop()
+                            onBackupSettingsClick()
+                        },
                         shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.height(36.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
@@ -182,13 +218,19 @@ fun MemoryVaultScreen(
                         )
                         Switch(
                             checked = isGlobalMemoryEnabled,
-                            onCheckedChange = { isGlobalMemoryEnabled = it }
+                            onCheckedChange = {
+                                haptics.selection()
+                                isGlobalMemoryEnabled = it
+                            }
                         )
                     }
 
                     var showMenu by remember { mutableStateOf(false) }
                     Box {
-                        IconButton(onClick = { showMenu = true }) {
+                        IconButton(onClick = {
+                            haptics.pop()
+                            showMenu = true
+                        }) {
                             Icon(TnIcons.DotsVertical, contentDescription = "More options", tint = MaterialTheme.colorScheme.onSurface)
                         }
                         DropdownMenu(
@@ -199,6 +241,7 @@ fun MemoryVaultScreen(
                             DropdownMenuItem(
                                 text = { Text("Import from another AI", color = MaterialTheme.colorScheme.onSurface) },
                                 onClick = {
+                                    haptics.pop()
                                     showMenu = false
                                     showImportDialog = true
                                 }
@@ -211,16 +254,18 @@ fun MemoryVaultScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        // Main Vault Body Area
-        Column(
+        // Unified Fluid LazyColumn for Entire Vault Screen (No trapped nested scrolling)
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-                // Memory Off subtle inline notice (spec §5)
-                if (!isGlobalMemoryEnabled) {
+            // Memory Off subtle inline notice (spec §5)
+            if (!isGlobalMemoryEnabled) {
+                item {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -234,8 +279,10 @@ fun MemoryVaultScreen(
                         )
                     }
                 }
+            }
 
-                // Search Input (Search notes, memories, docs)
+            // Search Input (Search notes, memories, docs)
+            item {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { viewModel.setSearchQuery(it) },
@@ -252,8 +299,10 @@ fun MemoryVaultScreen(
                     ),
                     singleLine = true
                 )
+            }
 
-                // Top Peer Cards (My notes & AI memory)
+            // Top Peer Cards (My notes & AI memory)
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -262,7 +311,10 @@ fun MemoryVaultScreen(
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { viewModel.setSelectedCategory(if (selectedCategory == "notes") "all" else "notes") },
+                            .clickable {
+                                haptics.selection()
+                                viewModel.setSelectedCategory(if (selectedCategory == "notes") "all" else "notes")
+                            },
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = if (selectedCategory == "notes") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
@@ -282,7 +334,10 @@ fun MemoryVaultScreen(
                     Card(
                         modifier = Modifier
                             .weight(1f)
-                            .clickable { viewModel.setSelectedCategory(if (selectedCategory == "facts") "all" else "facts") },
+                            .clickable {
+                                haptics.selection()
+                                viewModel.setSelectedCategory(if (selectedCategory == "facts") "all" else "facts")
+                            },
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = if (selectedCategory == "facts") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
@@ -298,12 +353,17 @@ fun MemoryVaultScreen(
                         }
                     }
                 }
+            }
 
-                // Wide Documents Card
+            // Wide Documents Card
+            item {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { viewModel.setSelectedCategory(if (selectedCategory == "documents") "all" else "documents") },
+                        .clickable {
+                            haptics.selection()
+                            viewModel.setSelectedCategory(if (selectedCategory == "documents") "all" else "documents")
+                        },
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow
@@ -328,23 +388,45 @@ fun MemoryVaultScreen(
                             }
                         }
 
-                        Button(
-                            onClick = { docPickerLauncher.launch("*/*") },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                                contentColor = if (selectedCategory == "documents") MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                            ),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(TnIcons.Plus, contentDescription = "Add Document", modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Add", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            FilledTonalButton(
+                                onClick = {
+                                    haptics.pop()
+                                    val intent = Intent(context, RagActivity::class.java).apply {
+                                        putExtra(RagActivity.EXTRA_INITIAL_TAB, RagActivity.TAB_GRAPH)
+                                    }
+                                    context.startActivity(intent)
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(TnIcons.Brain, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Graph", style = MaterialTheme.typography.labelMedium)
+                            }
+
+                            Button(
+                                onClick = {
+                                    haptics.pop()
+                                    docPickerLauncher.launch(documentMimeTypes)
+                                },
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(TnIcons.Plus, contentDescription = "Add Document", modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Add", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            }
                         }
                     }
                 }
+            }
 
-                // Recent Section Header + New Note/Doc Button
+            // Recent Section Header + New Note/Doc Button
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -359,7 +441,10 @@ fun MemoryVaultScreen(
 
                     if (selectedCategory == "documents") {
                         Button(
-                            onClick = { docPickerLauncher.launch("*/*") },
+                            onClick = {
+                                haptics.pop()
+                                docPickerLauncher.launch(documentMimeTypes)
+                            },
                             shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
                         ) {
@@ -369,7 +454,10 @@ fun MemoryVaultScreen(
                         }
                     } else {
                         Button(
-                            onClick = { onNoteClick(null, if (selectedCategory == "facts") "fact" else "note") },
+                            onClick = {
+                                haptics.action()
+                                onNoteClick(null, if (selectedCategory == "facts") "fact" else "note")
+                            },
                             shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface)
                         ) {
@@ -379,23 +467,21 @@ fun MemoryVaultScreen(
                         }
                     }
                 }
+            }
 
-                // Recent List Items with Provenance Type Icons
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    items(notes, key = { it.id }) { note ->
-                        RecentItemCard(
-                            note = note,
-                            onClick = { onNoteClick(note.id, note.noteType) }
-                        )
+            // Recent List Items with Keyed Optimization
+            items(notes, key = { it.id }) { note ->
+                RecentItemCard(
+                    note = note,
+                    onClick = {
+                        haptics.selection()
+                        onNoteClick(note.id, note.noteType)
                     }
-                }
+                )
             }
         }
     }
+}
 
 @Composable
 private fun RecentItemCard(

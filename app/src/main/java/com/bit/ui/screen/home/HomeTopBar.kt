@@ -7,7 +7,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.bit.ui.components.AnimatedTitle
 import com.bit.ui.icons.TnIcons
+import com.bit.ui.theme.LocalBitHaptics
 
 // ── TopBar ──────────────────────────────────────────────────────────────────────
 
@@ -36,6 +38,8 @@ internal fun TopBar(
     onStoreButtonClicked: (String?) -> Unit,
     onMemoryClick: () -> Unit = {}
 ) {
+    val haptics = LocalBitHaptics.current
+
     CenterAlignedTopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.Transparent,
@@ -54,6 +58,8 @@ internal fun TopBar(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
                     ),
                     modifier = Modifier
+                        .wrapContentSize()
+                        .widthIn(max = 240.dp)
                         .sharedBounds(
                             sharedTransitionScope.rememberSharedContentState(key = "chat_header"),
                             animatedVisibilityScope = animatedVisibilityScope
@@ -64,7 +70,10 @@ internal fun TopBar(
                         AnimatedTitle(
                             sharedTransitionScope = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope,
-                            onShowDynamicWindow = { showDynamicWindow() }
+                            onShowDynamicWindow = {
+                                haptics.pop()
+                                showDynamicWindow()
+                            }
                         )
                     }
                 }
@@ -72,7 +81,10 @@ internal fun TopBar(
         },
         navigationIcon = {
             Surface(
-                onClick = onMenuClick,
+                onClick = {
+                    haptics.pop()
+                    onMenuClick()
+                },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 contentColor = MaterialTheme.colorScheme.onSurface,
@@ -98,7 +110,10 @@ internal fun TopBar(
         },
         actions = {
             Surface(
-                onClick = onMemoryClick,
+                onClick = {
+                    haptics.pop()
+                    onStoreButtonClicked("models")
+                },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 contentColor = MaterialTheme.colorScheme.onSurface,
@@ -114,8 +129,8 @@ internal fun TopBar(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = TnIcons.Brain,
-                        contentDescription = "Memory Vault",
+                        imageVector = TnIcons.StoreFront,
+                        contentDescription = "Model Store",
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(20.dp)
                     )

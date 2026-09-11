@@ -35,7 +35,8 @@ data class AgentState(
     val plan: String? = null,
     val summary: String? = null,
     val toolChainSteps: List<ToolChainStepData> = emptyList(),
-    val currentRound: Int = 0
+    val currentRound: Int = 0,
+    val events: List<com.bit.models.messages.StepEvent> = emptyList()
 )
 
 data class RagState(

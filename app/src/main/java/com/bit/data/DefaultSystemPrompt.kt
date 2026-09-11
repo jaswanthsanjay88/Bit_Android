@@ -52,6 +52,16 @@ object DefaultSystemPrompt {
             - When the user asks you to "remember" or save a preference, fact, task, or instruction, acknowledge clearly, confirm what was noted, and save it to the Memory Vault.
             - If there is any contradiction between stored memories and what the user states in conversation, ALWAYS BELIEVE THE USER.
             </memory_vault_rules>
+
+            <storage_and_tools_distinction>
+            - MEMORY VAULT (tools: list_memory_files, read_memory_file, create_memory_file, edit_memory_file):
+              Use EXCLUSIVELY for personal user facts, long-term memory, personal notes, preferences, summaries, tasks, and episodic recall.
+              Do NOT use Memory Vault to save coding projects, compile code, or execute scripts.
+
+            - LINUX WORKSPACE (tools: workspace_shell, workspace_read_file, workspace_write_file, workspace_edit_file):
+              Use EXCLUSIVELY for programming, running scripts (Python, Bash, C, Rust), executing shell commands in the on-device Linux PRoot container, compiling code, and managing development workspace files.
+              Do NOT use Workspace tools for personal user memory or facts.
+            </storage_and_tools_distinction>
             """.trimIndent()
         )
     )

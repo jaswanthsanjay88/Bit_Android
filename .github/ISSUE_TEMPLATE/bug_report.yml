@@ -1,0 +1,77 @@
+name: Bug Report
+description: File a report to help us reproduce and fix an issue in BIT
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Please check existing issues and discussions before opening a new report.
+  - type: input
+    id: version
+    attributes:
+      label: App Version
+      description: What version of BIT are you running? (e.g., v1.0.4-release)
+      placeholder: e.g., v1.0.4-release
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device & Android Version
+      description: Device model and OS version
+      placeholder: e.g., OnePlus 11, Android 14 / OxygenOS 14
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected Component
+      description: Which part of the app is encountering the issue?
+      options:
+        - Linux Environment / Terminal / PRoot
+        - AI Model Inference (Llama / Gemini / Ollama)
+        - Tool Calling & Agent Skills
+        - Voice / TTS / STT
+        - File Manager / Storage
+        - Settings / General UI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the behavior.
+      placeholder: |
+        1. Open the app and go to '...'
+        2. Tap on '...'
+        3. Perform action '...'
+        4. See error or crash
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Crash Logs or Logcat Output
+      description: Paste any crash logs or logcat stacktraces if available.
+      render: shell
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or Screen Recordings
+      description: Drag and drop screenshots or screen recordings here.

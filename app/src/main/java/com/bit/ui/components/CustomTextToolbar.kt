@@ -82,14 +82,14 @@ fun CustomTextSelectionPopup(
                             state.onCopyRequested.invoke()
                             onDismiss()
                         }) {
-                            Text("Copy", color = Color.White)
+                            Text("Copy", color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                     if (state.onSelectAllRequested != null) {
                         TextButton(onClick = { 
                             state.onSelectAllRequested.invoke()
                         }) {
-                            Text("Select All", color = Color.White)
+                            Text("Select All", color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                     if (state.onPasteRequested != null) {
@@ -97,7 +97,7 @@ fun CustomTextSelectionPopup(
                             state.onPasteRequested.invoke()
                             onDismiss()
                         }) {
-                            Text("Paste", color = Color.White)
+                            Text("Paste", color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                     if (state.onCutRequested != null) {
@@ -105,7 +105,7 @@ fun CustomTextSelectionPopup(
                             state.onCutRequested.invoke()
                             onDismiss()
                         }) {
-                            Text("Cut", color = Color.White)
+                            Text("Cut", color = MaterialTheme.colorScheme.onSurface)
                         }
                     }
                 }

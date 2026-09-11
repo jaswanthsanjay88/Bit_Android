@@ -51,7 +51,17 @@ object PluginManager {
     @Volatile private var _cachedEnabledToolDefs: List<ToolDefinitionBuilder>? = null
 
     // Set of enabled plugin names
-    private val _enabledPluginNames = MutableStateFlow<Set<String>>(setOf(WEB_SEARCH_PLUGIN_NAME, "Memory Vault"))
+    private val _enabledPluginNames = MutableStateFlow<Set<String>>(
+        setOf(
+            WEB_SEARCH_PLUGIN_NAME,
+            "Memory Vault",
+            "File Manager",
+            "System Info",
+            WorkspacePlugin.PLUGIN_NAME,
+            McpPlugin.PLUGIN_NAME,
+            SkillPlugin.PLUGIN_NAME
+        )
+    )
     val enabledPluginNames: StateFlow<Set<String>> = _enabledPluginNames.asStateFlow()
 
     // Web Search enabled state (independent toggle)
@@ -381,6 +391,20 @@ object PluginManager {
     }
 
     /**
+     * Invalidate tool definition and lookup caches (e.g. after MCP server sync or tool toggle)
+     */
+    fun invalidateToolCache() {
+        _toolNameToPluginKey.clear()
+        _plugins.forEach { (pluginName, plugin) ->
+            plugin.getPluginInfo().toolDefinitionBuilder.forEach { toolDef ->
+                _toolNameToPluginKey[toolDef.name.lowercase()] = pluginName
+            }
+        }
+        _cachedEnabledToolDefs = null
+        syncToolsWithLLM()
+    }
+
+    /**
      * Check if any tools are currently enabled
      */
     fun hasEnabledTools(): Boolean = getEnabledToolDefinitions().isNotEmpty()
@@ -389,13 +413,36 @@ object PluginManager {
      * Execute a tool call and return result in SDK ToolResult format for multi-turn.
      * Returns a JSON string that can be appended as a "tool" message in the conversation.
      */
-    suspend fun executeToolForMultiTurn(toolCall: ToolCall): MultiTurnToolResult {
+    suspend fun executeToolForMultiTurn(
+        toolCall: ToolCall,
+        context: android.content.Context? = null,
+        callId: String = ""
+    ): MultiTurnToolResult {
         val startTime = System.currentTimeMillis()
         Log.d(TAG, "Multi-turn tool call: ${toolCall.name} with args: ${toolCall.arguments}")
 
-        // O(1) lookup via cached tool name -> plugin key map
-        val pluginKey = _toolNameToPluginKey[toolCall.name.lowercase()]
-        val plugin = pluginKey?.let { _plugins[it] }
+        // O(1) lookup via cached tool name -> plugin key map, with fallback for namespaced MCP calls
+        val directKey = _toolNameToPluginKey[toolCall.name.lowercase()]
+        var plugin = directKey?.let { _plugins[it] }
+        var pluginKey = directKey ?: plugin?.getPluginInfo()?.name
+
+        if (plugin == null) {
+            // Try matching normalized tool name or delegating to MCP/Skill plugins
+            plugin = _plugins.values.firstOrNull { p ->
+                val pInfo = p.getPluginInfo()
+                pInfo.toolDefinitionBuilder.any { tDef ->
+                    val tName = tDef.name.lowercase()
+                    val callName = toolCall.name.lowercase()
+                    tName == callName ||
+                    tName.replace("-", "_") == callName.replace("-", "_") ||
+                    callName.endsWith("__$tName") ||
+                    callName.endsWith("_$tName")
+                }
+            }
+            if (plugin != null) {
+                pluginKey = plugin.getPluginInfo().name
+            }
+        }
 
         if (plugin == null) {
             Log.e(TAG, "Tool not found: ${toolCall.name}")
@@ -411,13 +458,8 @@ object PluginManager {
         val pluginInfo = plugin.getPluginInfo()
 
         if (!_enabledPluginNames.value.contains(pluginInfo.name)) {
-            return MultiTurnToolResult(
-                toolName = toolCall.name,
-                resultJson = """{"error": "Plugin not enabled: ${pluginInfo.name}"}""",
-                isError = true,
-                pluginName = pluginInfo.name,
-                executionTimeMs = System.currentTimeMillis() - startTime
-            )
+            _enabledPluginNames.update { it + pluginInfo.name }
+            _cachedEnabledToolDefs = null
         }
 
         return try {
@@ -426,7 +468,16 @@ object PluginManager {
 
             if (result.isSuccess) {
                 val data = result.getOrNull()
-                val resultJson = convertDataToJson(data, pluginKey)
+                var resultJson = convertDataToJson(data, pluginKey)
+                if (context != null) {
+                    val safeCallId = callId.ifBlank { "call_${System.currentTimeMillis()}_${toolCall.name}" }
+                    resultJson = com.bit.agent.harness.util.ToolOutputTruncator.maybeTruncate(
+                        context = context,
+                        toolCallId = safeCallId,
+                        output = resultJson,
+                        hasShellAccess = hasEnabledTools()
+                    )
+                }
                 MultiTurnToolResult(
                     toolName = toolCall.name,
                     resultJson = resultJson,

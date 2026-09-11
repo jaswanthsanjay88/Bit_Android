@@ -10,26 +10,24 @@ import kotlinx.serialization.json.jsonObject
 object SearchResultFormatter {
 
     fun isRawSearchResult(text: String): Boolean = try {
-        val type = Json.parseToJsonElement(text).jsonObject["type"]?.let { (it as? JsonPrimitive)?.content }
-        type == "web_search"
+        val obj = Json.parseToJsonElement(text).jsonObject
+        val type = obj["type"]?.let { (it as? JsonPrimitive)?.content }
+        type == "web_search" || obj.containsKey("results") || obj.containsKey("totalResults") || obj.containsKey("searchTimeMs") || obj.containsKey("provider")
     } catch (_: Exception) { false }
 
-    fun format(text: String, context: Context): String {
+    fun format(text: String, context: Context? = null): String {
         if (!isRawSearchResult(text)) return text
         return try {
             val json = Json.parseToJsonElement(text).jsonObject
             val error = json["error"]?.let { (it as? JsonPrimitive)?.content }
             if (error != null) return formatError(json, error)
-            when (json["type"]?.let { (it as? JsonPrimitive)?.content }) {
-                "web_search" -> formatWebSearch(json)
-                else -> text
-            }
+            formatWebSearch(json)
         } catch (_: Exception) {
             text
         }
     }
 
-    fun getFirstLine(text: String, context: Context): String {
+    fun getFirstLine(text: String, context: Context? = null): String {
         val formatted = format(text, context)
         return formatted.lines().first().take(100)
     }
@@ -59,15 +57,18 @@ object SearchResultFormatter {
             val obj = element.jsonObject
             val title = (obj["title"] as? JsonPrimitive)?.content ?: untitled
             val url = (obj["url"] as? JsonPrimitive)?.content ?: ""
-            val desc = (obj["description"] as? JsonPrimitive)?.content ?: (obj["snippet"] as? JsonPrimitive)?.content ?: ""
-            "${i + 1}. $title\n   $url\n   $desc"
+            val desc = (obj["description"] as? JsonPrimitive)?.content
+                ?: (obj["snippet"] as? JsonPrimitive)?.content
+                ?: (obj["content"] as? JsonPrimitive)?.content
+                ?: ""
+            "### ${i + 1}. $title\n- **URL**: $url\n- $desc"
         }.joinToString("\n\n")
 
         val total = results.size
         val prefix = if (query.isNotBlank())
-            "Found $total search results for query: \"$query\""
+            "## Search Results for: \"$query\"\nFound $total results."
         else
-            "Found $total search results"
+            "## Search Results\nFound $total results."
         return "$prefix\n\n$body"
     }
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.animation.core.*
@@ -19,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalTextToolbar
@@ -34,6 +36,7 @@ import com.bit.ui.components.lazyMarkdownItems
 import com.bit.ui.components.ReasoningTraceCard
 import com.bit.ui.components.toTraceStep
 import com.bit.ui.components.CustomTextToolbar
+import com.bit.ui.icons.TnIcons
 import com.bit.ui.components.TextToolbarState
 import com.bit.ui.components.CustomTextSelectionPopup
 import com.bit.ui.components.EditMessageDialog
@@ -168,11 +171,13 @@ fun parseThinkingTags(raw: String): ParsedMessage {
     while (i < raw.length) {
         var minIdx = -1
         var selectedOpenTag = ""
-        for ((open, _) in THINK_TAGS) {
+        var selectedCloseTag = ""
+        for ((open, close) in THINK_TAGS) {
             val idx = raw.indexOf(open, i, ignoreCase = true)
             if (idx >= 0 && (minIdx < 0 || idx < minIdx)) {
                 minIdx = idx
                 selectedOpenTag = open
+                selectedCloseTag = close
             }
         }
 
@@ -182,19 +187,24 @@ fun parseThinkingTags(raw: String): ParsedMessage {
         }
 
         content.append(raw, i, minIdx)
-        val closeTag = THINK_TAGS.first { it.first == selectedOpenTag }.second
         val bodyStart = minIdx + selectedOpenTag.length
-        val end = raw.indexOf(closeTag, bodyStart, ignoreCase = true)
+        val end = raw.indexOf(selectedCloseTag, bodyStart, ignoreCase = true)
 
         if (end < 0) {
-            if (thinking.isNotEmpty()) thinking.append("\n\n")
-            thinking.append(raw, bodyStart, raw.length)
+            val chunk = raw.substring(bodyStart).trim()
+            if (chunk.isNotEmpty()) {
+                if (thinking.isNotEmpty()) thinking.append("\n\n")
+                thinking.append(chunk)
+            }
             isThinkingInProgress = true
             i = raw.length
         } else {
-            if (thinking.isNotEmpty()) thinking.append("\n\n")
-            thinking.append(raw, bodyStart, end)
-            i = end + closeTag.length
+            val chunk = raw.substring(bodyStart, end).trim()
+            if (chunk.isNotEmpty()) {
+                if (thinking.isNotEmpty()) thinking.append("\n\n")
+                thinking.append(chunk)
+            }
+            i = end + selectedCloseTag.length
         }
     }
 
@@ -233,6 +243,12 @@ fun BodyContent(
     val streaming by chatViewModel.streamingState.collectAsStateWithLifecycle()
     val chatState by chatViewModel.chatUiState.collectAsStateWithLifecycle()
     val agent by chatViewModel.agentState.collectAsStateWithLifecycle()
+    val pendingApproval by chatViewModel.pendingApproval.collectAsStateWithLifecycle()
+    val subagentSessions by com.bit.agent.harness.engine.SubagentSessionBus.sessions.collectAsStateWithLifecycle()
+    val runningSubagents = remember(subagentSessions) {
+        subagentSessions.values.filter { it.isRunning }.sortedBy { it.startedAtMs }
+    }
+    val openSubagent = com.bit.ui.screen.subagent.LocalSubagentNav.current
     val rag by chatViewModel.ragState.collectAsStateWithLifecycle()
     val config by chatViewModel.chatConfigState.collectAsStateWithLifecycle()
     val promptEditState by chatViewModel.promptEditState.collectAsStateWithLifecycle()
@@ -249,10 +265,6 @@ fun BodyContent(
     val haptics = com.bit.ui.theme.LocalBitHaptics.current
     var wasGenerating by remember { mutableStateOf(chatState.isGenerating) }
     var selectedTraceStep by remember { mutableStateOf<com.bit.ui.components.TraceStep?>(null) }
-    
-    var textToolbarState by remember { mutableStateOf(TextToolbarState()) }
-    val customTextToolbar = remember { CustomTextToolbar { textToolbarState = it } }
-    var selectedMessageForActionSheet by remember { mutableStateOf<Messages?>(null) }
 
     LaunchedEffect(chatState.isGenerating) {
         if (wasGenerating && !chatState.isGenerating) {
@@ -276,6 +288,18 @@ fun BodyContent(
         }
     }
 
+    // Snap to the approval card as soon as a step requests consent
+    LaunchedEffect(pendingApproval?.activeStep?.id) {
+        if (pendingApproval != null) {
+            val itemCount = listState.layoutInfo.totalItemsCount
+            if (itemCount > 0) {
+                try {
+                    listState.animateScrollToItem(itemCount - 1)
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     // Stable, non-shaking scroll tracking during active text generation
     LaunchedEffect(streaming.assistantMessage.length) {
         if (chatState.isGenerating && streaming.assistantMessage.isNotEmpty()) {
@@ -292,86 +316,189 @@ fun BodyContent(
         }
     }
 
-    CompositionLocalProvider(
-        LocalTextToolbar provides customTextToolbar
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(
+                bottom = paddingValues.calculateBottomPadding()
+            )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(
-                    bottom = paddingValues.calculateBottomPadding()
-                )
-        ) {
-            if (messages.isEmpty() && !chatState.isGenerating) {
-                EmptyMessagesState()
-            } else {
-                val deduped = remember(messages.size) { messages.distinctBy { it.msgId } }
-                val lastAssistantIndex = remember(deduped.size) { deduped.indexOfLast { it.role == Role.Assistant } }
-                val groupedItems = remember(deduped) { groupMessages(deduped, lastAssistantIndex) }
+        if (messages.isEmpty() && !chatState.isGenerating) {
+            EmptyMessagesState()
+        } else {
+            val deduped = remember(messages.size) { messages.distinctBy { it.msgId } }
+            val lastAssistantIndex = remember(deduped.size) { deduped.indexOfLast { it.role == Role.Assistant } }
+            val groupedItems = remember(deduped) { groupMessages(deduped, lastAssistantIndex) }
 
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        top = paddingValues.calculateTopPadding() + Standards.SpacingXl, 
-                        bottom = 120.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
-                ) {
-                    items(
-                        items = messages,
-                        key = { it.msgId }
-                    ) { msg ->
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = paddingValues.calculateTopPadding() + Standards.SpacingXl, 
+                    bottom = 120.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                itemsIndexed(
+                    items = messages,
+                    key = { index, msg -> "${msg.msgId}_${index}" }
+                ) { _, msg ->
+                    Box(modifier = Modifier.animateItem()) {
                         if (msg.role == Role.User) {
                             UserMessageBubble(
-                                message = msg,
-                                onLongClick = { selectedMessageForActionSheet = msg }
+                                message = msg
                             )
                         } else {
-                            val isLast = msg == messages.last()
-                            val parsedMessage = remember(msg.content.content) { parseThinkingTags(msg.content.content) }
-                            Column {
-                                com.bit.ui.screen.home.AssistantMessageHeader(
-                                    message = msg,
-                                    imageBlurEnabled = imageBlurEnabled,
-                                    onTraceStepClick = { selectedTraceStep = it }
-                                )
-                                
-                                if (parsedMessage.thinkingContent != null) {
-                                    ThinkingBlock(
-                                        thinkingText = parsedMessage.thinkingContent,
-                                        isStreaming = false
+                                val isLast = msg == messages.last()
+                                val parsedMessage = remember(msg.content.content) { parseThinkingTags(msg.content.content) }
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    com.bit.ui.screen.home.AssistantMessageHeader(
+                                        message = msg,
+                                        imageBlurEnabled = imageBlurEnabled,
+                                        onTraceStepClick = { selectedTraceStep = it }
                                     )
-                                }
-                                
-                                if (parsedMessage.actualContent.isNotEmpty()) {
-                                    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingMd)) {
-                                        androidx.compose.foundation.text.selection.SelectionContainer {
-                                            MarkdownText(
-                                                text = parsedMessage.actualContent,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
+                                    
+                                    if (parsedMessage.thinkingContent != null) {
+                                        ThinkingBlock(
+                                            thinkingText = parsedMessage.thinkingContent,
+                                            isStreaming = false
+                                        )
+                                    }
+                                    
+                                    if (parsedMessage.actualContent.isNotEmpty()) {
+                                        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = Standards.SpacingMd)) {
+                                            androidx.compose.foundation.text.selection.SelectionContainer {
+                                                MarkdownText(
+                                                    text = parsedMessage.actualContent,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
                                         }
                                     }
+                                    com.bit.ui.components.ContextStackIndicator(message = msg)
+                                    com.bit.ui.screen.home.AssistantMessageFooter(
+                                        message = msg,
+                                        ttsPlayingMsgId = ttsPlayingMsgId,
+                                        ttsIsPlaying = ttsIsPlaying,
+                                        ttsSynthesizing = ttsSynthesizing,
+                                        ttsModelLoaded = ttsModelLoaded,
+                                        onSpeak = { chatViewModel.speakMessage(it) },
+                                        onStopTTS = { chatViewModel.stopTTS() }, // toggle same message to stop
+                                        onRegenerate = if (isLast) { { chatViewModel.regenerateLastMessage() } } else null,
+                                        isRegenerateEnabled = isLast
+                                    )
                                 }
-                                com.bit.ui.screen.home.AssistantMessageFooter(
-                                    message = msg,
-                                    ttsPlayingMsgId = ttsPlayingMsgId,
-                                    ttsIsPlaying = ttsIsPlaying,
-                                    ttsSynthesizing = ttsSynthesizing,
-                                    ttsModelLoaded = ttsModelLoaded,
-                                    onSpeak = { chatViewModel.speakMessage(it) },
-                                    onStopTTS = { chatViewModel.stopTTS() }, // toggle same message to stop
-                                    onRegenerate = if (isLast) { { chatViewModel.regenerateLastMessage() } } else null,
-                                    isRegenerateEnabled = isLast
-                                )
                             }
                         }
                     }
 
                     if (chatState.isGenerating) {
                         val isImageGen = chatState.generationType == ModelType.IMAGE_GENERATION
+                        // Live subagent presence: tappable cards showing agents working for the user
+                        if (!isImageGen && runningSubagents.isNotEmpty()) {
+                            items(
+                                count = runningSubagents.size,
+                                key = { idx -> "subagent-live-${runningSubagents[idx].id}" }
+                            ) { idx ->
+                                val sub = runningSubagents[idx]
+                                Surface(
+                                    onClick = {
+                                        haptics.selection()
+                                        openSubagent(sub.id)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(Standards.RadiusMd),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(Standards.SpacingMd),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                                    ) {
+                                        val pulse = rememberInfiniteTransition(label = "subPulse")
+                                        val pulseAlpha by pulse.animateFloat(
+                                            initialValue = 0.35f, targetValue = 1f,
+                                            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                                androidx.compose.animation.core.tween(800),
+                                                androidx.compose.animation.core.RepeatMode.Reverse
+                                            ), label = "subAlpha"
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha))
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Subagent [${sub.role}] is working for you",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "Round ${sub.currentRound}/${sub.maxSteps} · tap to watch it think",
+                                                style = MaterialTheme.typography.labelMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = TnIcons.ChevronRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        // Live agent harness trace (plan + executed tool rounds)
+                        if (!isImageGen && (agent.plan != null || agent.toolChainSteps.isNotEmpty())) {
+                            item(key = "live-agent-trace") {
+                                ReasoningTraceCard(
+                                    steps = agent.toolChainSteps.map { it.toTraceStep() },
+                                    plan = agent.plan,
+                                    summary = null,
+                                    isLive = true,
+                                    currentRound = agent.currentRound,
+                                    maxRounds = 256
+                                )
+                            }
+                        }
+                        // Human-in-the-loop gates: typed answers for ask_user, Approve/Deny for restricted tools
+                        val approval = pendingApproval
+                        if (!isImageGen && approval != null) {
+                            item(key = "agent-step-approval") {
+                                if (approval.toolName.equals("ask_user", ignoreCase = true)) {
+                                    val question = try {
+                                        org.json.JSONObject(approval.toolArguments).optString("question")
+                                            .ifBlank { approval.activeStep.description }
+                                    } catch (_: Exception) {
+                                        approval.activeStep.description
+                                    }
+                                    com.bit.ui.components.AgentQuestionCard(
+                                        question = question,
+                                        onAnswer = { chatViewModel.answerAgentQuestion(it) },
+                                        onSkip = { chatViewModel.denyPendingAgentStep() }
+                                    )
+                                } else {
+                                    com.bit.ui.components.AgentApprovalCard(
+                                        toolName = approval.toolName,
+                                        description = approval.activeStep.description,
+                                        toolArguments = approval.toolArguments,
+                                        onApprove = { chatViewModel.approvePendingAgentStep() },
+                                        onDeny = { chatViewModel.denyPendingAgentStep() }
+                                    )
+                                }
+                            }
+                        }
                         if (isImageGen) {
                             item(key = "streaming-image-response") {
                                 ImageGenerationStreamingBubble(
@@ -427,6 +554,17 @@ fun BodyContent(
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
                                 }
+                                IconButton(
+                                    onClick = { chatViewModel.clearError() },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = com.bit.ui.icons.TnIcons.X,
+                                        contentDescription = "Dismiss",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -436,6 +574,20 @@ fun BodyContent(
                     Spacer(modifier = Modifier.height(Standards.SpacingLg))
                 }
             }
+        }
+
+        // Progressive bottom blur scrim when there are more messages down below
+        val canScrollDown by remember { derivedStateOf { listState.canScrollForward } }
+        AnimatedVisibility(
+            visible = canScrollDown,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            com.bit.ui.components.BottomBlurScrim(
+                height = 56.dp,
+                scrimColor = MaterialTheme.colorScheme.background
+            )
         }
 
         // Modal Bottom Sheet for model selection details
@@ -504,21 +656,6 @@ fun BodyContent(
             }
         }
 
-        CustomTextSelectionPopup(
-            state = textToolbarState,
-            onDismiss = { textToolbarState = TextToolbarState() }
-        )
-
-        selectedMessageForActionSheet?.let { msg ->
-            MessageActionBottomSheet(
-                message = msg,
-                show = true,
-                onDismiss = { selectedMessageForActionSheet = null },
-                onEditRequest = if (msg.role == Role.User) { { m: com.bit.models.messages.Messages -> chatViewModel.startEditingPrompt(m) } } else null,
-                onSaveToMemory = if (msg.role == Role.User) { { c: String -> chatViewModel.saveMessageToMemoryVault(c) } } else null
-            )
-        }
-
         promptEditState?.let { state ->
             EditMessageDialog(
                 initialText = state.initialText,
@@ -529,7 +666,6 @@ fun BodyContent(
                     chatViewModel.cancelPromptEdit()
                 }
             )
-        }
         }
     }
 }

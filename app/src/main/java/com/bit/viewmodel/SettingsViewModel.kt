@@ -48,6 +48,62 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     private val modelRepository = AppContainer.getModelRepository()
 
+    // ── Web Access Manager (BIT in Browser) ──
+    val webAccessManager = com.bit.network.server.WebAccessManager.getInstance(application)
+
+    // ── MCP Manager (Model Context Protocol) ──
+    val mcpManager = com.bit.mcp.McpManager.getInstance(application)
+
+    // ── Skill Manager (Agent Skills & Prompt Capabilities) ──
+    val skillManager = com.bit.skills.SkillManager.getInstance(application)
+
+    // ── App Storage & Diagnostics ──
+    val storageRepository = com.bit.repo.AppStorageRepository(application)
+    val storageSnapshot: StateFlow<com.bit.repo.AppStorageSnapshot> = storageRepository.snapshot
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.repo.AppStorageSnapshot(isScanning = true))
+
+    // ── WebDAV Cloud Sync ──
+    val webDavSyncManager = com.bit.sync.WebDavSyncManager(application)
+    val webDavConfig: StateFlow<com.bit.sync.WebDavConfig> = appSettingsDataStore.webDavConfig
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.sync.WebDavConfig())
+
+    private val _webDavSyncState = MutableStateFlow<com.bit.sync.WebDavSyncState>(com.bit.sync.WebDavSyncState.Idle)
+    val webDavSyncState: StateFlow<com.bit.sync.WebDavSyncState> = _webDavSyncState
+
+    private val _webDavBackups = MutableStateFlow<List<com.bit.sync.WebDavBackupItem>>(emptyList())
+    val webDavBackups: StateFlow<List<com.bit.sync.WebDavBackupItem>> = _webDavBackups
+
+    fun refreshStorage() {
+        viewModelScope.launch {
+            storageRepository.refresh()
+        }
+    }
+
+    suspend fun listStorageCategoryFiles(categoryId: String): List<com.bit.repo.StorageFileItem> {
+        return storageRepository.listCategoryFiles(categoryId)
+    }
+
+    fun deleteStorageFile(path: String, onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val success = storageRepository.deleteFile(path)
+            onResult(success)
+        }
+    }
+
+    fun clearTempCache(onFreed: (Long) -> Unit = {}) {
+        viewModelScope.launch {
+            val freed = storageRepository.clearTempCache()
+            onFreed(freed)
+        }
+    }
+
+    fun vacuumDatabase(onResult: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val success = storageRepository.vacuumDatabase()
+            onResult(success)
+        }
+    }
+
     // ── HuggingFace Token ──
     private val hfTokenManager = HuggingFaceTokenManager(application)
     private val _hfTokenState = MutableStateFlow(
@@ -72,6 +128,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _hfTokenState.value = if (!token.isNullOrBlank()) HfTokenState.SET else HfTokenState.NOT_SET
             }
         }
+
+        // Initialize storage & diagnostics scan
+        refreshStorage()
     }
 
     fun saveHfToken(token: String) {
@@ -536,6 +595,101 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         _backupProgress.value = null
     }
 
+    // ── WebDAV Methods ──
+
+    fun updateWebDavConfig(config: com.bit.sync.WebDavConfig) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveWebDavConfig(config)
+        }
+    }
+
+    fun testWebDavConnection(config: com.bit.sync.WebDavConfig = webDavConfig.value, onResult: (Boolean, String?) -> Unit = { _, _ -> }) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Testing connection...")
+            val result = webDavSyncManager.testConnection(config)
+            if (result.isSuccess) {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Success("Connected successfully!")
+                listWebDavBackups(config)
+                withContext(Dispatchers.Main) { onResult(true, null) }
+            } else {
+                val error = result.exceptionOrNull()?.message ?: "Connection failed"
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error(error)
+                withContext(Dispatchers.Main) { onResult(false, error) }
+            }
+        }
+    }
+
+    fun listWebDavBackups(config: com.bit.sync.WebDavConfig = webDavConfig.value) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = webDavSyncManager.listBackups(config)
+            if (result.isSuccess) {
+                _webDavBackups.value = result.getOrDefault(emptyList())
+            }
+        }
+    }
+
+    fun backupToWebDav(password: String, config: com.bit.sync.WebDavConfig = webDavConfig.value) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Creating and encrypting backup...")
+            val sdf = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault())
+            val tempBackupFile = java.io.File(getApplication<Application>().cacheDir, "BIT_backup_${sdf.format(java.util.Date())}.bitbackup")
+
+            val manager = SystemBackupManager(getApplication())
+            val success = manager.createBackupToFile(tempBackupFile, password, _backupOptions.value) { progress ->
+                _backupProgress.value = progress
+            }
+
+            if (success && tempBackupFile.exists()) {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Uploading to WebDAV...")
+                val uploadResult = webDavSyncManager.uploadBackup(config, tempBackupFile)
+                tempBackupFile.delete()
+
+                if (uploadResult.isSuccess) {
+                    _webDavSyncState.value = com.bit.sync.WebDavSyncState.Success("Cloud backup completed!")
+                    listWebDavBackups(config)
+                } else {
+                    _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error(uploadResult.exceptionOrNull()?.message ?: "Upload failed")
+                }
+            } else {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error("Failed to create local backup package")
+            }
+        }
+    }
+
+    fun restoreFromWebDav(item: com.bit.sync.WebDavBackupItem, password: String, config: com.bit.sync.WebDavConfig = webDavConfig.value) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Downloading remote backup...")
+            val tempFile = java.io.File(getApplication<Application>().cacheDir, item.displayName)
+
+            val downloadResult = webDavSyncManager.downloadBackup(config, item, tempFile)
+            if (downloadResult.isSuccess) {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Loading("Restoring database and settings...")
+                val manager = SystemBackupManager(getApplication())
+                val success = manager.restoreBackupFromFile(tempFile, password) { progress ->
+                    _backupProgress.value = progress
+                }
+                tempFile.delete()
+
+                if (success) {
+                    _webDavSyncState.value = com.bit.sync.WebDavSyncState.Success("Restore complete! Restarting app...")
+                } else {
+                    _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error("Restore failed: Incorrect password or corrupt archive")
+                }
+            } else {
+                _webDavSyncState.value = com.bit.sync.WebDavSyncState.Error(downloadResult.exceptionOrNull()?.message ?: "Download failed")
+            }
+        }
+    }
+
+    fun deleteWebDavBackup(item: com.bit.sync.WebDavBackupItem, config: com.bit.sync.WebDavConfig = webDavConfig.value) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = webDavSyncManager.deleteBackup(config, item)
+            if (result.isSuccess) {
+                listWebDavBackups(config)
+            }
+        }
+    }
+
     fun selectTtsModel(modelId: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -557,6 +711,97 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 } catch (e: Exception) {
                     Log.e("SettingsViewModel", "Failed to switch TTS model", e)
                 }
+            }
+        }
+    }
+
+    // ── Theme & Font Customization ──
+    val fontManager = com.bit.utils.FontFileManager(application)
+
+    private val _customFontsList = MutableStateFlow(fontManager.listCustomFonts())
+    val customFontsList: StateFlow<List<com.bit.utils.CustomFontItem>> = _customFontsList
+
+    val colorMode: StateFlow<com.bit.ui.theme.ColorMode> = appSettingsDataStore.colorMode
+        .map { modeStr ->
+            runCatching { com.bit.ui.theme.ColorMode.valueOf(modeStr) }.getOrDefault(com.bit.ui.theme.ColorMode.SYSTEM)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.ui.theme.ColorMode.SYSTEM)
+
+    fun setColorMode(mode: com.bit.ui.theme.ColorMode) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveColorMode(mode.name)
+        }
+    }
+
+    val dynamicColorEnabled: StateFlow<Boolean> = appSettingsDataStore.dynamicColorEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setDynamicColorEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveDynamicColorEnabled(enabled)
+        }
+    }
+
+    val themePresetId: StateFlow<String> = appSettingsDataStore.themePresetId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "obsidian")
+
+    fun setThemePresetId(id: String) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveThemePresetId(id)
+        }
+    }
+
+    val fontFamily: StateFlow<com.bit.ui.theme.BuiltinFont> = appSettingsDataStore.fontFamily
+        .map { fontStr ->
+            runCatching { com.bit.ui.theme.BuiltinFont.valueOf(fontStr) }.getOrDefault(com.bit.ui.theme.BuiltinFont.MANROPE)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.bit.ui.theme.BuiltinFont.MANROPE)
+
+    fun setFontFamily(font: com.bit.ui.theme.BuiltinFont) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveFontFamily(font.name)
+        }
+    }
+
+    val customFontPath: StateFlow<String> = appSettingsDataStore.customFontPath
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    fun setCustomFontPath(path: String) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveCustomFontPath(path)
+        }
+    }
+
+    val fontScale: StateFlow<Float> = appSettingsDataStore.fontScale
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1.0f)
+
+    fun setFontScale(scale: Float) {
+        viewModelScope.launch {
+            appSettingsDataStore.saveFontScale(scale)
+        }
+    }
+
+    fun importCustomFont(uri: Uri, name: String, onResult: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val path = fontManager.importFont(uri, name)
+            if (path != null) {
+                _customFontsList.value = fontManager.listCustomFonts()
+                appSettingsDataStore.saveCustomFontPath(path)
+                appSettingsDataStore.saveFontFamily(com.bit.ui.theme.BuiltinFont.CUSTOM.name)
+                onResult(true)
+            } else {
+                onResult(false)
+            }
+        }
+    }
+
+    fun deleteCustomFont(path: String) {
+        viewModelScope.launch {
+            fontManager.deleteFont(path)
+            _customFontsList.value = fontManager.listCustomFonts()
+            if (customFontPath.value == path) {
+                appSettingsDataStore.saveCustomFontPath("")
+                appSettingsDataStore.saveFontFamily(com.bit.ui.theme.BuiltinFont.MANROPE.name)
             }
         }
     }

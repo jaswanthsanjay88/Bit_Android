@@ -25,18 +25,37 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalView
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+
+object MotionDuration {
+    const val enter = 300
+    const val exit = 150
+    const val stateChange = 200
+    const val micro = 100 // ripples, tap feedback
+}
+
+object MotionEasing {
+    val standard = FastOutSlowInEasing
+    val emphasized = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+    val decelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
+    val accelerate = CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f)
+    val linear = LinearEasing // progress/loop only
+}
+
 // Centralized animation tokens — use these instead of inline spring()/tween() calls.
 object Motion {
 
     // Material 3 Emphasized easing curves
-    val EmphasizedEasing = CubicBezierEasing(0.2f, 0.0f, 0f, 1.0f)
-    val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f)
-    val EmphasizedAccelerate = CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f)
+    val EmphasizedEasing = MotionEasing.emphasized
+    val EmphasizedDecelerate = MotionEasing.decelerate
+    val EmphasizedAccelerate = MotionEasing.accelerate
 
     // Durations — M3 spec tokens
-    const val DurationShort = 200   // small state changes (icon toggle)
-    const val DurationMedium = 300  // standard transitions (card expand)
-    const val DurationLong = 500    // large/complex transitions (screen change)
+    const val DurationShort = MotionDuration.stateChange
+    const val DurationMedium = MotionDuration.enter
+    const val DurationExit = MotionDuration.exit
+    const val DurationLong = 500
 
     // Interactive press/toggle feedback — snappy with slight bounce
     fun <T> interactive(): FiniteAnimationSpec<T> = spring(
@@ -52,29 +71,29 @@ object Motion {
 
     // State changes — color, alpha, size
     fun <T> state(): FiniteAnimationSpec<T> = tween(
-        durationMillis = DurationShort,
-        easing = EmphasizedEasing
+        durationMillis = MotionDuration.stateChange,
+        easing = MotionEasing.standard
     )
 
     // Page/modal entrance — Emphasized deceleration
     fun <T> entrance(): FiniteAnimationSpec<T> = tween(
-        durationMillis = DurationMedium,
-        easing = EmphasizedDecelerate
+        durationMillis = MotionDuration.enter,
+        easing = MotionEasing.decelerate
     )
 
     // Exit — Emphasized acceleration
     fun <T> exit(): FiniteAnimationSpec<T> = tween(
-        durationMillis = DurationShort,
-        easing = EmphasizedAccelerate
+        durationMillis = MotionDuration.exit,
+        easing = MotionEasing.accelerate
     )
 
     // Standard enter transition for AnimatedVisibility
-    val Enter: EnterTransition = fadeIn(tween(DurationMedium, easing = EmphasizedDecelerate)) +
-        expandVertically(tween(DurationMedium, easing = EmphasizedDecelerate), expandFrom = Alignment.Top)
+    val Enter: EnterTransition = fadeIn(tween(MotionDuration.enter, easing = MotionEasing.decelerate)) +
+        expandVertically(tween(MotionDuration.enter, easing = MotionEasing.decelerate), expandFrom = Alignment.Top)
 
     // Standard exit transition for AnimatedVisibility
-    val Exit: ExitTransition = fadeOut(tween(DurationShort, easing = EmphasizedAccelerate)) +
-        shrinkVertically(tween(DurationShort, easing = EmphasizedAccelerate), shrinkTowards = Alignment.Top)
+    val Exit: ExitTransition = fadeOut(tween(MotionDuration.exit, easing = MotionEasing.accelerate)) +
+        shrinkVertically(tween(MotionDuration.exit, easing = MotionEasing.accelerate), shrinkTowards = Alignment.Top)
 }
 
 /**

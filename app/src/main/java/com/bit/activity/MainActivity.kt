@@ -47,6 +47,8 @@ import com.bit.ui.screen.settings.SettingsScreen
 import com.bit.ui.screen.setup.ImageGenSetupScreen
 import com.bit.ui.screen.setup.EmbeddingSetupScreen
 import com.bit.ui.screen.setup.SetupScreen
+import com.bit.ui.theme.MotionDuration
+import com.bit.ui.theme.MotionEasing
 import com.bit.ui.theme.NeuroVerseTheme
 import com.bit.viewmodel.ChatViewModel
 import com.bit.viewmodel.LLMModelViewModel
@@ -170,12 +172,18 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val betaStatus = remember { com.bit.util.BetaExpiryManager.checkStatus(context) }
+
                 AppNavigation(
                     startDestination = Screen.Intro.route,
                     targetDestination = targetDestination,
                     hasModelsInstalled = hasModelsInstalled,
                     needsMigration = needsMigration
                 )
+
+                if (betaStatus is com.bit.util.BetaStatus.Expired) {
+                    com.bit.ui.components.BetaExpiredDialog(status = betaStatus)
+                }
 
                 pendingUpdate?.let { info ->
                     com.bit.update.UpdateBottomSheet(
@@ -208,7 +216,10 @@ sealed class Screen(val route: String) {
     // Main app
     object Chat : Screen("chat")
     object Store : Screen("store")
-    object Editor : Screen("editor")
+    object Editor : Screen("editor?modelId={modelId}") {
+        fun createRoute(modelId: String? = null) =
+            if (!modelId.isNullOrBlank()) "editor?modelId=$modelId" else "editor?modelId="
+    }
     object Settings : Screen("settings")
     object AiMemory : Screen("ai_memory")
     object Update : Screen("update")
@@ -225,6 +236,10 @@ sealed class Screen(val route: String) {
     object TaskList : Screen("task_list")
     object ConflictReview : Screen("conflict_review")
     object BackupSettings : Screen("backup_settings")
+    object Workspace : Screen("workspace")
+    object SubagentSession : Screen("subagent_session?id={id}") {
+        fun createRoute(id: String) = "subagent_session?id=$id"
+    }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -244,32 +259,49 @@ fun AppNavigation(
     val llmModelViewModel: LLMModelViewModel = hiltViewModel()
 
     SharedTransitionLayout {
+        androidx.compose.runtime.CompositionLocalProvider(
+            com.bit.ui.screen.subagent.LocalSubagentNav provides { id ->
+                navController.navigate(Screen.SubagentSession.createRoute(id))
+            }
+        ) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
             enterTransition = {
                 slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(300)
-                ) + fadeIn(animationSpec = tween(300))
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard),
+                    initialOffset = { (it * 0.22f).toInt() }
+                ) + fadeIn(
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                )
             },
             exitTransition = {
                 slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Left,
-                    animationSpec = tween(300)
-                ) + fadeOut(animationSpec = tween(300))
+                    towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard),
+                    targetOffset = { -(it * 0.12f).toInt() }
+                ) + fadeOut(
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                )
             },
             popEnterTransition = {
                 slideIntoContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(300)
-                ) + fadeIn(animationSpec = tween(300))
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard),
+                    initialOffset = { -(it * 0.18f).toInt() }
+                ) + fadeIn(
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                )
             },
             popExitTransition = {
                 slideOutOfContainer(
-                    towards = AnimatedContentTransitionScope.SlideDirection.Right,
-                    animationSpec = tween(300)
-                ) + fadeOut(animationSpec = tween(300))
+                    towards = AnimatedContentTransitionScope.SlideDirection.End,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard),
+                    targetOffset = { (it * 0.22f).toInt() }
+                ) + fadeOut(
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                )
             }
         ) {
 
@@ -336,7 +368,28 @@ fun AppNavigation(
                 )
             }
 
-            composable(Screen.OnboardingSetup.route) {
+            composable(
+                route = Screen.OnboardingSetup.route,
+                enterTransition = {
+                    slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                        animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                    ) + fadeIn(tween(MotionDuration.enter))
+                },
+                exitTransition = {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                        animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                    ) + fadeOut(tween(MotionDuration.exit))
+                },
+                popEnterTransition = { fadeIn(tween(MotionDuration.enter)) },
+                popExitTransition = {
+                    slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                        animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                    ) + fadeOut(tween(MotionDuration.exit))
+                }
+            ) {
                 SetupScreen(
                     sharedTransitionScope = this@SharedTransitionLayout,
                     animatedVisibilityScope = this@composable,
@@ -363,26 +416,42 @@ fun AppNavigation(
                     onVaultManagerClick = {
                         navController.navigate(Screen.MemoryVault.route)
                     },
-                onImageGenSetupNeeded = {
-                    navController.navigate(Screen.ImageGenSetup.route)
-                },
-                onModelSelectedNavigate = { model ->
-                    val targetRoute = Screen.Chat.route
-                    if (navController.currentDestination?.route != targetRoute) {
-                        navController.navigate(targetRoute) {
-                            launchSingleTop = true
+                    onWorkspaceClick = {
+                        navController.navigate(Screen.Workspace.route)
+                    },
+                    onImageGenSetupNeeded = {
+                        navController.navigate(Screen.ImageGenSetup.route)
+                    },
+                    onModelSelectedNavigate = { model ->
+                        val targetRoute = Screen.Chat.route
+                        if (navController.currentDestination?.route != targetRoute) {
+                            navController.navigate(targetRoute) {
+                                launchSingleTop = true
+                            }
                         }
-                    }
-                },
-                chatViewModel = chatViewModel,
-                llmModelViewModel = llmModelViewModel
-            )
-        }
+                    },
+                    chatViewModel = chatViewModel,
+                    llmModelViewModel = llmModelViewModel
+                )
+            }
 
-        composable(Screen.Editor.route) {
-            ModelConfigEditorScreen(onBackClick = {
-                navController.popBackStack()
-            })
+        composable(
+            route = Screen.Editor.route,
+            arguments = listOf(
+                androidx.navigation.navArgument("modelId") {
+                    type = androidx.navigation.NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            val modelId = backStackEntry.arguments?.getString("modelId")
+            ModelConfigEditorScreen(
+                initialModelId = modelId,
+                onBackClick = {
+                    navController.popBackStack()
+                }
+            )
         }
 
         composable(
@@ -405,9 +474,11 @@ fun AppNavigation(
             val context = LocalContext.current
             SettingsScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onModelEditor = { navController.navigate(Screen.Editor.route) },
+                onModelEditor = { navController.navigate(Screen.Editor.createRoute()) },
+                onModelSelected = { model -> navController.navigate(Screen.Editor.createRoute(model.id)) },
                 onAiMemoryClick = { navController.navigate(Screen.AiMemory.route) },
                 onEmbeddingSetupClick = { navController.navigate(Screen.EmbeddingSetup.route) },
+                onNavigateToModelStore = { navController.navigate(Screen.Store.route) },
                 onDiagnosticsClick = { context.startActivity(Intent(context, DiagnosticsActivity::class.java)) },
                 onCheckForUpdates = { navController.navigate(Screen.Update.route) }
             )
@@ -420,7 +491,28 @@ fun AppNavigation(
             )
         }
 
-        composable(Screen.ImageGenSetup.route) {
+        composable(
+            route = Screen.ImageGenSetup.route,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                ) + fadeIn(tween(MotionDuration.enter))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            },
+            popEnterTransition = { fadeIn(tween(MotionDuration.enter)) },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            }
+        ) {
             ImageGenSetupScreen(
                 onComplete = {
                     llmModelViewModel.onQnnSetupComplete()
@@ -436,7 +528,28 @@ fun AppNavigation(
                 }
             )
         }
-        composable(Screen.EmbeddingSetup.route) {
+        composable(
+            route = Screen.EmbeddingSetup.route,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                ) + fadeIn(tween(MotionDuration.enter))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            },
+            popEnterTransition = { fadeIn(tween(MotionDuration.enter)) },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            }
+        ) {
             EmbeddingSetupScreen(
                 onSetupComplete = {
                     navController.popBackStack()
@@ -468,7 +581,26 @@ fun AppNavigation(
                     type = androidx.navigation.NavType.StringType
                     defaultValue = "note"
                 }
-            )
+            ),
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(MotionDuration.enter, easing = MotionEasing.standard)
+                ) + fadeIn(tween(MotionDuration.enter))
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            },
+            popEnterTransition = { fadeIn(tween(MotionDuration.enter)) },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(MotionDuration.exit, easing = MotionEasing.standard)
+                ) + fadeOut(tween(MotionDuration.exit))
+            }
         ) { backStackEntry ->
             val noteId = backStackEntry.arguments?.getString("noteId")
             val defaultType = backStackEntry.arguments?.getString("defaultType") ?: "note"
@@ -519,6 +651,22 @@ fun AppNavigation(
                 onBackClick = { navController.popBackStack() }
             )
         }
+
+        // ============ LINUX PROOT WORKSPACE ============
+        composable(Screen.Workspace.route) {
+            com.bit.ui.screen.workspace.WorkspaceHostScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        // ============ SUBAGENT SESSION DRILL-DOWN ============
+        composable(Screen.SubagentSession.route) { backStackEntry ->
+            com.bit.ui.screen.subagent.SubagentSessionScreen(
+                subagentId = backStackEntry.arguments?.getString("id").orEmpty(),
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
+        }
     }
 }

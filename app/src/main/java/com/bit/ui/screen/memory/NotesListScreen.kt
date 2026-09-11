@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.bit.ui.theme.bouncyClick
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.global.formatRelativeTime
@@ -202,7 +203,7 @@ fun NotesListScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    val linkCount = note.content.split("[[").size - 1
+                                    val linkCount = if (note.content.contains("[[")) note.content.split("[[").size - 1 else 0
                                     if (linkCount > 0) {
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),

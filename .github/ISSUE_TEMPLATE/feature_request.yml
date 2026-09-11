@@ -1,0 +1,37 @@
+name: Feature Request
+description: Suggest an idea or feature enhancement for BIT
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature for BIT. Please provide clear details to help us evaluate your proposal.
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of the proposed feature.
+    validations:
+      required: true
+  - type: textarea
+    id: problem-motivation
+    attributes:
+      label: Problem or Motivation
+      description: Is your feature request related to a problem or current limitation? Please describe.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Proposed Solution or Alternatives
+      description: Describe any alternative solutions or approaches you have considered.
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, mockups, or screenshots about the feature request here.
+    validations:
+      required: false

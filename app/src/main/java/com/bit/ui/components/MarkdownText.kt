@@ -297,11 +297,11 @@ internal fun parseMarkdown(text: String): List<MarkdownElement> {
             }
 
             // Fenced code block
-            line.startsWith("```") -> {
-                val language = line.removePrefix("```").trim()
+            line.trimStart().startsWith("```") -> {
+                val language = line.trimStart().removePrefix("```").trim()
                 val codeLines = mutableListOf<String>()
                 i++
-                while (i < lines.size && !lines[i].startsWith("```")) { codeLines.add(lines[i]); i++ }
+                while (i < lines.size && !lines[i].trimStart().startsWith("```")) { codeLines.add(lines[i]); i++ }
                 elements.add(MarkdownElement.CodeBlock(codeLines.joinToString("\n"), language))
             }
 
@@ -581,7 +581,7 @@ private fun HeadingText(
         style = MaterialTheme.typography.titleLarge,
         fontSize = fontSize,
         fontWeight = fontWeight,
-        color = LocalContentColor.current.copy(alpha = alpha),
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
         modifier = Modifier.padding(vertical = verticalPad)
     )
 }
@@ -591,8 +591,9 @@ private fun BodyText(text: String, colors: InlineColors) {
     Text(
         text = cachedInlineFormatting(text, colors),
         style = MaterialTheme.typography.bodyMedium,
-        color = LocalContentColor.current.copy(alpha = 0.87f),
-        lineHeight = 20.sp
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
+        lineHeight = 22.sp,
+        letterSpacing = 0.15.sp
     )
 }
 
@@ -611,8 +612,9 @@ private fun BulletPointView(text: String, level: Int, colors: InlineColors) {
         Text(
             text = cachedInlineFormatting(text, colors),
             style = MaterialTheme.typography.bodyMedium,
-            color = LocalContentColor.current.copy(alpha = 0.87f),
-            lineHeight = 20.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
+            lineHeight = 22.sp,
+            letterSpacing = 0.15.sp,
             modifier = Modifier.weight(1f)
         )
     }
@@ -634,8 +636,9 @@ private fun NumberedPointView(text: String, number: String, colors: InlineColors
         Text(
             text = cachedInlineFormatting(text, colors),
             style = MaterialTheme.typography.bodyMedium,
-            color = LocalContentColor.current.copy(alpha = 0.87f),
-            lineHeight = 20.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
+            lineHeight = 22.sp,
+            letterSpacing = 0.15.sp,
             modifier = Modifier.weight(1f)
         )
     }
@@ -661,7 +664,7 @@ private fun BlockQuoteView(text: String, level: Int, colors: InlineColors) {
         Text(
             text = cachedInlineFormatting(text, colors),
             style = MaterialTheme.typography.bodyMedium,
-            color = LocalContentColor.current.copy(alpha = 0.87f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.92f),
             lineHeight = 20.sp,
             modifier = Modifier.weight(1f)
         )
@@ -674,7 +677,7 @@ private fun InlineCodeView(text: String) {
         text = text,
         fontFamily = MapleMonoFontFamily,
         fontSize = 12.sp,
-        color = LocalContentColor.current.copy(alpha = 0.85f),
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.90f),
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
@@ -687,8 +690,7 @@ private fun InlineCodeView(text: String) {
 @Composable
 private fun CodeBlockView(code: String, language: String) {
     var isExpanded by remember(code) {
-        val lineCount = code.count { it == '\n' } + 1
-        mutableStateOf(lineCount <= 12)
+        mutableStateOf(true)
     }
     val context = LocalContext.current
 
@@ -795,12 +797,14 @@ private fun CodeBlockView(code: String, language: String) {
         }
 
         if (!isExpanded) {
+            val previewText = code.lines().take(3).joinToString("\n").trimEnd()
             Text(
-                text = code.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: "",
+                text = previewText.ifBlank { code.trim() },
                 fontFamily = MapleMonoFontFamily,
                 fontSize = 12.sp,
-                color = contentColor.copy(alpha = 0.4f),
-                maxLines = 1,
+                lineHeight = 17.sp,
+                color = contentColor.copy(alpha = 0.7f),
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1031,7 +1035,7 @@ private fun MathBlockView(expression: String, isTypst: Boolean) {
             Text(
                 text = if (isTypst) "TYPST" else "MATH",
                 fontFamily = MapleMonoFontFamily, fontSize = 10.sp, fontWeight = FontWeight.Medium,
-                color = LocalContentColor.current.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -1043,7 +1047,7 @@ private fun MathBlockView(expression: String, isTypst: Boolean) {
                 text = renderedMath,
                 fontFamily = MapleMonoFontFamily, fontSize = 16.sp,
                 fontStyle = FontStyle.Italic,
-                color = LocalContentColor.current, lineHeight = 24.sp
+                color = MaterialTheme.colorScheme.onSurface, lineHeight = 24.sp
             )
         }
     }

@@ -72,26 +72,18 @@ internal fun UserMessageBubble(
     ) {
         Box(
             modifier = Modifier
-                .padding(horizontal = Standards.SpacingSm, vertical = 5.dp)
+                .padding(horizontal = Standards.SpacingSm, vertical = 2.dp)
         ) {
             val interactionSource = remember { MutableInteractionSource() }
             val bubbleShape = RoundedCornerShape(20.dp)
-            val bubbleColor = Color.White.copy(alpha = 0.10f)
+            val bubbleColor = MaterialTheme.colorScheme.surfaceContainerHigh
             
             Box(
                 modifier = Modifier
-                    .widthIn(max = 280.dp)
+                    .widthIn(min = 40.dp, max = 340.dp)
                     .clip(bubbleShape)
                     .background(bubbleColor)
-                    .border(1.dp, Color.White.copy(alpha = 0.08f), bubbleShape)
-                    .combinedClickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = {},
-                        onLongClick = {
-                            onLongClick?.invoke(message)
-                        }
-                    )
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), bubbleShape)
             ) {
                 Column {
                     imageBitmap?.let { bmp ->
@@ -188,17 +180,7 @@ internal fun AssistantStreamingBubble(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = Standards.SpacingSm)
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = {},
-                    onLongClick = {
-                        if (message != null) {
-                            onLongClick?.invoke(message)
-                        }
-                    }
-                ),
+                .padding(vertical = Standards.SpacingSm),
             verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
             if (parsedMessage.thinkingContent != null) {
@@ -333,86 +315,80 @@ internal fun ThinkingBlock(
     thinkingText: String,
     isStreaming: Boolean = false
 ) {
-    // Auto-expand while streaming, auto-collapse when done
-    var userToggled by remember { mutableStateOf(false) }
-    var userExpandState by remember { mutableStateOf(false) }
+    var isExpanded by remember { mutableStateOf(isStreaming) }
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
-    val isExpanded = if (userToggled) userExpandState else isStreaming
+    LaunchedEffect(isStreaming) {
+        if (isStreaming) {
+            isExpanded = true
+        }
+    }
 
-    // Pulsing dot animation for streaming state
-    val infiniteTransition = rememberInfiniteTransition(label = "thinkPulse")
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "thinkPulseAlpha"
-    )
+    // Live elapsed timer tracking
+    val startTime = remember { System.currentTimeMillis() }
+    var elapsedMs by remember { mutableLongStateOf(0L) }
 
-    GlassCard(
-        backgroundColor = Glass.SurfaceMedium,
-        borderColor = Glass.BorderSubtle,
-        cornerRadius = 10.dp,
-        borderWidth = 0.8.dp,
-        contentPadding = PaddingValues(0.dp),
+    LaunchedEffect(isStreaming) {
+        if (isStreaming) {
+            while (true) {
+                elapsedMs = System.currentTimeMillis() - startTime
+                kotlinx.coroutines.delay(100)
+            }
+        }
+    }
+
+    val elapsedSeconds = (elapsedMs / 1000f)
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Standards.SpacingMd)
+            .padding(horizontal = 16.dp, vertical = 2.dp)
     ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        userToggled = true
-                        userExpandState = !isExpanded
-                    }
-                    .padding(vertical = Standards.SpacingSm, horizontal = Standards.SpacingMd),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
-                    verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
                 ) {
-                    Icon(
-                        imageVector = TnIcons.BulbFilled,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .graphicsLayer { alpha = if (isStreaming) pulseAlpha else 1f },
-                        tint = Glass.AccentWarm
-                    )
-                    Text(
-                        text = if (isStreaming) "Thinking…" else "Thought",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Glass.AccentWarm
-                    )
+                    haptics.selection()
+                    isExpanded = !isExpanded
                 }
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = when {
+                    isStreaming && elapsedSeconds > 0.5f -> "Thinking (${String.format(java.util.Locale.US, "%.1fs", elapsedSeconds)})…"
+                    isStreaming -> "Thinking…"
+                    elapsedSeconds > 0.5f -> "Thought for ${String.format(java.util.Locale.US, "%.1fs", elapsedSeconds)}"
+                    else -> "Thoughts"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = if (isExpanded) TnIcons.ChevronDown else TnIcons.ChevronRight,
+                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+                modifier = Modifier.size(15.dp)
+            )
+        }
 
-                ExpandCollapseIcon(isExpanded = isExpanded, size = 20.dp)
-            }
-
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = Motion.Enter,
-                exit = Motion.Exit
-            ) {
-                Column {
-                    HorizontalDivider(
-                        color = Glass.Divider
-                    )
-                    Text(
-                        text = thinkingText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Glass.TextSecondary,
-                        modifier = Modifier.padding(Standards.SpacingMd)
-                    )
-                }
-            }
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = Motion.Enter,
+            exit = Motion.Exit
+        ) {
+            Text(
+                text = thinkingText,
+                style = MaterialTheme.typography.bodySmall.copy(
+                    lineHeight = 20.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                modifier = Modifier.padding(start = 2.dp, top = 2.dp, bottom = 6.dp)
+            )
         }
     }
 }

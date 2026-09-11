@@ -92,6 +92,7 @@ fun TermsAndConditionsScreen(
                         • Inject documents (PDF, Word, Excel, EPUB) via RAG for AI-augmented responses
                         • Download models from Hugging Face (one-time download)
                         • Load custom models from local storage
+                        • Developer Workspaces (PRoot Sandboxes): On-device isolated Linux containers (Ubuntu Base, Alpine Linux) for local Python scripts, code compilation, and developer tooling in an unprivileged sandbox
 
                         FOR LOCAL PROVIDERS: All AI processing occurs entirely on your device. Your conversations, generated content, character cards, AI memories, and documents are stored securely on-device using MemoryVault encrypted storage (AES-256-GCM) and NEVER leave your device, with the exceptions noted in Section 5 (Network Usage).
 
@@ -160,7 +161,13 @@ fun TermsAndConditionsScreen(
                         • You are responsible for the content you search for and retrieve
                         • The Web Search plugin can be disabled in Settings
 
-                        EXCEPT FOR API PROVIDER USAGE AND WEB SEARCH, no other data is transmitted. When using local providers (GGUF, Diffusion, TTS, STT, VLM), your prompts, conversations, AI memories, character cards, generated content, and all other user data remain entirely on your device. We do not operate servers that receive your data. No analytics, telemetry, or tracking of any kind.
+                        LINUX WORKSPACE ASSETS & TOOLS:
+                        • When you explicitly install a developer workspace, the App downloads official open-source Linux distribution rootfs archives (Ubuntu Base from Canonical, Alpine Minirootfs from Alpine Linux) over HTTPS directly from public mirrors
+                        • Downloaded archives are cryptographically verified against published official SHA-256 signatures before extraction
+                        • Any Python package installations executed within workspaces are resolved directly from PyPI (Python Package Index) over HTTPS
+                        • Workspace downloads are strictly user-initiated with upfront consent and never occur automatically
+
+                        EXCEPT FOR API PROVIDER USAGE, WEB SEARCH, AND USER-REQUESTED WORKSPACE ASSETS, no other network transfers occur. When using local providers (GGUF, Diffusion, TTS, STT, VLM), your prompts, conversations, AI memories, character cards, generated content, and all other user data remain entirely on your device. We do not operate servers that receive your data. No analytics, telemetry, or tracking of any kind.
                     """.trimIndent()
                 )
 
@@ -219,6 +226,13 @@ fun TermsAndConditionsScreen(
                         • API provider connections (when configured)
                         • Web Search plugin queries (DuckDuckGo) when enabled
                         • No user data is uploaded to BIT-operated servers
+
+                        DEVELOPER WORKSPACES SANDBOX:
+                        • Workspaces operate inside an unprivileged PRoot user-space container strictly confined to the App's private internal storage directory
+                        • No Android root privileges are used, requested, or required
+                        • Workspaces have zero access to your personal files, external storage, photos, or contacts
+                        • File import/export occurs only through explicit user intent via Android's Storage Access Framework (SAF)
+                        • All execution occurs 100% on-device
 
                         YOUR RESPONSIBILITY:
                         • You are responsible for securing your device and backups

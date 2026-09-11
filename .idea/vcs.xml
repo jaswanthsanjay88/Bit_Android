@@ -4,9 +4,11 @@
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/llama-kt" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/llama-kt/src/main/cpp/llama.cpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/scratch/LastChat" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/scratch/ToolNeuron" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/scratch/bit-dependencies" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/scratch/fdroiddata" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/scratch/fdroiddata_repo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/scratch/llama_repo" vcs="Git" />
   </component>
 </project>

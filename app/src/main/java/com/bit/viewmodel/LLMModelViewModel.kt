@@ -308,9 +308,17 @@ class LLMModelViewModel @Inject constructor(
     }
 
     private suspend fun loadApiModel(model: Model) {
+        val config = getModelConfig(model.id)
+        val isImg = try {
+            val json = org.json.JSONObject(config?.modelLoadingParams ?: "{}")
+            json.optBoolean("isImageModel", com.bit.api.RemoteImageClient.isImageModelName(json.optString("model", model.modelName)))
+        } catch (e: Exception) {
+            com.bit.api.RemoteImageClient.isImageModelName(model.modelName)
+        }
+
         _currentModelID.value = model.id
         _currentModelType.value = ProviderType.API
-        ActiveModelSession.set(model.id, ProviderType.API)
+        ActiveModelSession.set(model.id, ProviderType.API, isImage = isImg)
         AppStateManager.setModelLoaded(model.modelName)
         appSettings.saveLastModelId(model.id)
         com.bit.plugins.PluginManager.setToolCallingModelLoaded(false)

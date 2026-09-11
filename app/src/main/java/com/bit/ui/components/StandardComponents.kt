@@ -205,14 +205,14 @@ fun SettingsClickableRow(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(Standards.IconMd),
-                tint = if (enabled) Color.White else Glass.TextMuted
+                tint = if (enabled) MaterialTheme.colorScheme.onSurface else Glass.TextMuted
             )
         } else if (iconRes != null) {
             Icon(
                 painter = painterResource(iconRes),
                 contentDescription = null,
                 modifier = Modifier.size(Standards.IconMd),
-                tint = if (enabled) Color.White else Glass.TextMuted
+                tint = if (enabled) MaterialTheme.colorScheme.onSurface else Glass.TextMuted
             )
         }
 

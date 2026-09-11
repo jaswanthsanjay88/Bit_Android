@@ -126,8 +126,11 @@ internal data class ApiCandidate(val content: ApiResponseContent? = null)
 
 @Serializable
 internal data class ApiUsageMetadata(
+    val promptTokenCount: Int? = null,
+    val candidatesTokenCount: Int? = null,
     val totalTokenCount: Int? = null,
-    val thoughtsTokenCount: Int? = null
+    val thoughtsTokenCount: Int? = null,
+    val cachedContentTokenCount: Int? = null
 )
 
 @Serializable
@@ -308,12 +311,13 @@ class GeminiProvider : LlmProvider {
             ApiToolConfig(includeServerSideToolInvocations = true)
         } else null
 
-        val hasGenParams = config.temperature != null || config.maxTokens != null || config.topP != null
+        val safeMaxTokens = config.maxTokens?.takeIf { it > 0 }?.coerceAtLeast(1)
+        val hasGenParams = config.temperature != null || safeMaxTokens != null || config.topP != null
                 || config.frequencyPenalty != null || config.presencePenalty != null
         val genConfig = if (thinkingConfig != null || hasGenParams) ApiGenerationConfig(
             thinkingConfig = thinkingConfig,
             temperature = config.temperature,
-            maxOutputTokens = config.maxTokens,
+            maxOutputTokens = safeMaxTokens,
             topP = config.topP,
             frequencyPenalty = config.frequencyPenalty,
             presencePenalty = config.presencePenalty
@@ -430,7 +434,23 @@ class GeminiProvider : LlmProvider {
                                         }
                                     }
                                     response.usageMetadata?.let { metadata ->
-                                        emit(StreamEvent.UsageUpdate(metadata.totalTokenCount ?: 0, metadata.thoughtsTokenCount ?: 0))
+                                        val prompt = metadata.promptTokenCount ?: 0
+                                        val candidates = metadata.candidatesTokenCount ?: 0
+                                        val total = metadata.totalTokenCount ?: (prompt + candidates)
+                                        val reasoning = metadata.thoughtsTokenCount ?: 0
+                                        val cached = metadata.cachedContentTokenCount ?: 0
+                                        Log.d("AgoraAPI", "Gemini Usage: prompt=$prompt, completion=$candidates, reasoning=$reasoning, cached=$cached, total=$total")
+                                        emit(
+                                            StreamEvent.UsageUpdate(
+                                                promptTokens = prompt,
+                                                completionTokens = candidates,
+                                                totalTokens = total,
+                                                reasoningTokens = reasoning,
+                                                cachedTokens = cached,
+                                                tokenCount = candidates,
+                                                thoughtsTokenCount = reasoning
+                                            )
+                                        )
                                     }
                                 } catch (e: Exception) {
                                     Log.e("AgoraAPI", "Parse error: ${e.message}", e)

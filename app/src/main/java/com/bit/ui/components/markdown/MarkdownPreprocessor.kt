@@ -20,17 +20,11 @@ object MarkdownPreprocessor {
         // Step 1: Extract code blocks to avoid mutating contents inside ``` or `
         val (textWithoutCode, codePlaceholders) = extractCodeBlocks(raw)
 
-        // Step 2: Parse LaTeX spans and convert to markdown image links
-        val textWithLatexImages = parseLatexSpansToMarkdown(textWithoutCode)
+        // Step 2: Protect literal angle-bracket tags (<widget>, <T>) so they aren't lost
+        val textWithProtectedTags = protectLiteralAngleBracketTags(textWithoutCode)
 
-        // Step 3: Protect literal angle-bracket tags
-        val textWithProtectedTags = protectLiteralAngleBracketTags(textWithLatexImages)
-
-        // Step 4: Escape unhandled dollars
-        val textEscaped = escapeDollarForMarkdown(textWithProtectedTags)
-
-        // Step 5: Restore original code blocks untouched
-        return restoreCodeBlocks(textEscaped, codePlaceholders)
+        // Step 3: Restore original code blocks untouched
+        return restoreCodeBlocks(textWithProtectedTags, codePlaceholders)
     }
 
     /**

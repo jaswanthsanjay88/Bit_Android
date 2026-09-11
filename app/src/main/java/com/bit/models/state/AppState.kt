@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import com.bit.plugins.PluginManager
 import com.bit.ui.icons.TnIcons
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.ui.res.vectorResource
@@ -75,7 +76,7 @@ fun AppState.getColor(): Color = when (this) {
 
     is AppState.NoModelLoaded -> MaterialTheme.colorScheme.onSurfaceVariant
 
-    is AppState.ModelLoaded -> androidx.compose.ui.graphics.Color.White
+    is AppState.ModelLoaded -> MaterialTheme.colorScheme.primary
 
     is AppState.LoadingModel -> MaterialTheme.colorScheme.secondary
 

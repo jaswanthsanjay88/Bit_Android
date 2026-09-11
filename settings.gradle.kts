@@ -30,4 +30,5 @@ include(":system_encryptor")
 include(":file_ops")
 include(":ums")
 include(":llama-kt")
+include(":workspace")
 

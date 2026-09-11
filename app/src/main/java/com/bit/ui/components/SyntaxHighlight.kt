@@ -1,9 +1,11 @@
 package com.bit.ui.components
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -43,18 +45,18 @@ object OneDarkTheme : SyntaxHighlightTheme {
     override val name = "One Dark"
     override val background = Color(0xFF282C34)
     override val lineNumberColor = Color(0xFF636D83)
-    override val defaultColor = Color(0xFFABB2BF)
+    override val defaultColor = Color(0xFFE2E8F0)
 
     override fun colorFor(token: CodeTokenType): Color = when (token) {
         CodeTokenType.Keyword -> Color(0xFFC678DD)
         CodeTokenType.String -> Color(0xFF98C379)
-        CodeTokenType.Comment -> Color(0xFF5C6370)
+        CodeTokenType.Comment -> Color(0xFF8B949E)
         CodeTokenType.Number -> Color(0xFFD19A66)
         CodeTokenType.Function -> Color(0xFF61AFEF)
         CodeTokenType.Type -> Color(0xFFE5C07B)
         CodeTokenType.Operator -> Color(0xFF56B6C2)
         CodeTokenType.Annotation -> Color(0xFFE06C75)
-        CodeTokenType.Punctuation -> Color(0xFF7F848E)
+        CodeTokenType.Punctuation -> Color(0xFFCBD5E1)
         CodeTokenType.Property -> Color(0xFFE06C75)
         CodeTokenType.Default -> defaultColor
     }
@@ -86,7 +88,8 @@ val LocalSyntaxTheme = staticCompositionLocalOf<SyntaxHighlightTheme?> { null }
 @Composable
 fun resolveSyntaxTheme(): SyntaxHighlightTheme {
     LocalSyntaxTheme.current?.let { return it }
-    return if (isSystemInDarkTheme()) OneDarkTheme else OneLightTheme
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f || isSystemInDarkTheme()
+    return if (isDark) OneDarkTheme else OneLightTheme
 }
 
 // ── Language definitions ──

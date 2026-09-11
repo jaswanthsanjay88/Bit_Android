@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bit.agent.harness.state.AgentHarnessState
 import com.bit.data.AppSettingsDataStore
 import kotlinx.coroutines.isActive
 import com.bit.models.table_schema.Model
@@ -56,6 +57,7 @@ fun HomeScreen(
     onStoreButtonClicked: (String?) -> Unit,
     onSettingsClick: () -> Unit,
     onVaultManagerClick: () -> Unit,
+    onWorkspaceClick: () -> Unit = {},
     onImageGenSetupNeeded: () -> Unit,
     onModelSelectedNavigate: (Model) -> Unit = {},
     chatViewModel: ChatViewModel,
@@ -101,6 +103,10 @@ fun HomeScreen(
                 HomeDrawerScreen(
                     onVaultManagerClick = onVaultManagerClick,
                     onSettingsClick = onSettingsClick,
+                    onWorkspaceClick = {
+                        drawerState.close()
+                        onWorkspaceClick()
+                    },
                     onChatSelected = {
                         chatViewModel.loadChat(it)
                         drawerState.close()
@@ -120,7 +126,7 @@ fun HomeScreen(
                             val currentProgress = (drawerState.offsetX.value / maxOffsetPx).coerceIn(0f, 1f)
                             alpha = (1f - currentProgress) * 0.6f
                         }
-                        .background(Color.Black)
+                        .background(MaterialTheme.colorScheme.scrim)
                 )
             }
 
@@ -234,6 +240,35 @@ fun HomeScreen(
                         chatViewModel = chatViewModel,
                         onClose = { showLiveVoiceMode = false }
                     )
+                }
+
+                // ── Universal Material 3 Error Pop-up Modal ──
+                val appState by com.bit.state.AppStateManager.appState.collectAsStateWithLifecycle()
+                var dismissedError by remember { mutableStateOf<String?>(null) }
+
+                if (appState is com.bit.models.state.AppState.Error) {
+                    val errorState = appState as com.bit.models.state.AppState.Error
+                    if (errorState.message != dismissedError) {
+                        com.bit.ui.components.BitErrorDialog(
+                            message = errorState.message,
+                            title = "Inference & Engine Notice",
+                            modelName = errorState.modelName,
+                            onDismiss = {
+                                dismissedError = errorState.message
+                                com.bit.state.AppStateManager.clearError()
+                            },
+                            onNavigateToModelStore = {
+                                dismissedError = errorState.message
+                                com.bit.state.AppStateManager.clearError()
+                                onStoreButtonClicked("models")
+                            },
+                            onNavigateToSettings = {
+                                dismissedError = errorState.message
+                                com.bit.state.AppStateManager.clearError()
+                                onSettingsClick()
+                            }
+                        )
+                    }
                 }
             }
         }

@@ -68,7 +68,8 @@ object RemoteInferenceClient {
             val payload = JSONObject().apply {
                 put("model", model)
                 put("stream", false) // Force non-streaming response for synchronous HTTP clients
-                put("max_tokens", maxTokens ?: 8192)
+                val safeMaxTokens = maxTokens?.takeIf { it > 0 } ?: 8192
+                put("max_tokens", safeMaxTokens)
                 
                 val toolsToUse = tools ?: buildDefaultTools()
                 if (toolsToUse.length() > 0) {

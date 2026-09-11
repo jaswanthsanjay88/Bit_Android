@@ -5,7 +5,9 @@ import com.bit.ui.theme.Motion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -80,6 +82,9 @@ internal fun DeviceInfoCard(deviceInfo: Map<String, String>) {
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(Standards.SpacingXs))
+            com.bit.ui.components.BatteryPowerIndicator(compact = false)
         }
     }
 }

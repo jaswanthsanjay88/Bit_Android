@@ -18,7 +18,7 @@ class OpenRouterProvider : BaseOpenAiProvider() {
         val reasoning = if (config.thinkingEnabled) {
             OpenAiReasoning(
                 effort = if (!config.thinkingBudgetEnabled) ThinkingLevels.openRouterEffort(config.thinkingLevel) else null,
-                maxTokens = config.thinkingBudgetTokens.takeIf { config.thinkingBudgetEnabled }
+                maxTokens = config.thinkingBudgetTokens.takeIf { config.thinkingBudgetEnabled && it > 0 }?.coerceIn(1, 131072)
             )
         } else null
         return request.copy(
