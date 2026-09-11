@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bit.global.Standards
 import com.bit.models.data.HFModelRepository
@@ -98,11 +99,17 @@ internal fun AdvancedTab(
         contentPadding = PaddingValues(horizontal = Standards.SpacingLg, vertical = Standards.SpacingSm),
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
     ) {
-        // Device Info Section
+        // Hardware Inference Headroom & Real-time RAM
         item {
-            DeviceInfoCard(deviceInfo)
+            HardwareHeadroomCard(deviceInfo)
         }
 
+        // Engine Runtime Tuning Controls
+        item {
+            EngineRuntimeTuningCard()
+        }
+
+        // Explorer Repositories Card with Architecture Filters & Badges
         item {
             ExplorerRepositoriesCard(
                 query = explorerQuery,
@@ -117,6 +124,11 @@ internal fun AdvancedTab(
                 onFetchRepoFiles = viewModel::fetchRepoFiles,
                 onDownloadModel = viewModel::downloadModelFromExplorer
             )
+        }
+
+        // Device Info Section
+        item {
+            DeviceInfoCard(deviceInfo)
         }
 
         // Repositories Section
@@ -181,6 +193,7 @@ internal fun ExplorerRepositoriesCard(
     onDownloadModel: (HuggingFaceExplorerRepo, com.bit.network.HuggingFaceFileResponse) -> Unit
 ) {
     var expanded by remember { mutableStateOf(true) }
+    var selectedArch by remember { mutableStateOf("All") }
 
     StandardCard(
         title = "HuggingFace Model Explorer",
@@ -199,6 +212,16 @@ internal fun ExplorerRepositoriesCard(
             exit = Motion.Exit
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)) {
+                // ── Research Architecture Filters ──
+                ArchitectureFilterRow(
+                    selectedArchitecture = selectedArch,
+                    onSelectArchitecture = { displayName, keyword ->
+                        selectedArch = displayName
+                        onQueryChange(keyword)
+                        onSearch()
+                    }
+                )
+
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQueryChange,
@@ -244,12 +267,23 @@ internal fun ExplorerRepositoriesCard(
                             )
                         }
                         query.isBlank() -> {
-                            Text(
-                                text = "🔥 Trending GGUF Models on HuggingFace",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs)
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.TrendingUp,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Trending GGUF Models on HuggingFace",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                         count > 0 -> {
                             CaptionText(text = "$count result${if (count != 1) "s" else ""} found for '$query'")
@@ -397,26 +431,66 @@ internal fun ExplorerResultRow(
                             )
                         } else {
                             ggufFiles.forEach { file ->
+                                val fileName = file.path.substringAfterLast("/")
+                                val sizeMB = (file.size ?: 0L) / (1024f * 1024f)
+                                val sizeGB = sizeMB / 1024f
+                                val quantLabel = when {
+                                    fileName.contains("q4_k_m", ignoreCase = true) -> "Q4_K_M • Balanced"
+                                    fileName.contains("q5_k_m", ignoreCase = true) -> "Q5_K_M • Recommended"
+                                    fileName.contains("q8_0", ignoreCase = true) -> "Q8_0 • Near Lossless"
+                                    fileName.contains("q6_k", ignoreCase = true) -> "Q6_K • High Quality"
+                                    fileName.contains("q3_k", ignoreCase = true) || fileName.contains("iq3", ignoreCase = true) -> "Q3 • Compact"
+                                    fileName.contains("q2_k", ignoreCase = true) || fileName.contains("iq2", ignoreCase = true) -> "Q2 • Minimal RAM"
+                                    fileName.contains("f16", ignoreCase = true) || fileName.contains("fp16", ignoreCase = true) -> "FP16 • Full Precision"
+                                    else -> null
+                                }
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = Standards.SpacingXs),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
                                         Text(
-                                            text = file.path.substringAfterLast("/"),
+                                            text = fileName,
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                        val sizeMB = (file.size ?: 0L) / (1024f * 1024f)
-                                        CaptionText(text = String.format("%.2f MB", sizeMB))
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingXs),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (quantLabel != null) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(4.dp),
+                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                                ) {
+                                                    Text(
+                                                        text = quantLabel,
+                                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                            CaptionText(
+                                                text = if (sizeGB >= 1f) String.format("%.2f GB", sizeGB) else String.format("%.0f MB", sizeMB)
+                                            )
+                                            CaptionText(text = "•")
+                                            CaptionText(
+                                                text = String.format("~%.1f GB RAM needed", sizeGB * 1.25f)
+                                            )
+                                        }
                                     }
                                     ActionButton(
                                         onClickListener = { onDownloadFile(file) },
                                         icon = TnIcons.Download,
-                                        contentDescription = "Download ${file.path}"
+                                        contentDescription = "Download $fileName"
                                     )
                                 }
                             }

@@ -81,6 +81,7 @@ class RagVaultIntegration(
                     metadata = NodeMetadata(
                         sourceId = "memory-vault",
                         sourceName = name,
+                        chunkTitle = com.bit.neuron_example.SemanticChunker.deriveChunkTitle(message.content, index),
                         position = index,
                         timestamp = message.timestamp,
                         extras = buildMap {

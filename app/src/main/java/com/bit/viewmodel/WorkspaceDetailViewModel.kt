@@ -54,6 +54,12 @@ class WorkspaceDetailViewModel @Inject constructor(
     private val _installedDistro = MutableStateFlow<com.bit.repo.InstalledDistroInfo?>(null)
     val installedDistro: StateFlow<com.bit.repo.InstalledDistroInfo?> = _installedDistro.asStateFlow()
 
+    private val _isProvisioningPython = MutableStateFlow(false)
+    val isProvisioningPython: StateFlow<Boolean> = _isProvisioningPython.asStateFlow()
+
+    private val _pythonVersion = MutableStateFlow<String?>(null)
+    val pythonVersion: StateFlow<String?> = _pythonVersion.asStateFlow()
+
     fun loadWorkspace(id: String) {
         _workspaceId.value = id
         refresh()
@@ -62,12 +68,46 @@ class WorkspaceDetailViewModel @Inject constructor(
     fun refresh() {
         val id = _workspaceId.value ?: return
         viewModelScope.launch {
+            if (!_isInstalling.value) {
+                repository.checkIntegrity()
+            }
             val ws = repository.getById(id)
             _workspace.value = ws
             _availableDistros.value = repository.getAvailableDistros()
             if (ws != null) {
                 _installedDistro.value = repository.detectInstalledDistro(ws.root)
                 loadFiles()
+                checkPython()
+            }
+        }
+    }
+
+    fun checkPython() {
+        val id = _workspaceId.value ?: return
+        viewModelScope.launch {
+            val result = repository.executeCommand(id, "python3 --version", timeoutMillis = 5_000L)
+            if (result.exitCode == 0 && result.stdout.contains("Python", ignoreCase = true)) {
+                _pythonVersion.value = result.stdout.trim()
+            } else {
+                _pythonVersion.value = null
+            }
+        }
+    }
+
+    fun installPython() {
+        val id = _workspaceId.value ?: return
+        if (_isProvisioningPython.value) return
+        _isProvisioningPython.value = true
+        viewModelScope.launch {
+            try {
+                val ok = repository.ensurePythonInstalled(id)
+                if (ok) {
+                    checkPython()
+                } else {
+                    _installError.value = "Python installation did not complete. You can also run 'apk add python3' or 'apt install python3' directly in the terminal."
+                }
+            } finally {
+                _isProvisioningPython.value = false
             }
         }
     }

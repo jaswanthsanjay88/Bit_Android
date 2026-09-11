@@ -23,6 +23,9 @@ interface MemoryNoteDao {
     @Query("DELETE FROM memory_notes WHERE id = :id")
     suspend fun deleteNoteById(id: String)
 
+    @Query("UPDATE memory_notes SET is_ai_memory_enabled = :isEnabled, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateAiMemoryEnabled(id: String, isEnabled: Boolean, updatedAt: Long = System.currentTimeMillis())
+
     @Query("DELETE FROM memory_notes")
     suspend fun deleteAll()
 

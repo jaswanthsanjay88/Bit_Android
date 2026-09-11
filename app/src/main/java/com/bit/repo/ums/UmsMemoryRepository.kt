@@ -69,6 +69,18 @@ class UmsMemoryRepository(private val ums: UnifiedMemorySystem) {
         ums.count(collection)
     }
 
+    suspend fun getById(entityId: String): AiMemory? = withContext(Dispatchers.IO) {
+        ums.queryString(collection, Tags.Memory.ENTITY_ID, entityId)
+            .firstOrNull()?.toAiMemory()
+    }
+
+    suspend fun deleteById(entityId: String): Boolean = withContext(Dispatchers.IO) {
+        val recordId = findRecordId(entityId) ?: return@withContext false
+        ums.delete(collection, recordId)
+        refreshCache()
+        true
+    }
+
     private fun findRecordId(entityId: String): Int? {
         return ums.queryString(collection, Tags.Memory.ENTITY_ID, entityId)
             .firstOrNull()?.id?.takeIf { it != 0 }

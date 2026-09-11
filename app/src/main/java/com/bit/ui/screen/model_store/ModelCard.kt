@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -121,19 +124,51 @@ fun ModelCard(
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val targetIconUrl = model.iconUrl ?: model.icon?.let { "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/$it.png" }
-                    if (!targetIconUrl.isNullOrBlank()) {
-                        coil3.compose.AsyncImage(
-                            model = targetIconUrl,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                        )
+                    val isDarkTheme = isSystemInDarkTheme()
+                    val targetIconUrl = remember(model.iconUrl, model.icon, isDarkTheme) {
+                        val raw = model.iconUrl ?: model.icon?.let { "https://unpkg.com/@lobehub/icons-static-png@1.95.0/dark/$it.png" }
+                        if (raw != null) {
+                            if (!isDarkTheme) raw.replace("/dark/", "/light/") else raw.replace("/light/", "/dark/")
+                        } else null
                     }
+
+                    // Elevated container tile ensures high contrast in both light and dark mode
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            if (!targetIconUrl.isNullOrBlank()) {
+                                coil3.compose.AsyncImage(
+                                    model = targetIconUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = when (model.modelType) {
+                                        ModelType.GGUF, ModelType.VLM -> TnIcons.Sparkles
+                                        ModelType.SD -> TnIcons.Photo
+                                        else -> TnIcons.Brain
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+
                     ModelTypeBadge(model.modelType)
                     Text(
                         text = model.name,

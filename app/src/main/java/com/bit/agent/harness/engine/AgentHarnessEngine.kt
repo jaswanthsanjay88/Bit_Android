@@ -47,7 +47,7 @@ class AgentHarnessEngine @Inject constructor(
 ) {
     companion object {
         private const val TAG = "AgentHarnessEngine"
-        const val DEFAULT_MAX_STEPS = 256
+        const val DEFAULT_MAX_STEPS = 1000
         const val DEFAULT_MAX_RETRIES_PER_STEP = 3
         private const val APPROVAL_TIMEOUT_MS = 5L * 60L * 1000L
         private const val MAX_SUBAGENT_CONTEXT_CHARS = 6000
@@ -442,7 +442,7 @@ class AgentHarnessEngine @Inject constructor(
                                         "audits (piped below). Apply EVERY item marked CORRECTION REQUIRED or " +
                                         "ADDITION REQUIRED, keep verified content unchanged, and output the FULL " +
                                         "revised findings. End with a summary of changes applied.",
-                                "max_steps" to 8
+                                "max_steps" to 50
                             )
                         ).toString(),
                         expectedOutcome = "Revised findings incorporating all reviewer corrections"
@@ -457,7 +457,7 @@ class AgentHarnessEngine @Inject constructor(
                                 "goal" to "Convergence audit: confirm the revised findings address every reviewer " +
                                         "correction and add no unsupported claims. Final verdict must be PASS or " +
                                         "PASS_WITH_CONDITIONS. If FAIL, list the remaining issues explicitly.",
-                                "max_steps" to 6
+                                "max_steps" to 50
                             )
                         ).toString(),
                         expectedOutcome = "Converged audit verdict (PASS / PASS WITH CONDITIONS)"
@@ -465,7 +465,7 @@ class AgentHarnessEngine @Inject constructor(
                     plan.steps.addAll(index + 1, listOf(revisionStep, convergenceStep))
                     logger.d(TAG, "Reviewer flagged corrections — injected revision + convergence steps after '${step.id}'")
                 } else {
-                    logger.w(TAG, "Reviewer flagged corrections but step budget cannot fit revision; skipping injection")
+                    logger.w(TAG, "Reviewer flagged corrections but maximum steps reached; skipping injection")
                 }
             }
 
@@ -521,18 +521,34 @@ class AgentHarnessEngine @Inject constructor(
         val steps = mutableListOf<TaskStep>()
         try {
             var text = jsonString.trim()
-            if (text.startsWith("```")) {
-                text = text.substringAfter("\n").substringBeforeLast("```").trim()
+            if (text.contains("```")) {
+                text = text.replace(Regex("""^```(?:json)?\s*""", RegexOption.MULTILINE), "")
+                    .replace(Regex("""\s*```$""", RegexOption.MULTILINE), "")
+                    .trim()
             }
-            val jsonArrayString = if (text.contains("[") && text.contains("]")) {
-                "[" + text.substringAfter("[").substringBeforeLast("]") + "]"
-            } else text
+            // Strip trailing commas before closing braces/brackets that break org.json
+            text = text.replace(Regex(""",\s*([\]}])"""), "$1")
 
-            val array = if (jsonArrayString.trim().startsWith("[")) {
-                JSONArray(jsonArrayString.trim())
-            } else {
-                val obj = JSONObject(text)
-                obj.optJSONArray("steps") ?: JSONArray()
+            val array = when {
+                text.contains("[") && text.contains("]") -> {
+                    val candidate = "[" + text.substringAfter("[").substringBeforeLast("]") + "]"
+                    try {
+                        JSONArray(candidate)
+                    } catch (_: Exception) {
+                        JSONArray(text)
+                    }
+                }
+                text.contains("{") && text.contains("}") -> {
+                    val candidate = "{" + text.substringAfter("{").substringBeforeLast("}") + "}"
+                    val obj = JSONObject(candidate)
+                    when {
+                        obj.has("steps") -> obj.optJSONArray("steps") ?: JSONArray()
+                        obj.has("plan") -> obj.optJSONArray("plan") ?: JSONArray()
+                        obj.has("toolName") || obj.has("tool") -> JSONArray().apply { put(obj) }
+                        else -> JSONArray()
+                    }
+                }
+                else -> JSONArray()
             }
 
             for (i in 0 until array.length()) {
@@ -651,7 +667,7 @@ class AgentHarnessEngine @Inject constructor(
                                 "FINDINGS — a detailed plain-language digest of the key developments.\n" +
                                 "CLAIMS — a numbered list of every explicit factual claim found, " +
                                 "one claim per line, statements only (no commentary).",
-                        "max_steps" to 8
+                        "max_steps" to 50
                     )
                 ).toString(),
                 expectedOutcome = "Detailed findings + numbered claims extracted from sources"
@@ -678,14 +694,14 @@ class AgentHarnessEngine @Inject constructor(
                                         mapOf(
                                             "role" to "Technical Claims Reviewer",
                                             "goal" to String.format(reviewerInstructions, focusA),
-                                            "max_steps" to 8
+                                            "max_steps" to 50
                                         )
                                     ),
                                     JSONObject(
                                         mapOf(
                                             "role" to "Commercial Claims Reviewer",
                                             "goal" to String.format(reviewerInstructions, focusB),
-                                            "max_steps" to 8
+                                            "max_steps" to 50
                                         )
                                     )
                                 )
@@ -709,7 +725,7 @@ class AgentHarnessEngine @Inject constructor(
                                     "End with: (a) a corrections list where every fixable issue is marked " +
                                     "CORRECTION REQUIRED or ADDITION REQUIRED together with the corrected statement, " +
                                     "and (b) a final verdict: PASS, PASS_WITH_CONDITIONS, or FAIL.",
-                            "max_steps" to 8
+                            "max_steps" to 50
                         )
                     ).toString(),
                     expectedOutcome = "Findings verified with flagged discrepancies"
@@ -753,7 +769,7 @@ class AgentHarnessEngine @Inject constructor(
                             mapOf(
                                 "role" to "Code Engineer A",
                                 "goal" to String.format(engineerInstructions, "Task: $firstGoal."),
-                                "max_steps" to 10
+                                "max_steps" to 50
                             )
                         ).toString(),
                         expectedOutcome = "Working Python file written and execution-verified"
@@ -768,7 +784,7 @@ class AgentHarnessEngine @Inject constructor(
                             mapOf(
                                 "role" to "Code Engineer B",
                                 "goal" to String.format(engineerInstructions, "Second deliverable — $secondGoal"),
-                                "max_steps" to 10
+                                "max_steps" to 50
                             )
                         ).toString(),
                         expectedOutcome = "Second Python file written and execution-verified"
@@ -784,7 +800,7 @@ class AgentHarnessEngine @Inject constructor(
                             mapOf(
                                 "role" to "Code Engineer",
                                 "goal" to String.format(engineerInstructions, "Task: $goal"),
-                                "max_steps" to 10
+                                "max_steps" to 50
                             )
                         ).toString(),
                         expectedOutcome = "Working Python file written and execution-verified"

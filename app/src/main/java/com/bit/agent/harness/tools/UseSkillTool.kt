@@ -61,13 +61,13 @@ class UseSkillTool(
 
             val skillFile = searchPaths.firstOrNull { it.exists() && it.isFile }
             val content = if (skillFile != null) {
-                skillFile.readText()
+                compactSkillInstructions(skillFile.readText())
             } else {
                 "Skill '$skillName' loaded with standard specialized best practices."
             }
 
             ToolObservation.success(
-                summary = "Skill '$skillName' instructions loaded successfully.",
+                summary = "Skill '$skillName' instructions loaded successfully (compacted for on-device context).",
                 payload = content,
                 executionTimeMs = System.currentTimeMillis() - startTime
             )
@@ -79,5 +79,54 @@ class UseSkillTool(
                 executionTimeMs = System.currentTimeMillis() - startTime
             )
         }
+    }
+
+    /**
+     * Compacts verbose SKILL.md guidelines into a concise instruction set
+     * tailored for local small language models (SLMs) with 2k-4k context limits.
+     */
+    private fun compactSkillInstructions(rawMarkdown: String, maxChars: Int = 1800): String {
+        if (rawMarkdown.length <= maxChars) return rawMarkdown
+
+        val lines = rawMarkdown.lines()
+        val builder = StringBuilder()
+
+        var inFrontmatter = false
+        var frontmatterDesc = ""
+        val ruleLines = mutableListOf<String>()
+
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed == "---") {
+                inFrontmatter = !inFrontmatter
+                continue
+            }
+            if (inFrontmatter) {
+                if (trimmed.startsWith("description:", ignoreCase = true)) {
+                    frontmatterDesc = trimmed.substringAfter(":").trim().removeSurrounding("\"")
+                }
+                continue
+            }
+
+            // Prioritize key directives, bullets, and section headers
+            if (trimmed.startsWith("#") || trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("1.") || trimmed.startsWith("2.")) {
+                ruleLines.add(line)
+            }
+        }
+
+        if (frontmatterDesc.isNotBlank()) {
+            builder.appendLine("**Overview**: $frontmatterDesc\n")
+        }
+
+        builder.appendLine("**Core Guidelines & Directives**:")
+        for (r in ruleLines) {
+            if (builder.length + r.length + 1 >= maxChars) {
+                builder.appendLine("\n... [Remaining guidelines truncated for local context efficiency]")
+                break
+            }
+            builder.appendLine(r)
+        }
+
+        return builder.toString().trim()
     }
 }

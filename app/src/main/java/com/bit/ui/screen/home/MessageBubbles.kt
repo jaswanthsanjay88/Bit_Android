@@ -72,7 +72,7 @@ internal fun UserMessageBubble(
     ) {
         Box(
             modifier = Modifier
-                .padding(horizontal = Standards.SpacingSm, vertical = 5.dp)
+                .padding(horizontal = Standards.SpacingSm, vertical = 2.dp)
         ) {
             val interactionSource = remember { MutableInteractionSource() }
             val bubbleShape = RoundedCornerShape(20.dp)

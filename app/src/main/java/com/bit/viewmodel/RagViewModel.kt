@@ -23,6 +23,46 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+enum class KnowledgeItemType {
+    PDF,
+    DOCX,
+    TEXT,
+    MARKDOWN,
+    NEURON_PACKAGE
+}
+
+enum class KnowledgeCategory(val label: String) {
+    ALL("All Knowledge"),
+    DOCUMENTS("Documents"),
+    NOTES("Notes"),
+    AI_MEMORY("AI Memory"),
+    PACKAGES("RAG Packages")
+}
+
+data class KnowledgeSourceItem(
+    val id: String,
+    val name: String,
+    val type: KnowledgeItemType,
+    val category: KnowledgeCategory,
+    val isEnabled: Boolean,
+    val chunkCount: Int,
+    val edgeCount: Int,
+    val sizeBytes: Long,
+    val updatedAt: Long,
+    val filePath: String? = null,
+    val isEncrypted: Boolean = false,
+    val isNeuronPackage: Boolean = false,
+    val description: String = ""
+) {
+    fun getFormattedSize(): String {
+        return when {
+            sizeBytes < 1024 -> "$sizeBytes B"
+            sizeBytes < 1024 * 1024 -> "${sizeBytes / 1024} KB"
+            else -> "${sizeBytes / (1024 * 1024)} MB"
+        }
+    }
+}
+
 // Data class for displaying RAG query results in UI
 data class RagQueryDisplayResult(
     val ragName: String,
@@ -35,6 +75,9 @@ data class RagQueryDisplayResult(
 class RagViewModel @Inject constructor(
     private val ragRepository: RagRepository,
     private val embeddingEngine: EmbeddingEngine,
+    private val globalRagOrchestrator: com.bit.worker.GlobalRagOrchestrator,
+    private val memoryNoteDao: com.bit.database.dao.MemoryNoteDao,
+    private val vaultStore: com.bit.data.VaultFileStore,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -60,12 +103,93 @@ class RagViewModel @Inject constructor(
     private val _embeddingDownloadProgress = MutableStateFlow(0f)
     val embeddingDownloadProgress: StateFlow<Float> = _embeddingDownloadProgress
 
+    // Graph State from Global Orchestrator
+    val graphNodes: StateFlow<List<com.bit.neuron_example.NeuronNode>> = globalRagOrchestrator.graphNodes
+    val graphStats: StateFlow<com.bit.neuron_example.GraphStats?> = globalRagOrchestrator.graphStats
+    val isGraphReady: StateFlow<Boolean> = globalRagOrchestrator.isGraphReady
+
     // RAG Lists
     val installedRags = ragRepository.getAllRags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val loadedRags = ragRepository.getLoadedRags()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Unified Knowledge Sources (Combining Documents, Notes, Facts, and Installed RAGs)
+    val unifiedSources: StateFlow<List<KnowledgeSourceItem>> = kotlinx.coroutines.flow.combine(
+        ragRepository.getAllRags(),
+        memoryNoteDao.getAllNotesFlow(),
+        globalRagOrchestrator.graphNodes
+    ) { rags, notes, nodes ->
+        val items = mutableListOf<KnowledgeSourceItem>()
+
+        // 1. Vault Notes, Documents, and Facts
+        for (note in notes) {
+            val isDoc = note.folder == "documents" || note.noteType == "document"
+            val isAiFact = note.folder == "ai_memory" || note.noteType in listOf("fact", "ai_fact")
+            val cat = when {
+                isDoc -> KnowledgeCategory.DOCUMENTS
+                isAiFact -> KnowledgeCategory.AI_MEMORY
+                else -> KnowledgeCategory.NOTES
+            }
+            val type = when {
+                note.title.endsWith(".pdf", ignoreCase = true) -> KnowledgeItemType.PDF
+                note.title.endsWith(".docx", ignoreCase = true) || note.title.endsWith(".doc", ignoreCase = true) -> KnowledgeItemType.DOCX
+                note.title.endsWith(".md", ignoreCase = true) -> KnowledgeItemType.MARKDOWN
+                else -> KnowledgeItemType.TEXT
+            }
+            val matchingNodes = nodes.filter { it.metadata.sourceId == note.id }
+            val chunkCount = if (matchingNodes.isNotEmpty()) matchingNodes.size else if (note.content.isNotBlank()) 1 else 0
+            val edgeCount = matchingNodes.sumOf { it.edges.size }
+            val size = if (note.filePath.isNotBlank()) {
+                val f = java.io.File(note.filePath)
+                if (f.exists()) f.length() else note.content.length.toLong()
+            } else {
+                note.content.length.toLong()
+            }
+
+            items.add(
+                KnowledgeSourceItem(
+                    id = note.id,
+                    name = note.title.ifBlank { "Untitled Note" },
+                    type = type,
+                    category = cat,
+                    isEnabled = note.isAiMemoryEnabled,
+                    chunkCount = chunkCount,
+                    edgeCount = edgeCount,
+                    sizeBytes = size,
+                    updatedAt = note.updatedAt,
+                    filePath = note.filePath.ifBlank { null },
+                    isEncrypted = false,
+                    isNeuronPackage = false,
+                    description = note.content.take(120).replace("\n", " ")
+                )
+            )
+        }
+
+        // 2. Installed RAG Packages
+        for (rag in rags) {
+            items.add(
+                KnowledgeSourceItem(
+                    id = rag.id,
+                    name = rag.name,
+                    type = KnowledgeItemType.NEURON_PACKAGE,
+                    category = KnowledgeCategory.PACKAGES,
+                    isEnabled = rag.isEnabled,
+                    chunkCount = rag.nodeCount,
+                    edgeCount = 0,
+                    sizeBytes = rag.sizeBytes,
+                    updatedAt = rag.updatedAt,
+                    filePath = rag.filePath,
+                    isEncrypted = rag.isEncrypted,
+                    isNeuronPackage = true,
+                    description = rag.description
+                )
+            )
+        }
+
+        items.sortedWith(compareByDescending<KnowledgeSourceItem> { it.isEnabled }.thenByDescending { it.updatedAt })
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Counts
     private val _installedCount = MutableStateFlow(0)
@@ -240,7 +364,68 @@ class RagViewModel @Inject constructor(
         _error.value = null
     }
 
-    // ==================== RAG Operations ====================
+    // ==================== Unified Knowledge Operations ====================
+
+    fun toggleSourceEnabled(source: KnowledgeSourceItem, isEnabled: Boolean) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (source.isNeuronPackage) {
+                ragRepository.updateRagEnabled(source.id, isEnabled)
+            } else {
+                globalRagOrchestrator.toggleDocumentEnabled(source.id, isEnabled)
+            }
+        }
+    }
+
+    fun deleteSource(source: KnowledgeSourceItem) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isLoading.value = true
+            try {
+                if (source.isNeuronPackage) {
+                    ragRepository.deleteRag(source.id)
+                } else {
+                    globalRagOrchestrator.deleteDocumentNote(source.id)
+                }
+                refreshCounts()
+            } catch (e: Exception) {
+                _error.value = "Failed to delete: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun importKnowledgeFile(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isLoading.value = true
+            _error.value = null
+            try {
+                val fileName = com.bit.util.DocumentParser.getFileName(context, uri)
+                val mimeType = context.contentResolver.getType(uri) ?: ""
+                val isNeuronPkg = fileName.endsWith(".neuron", ignoreCase = true) ||
+                        fileName.endsWith(".bit", ignoreCase = true) ||
+                        mimeType == "application/x-neuron"
+
+                if (isNeuronPkg) {
+                    val result = ragRepository.installRagFromUri(uri, fileName)
+                    if (result.isFailure) {
+                        _error.value = result.exceptionOrNull()?.message ?: "Failed to install RAG package"
+                    } else {
+                        refreshCounts()
+                    }
+                } else {
+                    val result = globalRagOrchestrator.attachDocument(uri)
+                    if (result.isFailure) {
+                        _error.value = result.exceptionOrNull()?.message ?: "Failed to import document"
+                    }
+                }
+            } catch (e: Exception) {
+                _error.value = "Error importing file: ${e.message}"
+                Log.e("RagViewModel", "Error importing knowledge file", e)
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
 
     fun toggleRagEnabled(ragId: String, isEnabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -514,48 +699,65 @@ class RagViewModel @Inject constructor(
     // ==================== Query with Display Results ====================
 
     suspend fun queryAndStoreResults(query: String, topK: Int = 5): String {
-        // Use the advanced retrieval pipeline
-        val aggregated = ragRepository.queryAllLoadedGraphsWithPipeline(query, topK)
+        val displayResults = mutableListOf<RagQueryDisplayResult>()
+        val contextBuilder = StringBuilder()
 
-        if (aggregated.ragResults.isEmpty()) {
+        // 1. Query GlobalRagOrchestrator (Vault documents, notes, facts)
+        try {
+            val orchestratorResult = globalRagOrchestrator.queryGlobalKnowledge(query, topK)
+            if (orchestratorResult != null && orchestratorResult.results.isNotEmpty()) {
+                for (res in orchestratorResult.results) {
+                    val sourceName = res.node.metadata.sourceName.ifBlank { "Knowledge Document" }
+                    displayResults.add(
+                        RagQueryDisplayResult(
+                            ragName = sourceName,
+                            content = res.node.content,
+                            score = res.score,
+                            nodeId = res.node.id
+                        )
+                    )
+                }
+                if (orchestratorResult.compressedContext.isNotBlank()) {
+                    contextBuilder.append(orchestratorResult.compressedContext).append("\n\n")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("RagViewModel", "Error querying globalRagOrchestrator: ${e.message}")
+        }
+
+        // 2. Query loaded RAG packages if any
+        try {
+            val packageResults = ragRepository.queryAllLoadedGraphsWithPipeline(query, topK)
+            for ((rag, retrievalResult) in packageResults.ragResults) {
+                for (res in retrievalResult.results) {
+                    displayResults.add(
+                        RagQueryDisplayResult(
+                            ragName = rag.name,
+                            content = res.node.content,
+                            score = res.score,
+                            nodeId = res.node.id
+                        )
+                    )
+                }
+            }
+            if (packageResults.combinedContext.isNotBlank()) {
+                contextBuilder.append(packageResults.combinedContext).append("\n\n")
+            }
+        } catch (e: Exception) {
+            Log.e("RagViewModel", "Error querying RAG packages: ${e.message}")
+        }
+
+        val sortedDisplay = displayResults.sortedByDescending { it.score }.take(topK * 2)
+        _lastRagResults.value = sortedDisplay
+
+        if (contextBuilder.isBlank()) {
             Log.w("RagViewModel", "No RAG results found for query: $query")
-            _lastRagResults.value = emptyList()
             return ""
         }
 
-        // Store results for UI display
-        val displayResults = mutableListOf<RagQueryDisplayResult>()
-        for ((rag, retrievalResult) in aggregated.ragResults) {
-            for (result in retrievalResult.results) {
-                displayResults.add(
-                    RagQueryDisplayResult(
-                        ragName = rag.name,
-                        content = result.node.content,
-                        score = result.score,
-                        nodeId = result.node.id
-                    )
-                )
-            }
-        }
-        _lastRagResults.value = displayResults.sortedByDescending { it.score }
-
-        // Build context with confidence-aware prefix
-        val contextBuilder = StringBuilder()
-        when (aggregated.overallConfidence) {
-            RetrievalConfidence.HIGH -> {
-                contextBuilder.append("### Relevant Knowledge:\n")
-            }
-            RetrievalConfidence.MEDIUM -> {
-                contextBuilder.append("### Relevant Knowledge:\n")
-            }
-            RetrievalConfidence.LOW -> {
-                contextBuilder.append("### Relevant Knowledge (uncertain — retrieved context may not fully answer the question):\n")
-            }
-        }
-        contextBuilder.append(aggregated.combinedContext)
-
-        Log.d("RagViewModel", "RAG context: ${contextBuilder.length} chars, ${displayResults.size} results, confidence=${aggregated.overallConfidence}")
-        return contextBuilder.toString()
+        val finalContext = "### Relevant Knowledge:\n${contextBuilder.toString().trim()}"
+        Log.d("RagViewModel", "Unified RAG context: ${finalContext.length} chars, ${sortedDisplay.size} results")
+        return finalContext
     }
 
     // ==================== Secure RAG Creation ====================

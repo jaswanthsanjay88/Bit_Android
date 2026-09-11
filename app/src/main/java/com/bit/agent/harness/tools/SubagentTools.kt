@@ -57,7 +57,7 @@ class InvokeSubagentTool(
                     ),
                     "max_steps" to ToolProperty(
                         type = "integer",
-                        description = "Optional max step budget for a single subagent (default: 8)"
+                        description = "Optional max steps for a single subagent (default: 50)"
                     )
                 ),
                 required = listOf("role", "goal")
@@ -81,7 +81,7 @@ class InvokeSubagentTool(
                         id = UUID.randomUUID().toString(),
                         role = o.optString("role", "Specialist").trim(),
                         goal = g,
-                        maxSteps = o.optInt("max_steps", 8).coerceIn(1, 20)
+                        maxSteps = o.optInt("max_steps", 50).coerceIn(1, 100)
                     )
                 }
                 if (tasks.isEmpty()) {
@@ -142,7 +142,7 @@ class InvokeSubagentTool(
             // Single-task mode
             val role = args.optString("role", "Specialist Agent").trim()
             val goal = args.optString("goal", "").trim()
-            val maxSteps = args.optInt("max_steps", 8).coerceIn(1, 20)
+            val maxSteps = args.optInt("max_steps", 50).coerceIn(1, 100)
 
             if (goal.isBlank()) {
                 return ToolObservation.error("Subagent goal cannot be blank", "Provide a clear task goal.")

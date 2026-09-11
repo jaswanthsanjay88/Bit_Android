@@ -45,7 +45,7 @@ object DocumentParser {
     /**
      * Get display file name from Content URI or last path segment.
      */
-    private fun getFileName(context: Context, uri: Uri): String {
+    fun getFileName(context: Context, uri: Uri): String {
         var name = ""
         if (uri.scheme == "content") {
             try {
@@ -67,6 +67,33 @@ object DocumentParser {
         return name
     }
 
+    const val MAX_DOCUMENT_SIZE_BYTES = 15 * 1024 * 1024L // 15 MB cap
+
+    private val BLOCKED_EXTENSIONS = setOf(
+        "png", "jpg", "jpeg", "webp", "gif", "bmp", "svg", "ico", "heic", "heif", "tiff",
+        "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "3gp", "m4v",
+        "mp3", "wav", "flac", "aac", "ogg", "m4a", "wma",
+        "zip", "rar", "7z", "tar", "gz", "bz2", "xz",
+        "apk", "aab", "exe", "bin", "so", "dylib", "dll", "iso", "dmg"
+    )
+
+    /**
+     * Check if a file name or MIME type belongs to media (image, video, audio) or binary archive.
+     */
+    fun isBlockedMediaOrBinary(fileName: String, mimeType: String?): Boolean {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        if (ext in BLOCKED_EXTENSIONS) return true
+        val mime = (mimeType ?: "").lowercase()
+        if (mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/") ||
+            mime == "application/zip" || mime == "application/x-tar" || mime == "application/x-rar-compressed" ||
+            mime == "application/x-7z-compressed" || mime == "application/vnd.android.package-archive" ||
+            mime == "application/octet-stream" && ext in BLOCKED_EXTENSIONS
+        ) {
+            return true
+        }
+        return false
+    }
+
     /**
      * Parse a document from a URI into plain text.
      */
@@ -82,8 +109,20 @@ object DocumentParser {
 
             Log.d(TAG, "Parsing document: $uri, Display Name: $fileName, MIME type: $detectedMimeType")
 
+            if (isBlockedMediaOrBinary(fileName, detectedMimeType)) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("Media and binary files (images, videos, audio, archives) cannot be imported as documents. Please use the Gallery for images, or select PDF, EPUB, Word, Excel, PowerPoint, or text documents.")
+                )
+            }
+
             val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: return@withContext Result.failure(Exception("Failed to read bytes from URI: $uri"))
+
+            if (bytes.size > MAX_DOCUMENT_SIZE_BYTES) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("File size (${bytes.size / (1024 * 1024)}MB) exceeds the 15MB document limit.")
+                )
+            }
 
             // 1. Magic Bytes Check for PDF (%PDF)
             val isPdfMagic = bytes.size >= 4 &&
@@ -131,7 +170,19 @@ object DocumentParser {
             val fileName = file.name
             Log.d(TAG, "Parsing document file: ${file.absolutePath}")
 
+            if (isBlockedMediaOrBinary(fileName, null)) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("Media and binary files (images, videos, audio, archives) cannot be imported as documents. Please use the Gallery for images, or select PDF, EPUB, Word, Excel, PowerPoint, or text documents.")
+                )
+            }
+
             val bytes = file.readBytes()
+
+            if (bytes.size > MAX_DOCUMENT_SIZE_BYTES) {
+                return@withContext Result.failure(
+                    IllegalArgumentException("File size (${bytes.size / (1024 * 1024)}MB) exceeds the 15MB document limit.")
+                )
+            }
 
             val isPdfMagic = bytes.size >= 4 &&
                 bytes[0] == 0x25.toByte() &&
@@ -416,17 +467,47 @@ object DocumentParser {
     }
 
     /**
-     * Parse a plain text file safely replacing invalid UTF-8 sequences.
+     * Check if a byte array contains binary (non-text) content.
+     */
+    fun isBinaryContent(bytes: ByteArray): Boolean {
+        val checkLength = minOf(bytes.size, 4096)
+        if (checkLength == 0) return false
+        var controlCharCount = 0
+        for (i in 0 until checkLength) {
+            val b = bytes[i].toInt() and 0xFF
+            if (b == 0x00) return true // Null byte is a definitive binary indicator
+            // Allow tab (9), newline (10), carriage return (13)
+            if (b < 32 && b != 9 && b != 10 && b != 13) {
+                controlCharCount++
+            }
+        }
+        // If more than 5% of sampled bytes are control characters, treat as binary
+        return (controlCharCount.toFloat() / checkLength) > 0.05f
+    }
+
+    /**
+     * Parse a plain text file safely rejecting binary data and replacing invalid UTF-8 sequences.
      */
     private fun parsePlainText(bytes: ByteArray): String {
+        if (isBinaryContent(bytes)) {
+            throw IllegalArgumentException("The file appears to contain binary or unsupported data and cannot be parsed as a text document.")
+        }
         return try {
             val decoder = Charsets.UTF_8.newDecoder()
                 .onMalformedInput(CodingErrorAction.REPLACE)
                 .onUnmappableCharacter(CodingErrorAction.REPLACE)
-            decoder.decode(ByteBuffer.wrap(bytes)).toString()
+            val text = decoder.decode(ByteBuffer.wrap(bytes)).toString()
+            // Verify replacement character count does not exceed 3% of content
+            val replacementCount = text.count { it == '\uFFFD' }
+            if (text.isNotEmpty() && (replacementCount.toFloat() / text.length) > 0.03f) {
+                throw IllegalArgumentException("The file contains corrupt or non-UTF8 binary characters.")
+            }
+            text
+        } catch (e: IllegalArgumentException) {
+            throw e
         } catch (e: Exception) {
-            Log.w(TAG, "UTF-8 safe decoding failed, falling back to ISO-8859-1", e)
-            String(bytes, Charsets.ISO_8859_1)
+            Log.w(TAG, "UTF-8 decoding failed", e)
+            throw IllegalArgumentException("Unable to decode text document: ${e.message}")
         }
     }
 

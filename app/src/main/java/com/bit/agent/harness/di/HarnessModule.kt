@@ -10,6 +10,7 @@ import com.bit.agent.harness.gate.SelfCorrectionPlanner
 import com.bit.agent.harness.gate.StepGateChecker
 import com.bit.agent.harness.tools.AgentToolBridge
 import com.bit.agent.harness.tools.AgentToolRegistry
+import com.bit.data.AiMemoryWriter
 import com.bit.database.dao.MemoryNoteDao
 import com.bit.mcp.McpManager
 import com.bit.worker.GlobalRagOrchestrator
@@ -56,6 +57,7 @@ object HarnessModule {
         ragOrchestrator: GlobalRagOrchestrator,
         memoryNoteDao: MemoryNoteDao,
         mcpManager: McpManager,
+        aiMemoryWriter: AiMemoryWriter,
         logger: HarnessLogger
     ): AgentToolRegistry {
         val registry = AgentToolRegistry(
@@ -64,6 +66,7 @@ object HarnessModule {
             ragOrchestrator = ragOrchestrator,
             memoryNoteDao = memoryNoteDao,
             mcpManager = mcpManager,
+            aiMemoryWriter = aiMemoryWriter,
             logger = logger
         )
         // Real multi-agent execution: subagents run isolated LLM+tool loops.

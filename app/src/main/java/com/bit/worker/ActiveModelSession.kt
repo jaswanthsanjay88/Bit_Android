@@ -12,13 +12,22 @@ object ActiveModelSession {
     private val _currentModelType = MutableStateFlow<ProviderType?>(null)
     val currentModelType: StateFlow<ProviderType?> = _currentModelType.asStateFlow()
 
-    fun set(modelId: String, type: ProviderType) {
+    private val _isImageModel = MutableStateFlow(false)
+    val isImageModel: StateFlow<Boolean> = _isImageModel.asStateFlow()
+
+    fun set(modelId: String, type: ProviderType, isImage: Boolean = false) {
         _currentModelId.value = modelId
         _currentModelType.value = type
+        _isImageModel.value = isImage || type == ProviderType.DIFFUSION
+    }
+
+    fun setIsImageModel(isImage: Boolean) {
+        _isImageModel.value = isImage
     }
 
     fun clear() {
         _currentModelId.value = ""
         _currentModelType.value = null
+        _isImageModel.value = false
     }
 }

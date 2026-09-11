@@ -304,6 +304,12 @@ private fun ProviderDetailView(
         )
     }
 
+    var isImageModel by remember(existingModel) {
+        mutableStateOf(
+            if (existingModel != null) false else com.bit.api.RemoteImageClient.isImageModelName(modelName)
+        )
+    }
+
     var apiKey by remember(existingModel) { mutableStateOf("") }
     var testStatus by remember { mutableStateOf<String?>(null) }
     var isTesting by remember { mutableStateOf(false) }
@@ -321,8 +327,12 @@ private fun ProviderDetailView(
                 val loadedEndpoint = json.optString("endpoint", "")
                 val loadedModel = json.optString("model", "")
                 val loadedKey = json.optString("authHeader", "")
+                val loadedIsImage = json.optBoolean("isImageModel", com.bit.api.RemoteImageClient.isImageModelName(loadedModel))
                 if (loadedEndpoint.isNotEmpty()) endpointUrl = loadedEndpoint
-                if (loadedModel.isNotEmpty()) modelName = loadedModel
+                if (loadedModel.isNotEmpty()) {
+                    modelName = loadedModel
+                    isImageModel = loadedIsImage
+                }
                 apiKey = loadedKey
             }
         }
@@ -412,7 +422,10 @@ private fun ProviderDetailView(
                 value = modelName,
                 onValueChange = {
                     modelName = it
-                    if (it.isNotBlank()) isEnabled = true
+                    if (it.isNotBlank()) {
+                        isEnabled = true
+                        isImageModel = com.bit.api.RemoteImageClient.isImageModelName(it)
+                    }
                 },
                 label = { Text("Model ID") },
                 modifier = Modifier.fillMaxWidth(),
@@ -436,12 +449,34 @@ private fun ProviderDetailView(
                             onClick = {
                                 modelName = model
                                 isEnabled = true
+                                isImageModel = com.bit.api.RemoteImageClient.isImageModelName(model)
                                 modelDropdownExpanded = false
                             }
                         )
                     }
                 }
             }
+        }
+
+        Text(
+            text = "Model Purpose",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            FilterChip(
+                selected = !isImageModel,
+                onClick = { isImageModel = false },
+                label = { Text("Chat / Text") }
+            )
+            FilterChip(
+                selected = isImageModel,
+                onClick = { isImageModel = true },
+                label = { Text("Image Generation") }
+            )
         }
 
         Row(
@@ -476,30 +511,42 @@ private fun ProviderDetailView(
                 testStatus = "Connecting..."
                 coroutineScope.launch {
                     try {
-                        val provider = LlmProviderResolver.resolveProvider(endpointUrl, modelName)
-                        val config = ProviderConfig(
-                            apiKey = apiKey,
-                            modelId = modelName,
-                            maxContextWindow = 1,
-                            thinkingEnabled = false,
-                            baseUrl = LlmProviderResolver.cleanBaseUrl(endpointUrl)
-                        )
-                        val testPrompt = listOf(
-                            ChatMessage(
-                                text = "Hello",
-                                participant = Participant.USER,
-                                status = MessageStatus.SUCCESS
+                        if (isImageModel) {
+                            val res = com.bit.api.RemoteImageClient.testConnection(
+                                endpointUrl = endpointUrl,
+                                apiKey = apiKey,
+                                modelName = modelName
                             )
-                        )
-                        var receivedChunk = false
-                        provider.generateResponse(testPrompt, config).collect { event ->
-                            if (event is StreamEvent.TextChunk) {
-                                receivedChunk = true
-                            } else if (event is StreamEvent.Error) {
-                                throw Exception(event.message)
+                            testStatus = res.fold(
+                                onSuccess = { msg -> "Success! $msg" },
+                                onFailure = { e -> "Failed: ${e.localizedMessage ?: e.message}" }
+                            )
+                        } else {
+                            val provider = LlmProviderResolver.resolveProvider(endpointUrl, modelName)
+                            val config = ProviderConfig(
+                                apiKey = apiKey,
+                                modelId = modelName,
+                                maxContextWindow = 1,
+                                thinkingEnabled = false,
+                                baseUrl = LlmProviderResolver.cleanBaseUrl(endpointUrl)
+                            )
+                            val testPrompt = listOf(
+                                ChatMessage(
+                                    text = "Hello",
+                                    participant = Participant.USER,
+                                    status = MessageStatus.SUCCESS
+                                )
+                            )
+                            var receivedChunk = false
+                            provider.generateResponse(testPrompt, config).collect { event ->
+                                if (event is StreamEvent.TextChunk) {
+                                    receivedChunk = true
+                                } else if (event is StreamEvent.Error) {
+                                    throw Exception(event.message)
+                                }
                             }
+                            testStatus = if (receivedChunk) "Success! Connection OK." else "No response received."
                         }
-                        testStatus = if (receivedChunk) "Success! Connection OK." else "No response received."
                     } catch (e: Exception) {
                         testStatus = "Failed: ${e.localizedMessage ?: e.message}"
                     } finally {
@@ -548,6 +595,7 @@ private fun ProviderDetailView(
                             put("model", modelName.trim())
                             put("stream", true)
                             put("authHeader", apiKey.trim())
+                            put("isImageModel", isImageModel)
                         }.toString()
 
                         val config = ModelConfig(

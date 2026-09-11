@@ -164,12 +164,40 @@ internal fun BottomBar(
 
     val isRagProcessing by chatViewModel.isRagProcessing.collectAsStateWithLifecycle()
     
+    val documentMimeTypes = remember {
+        arrayOf(
+            "application/pdf",
+            "text/plain",
+            "text/markdown",
+            "text/csv",
+            "text/html",
+            "application/json",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    }
+
     val fileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let {
-            attachedFiles = attachedFiles + it
-            chatViewModel.attachDocument(it)
+        uri?.let { selectedUri ->
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    selectedUri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+            val fileName = com.bit.util.DocumentParser.getFileName(context, selectedUri)
+            val mimeType = context.contentResolver.getType(selectedUri)
+            if (com.bit.util.DocumentParser.isBlockedMediaOrBinary(fileName, mimeType)) {
+                android.widget.Toast.makeText(
+                    context,
+                    "Media files (images/videos) cannot be imported as documents. Use Gallery for images.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return@rememberLauncherForActivityResult
+            }
+            attachedFiles = attachedFiles + selectedUri
+            chatViewModel.attachDocument(selectedUri)
             showAttachmentSheet = false
         }
     }
@@ -178,6 +206,7 @@ internal fun BottomBar(
     val loadedRags by ragViewModel.loadedRags.collectAsStateWithLifecycle()
     val isRagEnabledForChat by ragViewModel.isRagEnabledForChat.collectAsStateWithLifecycle()
     val lastRagResults by ragViewModel.lastRagResults.collectAsStateWithLifecycle()
+    val unifiedSources by ragViewModel.unifiedSources.collectAsStateWithLifecycle()
 
     // Plugin State
     val showPluginOverlay by pluginViewModel.showPluginOverlay.collectAsStateWithLifecycle()
@@ -194,6 +223,8 @@ internal fun BottomBar(
     val memoryResults by memoryViewModel.memoryResults.collectAsStateWithLifecycle()
     val vaultStats by memoryViewModel.vaultStats.collectAsStateWithLifecycle()
     val memoryEntryCount by memoryViewModel.memoryEntryCount.collectAsStateWithLifecycle()
+    val memoryDocuments by memoryViewModel.documents.collectAsStateWithLifecycle()
+    val memoryFacts by memoryViewModel.facts.collectAsStateWithLifecycle()
 
     // Web Search & non-WebSearch plugins
     val isWebSearchEnabled by pluginViewModel.isWebSearchEnabled.collectAsStateWithLifecycle()
@@ -229,11 +260,16 @@ internal fun BottomBar(
     MemoryOverlayBottomSheet(
         show = showMemoryOverlay,
         isMemoryEnabled = isMemoryEnabled,
+        documents = memoryDocuments,
+        facts = memoryFacts,
         vaultStats = vaultStats,
         memoryResults = memoryResults,
         memoryEntryCount = memoryEntryCount,
         onDismiss = { memoryViewModel.dismissMemoryOverlay() },
         onMemoryEnabledChange = { memoryViewModel.setMemoryEnabled(it) },
+        onAddFact = { memoryViewModel.addFact(it) },
+        onUploadDocument = { fileLauncher.launch(documentMimeTypes) },
+        onDeleteNote = { memoryViewModel.deleteNote(it) },
         onRefreshStats = { memoryViewModel.refreshStats() }
     )
 
@@ -250,7 +286,7 @@ internal fun BottomBar(
             showAttachmentSheet = false
         },
         onFilesClick = {
-            fileLauncher.launch("*/*")
+            fileLauncher.launch(documentMimeTypes)
             showAttachmentSheet = false
         },
         toolCallingEnabled = toolCallingEnabled,
@@ -692,7 +728,8 @@ internal fun BottomBar(
                                                 attachedImages = emptyList()
                                                 attachedFiles = emptyList()
                                             } else {
-                                                val hasRags = loadedRags.isNotEmpty() && isRagEnabledForChat
+                                                val hasActiveKnowledge = unifiedSources.any { it.isEnabled }
+                                                val hasRags = (loadedRags.isNotEmpty() || hasActiveKnowledge) && isRagEnabledForChat
                                                 val hasAttachedDoc = attachedFiles.isNotEmpty() || chatViewModel.attachedFileName.value != null
                                                 if (hasRags) {
                                                     value = ""
@@ -934,6 +971,7 @@ fun AddAttachmentBottomSheet(
                     ToggleRow(icon = TnIcons.Wrench, title = "Tool access", subtitle = if (activePluginCount > 0) "$activePluginCount active" else "Auto", onClick = onPluginClick)
                 }
                 ToggleRow(icon = TnIcons.Brain, title = "Memory", subtitle = if (isMemoryEnabled) "On" else "Off", onClick = onMemoryClick)
+                ToggleRow(icon = TnIcons.Database, title = "Knowledge & RAG", subtitle = if (isRagEnabled) "Active" else "Off", checked = isRagEnabled, onCheckedChange = { onRagClick() })
                 ToggleRow(icon = TnIcons.BulbFilled, title = "Reasoning", checked = isThinkingEnabled, onCheckedChange = onThinkingToggle)
             }
         }

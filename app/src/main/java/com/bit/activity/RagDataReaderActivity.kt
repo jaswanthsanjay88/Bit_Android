@@ -15,6 +15,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -421,10 +423,12 @@ private fun DocumentChunkCard(
                         }
                     }
                     Text(
-                        text = node.metadata.sourceName.ifBlank { "Chunk ${node.id.take(8)}" },
+                        text = node.metadata.chunkTitle.ifBlank { node.metadata.sourceName.ifBlank { "Chunk #${node.metadata.position + 1}" } },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -484,6 +488,7 @@ private fun NodeDetailSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
@@ -492,19 +497,49 @@ private fun NodeDetailSheetContent(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = node.metadata.sourceName.ifBlank { "Neural Node" },
+                    text = node.metadata.chunkTitle.ifBlank { node.metadata.sourceName.ifBlank { "Neural Node" } },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = "ID: ${node.id}",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (node.metadata.sourceName.isNotBlank()) {
+                    Text(
+                        text = "${node.metadata.sourceName} • Chunk #${node.metadata.position + 1}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "ID: ${node.id.take(16)}...",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Node ID", node.id))
+                            Toast.makeText(context, "Copied Node ID", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            TnIcons.Copy,
+                            contentDescription = "Copy ID",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
             }
 
             IconButton(onClick = onClose) {
@@ -525,12 +560,34 @@ private fun NodeDetailSheetContent(
                 modifier = Modifier.padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text(
-                    text = "CHUNK CONTENT",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            TnIcons.FileText,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "CHUNK CONTENT",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        text = "${node.content.length} chars • ~${(node.content.length / 4).coerceAtLeast(1)} tokens",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
 
                 Text(
                     text = node.content,
@@ -548,7 +605,7 @@ private fun NodeDetailSheetContent(
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.align(Alignment.End)
                 ) {
-                    Icon(Icons.Rounded.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(TnIcons.Copy, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Copy Text")
                 }
@@ -557,21 +614,34 @@ private fun NodeDetailSheetContent(
 
         // Synaptic Connections
         if (node.edges.isNotEmpty()) {
-            Text(
-                text = "SYNAPTIC CONNECTIONS (${node.edges.size})",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    TnIcons.BrainCircuit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    text = "SYNAPTIC CONNECTIONS (${node.edges.size})",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 220.dp),
+            Column(
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                items(node.edges) { edge ->
+                node.edges.forEach { edge ->
                     val targetNode = allNodes.find { it.id == edge.targetId }
+                    val targetTitle = targetNode?.metadata?.chunkTitle?.ifBlank {
+                        targetNode.metadata.sourceName.ifBlank { "Node ${edge.targetId.take(8)}" }
+                    } ?: "Node ${edge.targetId.take(8)}"
+
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -589,10 +659,12 @@ private fun NodeDetailSheetContent(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = targetNode?.metadata?.sourceName?.ifBlank { "Node ${edge.targetId.take(8)}" } ?: "Node ${edge.targetId.take(8)}",
+                                    text = targetTitle,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = targetNode?.content?.take(80) ?: "Target node content",
@@ -602,11 +674,24 @@ private fun NodeDetailSheetContent(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(Modifier.width(8.dp))
                             Badge(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                             ) {
-                                Text("${(edge.weight * 100).toInt()}% sim")
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                ) {
+                                    Icon(
+                                        TnIcons.Sparkles,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Text("${(edge.weight * 100).toInt()}% sim")
+                                }
                             }
                         }
                     }

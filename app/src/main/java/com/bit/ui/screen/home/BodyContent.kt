@@ -338,7 +338,7 @@ fun BodyContent(
                     top = paddingValues.calculateTopPadding() + Standards.SpacingXl, 
                     bottom = 120.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 itemsIndexed(
                     items = messages,
@@ -554,6 +554,17 @@ fun BodyContent(
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
                                 }
+                                IconButton(
+                                    onClick = { chatViewModel.clearError() },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = com.bit.ui.icons.TnIcons.X,
+                                        contentDescription = "Dismiss",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -563,6 +574,20 @@ fun BodyContent(
                     Spacer(modifier = Modifier.height(Standards.SpacingLg))
                 }
             }
+        }
+
+        // Progressive bottom blur scrim when there are more messages down below
+        val canScrollDown by remember { derivedStateOf { listState.canScrollForward } }
+        AnimatedVisibility(
+            visible = canScrollDown,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(200)),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            com.bit.ui.components.BottomBlurScrim(
+                height = 56.dp,
+                scrimColor = MaterialTheme.colorScheme.background
+            )
         }
 
         // Modal Bottom Sheet for model selection details

@@ -4,8 +4,8 @@ import android.content.Context
 import com.bit.agent.harness.HarnessLogger
 import com.bit.agent.harness.NoOpHarnessLogger
 import com.bit.agent.harness.model.SubagentResult
-import com.bit.agent.harness.model.SubagentTask
 import com.bit.api.ToolDefinition
+import com.bit.data.AiMemoryWriter
 import com.bit.database.dao.MemoryNoteDao
 import com.bit.mcp.McpManager
 import com.bit.plugins.PluginManager
@@ -27,6 +27,7 @@ class AgentToolRegistry @Inject constructor(
     private val ragOrchestrator: GlobalRagOrchestrator,
     private val memoryNoteDao: MemoryNoteDao,
     private val mcpManager: McpManager,
+    private val aiMemoryWriter: AiMemoryWriter,
     private val logger: HarnessLogger = NoOpHarnessLogger
 ) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -55,9 +56,11 @@ class AgentToolRegistry @Inject constructor(
             add(StrReplaceEditorTool(context))
             add(TodoWriteTool())
 
-            // 3. Memory Vault Tools
-            add(CreateMemoryTool(memoryNoteDao))
+            // 3. Memory Vault Tools (UMS Single Source of Truth)
+            add(CreateMemoryTool(aiMemoryWriter))
             add(QueryMemoryTool(memoryNoteDao))
+            add(UpdateMemoryTool(aiMemoryWriter))
+            add(DeleteMemoryTool(aiMemoryWriter))
 
             // 4. Subagent & Loop Tools
             val exec = subagentExecutor ?: SubagentExecutor { task ->

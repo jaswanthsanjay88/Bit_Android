@@ -297,11 +297,11 @@ internal fun parseMarkdown(text: String): List<MarkdownElement> {
             }
 
             // Fenced code block
-            line.startsWith("```") -> {
-                val language = line.removePrefix("```").trim()
+            line.trimStart().startsWith("```") -> {
+                val language = line.trimStart().removePrefix("```").trim()
                 val codeLines = mutableListOf<String>()
                 i++
-                while (i < lines.size && !lines[i].startsWith("```")) { codeLines.add(lines[i]); i++ }
+                while (i < lines.size && !lines[i].trimStart().startsWith("```")) { codeLines.add(lines[i]); i++ }
                 elements.add(MarkdownElement.CodeBlock(codeLines.joinToString("\n"), language))
             }
 
@@ -690,8 +690,7 @@ private fun InlineCodeView(text: String) {
 @Composable
 private fun CodeBlockView(code: String, language: String) {
     var isExpanded by remember(code) {
-        val lineCount = code.count { it == '\n' } + 1
-        mutableStateOf(lineCount <= 12)
+        mutableStateOf(true)
     }
     val context = LocalContext.current
 
@@ -798,12 +797,14 @@ private fun CodeBlockView(code: String, language: String) {
         }
 
         if (!isExpanded) {
+            val previewText = code.lines().take(3).joinToString("\n").trimEnd()
             Text(
-                text = code.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: "",
+                text = previewText.ifBlank { code.trim() },
                 fontFamily = MapleMonoFontFamily,
                 fontSize = 12.sp,
-                color = contentColor.copy(alpha = 0.4f),
-                maxLines = 1,
+                lineHeight = 17.sp,
+                color = contentColor.copy(alpha = 0.7f),
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()

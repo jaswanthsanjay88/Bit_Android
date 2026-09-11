@@ -100,26 +100,36 @@ class ChatViewModel @Inject constructor(
         val cached = cachedVaultNotes
         if (cached != null && now - vaultCacheTimestamp < VAULT_CACHE_TTL_MS) return cached
 
-        val vaultRoot = com.bit.global.AppPaths.vaultRoot(appContext)
-        val notes = try {
-            vaultRoot.walkTopDown()
-                .filter { it.isFile && it.extension.lowercase() == "md" }
-                .take(10)
-                .mapNotNull { file ->
-                    try {
-                        val raw = file.readText()
-                        if (raw.contains("is_ai_memory_enabled: false")) return@mapNotNull null
-                        val bodyStart = raw.indexOf("---", 3)
-                        if (bodyStart < 0) return@mapNotNull null
-                        val fullBody = raw.substring(bodyStart + 3).trimStart('\n')
-                        val body = if (fullBody.length > 500) fullBody.take(500) + "..." else fullBody
-                        val titleLine = raw.lines().find { it.trim().startsWith("title:") }
-                        val title = titleLine?.substringAfter("title:")?.trim() ?: file.nameWithoutExtension
-                        title to body
-                    } catch (_: Exception) { null }
+        val notes: List<Pair<String, String>> = try {
+            val db = com.bit.di.AppContainer.getDatabase()
+            val dbNotes = kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                db.memoryNoteDao().getAiEnabledNotesOnce()
+            }
+            if (dbNotes.isNotEmpty()) {
+                dbNotes.take(10).map { note ->
+                    val body = if (note.content.length > 500) note.content.take(500) + "..." else note.content
+                    note.title to body
                 }
-                .take(5)
-                .toList()
+            } else {
+                val vaultRoot = com.bit.global.AppPaths.vaultRoot(appContext)
+                vaultRoot.walkTopDown()
+                    .filter { it.isFile && it.extension.lowercase() == "md" }
+                    .take(10)
+                    .mapNotNull { file ->
+                        try {
+                            val raw = file.readText()
+                            if (raw.contains("is_ai_memory_enabled: false")) return@mapNotNull null
+                            val bodyStart = raw.indexOf("---", 3)
+                            val fullBody = if (bodyStart >= 0) raw.substring(bodyStart + 3).trimStart('\n') else raw
+                            val body = if (fullBody.length > 500) fullBody.take(500) + "..." else fullBody
+                            val titleLine = raw.lines().find { it.trim().startsWith("title:") }
+                            val title = titleLine?.substringAfter("title:")?.trim() ?: file.nameWithoutExtension
+                            title to body
+                        } catch (_: Exception) { null }
+                    }
+                    .take(5)
+                    .toList()
+            }
         } catch (_: Exception) { emptyList() }
 
         cachedVaultNotes = notes
@@ -548,7 +558,10 @@ class ChatViewModel @Inject constructor(
 
     /** True when a text generation model is loaded. */
     private val isAnyTextModelLoaded: Boolean
-        get() = LlmModelWorker.isGgufModelLoaded.value || ActiveModelSession.currentModelType.value == ProviderType.API
+        get() = LlmModelWorker.isGgufModelLoaded.value || (ActiveModelSession.currentModelType.value == ProviderType.API && !ActiveModelSession.isImageModel.value)
+
+    val isAnyImageModelLoaded: Boolean
+        get() = LlmModelWorker.isDiffusionModelLoaded.value || (ActiveModelSession.currentModelType.value == ProviderType.API && ActiveModelSession.isImageModel.value)
 
     // UI state
     private val _showDynamicWindow = MutableStateFlow(false)
@@ -596,11 +609,19 @@ class ChatViewModel @Inject constructor(
     // Model state
     val isTextModelLoaded: StateFlow<Boolean> = combine(
         LlmModelWorker.isGgufModelLoaded,
-        ActiveModelSession.currentModelType
-    ) { ggufLoaded, providerType ->
-        ggufLoaded || providerType == ProviderType.API
+        ActiveModelSession.currentModelType,
+        ActiveModelSession.isImageModel
+    ) { ggufLoaded, providerType, isImage ->
+        ggufLoaded || (providerType == ProviderType.API && !isImage)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-    val isImageModelLoaded = LlmModelWorker.isDiffusionModelLoaded
+
+    val isImageModelLoaded: StateFlow<Boolean> = combine(
+        LlmModelWorker.isDiffusionModelLoaded,
+        ActiveModelSession.isImageModel
+    ) { diffusionLoaded, apiImageLoaded ->
+        diffusionLoaded || apiImageLoaded
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val isVlmLoaded: StateFlow<Boolean> = combine(
         LlmModelWorker.isVlmLoaded,
         ActiveModelSession.currentModelType
@@ -630,13 +651,30 @@ class ChatViewModel @Inject constructor(
     // ── Attached Chat Document RAG ──
     private val _attachedFileName = MutableStateFlow<String?>(null)
     val attachedFileName: StateFlow<String?> = _attachedFileName.asStateFlow()
+    private val _attachedDocContent = MutableStateFlow<String?>(null)
+    val attachedDocContent: StateFlow<String?> = _attachedDocContent.asStateFlow()
     val isRagProcessing: StateFlow<Boolean> = globalRagOrchestrator.isProcessing
 
     fun attachDocument(uri: android.net.Uri) {
         viewModelScope.launch {
-            globalRagOrchestrator.attachDocument(uri).onSuccess {
-                _attachedFileName.value = "Document Added to Vault"
-            }.onFailure { e ->
+            try {
+                val fileName = com.bit.util.DocumentParser.getFileName(appContext, uri)
+                val parsed = com.bit.util.DocumentParser.parseDocument(uri, appContext)
+                if (parsed.isFailure) {
+                    reportError("Failed to parse document: ${parsed.exceptionOrNull()?.message}")
+                    return@launch
+                }
+                val text = parsed.getOrNull() ?: ""
+                _attachedDocContent.value = text
+                _attachedFileName.value = fileName
+
+                // Direct attach using parsed content - persists to vault, Room DB, and RAG graph
+                globalRagOrchestrator.attachDocumentContent(fileName, text, sourceUri = uri).onSuccess {
+                    Log.d(TAG, "Document successfully attached and indexed in vault: $fileName")
+                }.onFailure { e ->
+                    Log.w(TAG, "Document attached in memory, vector index failed: ${e.message}")
+                }
+            } catch (e: Exception) {
                 reportError("Failed to attach document: ${e.message}")
             }
         }
@@ -644,6 +682,7 @@ class ChatViewModel @Inject constructor(
 
     fun clearAttachedDocument() {
         _attachedFileName.value = null
+        _attachedDocContent.value = null
     }
 
     // ── Grouped State Flows (for optimized recomposition) ──
@@ -883,7 +922,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun switchToImageGeneration() {
-        if (!LlmModelWorker.isDiffusionModelLoaded.value) {
+        if (!isAnyImageModelLoaded) {
             reportError("Image generation model not loaded")
             return
         }
@@ -902,7 +941,7 @@ class ChatViewModel @Inject constructor(
             }
         }
         if (!isAnyTextModelLoaded) {
-            val hint = if (LlmModelWorker.isDiffusionModelLoaded.value)
+            val hint = if (isAnyImageModelLoaded)
                 "You have an image model loaded — switch to image mode, or load a text model for chat"
             else
                 "Please load a text generation model first"
@@ -979,7 +1018,13 @@ class ChatViewModel @Inject constructor(
                     chatManager.createNewChat().onSuccess { id ->
                         createdId = id
                         _currentChatId.value = id
-                        // Trigger title generation in background immediately!
+                        // Immediate title from user prompt (kills "New Chat" spam immediately)
+                        val instantTitle = prompt.trim().replace("\n", " ").take(35).trim()
+                        if (instantTitle.isNotBlank()) {
+                            chatManager.updateChatTitle(id, instantTitle)
+                            AppStateManager.chatRefreshed()
+                        }
+                        // Refine title asynchronously with LLM
                         generateChatTitleAsync(id, prompt, "")
                     }.onFailure { e ->
                         reportError("Failed to create chat: ${e.message}")
@@ -1045,6 +1090,21 @@ class ChatViewModel @Inject constructor(
                         )
                     }
                     _currentRagResults.value = displayResults
+                }
+
+                if (_attachedDocContent.value != null) {
+                    val docText = _attachedDocContent.value!!
+                    val docName = _attachedFileName.value ?: "Attached Document"
+                    val docContent = if (isSmall && docText.length > 1500) docText.take(1500) + "..." else if (docText.length > 25000) docText.take(25000) + "..." else docText
+                    val docChunk = "<attached_document name=\"$docName\">\n$docContent\n</attached_document>"
+                    ragContext = if (ragContext != null) "$docChunk\n\n$ragContext" else docChunk
+                    val docDisplay = com.bit.viewmodel.RagQueryDisplayResult(
+                        ragName = docName,
+                        content = if (docText.length > 300) docText.take(300) + "..." else docText,
+                        score = 1.0f,
+                        nodeId = "attached-$docName"
+                    )
+                    _currentRagResults.value = listOf(docDisplay) + _currentRagResults.value
                 }
 
                 executeUnifiedGeneration(prompt, ragContext, maxTokens, isNewChat)
@@ -1327,6 +1387,7 @@ class ChatViewModel @Inject constructor(
                         )
                         _messages.add(assistantMessage)
                         chatManager.addMessage(chatId, assistantMessage)
+                        handlePostTurnMemoryExtraction(prompt, chatId)
                         AppStateManager.setGenerationComplete()
                         AppStateManager.chatRefreshed()
                     }
@@ -1458,12 +1519,17 @@ class ChatViewModel @Inject constructor(
         val sdf = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
         val dateSdf = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
 
+        val activeMemoryNotes = getCachedVaultNotes()
+        val activeMemoryText = if (activeMemoryNotes.isNotEmpty()) {
+            activeMemoryNotes.joinToString("\n\n") { (title, body) -> "### Note: $title\n$body" }
+        } else ""
+
         val runtimeValues = mapOf(
             "{${com.bit.data.PredefinedVariables.TIME}}" to sdf.format(currentDateTime),
             "{${com.bit.data.PredefinedVariables.DATE}}" to dateSdf.format(currentDateTime),
             "{${com.bit.data.PredefinedVariables.SENT_TIME}}" to sdf.format(currentDateTime),
             "{${com.bit.data.PredefinedVariables.SENT_DATE}}" to dateSdf.format(currentDateTime),
-            "{${com.bit.data.PredefinedVariables.ACTIVE_MEMORY}}" to ""
+            "{${com.bit.data.PredefinedVariables.ACTIVE_MEMORY}}" to activeMemoryText
         )
 
         val activeModelId = currentModelId ?: ""
@@ -1793,6 +1859,7 @@ class ChatViewModel @Inject constructor(
                     )
                     _messages.add(assistantMessage)
                     chatManager.addMessage(chatId, assistantMessage)
+                    handlePostTurnMemoryExtraction(prompt, chatId)
                 }
                 AppStateManager.setGenerationComplete()
                 AppStateManager.chatRefreshed()
@@ -2911,6 +2978,12 @@ class ChatViewModel @Inject constructor(
             if (compiledPrompt.isNotEmpty()) {
                 append(compiledPrompt).append("\n\n")
             }
+
+            if (activeMemoryText.isNotBlank() && !compiledPrompt.contains(activeMemoryText)) {
+                append("<user_memory>\n")
+                append(activeMemoryText)
+                append("\n</user_memory>\n\n")
+            }
             
             if (hasTools && PluginManager.hasEnabledTools()) {
                 val toolsJsonArray = org.json.JSONArray()
@@ -3265,7 +3338,8 @@ class ChatViewModel @Inject constructor(
         height: Int? = null,
         scheduler: String? = null
     ) {
-        if (!LlmModelWorker.isDiffusionModelLoaded.value) {
+        val isRemoteImage = ActiveModelSession.currentModelType.value == ProviderType.API && ActiveModelSession.isImageModel.value
+        if (!LlmModelWorker.isDiffusionModelLoaded.value && !isRemoteImage) {
             reportError("Please load an image generation model first")
             return
         }
@@ -3273,6 +3347,60 @@ class ChatViewModel @Inject constructor(
         if (_isGenerating.value) return
         _isGenerating.value = true
         _currentGenerationType.value = ModelType.IMAGE_GENERATION
+
+        if (isRemoteImage) {
+            _streamingUserMessage.value = prompt
+            imageGenerationStartTime = System.currentTimeMillis()
+            userMessageAdded.set(false)
+
+            val activeModelId = ActiveModelSession.currentModelId.value
+            if (isNewConversation) {
+                currentUserMessage = Messages(
+                    msgId = "",
+                    role = Role.User,
+                    content = MessageContent(contentType = ContentType.Text, content = "Generate image: $prompt"),
+                    modelId = activeModelId
+                )
+                if (!userMessageAdded.get()) {
+                    _messages.add(currentUserMessage!!)
+                    userMessageAdded.set(true)
+                }
+                AppStateManager.setHasMessages(true)
+                generateRemoteImage(prompt = prompt, width = width ?: 1024, height = height ?: 1024, chatId = null, userMessage = currentUserMessage)
+            } else {
+                val chatId = _currentChatId.value
+                if (chatId == null) {
+                    reportError("No chat selected")
+                    resetStreamingState()
+                    return
+                }
+                currentUserMessage = Messages(
+                    msgId = "",
+                    role = Role.User,
+                    content = MessageContent(contentType = ContentType.Text, content = "Generate image: $prompt"),
+                    modelId = activeModelId
+                )
+                if (!userMessageAdded.get()) {
+                    _messages.add(currentUserMessage!!)
+                    userMessageAdded.set(true)
+                }
+                AppStateManager.setHasMessages(true)
+                viewModelScope.launch {
+                    chatManager.addUserMessage(chatId, "Generate image: $prompt").onSuccess { userMessage ->
+                        currentUserMessage = userMessage
+                        val idx = _messages.indexOfLast { it.role == Role.User && it.msgId == "" && it.content.content == "Generate image: $prompt" }
+                        if (idx != -1) {
+                            _messages[idx] = userMessage
+                        }
+                        generateRemoteImage(prompt = prompt, width = width ?: 1024, height = height ?: 1024, chatId = chatId, userMessage = userMessage)
+                    }.onFailure { e ->
+                        reportError("Failed to save message: ${e.message}")
+                        resetStreamingState()
+                    }
+                }
+            }
+            return
+        }
 
         viewModelScope.launch {
             try {
@@ -3355,6 +3483,98 @@ class ChatViewModel @Inject constructor(
             } catch (e: Exception) {
                 reportError(e.message)
                 resetStreamingState()
+            }
+        }
+    }
+
+    private fun generateRemoteImage(
+        prompt: String,
+        width: Int,
+        height: Int,
+        chatId: String?,
+        userMessage: Messages?
+    ) {
+        generationJob = viewModelScope.launch {
+            _error.value = null
+            _streamingImage.value = null
+            _imageGenerationProgress.value = 0.1f
+            _imageGenerationStep.value = "Connecting to remote image API..."
+            _isGenerating.value = true
+            AppStateManager.setGeneratingImage()
+
+            try {
+                val activeModelId = ActiveModelSession.currentModelId.value
+                val config = getModelConfig(activeModelId)
+                val loadingJson = org.json.JSONObject(config?.modelLoadingParams ?: "{}")
+                val endpointUrl = loadingJson.optString("endpoint", "")
+                val apiKey = loadingJson.optString("authHeader", "")
+                val modelName = loadingJson.optString("model", activeModelId)
+
+                _imageGenerationProgress.value = 0.4f
+                _imageGenerationStep.value = "Generating image with $modelName..."
+
+                val imageResult = withContext(Dispatchers.IO) {
+                    com.bit.api.RemoteImageClient.generateImage(
+                        endpointUrl = endpointUrl,
+                        apiKey = apiKey,
+                        modelName = modelName,
+                        prompt = prompt,
+                        size = "${width}x${height}"
+                    )
+                }
+                if (imageResult.isFailure) {
+                    throw imageResult.exceptionOrNull() ?: Exception("Failed to generate image")
+                }
+                val base64Image = imageResult.getOrThrow()
+
+                _imageGenerationProgress.value = 1.0f
+                _isGenerating.value = false
+
+                val imageBytes = android.util.Base64.decode(base64Image, android.util.Base64.DEFAULT)
+                val bitmap = android.graphics.BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+                bitmap?.let { _streamingImage.value = it }
+
+                val generationTime = System.currentTimeMillis() - imageGenerationStartTime
+                currentImageMetrics = ImageGenerationMetrics(
+                    steps = 1,
+                    cfgScale = 1.0f,
+                    seed = 0L,
+                    width = width,
+                    height = height,
+                    scheduler = "API",
+                    generationTimeMs = generationTime
+                )
+
+                if (chatId == null) {
+                    createChatWithImageMessage("Generate image: $prompt", base64Image, prompt, 0L)
+                } else {
+                    if (userMessage != null && !userMessageAdded.get()) {
+                        _messages.add(userMessage)
+                        userMessageAdded.set(true)
+                    }
+                    val imageMessage = Messages(
+                        role = Role.Assistant,
+                        content = MessageContent(
+                            contentType = ContentType.Image,
+                            content = "Generated image for: $prompt",
+                            imageData = base64Image,
+                            imagePrompt = prompt,
+                            imageSeed = 0L
+                        ),
+                        modelId = activeModelId,
+                        imageMetrics = currentImageMetrics
+                    )
+                    _messages.add(imageMessage)
+                    chatManager.addImageMessage(chatId, base64Image, prompt, 0L, currentImageMetrics)
+                    AppStateManager.setGenerationComplete()
+                    AppStateManager.chatRefreshed()
+                    resetStreamingState()
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Remote image generation failed", e)
+                handleImageGenerationException(prompt, e)
             }
         }
     }
@@ -3498,6 +3718,7 @@ class ChatViewModel @Inject constructor(
                         toolChainSteps = toolChainSteps
                     )
                     chatManager.addMessage(newChatId, assistantMsg)
+                    handlePostTurnMemoryExtraction(userPrompt, newChatId)
                 }
                 chatManager.getChatMessages(newChatId).onSuccess { loadedMessages ->
                     _messages.clear()
@@ -3523,7 +3744,7 @@ class ChatViewModel @Inject constructor(
     private suspend fun createChatWithImageMessage(
         userPrompt: String, imageBase64: String, imagePrompt: String, seed: Long
     ) {
-        val diffusionModelId = LlmModelWorker.currentDiffusionModelId.value
+        val diffusionModelId = LlmModelWorker.currentDiffusionModelId.value ?: ActiveModelSession.currentModelId.value.ifBlank { null }
         chatManager.createNewChat().onSuccess { newChatId ->
             _currentChatId.value = newChatId
             val userMsg = Messages(
@@ -4158,6 +4379,44 @@ class ChatViewModel @Inject constructor(
 
             val actualLen = bytes.size - i
             return if (actualLen >= expectedLen) bytes.size else i
+        }
+    }
+
+    private fun handlePostTurnMemoryExtraction(userPrompt: String, chatId: String?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val isEnabled = appSettings.aiMemoryEnabled.first()
+                if (!isEnabled) return@launch
+
+                if (aiMemoryWriter.isExplicitRememberCommand(userPrompt)) {
+                    val cleanFact = userPrompt
+                        .replace(Regex("(?i)^(please\\s+)?(remember\\s+that|remember\\s+this|don't\\s+forget\\s+that|don't\\s+forget|save\\s+to\\s+memory|note\\s+that|keep\\s+in\\s+mind)\\s*:?\\s*"), "")
+                        .trim()
+                    if (cleanFact.isNotBlank()) {
+                        val category = when {
+                            cleanFact.contains("i like", ignoreCase = true) ||
+                            cleanFact.contains("prefer", ignoreCase = true) ||
+                            cleanFact.contains("favorite", ignoreCase = true) -> com.bit.models.table_schema.MemoryCategory.PREFERENCE
+                            cleanFact.contains("i work", ignoreCase = true) ||
+                            cleanFact.contains("my job", ignoreCase = true) ||
+                            cleanFact.contains("project", ignoreCase = true) -> com.bit.models.table_schema.MemoryCategory.WORK
+                            cleanFact.contains("my name", ignoreCase = true) ||
+                            cleanFact.contains("i live", ignoreCase = true) ||
+                            cleanFact.contains("i am", ignoreCase = true) -> com.bit.models.table_schema.MemoryCategory.PERSONAL
+                            else -> com.bit.models.table_schema.MemoryCategory.GENERAL
+                        }
+                        aiMemoryWriter.saveOrUpdateAiMemory(
+                            text = cleanFact,
+                            title = "Fact: ${cleanFact.take(30)}",
+                            category = category,
+                            sourceConversationId = chatId
+                        )
+                        Log.d(TAG, "Post-turn memory extracted and saved to UMS/RAG: $cleanFact")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Post-turn memory extraction failed", e)
+            }
         }
     }
 

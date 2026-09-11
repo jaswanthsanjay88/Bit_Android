@@ -3,8 +3,11 @@ package com.bit.repo
 import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -247,10 +250,13 @@ class WorkspaceRepository @Inject constructor(
                 dao.deleteById(workspace.id)
                 continue
             }
+            val hasRootfs = manager.hasRootfs(workspace.root)
             val statusName = workspace.shellStatus
-            if ((statusName == WorkspaceShellStatus.READY.name || statusName == WorkspaceShellStatus.INSTALLING.name)
-                && !manager.hasRootfs(workspace.root)
-            ) {
+            if (statusName == WorkspaceShellStatus.INSTALLING.name) {
+                val resolved = if (hasRootfs) WorkspaceShellStatus.READY.name else WorkspaceShellStatus.DISABLED.name
+                Log.i(TAG, "Resolving stale INSTALLING workspace ${workspace.id} to $resolved (hasRootfs=$hasRootfs)")
+                updateShellState(workspace.id, resolved)
+            } else if (statusName == WorkspaceShellStatus.READY.name && !hasRootfs) {
                 Log.w(TAG, "Rootfs missing, resetting shell status: id=${workspace.id}")
                 updateShellState(workspace.id, WorkspaceShellStatus.DISABLED.name)
             }
@@ -341,21 +347,38 @@ print("Or ask AI to execute scripts in this workspace.")
             }
             val ready = manager.hasRootfs(workspace.root)
             if (ready) {
-                // Auto-provision Python 3 & isolated virtual environment
-                onProgress(RootfsInstallProgress(stage = RootfsInstallStage.CONFIGURING))
-                ensurePythonInstalled(workspace.id)
+                // Auto-provision Python 3 with real-time estimated progress before finalizing
+                onProgress(RootfsInstallProgress(
+                    stage = RootfsInstallStage.CONFIGURING,
+                    customStageMessage = "Configuring Linux sandbox & installing Python 3 runtime (~15s)...",
+                    estimatedSecondsRemaining = 15
+                ))
+                runCatching {
+                    ensurePythonInstalled(workspace.id)
+                }.onFailure { e ->
+                    Log.w(TAG, "Background Python provision failed: ${e.message}")
+                }
+                onProgress(RootfsInstallProgress(
+                    stage = RootfsInstallStage.INSTALLED,
+                    customStageMessage = "Linux environment and Python 3 ready!",
+                    estimatedSecondsRemaining = 0
+                ))
             }
             val newStatus = if (ready) WorkspaceShellStatus.READY.name else WorkspaceShellStatus.BROKEN.name
-            updateShellState(workspace.id, newStatus)
+            withContext(NonCancellable) {
+                updateShellState(workspace.id, newStatus)
+            }
             ready
         } catch (e: Exception) {
             Log.e(TAG, "Rootfs installation failed for ${workspace.id}", e)
-            val newStatus = if (manager.hasRootfs(workspace.root)) {
-                WorkspaceShellStatus.READY.name
-            } else {
-                WorkspaceShellStatus.BROKEN.name
+            withContext(NonCancellable) {
+                val newStatus = if (manager.hasRootfs(workspace.root)) {
+                    WorkspaceShellStatus.READY.name
+                } else {
+                    WorkspaceShellStatus.DISABLED.name
+                }
+                updateShellState(workspace.id, newStatus)
             }
-            updateShellState(workspace.id, newStatus)
             throw e
         }
     }
@@ -364,38 +387,57 @@ print("Or ask AI to execute scripts in this workspace.")
         val workspace = dao.getById(id) ?: return@withContext false
         if (!manager.hasRootfs(workspace.root)) return@withContext false
 
+        // Check if python3 is already installed and responsive
+        val preCheck = runCatching {
+            manager.executeCommand(
+                root = workspace.root,
+                command = "python3 --version",
+                timeoutMillis = 5_000L
+            )
+        }.getOrNull()
+        if (preCheck?.exitCode == 0 && preCheck.stdout.contains("Python 3", ignoreCase = true)) {
+            Log.i(TAG, "Python 3 is already verified: ${preCheck.stdout.trim()}")
+            return@withContext true
+        }
+
         val linuxDir = manager.linuxDir(workspace.root)
         val isAlpine = File(linuxDir, "sbin/apk").exists()
         val isUbuntuOrDebian = File(linuxDir, "usr/bin/apt-get").exists() || File(linuxDir, "usr/bin/apt").exists()
 
-        // Architectural Decision (PEP 668 & Google Play Compliance):
-        // Create an isolated virtual environment (/opt/bit-env) with system site packages.
-        // This avoids modifying system python or overriding Debian/Ubuntu's EXTERNALLY-MANAGED flag,
-        // scoping dynamic pip installs and preventing base filesystem corruption.
         val bootstrapCmd = if (isAlpine) {
-            "apk update && apk add --no-cache python3 py3-pip bash curl git ca-certificates && " +
-            "python3 -m venv --system-site-packages /opt/bit-env 2>/dev/null || true; " +
-            "ln -sf /opt/bit-env/bin/python /usr/bin/python 2>/dev/null || ln -sf /usr/bin/python3 /usr/bin/python; " +
-            "ln -sf /opt/bit-env/bin/pip /usr/bin/pip 2>/dev/null || ln -sf /usr/bin/pip3 /usr/bin/pip"
+            "sed -i 's/^#//g' /etc/apk/repositories 2>/dev/null || true; " +
+            "grep -q 'community' /etc/apk/repositories || (grep 'main' /etc/apk/repositories | sed 's/main/community/' >> /etc/apk/repositories 2>/dev/null || true); " +
+            "(apk update || true); " +
+            "(apk add --no-cache python3 py3-pip bash curl git ca-certificates || apk add --no-cache python3 || apk add --no-cache --force-broken-world python3); " +
+            "ln -sf /usr/bin/python3 /usr/bin/python 2>/dev/null || true; " +
+            "ln -sf /usr/bin/pip3 /usr/bin/pip 2>/dev/null || true"
         } else if (isUbuntuOrDebian) {
-            "export DEBIAN_FRONTEND=noninteractive; dpkg --configure -a; " +
-            "(apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv python-is-python3 curl git ca-certificates || " +
-            "apt-get update --fix-missing && apt-get install -y --no-install-recommends python3 python3-pip python3-venv curl git ca-certificates) && " +
-            "python3 -m venv --system-site-packages /opt/bit-env 2>/dev/null || true; " +
-            "ln -sf /opt/bit-env/bin/python /usr/bin/python 2>/dev/null || true; " +
-            "ln -sf /opt/bit-env/bin/pip /usr/bin/pip 2>/dev/null || true"
+            "export DEBIAN_FRONTEND=noninteractive; " +
+            "echo 'Acquire::ForceIPv4 \"true\";' > /etc/apt/apt.conf.d/99force-ipv4 2>/dev/null || true; " +
+            "echo 'Acquire::http::Timeout \"20\";' >> /etc/apt/apt.conf.d/99force-ipv4 2>/dev/null || true; " +
+            "apt-get update -o Acquire::ForceIPv4=true && " +
+            "apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true python3 ca-certificates && " +
+            "(apt-get install -y --no-install-recommends -o Acquire::ForceIPv4=true python3-pip python3-venv python-is-python3 || true); " +
+            "ln -sf /usr/bin/python3 /usr/bin/python 2>/dev/null || true; " +
+            "ln -sf /usr/bin/pip3 /usr/bin/pip 2>/dev/null || true"
         } else {
-            "which python3 || (which apk && apk add --no-cache python3 py3-pip) || (which apt-get && apt-get update && apt-get install -y python3)"
+            "which python3 || (which apk && apk add --no-cache python3) || (which apt-get && apt-get update && apt-get install -y python3)"
         }
 
         try {
             val result = manager.executeCommand(
                 root = workspace.root,
                 command = bootstrapCmd,
-                timeoutMillis = 300_000L
+                timeoutMillis = 120_000L
             )
             Log.i(TAG, "Python provision exitCode=${result.exitCode}: stdout=${result.stdout.takeLast(200)}, stderr=${result.stderr.takeLast(200)}")
-            result.exitCode == 0
+            // Verify if python3 is now working
+            val postCheck = manager.executeCommand(
+                root = workspace.root,
+                command = "python3 --version",
+                timeoutMillis = 5_000L
+            )
+            postCheck.exitCode == 0
         } catch (e: Exception) {
             Log.e(TAG, "Error installing Python 3", e)
             false

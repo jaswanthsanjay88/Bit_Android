@@ -139,7 +139,7 @@ data class SubagentTask(
     val role: String,
     val goal: String,
     val allowedTools: List<String> = emptyList(),
-    val maxSteps: Int = 10
+    val maxSteps: Int = 50
 )
 
 @Serializable

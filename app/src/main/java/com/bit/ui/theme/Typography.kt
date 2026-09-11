@@ -20,13 +20,9 @@ val ManropeFontFamily = FontFamily(
     Font(resId = R.font.manrope, weight = FontWeight.Bold),
 )
 
-val MapleMonoFontFamily = FontFamily(
-    Font(resId = R.font.maple_mono, weight = FontWeight.Normal),
-    Font(resId = R.font.maple_mono_medium, weight = FontWeight.Medium),
-    Font(resId = R.font.maple_mono_semibold, weight = FontWeight.SemiBold),
-    Font(resId = R.font.maple_mono_bold, weight = FontWeight.Bold),
-    Font(resId = R.font.maple_mono_bold, weight = FontWeight.Black),
-)
+// Use FontFamily.Monospace for code and terminal blocks to eliminate Minikin variable-font
+// shaping bugs where glyphs render with zero advance width and disappear on Android devices.
+val MapleMonoFontFamily = FontFamily.Monospace
 
 val GoogleSansFontFamily = FontFamily(
     Font(resId = R.font.google_sans_flex)

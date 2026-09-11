@@ -453,7 +453,7 @@ class ProotShellRunner(
 
     private companion object {
         private const val WORKSPACE_DIR = "/workspace"
-        private const val ROOTFS_PATH = "/opt/bit-env/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        private const val ROOTFS_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         private const val MAX_VERBOSE_LINES = 200
         private val ROOTFS_SHELLS = listOf(
             "/bin/bash",

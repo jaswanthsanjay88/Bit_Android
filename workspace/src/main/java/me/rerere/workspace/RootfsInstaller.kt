@@ -34,18 +34,45 @@ class RootfsInstaller(
     fun getCachedArchive(url: String, expectedSha256: String? = null): File? {
         val dir = cacheDir ?: return null
         val format = ArchiveFormat.fromUrl(url)
-        val hash = url.hashCode().toString(16)
-        val file = File(dir, "rootfs_$hash.${format.extension}")
-        if (!file.exists() || file.length() <= 500_000L) return null
+        val hash = (url.hashCode().toLong() and 0xFFFFFFFFL).toString(16)
+        val legacyHash = url.hashCode().toString(16)
 
+        val candidateNames = mutableListOf(
+            "rootfs_$hash.${format.extension}",
+            "rootfs_$legacyHash.${format.extension}"
+        )
         if (!expectedSha256.isNullOrBlank()) {
-            val actualHash = runCatching { calculateSha256(file) }.getOrNull()
-            if (!expectedSha256.trim().equals(actualHash, ignoreCase = true)) {
-                file.delete()
-                return null
+            candidateNames.add("rootfs_${expectedSha256.take(16)}.${format.extension}")
+        }
+
+        for (name in candidateNames) {
+            val file = File(dir, name)
+            if (file.exists() && file.length() > 500_000L) {
+                val marker = File(dir, "${file.nameWithoutExtension}.verified")
+                if (marker.exists()) return file
+                if (!expectedSha256.isNullOrBlank()) {
+                    val actualHash = runCatching { calculateSha256(file) }.getOrNull()
+                    if (expectedSha256.trim().equals(actualHash, ignoreCase = true)) {
+                        marker.writeText(actualHash ?: "verified")
+                        return file
+                    }
+                } else {
+                    return file
+                }
             }
         }
-        return file
+
+        // Search directory for any verified archive matching expectedSha256
+        if (!expectedSha256.isNullOrBlank()) {
+            val matched = dir.listFiles()?.firstOrNull { f ->
+                (f.name.endsWith(".tar.gz") || f.name.endsWith(".tar.xz")) &&
+                f.length() > 500_000L &&
+                File(dir, "${f.nameWithoutExtension}.verified").takeIf { it.exists() }?.readText()?.trim()?.equals(expectedSha256.trim(), ignoreCase = true) == true
+            }
+            if (matched != null) return matched
+        }
+
+        return null
     }
 
     fun isCached(url: String, expectedSha256: String? = null): Boolean = getCachedArchive(url, expectedSha256) != null
@@ -107,9 +134,16 @@ class RootfsInstaller(
                 cacheDir?.let { cDir ->
                     runCatching {
                         cDir.mkdirs()
-                        val hash = url.hashCode().toString(16)
+                        val hash = (url.hashCode().toLong() and 0xFFFFFFFFL).toString(16)
                         val persistentCache = File(cDir, "rootfs_$hash.${format.extension}")
-                        archive.copyTo(persistentCache, overwrite = true)
+                        if (archive.absolutePath != persistentCache.absolutePath) {
+                            archive.copyTo(persistentCache, overwrite = true)
+                        }
+                        File(cDir, "rootfs_$hash.verified").writeText(expectedSha256 ?: "verified")
+                        if (!expectedSha256.isNullOrBlank()) {
+                            val shaPrefix = expectedSha256.take(16)
+                            File(cDir, "rootfs_$shaPrefix.verified").writeText(expectedSha256)
+                        }
                     }
                 }
             }
@@ -127,7 +161,9 @@ class RootfsInstaller(
             }
             onProgress(RootfsInstallProgress(stage = RootfsInstallStage.INSTALLED))
         } finally {
-            if (cachedArchive == null) {
+            val hash = url.hashCode().toString(16)
+            val persistentCache = cacheDir?.let { File(it, "rootfs_$hash.${format.extension}") }
+            if (cachedArchive == null && (persistentCache == null || archive.absolutePath != persistentCache.absolutePath)) {
                 archive.delete()
             }
             stagingDir.deleteRecursively()

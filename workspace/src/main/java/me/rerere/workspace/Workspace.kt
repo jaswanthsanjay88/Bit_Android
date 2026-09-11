@@ -36,6 +36,8 @@ data class RootfsInstallProgress(
     val totalBytes: Long? = null,
     val entriesExtracted: Int = 0,
     val currentEntry: String? = null,
+    val customStageMessage: String? = null,
+    val estimatedSecondsRemaining: Int? = null,
 )
 
 data class WorkspaceConfig(

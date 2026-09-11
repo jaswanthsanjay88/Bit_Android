@@ -42,12 +42,19 @@ class VaultFileStore @Inject constructor(
                 else -> metaMap["folder"] ?: "notes"
             }
 
+            val noteType = when {
+                folderName == "documents" -> metaMap["type"] ?: "document"
+                folderName == "ai_memory" -> metaMap["type"] ?: "fact"
+                folderName == "tasks" -> metaMap["type"] ?: "task"
+                else -> metaMap["type"] ?: "note"
+            }
+
             MemoryNote(
                 id = metaMap["id"] ?: file.nameWithoutExtension,
                 title = metaMap["title"] ?: file.nameWithoutExtension.replace("-", " ").capitalizeWords(),
                 content = body,
                 tags = metaMap["tags"] ?: "",
-                noteType = metaMap["type"] ?: "note",
+                noteType = noteType,
                 folder = folderName,
                 status = metaMap["status"]?.takeIf { it != "null" } ?: "todo",
                 dueDate = metaMap["due_date"]?.takeIf { it != "null" }?.toLongOrNull(),
@@ -216,10 +223,18 @@ class VaultFileStore @Inject constructor(
     }
 
     private fun splitFrontmatter(raw: String): Pair<String, String> {
-        if (!raw.startsWith("---")) return "" to raw
-        val endIdx = raw.indexOf("---", 3)
-        if (endIdx < 0) return "" to raw
-        return raw.substring(3, endIdx).trim() to raw.substring(endIdx + 3).trimStart('\n')
+        val trimmed = raw.trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+        if (!trimmed.startsWith("---")) return "" to raw
+        val endIdx = trimmed.indexOf("\n---", 3)
+        if (endIdx < 0) {
+            val altIdx = trimmed.indexOf("---", 3)
+            if (altIdx < 0) return "" to raw
+            return trimmed.substring(3, altIdx).trim() to trimmed.substring(altIdx + 3).trimStart('\r', '\n')
+        }
+        val frontmatter = trimmed.substring(3, endIdx).trim()
+        val afterClose = trimmed.indexOf('\n', endIdx + 4)
+        val body = if (afterClose >= 0) trimmed.substring(afterClose + 1) else trimmed.substring(endIdx + 4)
+        return frontmatter to body.trimStart('\r', '\n')
     }
 
     private fun parseFrontmatterYaml(yaml: String): Map<String, String> {

@@ -40,19 +40,18 @@ class LlmGoalPlanner(
     }
 
     override suspend fun generatePlanJson(goal: String): String? {
-        val planningPrompt = buildPlanningPrompt(goal)
-
         // 1. Try local GGUF model if loaded
         if (LlmModelWorker.isGgufModelLoaded.value) {
             try {
+                val slmPrompt = buildSlmPlanningPrompt(goal)
                 val messages = org.json.JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "system")
-                        put("content", "You are an autonomous task planner. Return ONLY a valid JSON array of steps without any other text or markdown fences.")
+                        put("content", "You are an autonomous task planner. Return ONLY a valid JSON array of steps without any other text, explanation, or markdown fences.")
                     })
                     put(JSONObject().apply {
                         put("role", "user")
-                        put("content", planningPrompt)
+                        put("content", slmPrompt)
                     })
                 }
                 val builder = StringBuilder()
@@ -63,10 +62,8 @@ class LlmGoalPlanner(
                 }
                 val text = builder.toString().trim()
                 if (text.isNotBlank()) {
-                    val cleanJson = if (text.contains("[")) {
-                        "[" + text.substringAfter("[").substringBeforeLast("]") + "]"
-                    } else text
-                    return cleanJson
+                    val cleanJson = cleanSlmPlanJson(text)
+                    if (!cleanJson.isNullOrBlank()) return cleanJson
                 }
             } catch (e: Exception) {
                 logger.w(TAG, "Local GGUF planning failed: ${e.message}")
@@ -77,6 +74,7 @@ class LlmGoalPlanner(
         val cfg = resolveInferenceConfig()
         if (cfg != null) {
             return try {
+                val planningPrompt = buildPlanningPrompt(goal)
                 val messages = listOf(
                     ChatMessage(text = planningPrompt, participant = Participant.USER)
                 )
@@ -86,10 +84,7 @@ class LlmGoalPlanner(
                 }
                 val text = builder.toString().trim()
                 if (text.isNotBlank()) {
-                    val cleanJson = if (text.contains("[")) {
-                        "[" + text.substringAfter("[").substringBeforeLast("]") + "]"
-                    } else text
-                    cleanJson
+                    cleanSlmPlanJson(text) ?: text
                 } else null
             } catch (e: Exception) {
                 logger.w(TAG, "Remote LLM planning failed: ${e.message}")
@@ -98,6 +93,63 @@ class LlmGoalPlanner(
         }
 
         return null
+    }
+
+    private fun cleanSlmPlanJson(raw: String): String? {
+        var text = raw.trim()
+        if (text.contains("```")) {
+            text = text.replace(Regex("""^```(?:json)?\s*""", RegexOption.MULTILINE), "")
+                .replace(Regex("""\s*```$""", RegexOption.MULTILINE), "")
+                .trim()
+        }
+        // Remove trailing commas before closing braces/brackets
+        text = text.replace(Regex(""",\s*([\]}])"""), "$1")
+
+        if (text.contains("[") && text.contains("]")) {
+            return "[" + text.substringAfter("[").substringBeforeLast("]") + "]"
+        }
+        if (text.contains("{") && text.contains("}")) {
+            val candidate = "{" + text.substringAfter("{").substringBeforeLast("}") + "}"
+            return try {
+                val obj = JSONObject(candidate)
+                when {
+                    obj.has("steps") -> obj.getJSONArray("steps").toString()
+                    obj.has("plan") -> obj.getJSONArray("plan").toString()
+                    obj.has("toolName") || obj.has("tool") -> org.json.JSONArray().put(obj).toString()
+                    else -> candidate
+                }
+            } catch (_: Exception) {
+                candidate
+            }
+        }
+        return text.takeIf { it.isNotBlank() }
+    }
+
+    private fun buildSlmPlanningPrompt(goal: String): String {
+        val toolNames = toolRegistry?.names().orEmpty()
+        val toolList = if (toolNames.isEmpty()) {
+            "web_search, workspace_write_file, workspace_shell, workspace_read_file, create_memory_file, invoke_subagent"
+        } else {
+            toolNames.joinToString(", ")
+        }
+        return buildString {
+            appendLine("Decompose this user task into actionable tool steps.")
+            appendLine("Allowed tools: [$toolList]")
+            appendLine()
+            appendLine("Respond ONLY with a JSON array:")
+            appendLine("""[
+  {
+    "id": "step_1",
+    "description": "Short description",
+    "toolName": "tool_name",
+    "arguments": {"param": "value"},
+    "expectedOutcome": "Expected result"
+  }
+]""")
+            appendLine("No markdown fences, no conversational prose, only the raw JSON array.")
+            appendLine()
+            appendLine("User Goal: $goal")
+        }
     }
 
     private data class InferenceSetup(val provider: com.bit.api.LlmProvider, val config: ProviderConfig)

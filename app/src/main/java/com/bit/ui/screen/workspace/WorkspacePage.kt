@@ -36,6 +36,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkspacePage(
     onBack: () -> Unit,
@@ -50,60 +51,82 @@ fun WorkspacePage(
     var deletingWorkspace by remember { mutableStateOf<WorkspaceEntity?>(null) }
     val lazyListState = rememberLazyListState()
 
-    LazyColumn(
-        state = lazyListState,
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-            .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
-        verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
-    ) {
-        // ── TOP HEADER / ACTION BAR ──
-        item(key = "header_bar") {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "LINUX WORKSPACES",
-                        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.statusBars,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "${workspaces.size}",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = "Linux Workspaces",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = "${workspaces.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        bitHaptics.pop()
+                        onBack()
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                }
-
-                FilledTonalButton(
-                    onClick = {
-                        bitHaptics.pop()
-                        showCreateDialog = true
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("New Workspace", style = MaterialTheme.typography.labelMedium)
-                }
-            }
+                },
+                actions = {
+                    FilledTonalButton(
+                        onClick = {
+                            bitHaptics.pop()
+                            showCreateDialog = true
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("New", style = MaterialTheme.typography.labelMedium)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                )
+            )
         }
+    ) { innerPadding ->
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .navigationBarsPadding()
+                .imePadding()
+                .background(MaterialTheme.colorScheme.background),
+            contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
+            verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+        ) {
 
         // ── INFO BANNER CARD ──
         item(key = "info_banner") {
@@ -344,6 +367,7 @@ fun WorkspacePage(
                 }
             }
         )
+    }
     }
 }
 

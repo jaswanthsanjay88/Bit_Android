@@ -33,6 +33,12 @@ fun GuideScreen(
     val pagerState = rememberPagerState(pageCount = { totalSlides })
     val coroutineScope = rememberCoroutineScope()
 
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+
+    LaunchedEffect(pagerState.currentPage) {
+        haptics.pop()
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background
@@ -68,7 +74,7 @@ fun GuideScreen(
                     }
                 }
 
-                // Skip button top-right (only if not on the last slide) with 48dp target padding
+                // Skip button top-right (only if not on the last slide)
                 if (pagerState.currentPage < totalSlides - 1) {
                     TextButton(
                         onClick = onContinue,
@@ -79,10 +85,10 @@ fun GuideScreen(
                         Text(
                             text = "Skip",
                             style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.W500,
+                                fontWeight = FontWeight.W600,
                                 letterSpacing = 0.08.sp
                             ),
-                            color = MaterialTheme.colorScheme.onBackground
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -94,7 +100,7 @@ fun GuideScreen(
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 // Spacer to balance the top header
-                Spacer(modifier = Modifier.height(72.dp))
+                Spacer(modifier = Modifier.height(64.dp))
 
                 // ── Hero Visual (Fixed, morphing on page change) ──
                 Box(
@@ -124,7 +130,7 @@ fun GuideScreen(
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier
-                        .weight(0.8f)
+                        .weight(0.85f)
                         .fillMaxWidth()
                 ) { page ->
                     val slide = getOnboardingSlide(page)
@@ -135,22 +141,45 @@ fun GuideScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
+                        Surface(
+                            shape = RoundedCornerShape(100.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
+                            ),
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        ) {
+                            Text(
+                                text = slide.tag,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                ),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
+                        }
+
                         Text(
                             text = slide.title,
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 color = MaterialTheme.colorScheme.onBackground,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
                             text = slide.description,
                             style = MaterialTheme.typography.bodyLarge.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                lineHeight = 22.sp
                             ),
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
@@ -171,7 +200,7 @@ fun GuideScreen(
                         repeat(totalSlides) { index ->
                             val isActive = index == pagerState.currentPage
                             val width by animateDpAsState(
-                                targetValue = if (isActive) 24.dp else 8.dp,
+                                targetValue = if (isActive) 28.dp else 8.dp,
                                 animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
                                 label = "indicatorWidth"
                             )
@@ -182,7 +211,7 @@ fun GuideScreen(
                             )
                             Box(
                                 modifier = Modifier
-                                    .height(6.dp)
+                                    .height(5.dp)
                                     .width(width)
                                     .background(
                                         color = color,
@@ -192,7 +221,7 @@ fun GuideScreen(
                         }
                     }
 
-                    // Primary CTA Button with spring press scale haptic-like effect
+                    // Primary CTA Button with spring press scale
                     val interactionSource = remember { MutableInteractionSource() }
                     val isPressed by interactionSource.collectIsPressedAsState()
                     val buttonScale by animateFloatAsState(
@@ -215,18 +244,22 @@ fun GuideScreen(
                             }
                         },
                         interactionSource = interactionSource,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .height(54.dp)
                             .graphicsLayer {
                                 scaleX = buttonScale
                                 scaleY = buttonScale
                             }
                     ) {
                         Text(
-                            text = if (pagerState.currentPage == totalSlides - 1) "Get Started" else "Continue",
+                            text = if (pagerState.currentPage == totalSlides - 1) "Launch Harness" else "Continue",
                             style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
                             )
                         )
                     }
@@ -237,21 +270,25 @@ fun GuideScreen(
 }
 
 private data class OnboardingSlide(
+    val tag: String,
     val title: String,
     val description: String
 )
 
 private fun getOnboardingSlide(index: Int): OnboardingSlide = when (index) {
     0 -> OnboardingSlide(
-        title = "Runs fully offline",
-        description = "Local AI models run entirely on your phone. No cloud, no trackers, and zero subscriptions."
+        tag = "AUTONOMOUS SYSTEM",
+        title = "Local Agentic Harness",
+        description = "Execute multi-step task graphs, Linux PRoot sandboxes, code scripts, and tool chains natively on your mobile silicon."
     )
     1 -> OnboardingSlide(
-        title = "Private by design",
-        description = "Everything stays encrypted. Your chats, documents, and memories never leave your device."
+        tag = "ON-DEVICE INFERENCE",
+        title = "Built for Small Models",
+        description = "Purpose-engineered for 1B–8B local SLMs with context budget enforcement, deterministic state machines, and self-correction loops."
     )
     else -> OnboardingSlide(
-        title = "Tailored to you",
-        description = "Select the optimal offline model configured for your device memory and performance."
+        tag = "SELF-SOVEREIGN",
+        title = "Encrypted & Private",
+        description = "Zero trackers, zero cloud telemetry. Your chats, documents, and memory vault remain completely offline and encrypted."
     )
 }

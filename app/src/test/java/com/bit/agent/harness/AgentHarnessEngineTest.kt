@@ -135,6 +135,88 @@ class AgentHarnessEngineTest {
     }
 
     @Test
+    fun testParsePlanJsonWithMarkdownAndPreamble() {
+        val engine = com.bit.agent.harness.engine.AgentHarnessEngine(
+            toolBridge = AgentToolBridge(),
+            gateChecker = StepGateChecker(),
+            correctionPlanner = SelfCorrectionPlanner()
+        )
+
+        val slmOutput = """
+            Sure! Here is the execution plan for your request:
+            ```json
+            [
+                {
+                    "id": "step_1",
+                    "description": "Inspect workspace",
+                    "toolName": "workspace_shell",
+                    "arguments": {"command": "ls -la"},
+                    "expectedOutcome": "Files listed"
+                }
+            ]
+            ```
+            Hope this helps you achieve your task!
+        """.trimIndent()
+
+        val plan = engine.parsePlanJson("Inspect", slmOutput)
+        assertEquals(1, plan.steps.size)
+        assertEquals("step_1", plan.steps[0].id)
+        assertEquals("workspace_shell", plan.steps[0].toolName)
+    }
+
+    @Test
+    fun testParsePlanJsonWithTrailingCommasAndSingleObject() {
+        val engine = com.bit.agent.harness.engine.AgentHarnessEngine(
+            toolBridge = AgentToolBridge(),
+            gateChecker = StepGateChecker(),
+            correctionPlanner = SelfCorrectionPlanner()
+        )
+
+        // Single step object output with trailing comma
+        val singleObjJson = """
+            {
+                "id": "step_single",
+                "description": "Quick web search",
+                "toolName": "web_search",
+                "arguments": {"query": "Android SLM",},
+                "expectedOutcome": "Search results",
+            }
+        """.trimIndent()
+
+        val plan = engine.parsePlanJson("Single Step", singleObjJson)
+        assertEquals(1, plan.steps.size)
+        assertEquals("step_single", plan.steps[0].id)
+        assertEquals("web_search", plan.steps[0].toolName)
+    }
+
+    @Test
+    fun testParsePlanJsonWithWrappedStepsOrPlanObject() {
+        val engine = com.bit.agent.harness.engine.AgentHarnessEngine(
+            toolBridge = AgentToolBridge(),
+            gateChecker = StepGateChecker(),
+            correctionPlanner = SelfCorrectionPlanner()
+        )
+
+        val wrappedJson = """
+            {
+                "plan": [
+                    {
+                        "id": "s1",
+                        "description": "Check memory",
+                        "toolName": "create_memory",
+                        "arguments": {"title": "Note", "content": "Memory content"}
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val plan = engine.parsePlanJson("Wrapped Plan", wrappedJson)
+        assertEquals(1, plan.steps.size)
+        assertEquals("s1", plan.steps[0].id)
+        assertEquals("create_memory", plan.steps[0].toolName)
+    }
+
+    @Test
     fun testDecomposeToDagPlanAndFormatMarkdown() {
         val engine = com.bit.agent.harness.engine.AgentHarnessEngine(
             toolBridge = AgentToolBridge(),

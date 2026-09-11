@@ -94,13 +94,35 @@ class MemoryVaultViewModel @Inject constructor(
     }
 
     init {
+        viewModelScope.launch {
+            memoryNoteDao.getAllNotesFlow().collect { dbNotes ->
+                if (dbNotes.isNotEmpty()) {
+                    _notes.value = dbNotes
+                }
+            }
+        }
         refreshNotesFromDisk()
     }
 
     fun refreshNotesFromDisk() {
         viewModelScope.launch(Dispatchers.IO) {
             val fileNotes = vaultFileStore.listAllNotes()
-            _notes.value = fileNotes
+            if (fileNotes.isNotEmpty()) {
+                _notes.value = fileNotes
+                for (note in fileNotes) {
+                    val noteForDb = if (note.content.length > 50_000) {
+                        note.copy(content = note.content.take(50_000) + "\n\n...[Full document stored in vault on disk]...")
+                    } else {
+                        note
+                    }
+                    try { memoryNoteDao.insertNote(noteForDb) } catch (_: Exception) {}
+                }
+            } else {
+                val dbNotes = memoryNoteDao.getAllNotesOnce()
+                if (dbNotes.isNotEmpty()) {
+                    _notes.value = dbNotes
+                }
+            }
         }
     }
 

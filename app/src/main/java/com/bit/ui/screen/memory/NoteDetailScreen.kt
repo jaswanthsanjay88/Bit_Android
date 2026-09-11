@@ -105,10 +105,23 @@ fun NoteDetailScreen(
     var markdownContent by remember(existingNote) { mutableStateOf(existingNote?.content ?: "") }
     var editTextRef by remember { mutableStateOf<EditText?>(null) }
 
-    var isPreviewMode by remember { mutableStateOf(false) }
+    var isDeleted by remember { mutableStateOf(false) }
+
+    // Check if an original PDF binary file exists for this document
+    val pdfFile = remember(existingNote, currentFilePath, currentNoteId, title) {
+        val candidates = listOfNotNull(
+            currentNoteId?.let { File(com.bit.global.AppPaths.documentsVault(context), "$it.pdf") },
+            existingNote?.id?.let { File(com.bit.global.AppPaths.documentsVault(context), "$it.pdf") },
+            if (currentFilePath.endsWith(".pdf", ignoreCase = true)) File(currentFilePath) else null,
+            if (existingNote?.filePath?.endsWith(".pdf", ignoreCase = true) == true) File(existingNote.filePath) else null,
+            if (title.endsWith(".pdf", ignoreCase = true)) File(com.bit.global.AppPaths.documentsVault(context), title) else null
+        )
+        candidates.firstOrNull { it.exists() && it.length() > 0 }
+    }
+
+    var isPreviewMode by remember(pdfFile) { mutableStateOf(pdfFile != null) }
     var showSlashMenu by remember { mutableStateOf(false) }
     var slashQuery by remember { mutableStateOf("") }
-    var isDeleted by remember { mutableStateOf(false) }
 
     // When existingNote updates/loads, sync content & title
     LaunchedEffect(existingNote) {
@@ -236,7 +249,9 @@ fun NoteDetailScreen(
                         },
                         label = {
                             Text(
-                                if (isPreviewMode) "Preview" else "Edit",
+                                if (isPreviewMode) {
+                                    if (pdfFile != null) "PDF View" else "Preview"
+                                } else "Edit",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Medium
                             )
@@ -320,16 +335,28 @@ fun NoteDetailScreen(
             Spacer(Modifier.height(16.dp))
 
             if (isPreviewMode) {
-                // Material 3 AST Markdown Preview
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    MarkdownText(
-                        text = markdownContent.ifBlank { "*No content yet. Tap Edit to start typing.*" },
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                if (pdfFile != null) {
+                    // Genuine multi-page PDF Rendering
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        com.bit.ui.components.PdfPageViewer(
+                            file = pdfFile,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                    }
+                } else {
+                    // Material 3 AST Markdown Preview
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        MarkdownText(
+                            text = markdownContent.ifBlank { "*No content yet. Tap Edit to start typing.*" },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             } else {
                 // Markwon Live Syntax-Highlighted Editor

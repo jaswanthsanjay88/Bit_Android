@@ -48,3 +48,31 @@ fun TopBlurScrim(
             )
     )
 }
+
+/**
+ * Progressive blur scrim for bottom area (chat lists, drawer history, message feeds).
+ * Smoothly fades content into the bottom edge with a multi-stop gradient scrim.
+ */
+@Composable
+fun BottomBlurScrim(
+    modifier: Modifier = Modifier,
+    height: Dp = 56.dp,
+    scrimColor: Color = MaterialTheme.colorScheme.surface
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .background(
+                brush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.00f to Color.Transparent,
+                        0.25f to scrimColor.copy(alpha = 0.25f),
+                        0.55f to scrimColor.copy(alpha = 0.65f),
+                        0.80f to scrimColor.copy(alpha = 0.90f),
+                        1.00f to scrimColor.copy(alpha = 0.98f)
+                    )
+                )
+            )
+    )
+}

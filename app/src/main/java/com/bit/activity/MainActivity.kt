@@ -236,6 +236,7 @@ sealed class Screen(val route: String) {
     object TaskList : Screen("task_list")
     object ConflictReview : Screen("conflict_review")
     object BackupSettings : Screen("backup_settings")
+    object Workspace : Screen("workspace")
     object SubagentSession : Screen("subagent_session?id={id}") {
         fun createRoute(id: String) = "subagent_session?id=$id"
     }
@@ -415,21 +416,24 @@ fun AppNavigation(
                     onVaultManagerClick = {
                         navController.navigate(Screen.MemoryVault.route)
                     },
-                onImageGenSetupNeeded = {
-                    navController.navigate(Screen.ImageGenSetup.route)
-                },
-                onModelSelectedNavigate = { model ->
-                    val targetRoute = Screen.Chat.route
-                    if (navController.currentDestination?.route != targetRoute) {
-                        navController.navigate(targetRoute) {
-                            launchSingleTop = true
+                    onWorkspaceClick = {
+                        navController.navigate(Screen.Workspace.route)
+                    },
+                    onImageGenSetupNeeded = {
+                        navController.navigate(Screen.ImageGenSetup.route)
+                    },
+                    onModelSelectedNavigate = { model ->
+                        val targetRoute = Screen.Chat.route
+                        if (navController.currentDestination?.route != targetRoute) {
+                            navController.navigate(targetRoute) {
+                                launchSingleTop = true
+                            }
                         }
-                    }
-                },
-                chatViewModel = chatViewModel,
-                llmModelViewModel = llmModelViewModel
-            )
-        }
+                    },
+                    chatViewModel = chatViewModel,
+                    llmModelViewModel = llmModelViewModel
+                )
+            }
 
         composable(
             route = Screen.Editor.route,
@@ -645,6 +649,13 @@ fun AppNavigation(
         composable(Screen.BackupSettings.route) {
             com.bit.ui.screen.memory.BackupSettingsScreen(
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ============ LINUX PROOT WORKSPACE ============
+        composable(Screen.Workspace.route) {
+            com.bit.ui.screen.workspace.WorkspaceHostScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

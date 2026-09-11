@@ -37,40 +37,46 @@ internal fun MetricsDisplay(metrics: DecodingMetrics, memoryMetrics: MemoryMetri
     ) {
         Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) { isExpanded = !isExpanded }
                 .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            val mainTokenText = if (metrics.tokensPredicted > 0) {
-                "${metrics.tokensPredicted} tokens"
-            } else if (totalTokens > 0) {
-                "$totalTokens tokens"
-            } else null
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val mainTokenText = if (metrics.tokensPredicted > 0) {
+                    "${metrics.tokensPredicted} tokens"
+                } else if (totalTokens > 0) {
+                    "$totalTokens tokens"
+                } else null
 
-            if (formattedSpeed != null) {
-                Text(
-                    text = "$formattedSpeed t/s",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                )
-            }
-            if (mainTokenText != null) {
-                Text(
-                    text = if (formattedSpeed != null) "•  $mainTokenText" else mainTokenText,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                )
-            }
-            if (formattedTime != null) {
-                Text(
-                    text = "•  ${formattedTime}s",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-                )
+                if (formattedSpeed != null) {
+                    Text(
+                        text = "$formattedSpeed t/s",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                    )
+                }
+                if (mainTokenText != null) {
+                    Text(
+                        text = if (formattedSpeed != null) "•  $mainTokenText" else mainTokenText,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                    )
+                }
+                if (formattedTime != null) {
+                    Text(
+                        text = "•  ${formattedTime}s",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+                    )
+                }
             }
         }
 

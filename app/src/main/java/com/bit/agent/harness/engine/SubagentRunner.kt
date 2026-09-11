@@ -37,7 +37,7 @@ class SubagentRunner(
     companion object {
         private const val TAG = "SubagentRunner"
         private const val FORBIDDEN_TOOL = "invoke_subagent"
-        private const val MAX_SUB_STEPS = 20
+        private const val MAX_SUB_STEPS = 100
 
         /** Text-only rounds shorter than this are treated as mid-work chatter, not the final report. */
         private const val MIN_FINAL_ANSWER_CHARS = 100
@@ -215,16 +215,15 @@ class SubagentRunner(
                 }
             }
 
-            // Budget exhausted mid-work: force a final synthesis pass with tools disabled so the
+            // Final synthesis pass with tools disabled so the
             // parent agent receives a real report instead of raw mid-task reasoning.
             if (!endedCleanly && chatMessages.isNotEmpty()) {
-                logger.d(TAG, "Step budget exhausted; forcing final synthesis for [${task.role}]")
-                SubagentSessionBus.log(task.id, stepsCompleted, "Step budget reached — writing final report")
+                logger.d(TAG, "Completed all rounds; synthesizing final report for [${task.role}]")
+                SubagentSessionBus.log(task.id, stepsCompleted, "Writing final report")
                 chatMessages.add(
                     ChatMessage(
-                        text = "STEP BUDGET REACHED. Stop investigating. Based ONLY on the tool results " +
-                                "collected above, write your FINAL report now: what was verified, what is " +
-                                "contradicted or uncertain, and your conclusion. No tool calls.",
+                        text = "Based on all tool results collected above, write your FINAL report now: " +
+                                "what was verified, what is contradicted or uncertain, and your conclusion. No tool calls.",
                         participant = Participant.USER
                     )
                 )
@@ -271,9 +270,9 @@ class SubagentRunner(
                 summary = if (endedCleanly) {
                     "Completed in $stepsCompleted step(s)"
                 } else if (success) {
-                    "Budget-capped after $stepsCompleted steps; forced synthesis applied"
+                    "Completed in $stepsCompleted step(s) with final synthesis"
                 } else {
-                    "Exhausted $maxSteps step budget without a final answer"
+                    "Completed in $maxSteps step(s) without a final answer"
                 },
                 output = finalText.ifBlank { "No final text produced." },
                 artifacts = artifacts,
@@ -363,8 +362,7 @@ class SubagentRunner(
             appendLine()
             appendLine("RULES:")
             appendLine("- You operate in an isolated context; the parent agent only sees your final report.")
-            appendLine("- Use the available tools to accomplish the mission.")
-            appendLine("- You have a strict step budget of ${task.maxSteps} turns; be efficient.")
+            appendLine("- Use the available tools to accomplish the mission thoroughly.")
             appendLine("- When the mission is complete, reply with ONLY the concise final report (no tool calls).")
             appendLine("- Never attempt to deploy further subagents.")
             appendLine()

@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bit.neuron_example.EdgeType
 import com.bit.neuron_example.NeuronNode
 import com.bit.neuron_example.SourceType
 import com.bit.ui.theme.LocalBitHaptics
@@ -74,6 +75,10 @@ fun NeuronGraphCanvas(
         nodes.sumOf { it.edges.size }
     }
 
+    val entityConnections = remember(nodes) {
+        nodes.sumOf { node -> node.edges.count { it.type == EdgeType.ENTITY } } / 2
+    }
+
     val matchingNodeIds = remember(nodes, searchQuery) {
         if (searchQuery.isBlank()) emptySet()
         else nodes.filter {
@@ -93,6 +98,7 @@ fun NeuronGraphCanvas(
     val surfaceColor = MaterialTheme.colorScheme.surfaceContainerLowest
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val entitySynapseColor = Color(0xFF06B6D4) // Vibrant Cyan for Entity Synaptic Bridges
 
     Box(
         modifier = modifier
@@ -161,28 +167,45 @@ fun NeuronGraphCanvas(
                                     selectedNode.id == sourceNode.id ||
                                     selectedNode.id == edge.targetId
 
-                            val edgeAlpha = if (isHighlighted) {
-                                (0.35f + (edge.weight * 0.45f)).coerceIn(0.2f, 0.9f)
-                            } else {
-                                0.08f
+                            val (baseColor, baseAlpha) = when (edge.type) {
+                                EdgeType.ENTITY -> entitySynapseColor to 0.80f
+                                EdgeType.SEMANTIC -> primaryColor to 0.55f
+                                EdgeType.SEQUENTIAL -> outlineVariant to 0.30f
+                                EdgeType.EXPLICIT -> Color(0xFF10B981) to 0.60f
                             }
 
-                            val edgeColor = if (isHighlighted && selectedNode != null) primaryColor else outlineVariant
+                            val edgeAlpha = if (selectedNode != null) {
+                                if (isHighlighted) {
+                                    (baseAlpha * (0.6f + (edge.weight * 0.4f))).coerceIn(0.25f, 0.95f)
+                                } else {
+                                    0.05f
+                                }
+                            } else {
+                                if (edge.type == EdgeType.ENTITY) 0.65f
+                                else (baseAlpha * 0.45f).coerceIn(0.12f, 0.40f)
+                            }
+
+                            val strokeW = if (selectedNode != null && isHighlighted) {
+                                if (edge.type == EdgeType.ENTITY) 2.8.dp.toPx() * scale else 2.2.dp.toPx() * scale
+                            } else {
+                                if (edge.type == EdgeType.ENTITY) 1.8.dp.toPx() * scale else 1.1.dp.toPx() * scale
+                            }
 
                             drawLine(
-                                color = edgeColor.copy(alpha = edgeAlpha),
+                                color = baseColor.copy(alpha = edgeAlpha),
                                 start = sourceScreen,
                                 end = targetScreen,
-                                strokeWidth = if (isHighlighted && selectedNode != null) 2.5.dp.toPx() * scale else 1.2.dp.toPx() * scale,
+                                strokeWidth = strokeW,
                                 cap = StrokeCap.Round
                             )
 
-                            // Draw moving action pulse across highlighted edges
-                            if (isHighlighted && selectedNode != null) {
+                            // Draw moving action pulse across active edges
+                            val shouldPulse = (selectedNode != null && isHighlighted) || (selectedNode == null && edge.type == EdgeType.ENTITY)
+                            if (shouldPulse) {
                                 val pulseOffset = (sourceScreen * (1f - pulsePhase)) + (targetScreen * pulsePhase)
                                 drawCircle(
-                                    color = primaryColor,
-                                    radius = 3.dp.toPx() * scale,
+                                    color = baseColor.copy(alpha = if (selectedNode != null) 0.9f else 0.75f),
+                                    radius = (if (edge.type == EdgeType.ENTITY) 3.5.dp else 2.8.dp).toPx() * scale,
                                     center = pulseOffset
                                 )
                             }
@@ -244,15 +267,16 @@ fun NeuronGraphCanvas(
 
                     // Node Label (Visible when zoomed in or when selected)
                     if (scale >= 0.85f || isSelected || isSearchMatch) {
-                        val label = node.metadata.sourceName.ifBlank { "Node ${node.id.take(4)}" }
+                        val label = node.metadata.chunkTitle.ifBlank { node.metadata.sourceName.ifBlank { "Node ${node.id.take(4)}" } }
                         val paint = android.graphics.Paint().apply {
                             color = if (isSelected) android.graphics.Color.WHITE else android.graphics.Color.GRAY
                             textSize = (10.sp.toPx() * scale.coerceIn(0.7f, 1.3f))
                             textAlign = android.graphics.Paint.Align.CENTER
                             isAntiAlias = true
                         }
+                        val displayText = if (label.length > 22) label.take(20) + "…" else label
                         drawContext.canvas.nativeCanvas.drawText(
-                            label.take(14),
+                            displayText,
                             screenPos.x,
                             screenPos.y + baseRadius + (12.dp.toPx() * scale),
                             paint
@@ -281,11 +305,15 @@ fun NeuronGraphCanvas(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = primaryColor,
+                            color = if (entityConnections > 0) entitySynapseColor else primaryColor,
                             modifier = Modifier.size(8.dp)
                         ) {}
                         Text(
-                            text = "${nodes.size} neurons • $totalConnections synapses",
+                            text = if (entityConnections > 0) {
+                                "${nodes.size} neurons • $totalConnections synapses (${entityConnections} entity)"
+                            } else {
+                                "${nodes.size} neurons • $totalConnections synapses"
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface

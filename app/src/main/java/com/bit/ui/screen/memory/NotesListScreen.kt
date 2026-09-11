@@ -182,8 +182,7 @@ fun NotesListScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .animateItem()
-                                .bouncyClick { onNoteClick(note.id, note.noteType) },
+                                .clickable { onNoteClick(note.id, note.noteType) },
                             shape = RoundedCornerShape(16.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                         ) {
@@ -204,7 +203,7 @@ fun NotesListScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    val linkCount = note.content.split("[[").size - 1
+                                    val linkCount = if (note.content.contains("[[")) note.content.split("[[").size - 1 else 0
                                     if (linkCount > 0) {
                                         Surface(
                                             shape = RoundedCornerShape(12.dp),

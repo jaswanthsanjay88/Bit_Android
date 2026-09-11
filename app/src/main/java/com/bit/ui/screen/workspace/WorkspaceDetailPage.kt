@@ -53,6 +53,7 @@ import me.rerere.workspace.WorkspaceFileEntry
 import me.rerere.workspace.WorkspaceShellStatus
 import me.rerere.workspace.WorkspaceStorageArea
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkspaceDetailPage(
     workspaceId: String,
@@ -78,6 +79,8 @@ fun WorkspaceDetailPage(
     val isInstalling by viewModel.isInstalling.collectAsStateWithLifecycle()
     val availableDistros by viewModel.availableDistros.collectAsStateWithLifecycle()
     val installedDistro by viewModel.installedDistro.collectAsStateWithLifecycle()
+    val pythonVersion by viewModel.pythonVersion.collectAsStateWithLifecycle()
+    val isProvisioningPython by viewModel.isProvisioningPython.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var editingFile by remember { mutableStateOf<WorkspaceFileEntry?>(null) }
@@ -163,63 +166,83 @@ fun WorkspaceDetailPage(
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm)
-    ) {
-        // ── TOP HEADER (Container Summary & Terminal / Processes Action) ──
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = ws.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "PRoot Sandbox Container",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            FilledTonalButton(
-                onClick = {
-                    bitHaptics.pop()
-                    showProcessesSheet = true
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.statusBars,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            text = ws.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "PRoot Sandbox Container",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 },
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                if (activeProcessesCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .background(Color(0xFF22C55E), CircleShape)
-                    )
-                    Spacer(Modifier.width(6.dp))
-                }
-                Icon(TnIcons.Terminal, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    text = if (activeProcessesCount > 0) "Processes ($activeProcessesCount)" else "Processes",
-                    style = MaterialTheme.typography.labelMedium
+                navigationIcon = {
+                    IconButton(onClick = {
+                        bitHaptics.pop()
+                        onBack()
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                actions = {
+                    FilledTonalButton(
+                        onClick = {
+                            bitHaptics.pop()
+                            showProcessesSheet = true
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        if (activeProcessesCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .size(7.dp)
+                                    .background(Color(0xFF22C55E), CircleShape)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Icon(TnIcons.Terminal, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = if (activeProcessesCount > 0) "Processes ($activeProcessesCount)" else "Processes",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
                 )
-            }
+            )
         }
-
-        Spacer(Modifier.height(10.dp))
-
-        // ── TABS ──
-        PrimaryTabRow(
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .navigationBarsPadding()
+                .padding(horizontal = Standards.SpacingMd)
+        ) {
+            // ── TABS ──
+            PrimaryTabRow(
             selectedTabIndex = selectedTab,
             containerColor = MaterialTheme.colorScheme.background,
             contentColor = MaterialTheme.colorScheme.primary,
@@ -281,6 +304,8 @@ fun WorkspaceDetailPage(
                         isInstalling = isInstalling,
                         installProgress = installProgress,
                         installError = installError,
+                        pythonVersion = pythonVersion,
+                        isProvisioningPython = isProvisioningPython,
                         onInstallDistro = { distro ->
                             bitHaptics.pop()
                             if (distro.isDownloaded) {
@@ -288,6 +313,14 @@ fun WorkspaceDetailPage(
                             } else {
                                 pendingConsentDistro = distro
                             }
+                        },
+                        onInstallPython = {
+                            bitHaptics.pop()
+                            viewModel.installPython()
+                        },
+                        onRefreshPython = {
+                            bitHaptics.selection()
+                            viewModel.checkPython()
                         },
                         onCustomUrl = {
                             bitHaptics.pop()
@@ -556,6 +589,7 @@ fun WorkspaceDetailPage(
             }
         )
     }
+    }
 }
 
 @Composable
@@ -566,7 +600,11 @@ private fun EnvironmentTabContent(
     isInstalling: Boolean,
     installProgress: me.rerere.workspace.RootfsInstallProgress?,
     installError: String?,
+    pythonVersion: String?,
+    isProvisioningPython: Boolean,
     onInstallDistro: (com.bit.repo.LinuxDistro) -> Unit,
+    onInstallPython: () -> Unit,
+    onRefreshPython: () -> Unit,
     onCustomUrl: () -> Unit,
     onToolApprovalChange: (String, Boolean) -> Unit,
     onOpenTerminal: () -> Unit,
@@ -636,9 +674,9 @@ private fun EnvironmentTabContent(
 
                         // Live status pill
                         Surface(
-                            color = Color(0x2222C55E),
+                            color = MaterialTheme.colorScheme.primaryContainer,
                             shape = RoundedCornerShape(100.dp),
-                            border = BorderStroke(1.dp, Color(0x4422C55E))
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -648,12 +686,12 @@ private fun EnvironmentTabContent(
                                 Box(
                                     modifier = Modifier
                                         .size(7.dp)
-                                        .background(Color(0xFF22C55E), CircleShape)
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape)
                                 )
                                 Text(
                                     text = "ACTIVE",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF4ADE80),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -662,27 +700,66 @@ private fun EnvironmentTabContent(
 
                     Spacer(Modifier.height(14.dp))
 
-                    // Spec Grid (Storage, Package Manager, Architecture)
-                    Row(
+                    // Unified Spec Grid (Package Manager, Python Runtime, Disk Usage, Architecture)
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
                             .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column {
-                            Text("Package Manager", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(installedDistro.packageManager, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Package Manager", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(installedDistro.packageManager, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Python Runtime", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                val pyText = if (pythonVersion != null) {
+                                    pythonVersion.replace("Python ", "v")
+                                } else if (isProvisioningPython) {
+                                    "Installing..."
+                                } else {
+                                    "Ready"
+                                }
+                                Text(
+                                    text = pyText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
-                        Column {
-                            Text("Rootfs Disk Usage", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(installedDistro.sizeText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Rootfs Disk Usage", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(installedDistro.sizeText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Architecture", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(installedDistro.arch, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            }
                         }
-                        Column {
-                            Text("Architecture", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(installedDistro.arch, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                        }
+                    }
+
+                    if (isProvisioningPython) {
+                        Spacer(Modifier.height(8.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "Configuring Python runtime in background...",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
 
                     Spacer(Modifier.height(14.dp))
@@ -765,12 +842,37 @@ private fun EnvironmentTabContent(
                         null -> "Preparing environment..."
                     }
 
-                    Text(
-                        text = stageName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    val displayMessage = installProgress?.customStageMessage ?: stageName
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = displayMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        val remaining = installProgress?.estimatedSecondsRemaining
+                        if (remaining != null && remaining > 0) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(100.dp)
+                            ) {
+                                Text(
+                                    text = "~${remaining}s",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -920,7 +1022,7 @@ private fun LinuxDistroItemCard(
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, if (distro.isDownloaded) Color(0x5522C55E) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+        border = BorderStroke(1.dp, if (distro.isDownloaded) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -982,7 +1084,7 @@ private fun LinuxDistroItemCard(
                                 Text(
                                     text = "SHA-256 Verified",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF22C55E),
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
@@ -993,9 +1095,9 @@ private fun LinuxDistroItemCard(
                 // Download Status Pill
                 if (distro.isDownloaded) {
                     Surface(
-                        color = Color(0x2222C55E),
+                        color = MaterialTheme.colorScheme.primaryContainer,
                         shape = RoundedCornerShape(100.dp),
-                        border = BorderStroke(1.dp, Color(0x4422C55E))
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -1005,13 +1107,13 @@ private fun LinuxDistroItemCard(
                             Icon(
                                 TnIcons.Check,
                                 contentDescription = null,
-                                tint = Color(0xFF4ADE80),
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(12.dp)
                             )
                             Text(
                                 text = "DOWNLOADED",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF4ADE80),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -1047,22 +1149,25 @@ private fun LinuxDistroItemCard(
                 Button(
                     onClick = onInstall,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF166534))
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
-                    Icon(TnIcons.CircleCheck, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(TnIcons.CircleCheck, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Instant Install (Ready on device)", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Instant Setup (Cached on device)", fontWeight = FontWeight.SemiBold)
                 }
             } else {
                 FilledTonalButton(
                     onClick = onInstall,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Icon(TnIcons.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Download & Install (${distro.sizeText})")
+                    Text("Download & Setup (${distro.sizeText})")
                 }
             }
         }

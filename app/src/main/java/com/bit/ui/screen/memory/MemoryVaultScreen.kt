@@ -97,13 +97,41 @@ fun MemoryVaultScreen(
     var showImportDialog by remember { mutableStateOf(false) }
     val haptics = com.bit.ui.theme.LocalBitHaptics.current
 
+    val documentMimeTypes = remember {
+        arrayOf(
+            "application/pdf",
+            "text/plain",
+            "text/markdown",
+            "text/csv",
+            "text/html",
+            "application/json",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    }
+
     val docPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: android.net.Uri? ->
         uri?.let {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    it,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (_: Exception) {}
+            val fileName = com.bit.util.DocumentParser.getFileName(context, it)
+            val mimeType = context.contentResolver.getType(it)
+            if (com.bit.util.DocumentParser.isBlockedMediaOrBinary(fileName, mimeType)) {
+                android.widget.Toast.makeText(
+                    context,
+                    "Media files (images/videos) cannot be imported as documents.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+                return@rememberLauncherForActivityResult
+            }
             viewModel.importDocumentFromUri(it) { success ->
                 if (success) {
-                    android.widget.Toast.makeText(context, "Document added to Vault", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, "Document added to Vault: $fileName", android.widget.Toast.LENGTH_SHORT).show()
                 } else {
                     android.widget.Toast.makeText(context, "Failed to parse document", android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -226,16 +254,18 @@ fun MemoryVaultScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        // Main Vault Body Area
-        Column(
+        // Unified Fluid LazyColumn for Entire Vault Screen (No trapped nested scrolling)
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-                // Memory Off subtle inline notice (spec §5)
-                if (!isGlobalMemoryEnabled) {
+            // Memory Off subtle inline notice (spec §5)
+            if (!isGlobalMemoryEnabled) {
+                item {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -249,8 +279,10 @@ fun MemoryVaultScreen(
                         )
                     }
                 }
+            }
 
-                // Search Input (Search notes, memories, docs)
+            // Search Input (Search notes, memories, docs)
+            item {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { viewModel.setSearchQuery(it) },
@@ -267,8 +299,10 @@ fun MemoryVaultScreen(
                     ),
                     singleLine = true
                 )
+            }
 
-                // Top Peer Cards (My notes & AI memory)
+            // Top Peer Cards (My notes & AI memory)
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -319,8 +353,10 @@ fun MemoryVaultScreen(
                         }
                     }
                 }
+            }
 
-                // Wide Documents Card
+            // Wide Documents Card
+            item {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -359,7 +395,10 @@ fun MemoryVaultScreen(
                             FilledTonalButton(
                                 onClick = {
                                     haptics.pop()
-                                    context.startActivity(Intent(context, RagActivity::class.java))
+                                    val intent = Intent(context, RagActivity::class.java).apply {
+                                        putExtra(RagActivity.EXTRA_INITIAL_TAB, RagActivity.TAB_GRAPH)
+                                    }
+                                    context.startActivity(intent)
                                 },
                                 shape = RoundedCornerShape(12.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
@@ -372,7 +411,7 @@ fun MemoryVaultScreen(
                             Button(
                                 onClick = {
                                     haptics.pop()
-                                    docPickerLauncher.launch("*/*")
+                                    docPickerLauncher.launch(documentMimeTypes)
                                 },
                                 shape = RoundedCornerShape(12.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
@@ -384,8 +423,10 @@ fun MemoryVaultScreen(
                         }
                     }
                 }
+            }
 
-                // Recent Section Header + New Note/Doc Button
+            // Recent Section Header + New Note/Doc Button
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -402,7 +443,7 @@ fun MemoryVaultScreen(
                         Button(
                             onClick = {
                                 haptics.pop()
-                                docPickerLauncher.launch("*/*")
+                                docPickerLauncher.launch(documentMimeTypes)
                             },
                             shape = RoundedCornerShape(20.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)
@@ -426,26 +467,21 @@ fun MemoryVaultScreen(
                         }
                     }
                 }
+            }
 
-                // Recent List Items with Provenance Type Icons
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
-                ) {
-                    items(notes, key = { it.id }) { note ->
-                        RecentItemCard(
-                            note = note,
-                            onClick = {
-                                haptics.selection()
-                                onNoteClick(note.id, note.noteType)
-                            }
-                        )
+            // Recent List Items with Keyed Optimization
+            items(notes, key = { it.id }) { note ->
+                RecentItemCard(
+                    note = note,
+                    onClick = {
+                        haptics.selection()
+                        onNoteClick(note.id, note.noteType)
                     }
-                }
+                )
             }
         }
     }
+}
 
 @Composable
 private fun RecentItemCard(

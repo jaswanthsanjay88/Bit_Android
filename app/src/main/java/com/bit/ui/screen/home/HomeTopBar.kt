@@ -112,7 +112,7 @@ internal fun TopBar(
             Surface(
                 onClick = {
                     haptics.pop()
-                    onMemoryClick()
+                    onStoreButtonClicked("models")
                 },
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -129,8 +129,8 @@ internal fun TopBar(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = TnIcons.Brain,
-                        contentDescription = "Memory Vault",
+                        imageVector = TnIcons.StoreFront,
+                        contentDescription = "Model Store",
                         tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(20.dp)
                     )
