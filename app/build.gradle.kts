@@ -20,8 +20,8 @@ android {
         applicationId = "com.bit.agent"
         minSdk = 29
         targetSdk = 36
-        versionCode = 85
-        versionName = "2.1.0-beta.1"
+        versionCode = 86
+        versionName = "2.1.2"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
@@ -30,9 +30,10 @@ android {
         buildConfigField("int", "BETA_EXPIRY_DAYS", "0")
     }
 
+    val isBuildingBundle = gradle.startParameter.taskNames.any { it.contains("bundle", ignoreCase = true) }
     splits {
         abi {
-            isEnable = true
+            isEnable = !isBuildingBundle
             reset()
             include("arm64-v8a", "x86_64")
             isUniversalApk = true

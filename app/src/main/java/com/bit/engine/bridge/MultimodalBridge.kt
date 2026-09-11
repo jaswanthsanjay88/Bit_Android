@@ -60,7 +60,7 @@ object MultimodalBridge {
         userMessage.put("role", "user")
         
         // We use the default marker for images if available, otherwise just [img-0]
-        val marker = engine.getVlmDefaultMarker() ?: "[img-0]"
+        val marker = engine.getVlmDefaultMarker().takeIf { it.isNotBlank() } ?: "[img-0]"
         userMessage.put("content", "$marker\n$prompt")
         messages.put(userMessage)
         

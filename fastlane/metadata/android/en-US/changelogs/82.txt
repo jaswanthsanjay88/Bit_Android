@@ -1,0 +1,5 @@
+﻿• Fast Onboarding: Lightweight LFM2 350M & Gemma 1B models for instant setup and low RAM usage.
+• Android 15 Ready: Edge-to-edge display and 16 KB memory page size support.
+• Performance: Improved RAM detection, faster grammar execution, and stability fixes.
+• UI Polish: Refined Material 3 bottom sheets and dynamic status chips.
+• Zero Telemetry: 100% private, offline on-device AI.

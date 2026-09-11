@@ -3,15 +3,88 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BIT Developer & User Documentation — developer.android.com style</title>
-  <meta name="description" content="Official developer and user documentation for BIT — Privacy-first Android AI assistant. Task-oriented guides, architecture references, and tester manuals." />
+  <title>BIT Documentation — Official Diátaxis Manual &amp; Screen Navigation Guide</title>
+  <meta name="description" content="Official user manual, vertical screen-by-screen visual tour, tester protocols, and technical architecture for BIT — 100% On-Device Android AI Engine." />
 
-  <!-- Google Fonts: Fraunces & Inter -->
+  <!-- Google Fonts: Fraunces, Inter, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=apple2.2" />
+  <style>
+    /* Inlined Apple-grade overrides to guarantee instant cache bust */
+    .screen-quick-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 36px; position: sticky; top: 68px; z-index: 90; background: rgba(10, 11, 14, 0.88); backdrop-filter: blur(16px); padding: 10px 16px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); }
+    .screen-quick-nav span { font-family: var(--font-mono); font-size: 0.72rem; color: #86868b; font-weight: 600; letter-spacing: 0.06em; margin-right: 4px; }
+    .screen-quick-nav a { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 20px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: #a1a1a6; font-size: 0.78rem; font-weight: 500; text-decoration: none; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+    .screen-quick-nav a:hover, .screen-quick-nav a.active { background: rgba(121, 168, 255, 0.14); color: #79a8ff; border-color: rgba(121, 168, 255, 0.35); }
+    .screen-showcase-card { background: rgba(18, 19, 24, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; padding: 32px 36px; backdrop-filter: blur(20px); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4); margin-bottom: 48px; transition: border-color 0.2s ease; }
+    .screen-showcase-card:hover { border-color: rgba(255, 255, 255, 0.14); }
+    .screen-card-header { margin-bottom: 28px; }
+    .screen-badge-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+    .screen-tag { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #79a8ff; background: rgba(121, 168, 255, 0.12); border: 1px solid rgba(121, 168, 255, 0.25); padding: 3px 10px; border-radius: 20px; }
+    .screen-breadcrumb { font-family: var(--font-mono); font-size: 0.74rem; color: #86868b; display: flex; align-items: center; gap: 6px; }
+    .screen-title { font-family: var(--font-display); font-size: 1.65rem; font-weight: 400; color: #f5f5f7; letter-spacing: -0.015em; margin: 0 0 10px 0; }
+    .screen-description { font-size: 0.92rem; color: #a1a1a6; line-height: 1.6; margin: 0; max-width: 820px; }
+    .screen-card-split { display: grid; grid-template-columns: 260px 1fr; gap: 36px; align-items: start; }
+    .screen-device-col { position: sticky; top: 96px; display: flex; flex-direction: column; align-items: center; }
+    .screen-content-col { min-width: 0; }
+    .doc-phone-frame { position: relative !important; width: 250px !important; max-width: 250px !important; margin: 0 auto !important; border-radius: 40px !important; background: #000000 !important; border: 6px solid #1c1d22 !important; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 20px 48px -8px rgba(0, 0, 0, 0.85), 0 0 32px rgba(121, 168, 255, 0.05) !important; overflow: hidden !important; cursor: pointer; transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+    .doc-phone-frame::before { content: ''; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 58px; height: 12px; background: #000000; border-radius: 12px; z-index: 5; border: 1px solid rgba(255, 255, 255, 0.08); }
+    .doc-phone-frame::after { content: ''; position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 80px; height: 3px; background: rgba(255, 255, 255, 0.35); border-radius: 2px; z-index: 5; }
+    .doc-phone-frame:hover { transform: translateY(-4px) scale(1.015); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 30px 64px -8px rgba(0, 0, 0, 0.95), 0 0 44px rgba(121, 168, 255, 0.12) !important; }
+    .doc-phone-frame img { display: block !important; width: 100% !important; max-width: 100% !important; height: auto !important; max-height: 550px !important; border-radius: 34px !important; object-fit: contain !important; pointer-events: none; }
+    .doc-phone-zoom-hint { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); background: rgba(12, 13, 16, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.15); color: #e5e5ea; font-size: 0.72rem; font-weight: 500; letter-spacing: 0.02em; padding: 4px 10px; border-radius: 20px; pointer-events: none; display: flex; align-items: center; gap: 5px; white-space: nowrap; z-index: 6; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5); }
+    .section-subhead { font-size: 0.96rem; font-weight: 600; letter-spacing: -0.01em; color: #f5f5f7; margin: 0 0 12px 0; display: flex; align-items: center; gap: 8px; }
+    .ui-points-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .ui-point-card { background: rgba(255, 255, 255, 0.025); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 14px; padding: 14px 16px; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+    .ui-point-card:hover { background: rgba(255, 255, 255, 0.045); border-color: rgba(121, 168, 255, 0.28); transform: translateY(-1px); }
+    .ui-point-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; color: #f5f5f7; font-size: 0.88rem; }
+    .ui-step-num { flex-shrink: 0; width: 20px; height: 20px; background: rgba(121, 168, 255, 0.14); border: 1px solid rgba(121, 168, 255, 0.25); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: #79a8ff; font-family: var(--font-mono); }
+    .ui-point-card p { color: #a1a1a6; font-size: 0.82rem; line-height: 1.5; margin: 0; }
+    .screen-showcase-card .table-container { background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 14px; overflow: hidden; margin-bottom: 18px; }
+    .screen-showcase-card .docs-table { margin: 0; width: 100%; }
+    .screen-showcase-card .docs-table th { padding: 8px 14px; font-size: 0.78rem; color: #86868b; text-transform: uppercase; letter-spacing: 0.04em; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+    .screen-showcase-card .docs-table td { padding: 8px 14px; font-size: 0.82rem; color: #a1a1a6; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
+    .screen-showcase-card .docs-table tr:last-child td { border-bottom: none; }
+    .tester-pass-box { background: rgba(52, 199, 89, 0.06); border: 1px solid rgba(52, 199, 89, 0.22); border-radius: 14px; padding: 14px 18px; }
+    .tester-pass-title { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; font-weight: 700; font-family: var(--font-mono); color: #34c759; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .tester-pass-desc { font-size: 0.82rem; color: #c8e6c9; line-height: 1.45; margin: 0; }
+    .reference-card { background: rgba(18, 19, 24, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; padding: 24px 28px; backdrop-filter: blur(16px); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35); margin: 20px 0 36px 0; }
+    .table-container { background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 16px; overflow-x: auto; margin: 12px 0; }
+    .docs-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem; }
+    .docs-table th { padding: 12px 18px; font-size: 0.74rem; font-family: var(--font-mono); font-weight: 700; color: #86868b; text-transform: uppercase; letter-spacing: 0.08em; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08); white-space: nowrap; }
+    .docs-table td { padding: 14px 18px; font-size: 0.88rem; color: #a1a1a6; border-bottom: 1px solid rgba(255, 255, 255, 0.04); line-height: 1.5; }
+    .docs-table tr:last-child td { border-bottom: none; }
+    .docs-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+    .docs-table strong { color: #f5f5f7; font-weight: 600; }
+    .badge-quant { font-family: var(--font-mono); font-size: 0.76rem; background: rgba(121, 168, 255, 0.12); color: #79a8ff; border: 1px solid rgba(121, 168, 255, 0.25); padding: 2px 8px; border-radius: 6px; display: inline-block; }
+    .badge-perm-danger { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; background: rgba(255, 107, 107, 0.12); color: #ff8787; border: 1px solid rgba(255, 107, 107, 0.3); padding: 3px 10px; border-radius: 20px; display: inline-block; white-space: nowrap; }
+    .badge-perm-normal { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; background: rgba(76, 175, 80, 0.12); color: #81c784; border: 1px solid rgba(76, 175, 80, 0.3); padding: 3px 10px; border-radius: 20px; display: inline-block; white-space: nowrap; }
+    .badge-perm-runtime { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; background: rgba(179, 157, 219, 0.12); color: #b39ddb; border: 1px solid rgba(179, 157, 219, 0.3); padding: 3px 10px; border-radius: 20px; display: inline-block; white-space: nowrap; }
+    .code-block-wrapper { background: rgba(10, 11, 14, 0.9); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 18px; overflow: hidden; margin: 20px 0; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4); }
+    .code-block-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .mac-window-dots { display: flex; align-items: center; gap: 6px; }
+    .mac-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .mac-dot-red { background: #ff5f56; }
+    .mac-dot-yellow { background: #ffbd2e; }
+    .mac-dot-green { background: #27c93f; }
+    .code-block-filename { font-family: var(--font-mono); font-size: 0.74rem; color: #86868b; letter-spacing: 0.04em; }
+    .code-block-wrapper pre { margin: 0; padding: 20px 24px; overflow-x: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; line-height: 1.65; color: #e5e5ea; }
+    .code-block-wrapper code { font-family: inherit; font-size: inherit; color: inherit; }
+    .lightbox-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.94); backdrop-filter: blur(16px); z-index: 99999; align-items: center; justify-content: center; padding: 20px; }
+    .lightbox-modal.active { display: flex; }
+    .lightbox-content { position: relative; max-width: 90vw; max-height: 92vh; display: flex; flex-direction: column; align-items: center; }
+    .lightbox-content img { max-width: 100%; max-height: 82vh; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9); border: 1px solid rgba(255, 255, 255, 0.2); }
+    .lightbox-caption { color: #f5f5f7; margin-top: 12px; font-size: 0.92rem; font-weight: 500; text-align: center; }
+    .lightbox-close { position: absolute; top: -40px; right: 0; background: rgba(255, 255, 255, 0.15); border: none; color: #FFFFFF; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: background 0.2s; }
+    .lightbox-close:hover { background: rgba(255, 255, 255, 0.3); }
+    @media (max-width: 991px) {
+      .screen-card-split { grid-template-columns: 1fr; gap: 28px; }
+      .screen-device-col { position: static; margin-bottom: 20px; }
+      .screen-showcase-card { padding: 24px 20px; }
+    }
+  </style>
 </head>
 <body>
 
@@ -27,7 +100,7 @@
         <li><a href="index.html#benchmarks" class="nav-link">Specs</a></li>
         <li><a href="index.html#showcase" class="nav-link">Models</a></li>
         <li><a href="index.html#architecture" class="nav-link">Architecture</a></li>
-        <li><a href="docs.html" class="nav-link active">Docs</a></li>
+        <li><a href="docs.html" class="nav-link active">Documentation</a></li>
         <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="nav-link">GitHub</a></li>
       </ul>
 
@@ -41,17 +114,19 @@
   <!-- ── Documentation Header ── -->
   <section class="docs-header">
     <div class="container">
-      <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">DEVELOPER &amp; USER DOCUMENTATION</div>
-      <h1 class="docs-h2" style="border: none; padding: 0; margin-bottom: 8px;">BIT Documentation Center</h1>
+      <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #79a8ff; margin-bottom: 8px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">DIÁTAXIS DOCUMENTATION FRAMEWORK</div>
+      <h1 class="docs-h2" style="border: none; padding: 0; margin-bottom: 12px; font-size: 2.3rem;">BIT Documentation Center</h1>
       <div class="docs-metadata">
-        <span>Last updated: August 2026</span>
-        <span>•</span>
-        <span>Version: BIT v2.0.0</span>
-        <span>•</span>
-        <span>Platform: Android (ARM64 / x86_64)</span>
+        <span>Version: v2.1.1 (Build 82)</span>
+        <span>&bull;</span>
+        <span>Platform: Android 10+ (API 29+)</span>
+        <span>&bull;</span>
+        <span>Architecture: ARM64 NEON &amp; x86_64</span>
+        <span>&bull;</span>
+        <span>Target SDK: 36 (Android 16 DP)</span>
       </div>
-      <p style="color: var(--text-secondary); max-width: 680px; font-size: 0.98rem; line-height: 1.6;">
-        Task-oriented technical guides, subsystem concepts, exact code references, and tester verification protocols for BIT's on-device AI stack.
+      <p style="color: var(--text-secondary); max-width: 760px; font-size: 0.98rem; line-height: 1.6; margin-top: 12px;">
+        Structured under the Diátaxis technical framework across four quadrants: practical <strong>Tutorials</strong> for onboarding, comprehensive <strong>How-To Guides</strong> with vertical screen-by-screen visual breakdowns, architectural <strong>Explanations</strong>, and exhaustive <strong>Technical Reference</strong>.
       </p>
     </div>
   </section>
@@ -60,541 +135,1247 @@
   <div class="container">
     <div class="docs-layout">
 
-      <!-- Left Navigation Sidebar (Google Developer Hierarchy) -->
+      <!-- Left Navigation Sidebar -->
       <aside class="docs-sidebar">
+        <!-- QUADRANT 1: TUTORIALS -->
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Get Started</div>
+          <div class="docs-sidebar-title" style="color: #81c784;">I. Tutorials</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#overview" class="docs-sidebar-link active">Overview &amp; Quickstart</a></li>
-            <li><a href="#install-bit" class="docs-sidebar-link">Install BIT on Android</a></li>
-            <li><a href="#load-first-model" class="docs-sidebar-link">Load your first GGUF model</a></li>
+            <li><a href="#tutorial-first-5-minutes" class="docs-sidebar-link active">Your First 5 Minutes Offline</a></li>
+            <li><a href="#tutorial-installation" class="docs-sidebar-link">Google Play Closed Testing</a></li>
           </ul>
         </div>
 
+        <!-- QUADRANT 2: HOW-TO GUIDES -->
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Concepts</div>
+          <div class="docs-sidebar-title" style="color: #79a8ff;">II. How-To Guides (Visual Tour)</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#privacy-architecture" class="docs-sidebar-link">On-device privacy architecture</a></li>
-            <li><a href="#gguf-quantization" class="docs-sidebar-link">GGUF quantization &amp; silicon offload</a></li>
-            <li><a href="#hybrid-rag-concept" class="docs-sidebar-link">Hybrid RAG &amp; memory decay model</a></li>
+            <li><a href="#guide-screen-tour" class="docs-sidebar-link">Screen Navigation Overview</a></li>
+            <li><a href="#card-chat" class="docs-sidebar-link">1. Chat &amp; Streaming</a></li>
+            <li><a href="#card-voice" class="docs-sidebar-link">2. Live Voice Mode</a></li>
+            <li><a href="#card-store" class="docs-sidebar-link">3. Model Store &amp; SAF</a></li>
+            <li><a href="#card-rag" class="docs-sidebar-link">4. Private Document RAG</a></li>
+            <li><a href="#card-editor" class="docs-sidebar-link">5. Sampler &amp; Context Editor</a></li>
+            <li><a href="#card-settings" class="docs-sidebar-link">6. Hardware &amp; Diagnostics</a></li>
+            <li><a href="#guide-qa-matrix" class="docs-sidebar-link">QA Acceptance Suite (5 TCs)</a></li>
           </ul>
         </div>
 
+        <!-- QUADRANT 3: EXPLANATION -->
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Guides</div>
+          <div class="docs-sidebar-title" style="color: #ffb74d;">III. Explanation</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#setup-local-inference" class="docs-sidebar-link">Set up local inference</a></li>
-            <li><a href="#configure-model-params" class="docs-sidebar-link">Configure per-model parameters</a></li>
-            <li><a href="#enable-voice-mode" class="docs-sidebar-link">Enable hands-free voice mode</a></li>
-            <li><a href="#constrain-gbnf-tools" class="docs-sidebar-link">Constrain tool calls with GBNF</a></li>
-            <li><a href="#architecture-overview" class="docs-sidebar-link">Architecture Overview</a></li>
-            <li><a href="#tester-qa-guide" class="docs-sidebar-link">Test BIT on device (QA &amp; Tester Guide)</a></li>
+            <li><a href="#explanation-privacy" class="docs-sidebar-link">On-Device vs Cloud Security</a></li>
+            <li><a href="#explanation-gguf" class="docs-sidebar-link">GGUF Quantization on Silicon</a></li>
+            <li><a href="#explanation-rag" class="docs-sidebar-link">Hybrid RAG &amp; Memory Decay</a></li>
           </ul>
         </div>
 
+        <!-- QUADRANT 4: REFERENCE -->
         <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Reference</div>
+          <div class="docs-sidebar-title" style="color: #f06292;">IV. Reference</div>
           <ul class="docs-sidebar-links">
-            <li><a href="#model-store-api" class="docs-sidebar-link">Model Store REST API</a></li>
-            <li><a href="#engine-pipeline-spec" class="docs-sidebar-link">Llama.kt &amp; JNI pipeline spec</a></li>
-            <li><a href="#database-schemas" class="docs-sidebar-link">Memory Note &amp; Room DB schemas</a></li>
-            <li><a href="#gbnf-tool-definitions" class="docs-sidebar-link">Built-in GBNF tool definitions</a></li>
-          </ul>
-        </div>
-
-        <div class="docs-sidebar-group">
-          <div class="docs-sidebar-title">Release Notes</div>
-          <ul class="docs-sidebar-links">
-            <li><a href="#release-notes" class="docs-sidebar-link">Version changelog</a></li>
-            <li><a href="#fdroid-spec" class="docs-sidebar-link">F-Droid build &amp; verification</a></li>
+            <li><a href="#reference-ram-matrix" class="docs-sidebar-link">Hardware &amp; RAM Tiering</a></li>
+            <li><a href="#reference-schemata" class="docs-sidebar-link">GBNF Grammar Schemata</a></li>
+            <li><a href="#reference-permissions" class="docs-sidebar-link">Security &amp; Permissions</a></li>
           </ul>
         </div>
       </aside>
 
-      <!-- Main Article Body -->
-      <main class="docs-article">
+      <!-- Main Content Area -->
+      <main class="docs-content">
 
-        <!-- ==================== GET STARTED ==================== -->
+        <!-- ================================================================= -->
+        <!-- QUADRANT I: TUTORIALS (Learning-oriented)                          -->
+        <!-- ================================================================= -->
 
-        <section id="overview" class="docs-section">
-          <h2 class="docs-h2">Overview &amp; Quickstart</h2>
-          <p class="docs-summary">Summary: BIT is a 100% offline, privacy-first AI assistant for Android that runs language models, speech recognition, voice synthesis, and vector memory on local device hardware.</p>
-
-          <p class="docs-p">
-            BIT eliminates cloud latency and subscription costs by packaging high-performance C++ inference engines into an Android application. Every user query, audio recording, document index, and long-term memory fact remains sealed on your physical phone storage.
-          </p>
-          <p class="docs-p">
-            The platform combines a Kotlin Jetpack Compose interface with native C++ llama.cpp JNI bindings, Sherpa-ONNX speech-to-text, Piper neural voice synthesis, and an FTS5 vector memory graph.
+        <section id="tutorial-first-5-minutes" class="docs-section">
+          <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #81c784; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">DIÁTAXIS QUADRANT I — TUTORIALS</div>
+          <h2 class="docs-h2">Your First 5 Minutes Offline with BIT</h2>
+          <p class="docs-summary">
+            A step-by-step hands-on guide taking a new user from installation on Google Play to their first verified local inference with zero internet connection.
           </p>
 
-          <div class="doc-callout doc-callout-note">
-            <div class="doc-callout-title">Note</div>
-            BIT requires zero network permissions during normal operation. Internet access is only utilized if you choose to download GGUF models directly from HuggingFace or connect external cloud API fallbacks.
+          <div class="tutorial-card" id="tutorial-installation">
+            <h3 class="tutorial-step-title">
+              <span class="tutorial-step-badge">Step 1</span>
+              Install via Google Play Closed Testing Track
+            </h3>
+            <p class="docs-p">
+              Authorized testers receive an invitation link to the <strong>Google Play Closed Testing</strong> track. Tap the opt-in link on your Android device and install <strong>BIT (v2.1.1, Build 82)</strong> directly from the Google Play Store. Automatic updates will stream directly to your phone as new releases are pushed.
+            </p>
           </div>
 
-          <a href="#install-bit" class="docs-next-step">Next step: Install BIT on Android →</a>
+          <div class="tutorial-card">
+            <h3 class="tutorial-step-title">
+              <span class="tutorial-step-badge">Step 2</span>
+              Hardware Auto-Discovery &amp; Streamlined Model Selection
+            </h3>
+            <p class="docs-p">
+              Upon first launch, BIT analyzes your device SoC and RAM. The setup screen guides you to lightweight models to ensure an instant download without memory pressure:
+            </p>
+            <ul style="color: var(--text-secondary); margin: 8px 0 16px 20px; line-height: 1.6; font-size: 0.95rem;">
+              <li><strong>Ultra-Fast Setup (Devices under 4GB RAM):</strong> <strong>LFM2 350M</strong> (<code>lfm2-350m-q8</code>, ~400 MB). Liquid AI's ultra-lightweight model with instant response and lowest memory footprint.</li>
+              <li><strong>Recommended Setup (Devices with 4GB+ RAM):</strong> <strong>Gemma 3 1B IT</strong> (<code>gemma-3-1b-it-q4km</code>, ~750 MB). Google's lightweight 1B model with high reasoning precision.</li>
+              <li><strong>Power-User Models (3B - 7B):</strong> Higher-capacity models can be downloaded anytime post-onboarding from the <strong>Model Store</strong> tab.</li>
+            </ul>
+          </div>
+
+          <div class="tutorial-card">
+            <h3 class="tutorial-step-title">
+              <span class="tutorial-step-badge">Step 3</span>
+              Verify Offline Air-Gap Mode &amp; First Inference
+            </h3>
+            <p class="docs-p">
+              Once the initial model finishes downloading:
+            </p>
+            <ol style="color: var(--text-secondary); margin: 8px 0 16px 20px; line-height: 1.6; font-size: 0.95rem;">
+              <li>Swipe down your Android status bar and enable <strong>Airplane Mode</strong> (disable Wi-Fi and Cellular).</li>
+              <li>Return to BIT and type in the prompt box: <em>"Explain quantum computing in 2 sentences."</em></li>
+              <li>Observe the token stream. The generation metrics bar below the response will report real-time speed in tokens per second (<code>tok/s</code>) and Time-to-First-Token (<code>TTFT</code>).</li>
+            </ol>
+          </div>
         </section>
 
-        <section id="install-bit" class="docs-section">
-          <h2 class="docs-h2">Install BIT on Android</h2>
-          <p class="docs-summary">Summary: Download and sideload the release APK directly on ARM64 or x86_64 Android devices running Android 8.0 (API level 26) or higher.</p>
+        <!-- ================================================================= -->
+        <!-- QUADRANT II: HOW-TO GUIDES (Vertical Visual Tour)                  -->
+        <!-- ================================================================= -->
 
-          <p class="docs-p">
-            BIT is distributed directly through GitHub Releases and F-Droid rather than proprietary app stores. This enables unconstrained native C++ binary distribution and immediate open-source release cadences.
-          </p>
-          <p class="docs-p">
-            To install via Android Debug Bridge (ADB), connect your device via USB with Developer Options enabled and execute:
+        <section id="guide-screen-tour" class="docs-section">
+          <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #79a8ff; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">DIÁTAXIS QUADRANT II — HOW-TO GUIDES</div>
+          <h2 class="docs-h2">Screen-by-Screen Visual Navigation Guide</h2>
+          <p class="docs-summary">
+            A comprehensive, vertical screen-by-screen walkthrough explaining every single UI element, button, gesture, and technical feature across BIT. Powered by genuine on-device captures with status bar clutter removed for pristine clarity.
           </p>
 
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>BASH</span>
-              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('adb install -r app-arm64-v8a-release.apk')">Copy</button>
+          <!-- Sticky Vertical Jump Navigation (Zero Emojis) -->
+          <div class="screen-quick-nav">
+            <span>JUMP TO:</span>
+            <a href="#card-chat">1. Chat Interface</a>
+            <a href="#card-voice">2. Live Voice Mode</a>
+            <a href="#card-store">3. Model Store</a>
+            <a href="#card-rag">4. Document RAG</a>
+            <a href="#card-editor">5. Model Editor</a>
+            <a href="#card-settings">6. Hardware &amp; Settings</a>
+          </div>
+
+          <!-- ===================================================== -->
+          <!-- SCREEN 1: CHAT INTERFACE                             -->
+          <!-- ===================================================== -->
+          <div class="screen-showcase-card" id="card-chat">
+            <div class="screen-card-header">
+              <div class="screen-badge-row">
+                <span class="screen-tag">Core Interface</span>
+                <span class="screen-breadcrumb">Home &gt; Bottom Navigation &gt; Chat</span>
+              </div>
+              <h3 class="screen-title" id="guide-chat">1. Main Chat Interface &amp; Local Streaming Inference</h3>
+              <p class="screen-description">
+                The primary conversational workspace. Powered by an on-device C++ inference engine that evaluates quantized GGUF matrices directly inside system RAM. Responses stream word-by-word with zero telemetry and instant responsiveness.
+              </p>
             </div>
-            <pre class="code-block" style="border:none; margin:0;">adb install -r app-arm64-v8a-release.apk</pre>
-          </div>
 
-          <div class="doc-callout doc-callout-tip">
-            <div class="doc-callout-title">Tip</div>
-            For modern flagship devices (Snapdragon 8 Gen 2/3/4 or MediaTek Dimensity 9200/9300), use the <code class="mono">arm64-v8a</code> APK slice for maximum SIMD vector performance.
-          </div>
+            <!-- Apple Split Showcase -->
+            <div class="screen-card-split">
+              <!-- Sticky Phone Column -->
+              <div class="screen-device-col">
+                <div class="doc-phone-frame" onclick="openLightbox('img/live_captures/1_chat.png?v=83', 'Screen 1: Main Chat Interface & Local Streaming Inference')">
+                  <img src="img/live_captures/1_chat.png?v=83" alt="BIT Chat Screen Live Capture" loading="lazy" />
+                  <div class="doc-phone-zoom-hint">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
+              </div>
 
-          <a href="#load-first-model" class="docs-next-step">Next step: Load your first GGUF model →</a>
-        </section>
+              <!-- Content Column -->
+              <div class="screen-content-col">
+                <h4 class="section-subhead">UI Points &amp; Controls Explained</h4>
+                <div class="ui-points-grid">
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">1</span>
+                      <strong>Model Selector Pill (Top Center)</strong>
+                    </div>
+                    <p>Displays the currently loaded model (e.g. <code>Ready: gpt-oss-20b</code>) and its live status. Tapping opens a quick-switch dropdown to transition between downloaded models instantly.</p>
+                  </div>
 
-        <section id="load-first-model" class="docs-section">
-          <h2 class="docs-h2">Load your first GGUF model</h2>
-          <p class="docs-summary">Summary: Download a recommended GGUF model from the curated Model Store or import an existing `.gguf` file using the system file picker.</p>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">2</span>
+                      <strong>Navigation Drawer (Top Left)</strong>
+                    </div>
+                    <p>Opens the slide-out drawer with session history, full-text search across past chats, a "New Chat" button, and quick links to Vault and Settings.</p>
+                  </div>
 
-          <p class="docs-p">
-            On first launch, BIT analyzes available system RAM and chipset capabilities to suggest an optimal model. Select a recommended entry like <code class="mono">all-MiniLM-L6-v2-Q5_K_M.gguf</code> for embeddings or <code class="mono">Qwen2.5-1.5B-Instruct-Q4_K_M.gguf</code> for general chat.
-          </p>
-          <p class="docs-p">
-            Alternatively, if you already have `.gguf` files on your device, tap <strong>Import Local Model</strong> in the Model Store and choose the file via the Storage Access Framework (SAF) picker.
-          </p>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">3</span>
+                      <strong>Subsystem Status Chips</strong>
+                    </div>
+                    <p>Real-time indicators showing active subsystems: <code>RAG</code> (documents indexed), <code>Tools</code> (local device tools enabled), <code>Memory</code> (Vault recall active), and <code>TTS</code> (offline voice ready).</p>
+                  </div>
 
-          <a href="#privacy-architecture" class="docs-next-step">Next step: On-device privacy architecture →</a>
-        </section>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">4</span>
+                      <strong>Thinking Mode Toggle (Top Right)</strong>
+                    </div>
+                    <p>Specialized toggle for reasoning models (DeepSeek R1, QwQ). When active, the model generates an expandable <code>&lt;think&gt;</code> scratchpad before its final answer.</p>
+                  </div>
 
-        <!-- ==================== CONCEPTS ==================== -->
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">5</span>
+                      <strong>Markdown &amp; LaTeX Stream</strong>
+                    </div>
+                    <p>Full AST Markdown renderer with syntax-highlighted code blocks, copy code actions, formatted tables, and KaTeX LaTeX math support for scientific formulas.</p>
+                  </div>
 
-        <section id="privacy-architecture" class="docs-section">
-          <h2 class="docs-h2">On-device privacy architecture</h2>
-          <p class="docs-summary">Summary: BIT processes all prompts, audio streams, and memory indices in-process on local silicon without external network calls.</p>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">6</span>
+                      <strong>Message Action Sheet (Long-Press)</strong>
+                    </div>
+                    <p>Long-pressing any assistant response opens an action sheet with options to: Copy raw markdown, Share text via Android Sharesheet, Edit prompt, Replay aloud via Piper VITS TTS, or Save Fact to Memory Vault.</p>
+                  </div>
 
-          <p class="docs-p">
-            Unlike cloud-based AI applications that transmit user audio and prompts to remote server farms, BIT executes the complete inference pipeline inside the app process space.
-          </p>
-          <p class="docs-p">
-            Memory notes and vector embeddings are stored in a local SQLite Room database (<code class="mono">bit_db</code>) and encrypted filesystem directories (<code class="mono">AppPaths.aiMemoriesVault</code>).
-          </p>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">7</span>
+                      <strong>Live Generation Metrics Bar</strong>
+                    </div>
+                    <p>Appears under completed responses displaying real-time speed in tokens per second (<code>tok/s</code>), Time-to-First-Token (<code>TTFT</code> in ms), and total token counts.</p>
+                  </div>
 
-          <div class="doc-callout doc-callout-warning">
-            <div class="doc-callout-title">Warning</div>
-            If you enable optional API provider fallbacks (e.g. OpenAI or Anthropic), queries routed to those providers will travel over HTTPS to third-party servers. On-device GGUF execution never connects to third-party servers.
-          </div>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">8</span>
+                      <strong>Attachment &amp; Vision (+ Button)</strong>
+                    </div>
+                    <p>Attach camera photos or gallery images for on-device Vision-Language Model (VLM) image understanding via multimodal projectors.</p>
+                  </div>
 
-          <a href="#gguf-quantization" class="docs-next-step">Next step: GGUF quantization &amp; silicon offload →</a>
-        </section>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">9</span>
+                      <strong>Prompt Input Field</strong>
+                    </div>
+                    <p>Supports multi-line text, hardware keyboards, clipboard paste, and Android IME voice typing. Expands smoothly as you compose queries.</p>
+                  </div>
 
-        <section id="gguf-quantization" class="docs-section">
-          <h2 class="docs-h2">GGUF quantization &amp; silicon offload</h2>
-          <p class="docs-summary">Summary: GGUF quantization shrinks model weights by 4x–8x while preserving reasoning quality, enabling fast execution on mobile CPU and GPU cores.</p>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">10</span>
+                      <strong>Send / Abort Streaming Button</strong>
+                    </div>
+                    <p>Adaptive action button: displays an arrow when idle to submit prompts, and morphs into a square during generation to immediately halt streaming mid-sentence.</p>
+                  </div>
 
-          <p class="docs-p">
-            Full-precision 16-bit models require excessive RAM and memory bandwidth. GGUF quantization compresses weight matrices into 4-bit (`Q4_K_M`) or 5-bit (`Q5_K_M`) integer representations.
-          </p>
-          <p class="docs-p">
-            BIT's native C++ engine utilizes ARM NEON SIMD instructions, MediaTek APU extensions, and Qualcomm Hexagon DSP offloading to maximize tokens per second while minimizing battery drain.
-          </p>
+                  <div class="ui-point-card" style="grid-column: 1 / -1;">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">11</span>
+                      <strong>Floating Liquid Voice Orb (FAB)</strong>
+                    </div>
+                    <p>A floating animated sphere resting above the input bar. Tapping it triggers an instant animated transition into hands-free, real-time Live Voice Mode.</p>
+                  </div>
+                </div>
 
-          <a href="#hybrid-rag-concept" class="docs-next-step">Next step: Hybrid RAG &amp; memory decay model →</a>
-        </section>
+                <!-- Gestures Table -->
+                <h4 class="section-subhead" style="margin-top: 24px;">Interaction &amp; Gestures Matrix</h4>
+                <div class="table-container">
+                  <table class="docs-table">
+                    <thead>
+                      <tr>
+                        <th>Gesture / Action</th>
+                        <th>Target Area</th>
+                        <th>Resulting System Behavior</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Single Tap</strong></td>
+                        <td>Model Pill (Header)</td>
+                        <td>Opens model selector dropdown with memory usage stats.</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Long Press</strong></td>
+                        <td>Assistant Message Bubble</td>
+                        <td>Opens Message Action Bottom Sheet (Copy, TTS, Share, Save to Vault).</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Single Tap</strong></td>
+                        <td>Floating Voice Orb</td>
+                        <td>Switches from Text Mode to Hands-Free Conversational Voice Mode.</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Single Tap</strong></td>
+                        <td>Stop Icon (while generating)</td>
+                        <td>Immediately terminates llama.cpp inference loop and preserves tokens.</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Swipe Right</strong></td>
+                        <td>Left Screen Edge</td>
+                        <td>Draws out conversation drawer with session history.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
 
-        <section id="hybrid-rag-concept" class="docs-section">
-          <h2 class="docs-h2">Hybrid RAG &amp; memory decay model</h2>
-          <p class="docs-summary">Summary: BIT pairs FTS5 keyword indexing with vector cosine similarity to retrieve relevant historical memories and documents for every prompt.</p>
-
-          <p class="docs-p">
-            Traditional vector search can miss exact code symbols or proper nouns, while keyword search misses semantic context. BIT uses Reciprocal Rank Fusion (RRF) to merge results from both SQLite FTS5 keyword queries and 384-dimensional vector embeddings into a unified score.
-          </p>
-          <p class="docs-p">
-            Memory entries undergo automated decay: facts lose weight over time unless reinforced by user interaction, keeping context windows lean and relevant.
-          </p>
-
-          <a href="#setup-local-inference" class="docs-next-step">Next step: Set up local inference →</a>
-        </section>
-
-        <!-- ==================== GUIDES ==================== -->
-
-        <section id="setup-local-inference" class="docs-section">
-          <h2 class="docs-h2">Set up local inference</h2>
-          <p class="docs-summary">Summary: Initialize and configure the `EmbeddingEngine` and `GlobalRagOrchestrator` programmatically in Kotlin.</p>
-
-          <p class="docs-p">
-            `EmbeddingEngine` automatically detects valid `.gguf` model files at `AppPaths.embeddingModel(context)` and loads native handles cleanly.
-          </p>
-          <p class="docs-p">
-            Here is the exact initialization sequence executed on app startup:
-          </p>
-
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>KOTLIN</span>
-              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('val engine = EmbeddingEngine()\nval isReady = engine.ensureInitialized(context)')">Copy</button>
+                <!-- Tester Pass Criteria -->
+                <div class="tester-pass-box">
+                  <div class="tester-pass-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Closed Testing Pass Criteria
+                  </div>
+                  <div class="tester-pass-desc">
+                    With Airplane Mode active on your Google Play Closed Testing build, enter "List 3 advantages of local on-device AI". Tokens must stream smoothly without lag. Metrics counter must display tokens/sec upon completion.
+                  </div>
+                </div>
+              </div>
             </div>
-            <pre class="code-block" style="border:none; margin:0;"><code class="language-kotlin">// Initialize EmbeddingEngine from downloaded model file
-val embeddingEngine = EmbeddingEngine()
-val isReady = embeddingEngine.ensureInitialized(context)
-
-if (isReady) {
-    Log.d("Inference", "Embedding dimension: ${embeddingEngine.getDimension()}")
-}</code></pre>
           </div>
 
-          <a href="#configure-model-params" class="docs-next-step">Next step: Configure per-model parameters →</a>
-        </section>
-
-        <section id="configure-model-params" class="docs-section">
-          <h2 class="docs-h2">Configure per-model parameters</h2>
-          <p class="docs-summary">Summary: Adjust context window size, sampling temperature, thread allocation, and Flash Attention in the Model Config Editor.</p>
-
-          <p class="docs-p">
-            Each GGUF model registered in BIT maintains an independent parameter profile stored in Room DB (`model_configs` table).
-          </p>
-
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>KOTLIN</span>
-              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('val config = GgufInferenceParams(\n    temperature = 0.7f,\n    contextSize = 2048,\n    threads = 4,\n    flashAttention = true\n)')">Copy</button>
+          <!-- ===================================================== -->
+          <!-- SCREEN 2: LIVE VOICE MODE                            -->
+          <!-- ===================================================== -->
+          <div class="screen-showcase-card" id="card-voice">
+            <div class="screen-card-header">
+              <div class="screen-badge-row">
+                <span class="screen-tag">Conversational Voice</span>
+                <span class="screen-breadcrumb">Chat Screen &gt; Tap Floating Voice Orb</span>
+              </div>
+              <h3 class="screen-title" id="guide-voice">2. Live Hands-Free Conversational Voice Mode</h3>
+              <p class="screen-description">
+                A full-screen conversational interface centered around an interactive liquid neural orb. Combines 16kHz Sherpa-ONNX Whisper speech recognition, Silero Voice Activity Detection (VAD), and low-latency Piper neural voice synthesis.
+              </p>
             </div>
-            <pre class="code-block" style="border:none; margin:0;"><code class="language-kotlin">data class GgufInferenceParams(
-    val temperature: Float = 0.7f,
-    val topP: Float = 0.9f,
-    val contextSize: Int = 2048,
-    val threads: Int = 4,
-    val flashAttention: Boolean = true,
-    val repetitionPenalty: Float = 1.1f
-)</code></pre>
-          </div>
 
-          <a href="#enable-voice-mode" class="docs-next-step">Next step: Enable hands-free voice mode →</a>
-        </section>
+            <!-- Apple Split Showcase -->
+            <div class="screen-card-split">
+              <!-- Sticky Phone Column -->
+              <div class="screen-device-col">
+                <div class="doc-phone-frame" onclick="openLightbox('img/live_captures/2_voice.png?v=83', 'Screen 2: Live Hands-Free Voice Mode')">
+                  <img src="img/live_captures/2_voice.png?v=83" alt="BIT Voice Mode Live Capture" loading="lazy" />
+                  <div class="doc-phone-zoom-hint">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
+              </div>
 
-        <section id="enable-voice-mode" class="docs-section">
-          <h2 class="docs-h2">Enable hands-free voice mode</h2>
-          <p class="docs-summary">Summary: Configure Sherpa-ONNX speech recognition, Piper TTS synthesis, and Silero VAD barge-in for continuous voice interaction.</p>
+              <!-- Content Column -->
+              <div class="screen-content-col">
+                <h4 class="section-subhead">UI Points &amp; Controls Explained</h4>
+                <div class="ui-points-grid">
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">1</span>
+                      <strong>Pulsing Liquid Neural Orb (Center)</strong>
+                    </div>
+                    <p>Interactive 3D shader reflecting AI engine states in real time: <em>Cyan/Blue</em> = Listening to your voice; <em>Silver/White</em> = Thinking and generating tokens; <em>Warm Amber</em> = Speaking audio response aloud.</p>
+                  </div>
 
-          <p class="docs-p">
-            Tap the microphone orb on the main screen to start Live Voice Mode. Speech input is captured via `AudioCaptureService` at 16kHz mono.
-          </p>
-          <p class="docs-p">
-            Silero Voice Activity Detection (VAD) monitors incoming audio continuously. If you speak while BIT is reading a response aloud, VAD detects barge-in, immediately cancels TTS output, and begins transcribing your new prompt.
-          </p>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">2</span>
+                      <strong>Live Audio Frequency Waveform</strong>
+                    </div>
+                    <p>Dynamic visual bars beneath the orb displaying real-time 16kHz microphone amplitude, providing immediate feedback that your voice is being captured clearly.</p>
+                  </div>
 
-          <a href="#constrain-gbnf-tools" class="docs-next-step">Next step: Constrain tool calls with GBNF →</a>
-        </section>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">3</span>
+                      <strong>Zero Push-to-Talk Silero VAD</strong>
+                    </div>
+                    <p>Hands-free voice detection. There are no buttons to hold down while speaking; the neural VAD continuously monitors speech probability and triggers inference the moment you stop speaking.</p>
+                  </div>
 
-        <section id="constrain-gbnf-tools" class="docs-section">
-          <h2 class="docs-h2">Constrain tool calls with GBNF</h2>
-          <p class="docs-summary">Summary: Apply Grammar-Based Next-Token Filtering (GBNF) to force model outputs into syntactically valid JSON tool calls.</p>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">4</span>
+                      <strong>Whisper ASR Streaming Transcription</strong>
+                    </div>
+                    <p>Real-time speech-to-text preview displaying transcribed user speech as words are spoken, powered by an on-device Sherpa-ONNX Whisper encoder.</p>
+                  </div>
 
-          <p class="docs-p">
-            Standard language models can produce malformed JSON when attempting tool calls. BIT injects a strict GBNF grammar into the native sampler loop, forcing every generated token to follow the expected JSON schema.
-          </p>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">5</span>
+                      <strong>Real-Time Voice Synthesis (Piper TTS)</strong>
+                    </div>
+                    <p>Offline VITS neural voice generation streaming natural speech with sub-300ms Time-to-First-Audio without internet access.</p>
+                  </div>
 
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>GBNF</span>
-              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('root ::= tool-call\ntool-call ::= \"{\\\"tool\\\": \\\"\" name \"\\\", \\\"args\\\": \" object \"}\"')">Copy</button>
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">6</span>
+                      <strong>Dynamic Latency &amp; Engine Counter</strong>
+                    </div>
+                    <p>Header telemetry badge reporting end-to-end conversational turn latency (ASR + LLM generation + TTS synthesis) in milliseconds.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">7</span>
+                      <strong>Microphone Mute / Privacy Action</strong>
+                    </div>
+                    <p>Bottom-left circular control to instantly cut microphone audio capture while keeping the voice session active.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">8</span>
+                      <strong>Barge-In &amp; Instant Interrupt</strong>
+                    </div>
+                    <p>Speak aloud at any point while the assistant is talking or tap anywhere on screen. BIT immediately cuts audio playback and pivots to process your new voice input.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">9</span>
+                      <strong>Return to Chat View (X Button)</strong>
+                    </div>
+                    <p>Closes full-screen voice mode. All spoken dialog turns are automatically transcribed and saved into your active text chat session.</p>
+                  </div>
+                </div>
+
+                <!-- Gestures Table -->
+                <h4 class="section-subhead" style="margin-top: 24px;">Interaction &amp; Gestures Matrix</h4>
+                <div class="table-container">
+                  <table class="docs-table">
+                    <thead>
+                      <tr>
+                        <th>Gesture / Action</th>
+                        <th>Target Area</th>
+                        <th>Resulting System Behavior</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Speak Aloud</strong></td>
+                        <td>Anywhere (Hands-Free)</td>
+                        <td>Silero VAD detects voice onset; waveform animates; Whisper transcribes audio.</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Speak while AI talks</strong></td>
+                        <td>Microphone Audio</td>
+                        <td>Barge-in triggers: TTS output immediately halts; new question is processed.</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Single Tap</strong></td>
+                        <td>Mute Button (Bottom Left)</td>
+                        <td>Toggles microphone recording on/off for privacy.</td>
+                      </tr>
+                      <tr>
+                        <td><strong>Single Tap</strong></td>
+                        <td>Close Icon (Top Right)</td>
+                        <td>Exits Voice Mode and persists conversation transcript into text chat history.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Tester Pass Criteria -->
+                <div class="tester-pass-box">
+                  <div class="tester-pass-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Closed Testing Pass Criteria
+                  </div>
+                  <div class="tester-pass-desc">
+                    Launch Voice Mode on your closed testing build. Speak "Tell me a short poem." Once speech playback starts, interrupt by saying "Stop, what is 2 plus 2?". Audio must immediately cut and answer "4" within 800ms.
+                  </div>
+                </div>
+              </div>
             </div>
-            <pre class="code-block" style="border:none; margin:0;">root ::= tool-call
-tool-call ::= "{" space "\"tool\":" space string "," space "\"args\":" space object "}"
-string ::= "\"" [a-zA-Z0-9_-]+ "\""
-object ::= "{" space "}" | "{" space string ":" space string "}"
-space ::= [ \t\n]*</pre>
           </div>
 
-          <a href="#architecture-overview" class="docs-next-step">Next step: Architecture Overview →</a>
-        </section>
-
-        <section id="architecture-overview" class="docs-section">
-          <h2 class="docs-h2">Architecture Overview</h2>
-          <p class="docs-summary">Summary: Core architectural design principles enabling real-time on-device and cloud hybrid inference seamlessly in Android.</p>
-
-          <p class="docs-p">
-            BIT follows a strict multi-module design and leverages Jetpack Compose and MVVM for an ultra-responsive UI. Computationally heavy tasks (like local LLM generation or image diffusion) are carefully managed via Background/Foreground Services and JNI layer bridging to prevent UI jank.
-          </p>
-
-          <h3 class="docs-h3">1. UI Layer (Jetpack Compose &amp; ViewModels)</h3>
-          <p class="docs-p">
-            The UI is fully declarative and reacts to StateFlow emissions from view models like `ChatViewModel`. User interactions are mapped to events that trigger background execution pipelines. The UI has no knowledge of whether the model being used is local (GGUF) or remote (Cloud API); it just consumes a unified `StreamEvent` interface.
-          </p>
-
-          <h3 class="docs-h3">2. Service Layer (Foreground Workers)</h3>
-          <p class="docs-p">
-            Android aggressively kills background processes. To allow models to persist in RAM when you minimize the app, BIT utilizes `LlmModelWorker` as a Foreground Service. This worker pins the native C++ engine in memory. `ModelDownloadService` manages asynchronous background downloading of large `.gguf` weights (which can be multi-gigabyte files).
-          </p>
-
-          <h3 class="docs-h3">3. Unified API Layer (`com.bit.api`)</h3>
-          <p class="docs-p">
-            The `com.bit.api` package encapsulates API handlers (Gemini, OpenAI, Claude, DeepSeek, Ollama, OpenRouter). Through the `ApiProvider` and `ApiRegistry` interfaces, all interactions—including tool-calling and stream parsing—are normalized before reaching the ViewModel.
-          </p>
-
-          <h3 class="docs-h3">4. Inference Engines (JNI/C++)</h3>
-          <p class="docs-p">
-            Native inference happens inside `llama-kt` (Text/VLM) and `DiffusionEngine` (Images). `llama.cpp` handles memory mapping (mmap) automatically, efficiently swapping pages from storage so devices with 6GB of RAM can run 8GB models.
-          </p>
-
-          <a href="#tester-qa-guide" class="docs-next-step">Next step: Test BIT on device (QA &amp; Tester Guide) →</a>
-        </section>
-
-        <section id="tester-qa-guide" class="docs-section">
-          <h2 class="docs-h2">Test BIT on device (QA &amp; Tester Guide)</h2>
-          <p class="docs-summary">Summary: Complete verification protocol for QA engineers and manual testers validating APK installations, GGUF loading, RAG memory sync, and voice mode.</p>
-
-          <p class="docs-p">
-            This test suite provides a comprehensive step-by-step procedure to confirm that a release build functions correctly on physical Android hardware before deployment.
-          </p>
-
-          <h3 class="docs-h3">Test Case 1: Clean APK Installation &amp; Diagnostics</h3>
-          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 20px;">
-            <li>Install release APK using <code class="mono">adb install -r app-arm64-v8a-release.apk</code>.</li>
-            <li>Launch BIT. Confirm splash screen opens cleanly without crash loops.</li>
-            <li>Navigate to <strong>Settings → Diagnostics</strong> and verify CPU architecture, detected RAM, and NPU features display accurately.</li>
-          </ol>
-
-          <h3 class="docs-h3">Test Case 2: Model Store Download &amp; Local GGUF Load</h3>
-          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 20px;">
-            <li>Open <strong>Model Store</strong>. Tap <strong>Download</strong> on <code class="mono">all-MiniLM-L6-v2-Q5_K_M.gguf</code>. Confirm progress bar advances to 100%.</li>
-            <li>Tap <strong>Import Local Model</strong> and choose a local GGUF file via SAF file picker. Verify model displays in installed list.</li>
-            <li>Send a prompt: "Hello, summarize your capabilities in 2 sentences." Confirm response generates smoothly.</li>
-          </ol>
-
-          <h3 class="docs-h3">Test Case 3: Memory Vault Single Write-Path &amp; Node Eviction</h3>
-          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 20px;">
-            <li>Send prompt: "Remember that my favorite programming language is Kotlin."</li>
-            <li>Open <strong>Memory Vault</strong> tab. Confirm a new entry appears in the <code class="mono">ai_memory</code> folder.</li>
-            <li>Verify the file <code class="mono">ai_memory/*.md</code> exists on disk and is present in Room DB table <code class="mono">memory_notes</code>.</li>
-            <li>Delete the memory entry from UI. Verify the corresponding `.md` file is deleted from disk and purged from `NeuronGraph`.</li>
-          </ol>
-
-          <h3 class="docs-h3">Test Case 4: Live Voice Mode &amp; VAD Barge-in</h3>
-          <ol style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7; margin-bottom: 20px;">
-            <li>Tap the microphone orb to initiate Live Voice Mode. Grant microphone permissions when prompted.</li>
-            <li>Speak: "Tell me a story about space exploration." Confirm real-time STT transcription displays in UI.</li>
-            <li>While Piper TTS is reading the response aloud, start speaking mid-sentence. Confirm TTS stops instantly (VAD barge-in) and enters listening state.</li>
-          </ol>
-
-          <div class="doc-callout doc-callout-tip">
-            <div class="doc-callout-title">Tip</div>
-            Save execution logs during QA testing via ADB: <code class="mono">adb logcat -s "EmbeddingEngine:V" "GlobalRagOrchestrator:V" "MemoryPlugin:V"</code>.
-          </div>
-
-          <a href="#model-store-api" class="docs-next-step">Next step: Model Store REST API →</a>
-        </section>
-
-        <!-- ==================== REFERENCE ==================== -->
-
-        <section id="model-store-api" class="docs-section">
-          <h2 class="docs-h2">Model Store REST API</h2>
-          <p class="docs-summary">Summary: REST specification for BIT's curated model catalog endpoint hosted at `/api/models`.</p>
-
-          <p class="docs-p">
-            The Model Store fetches curated GGUF models dynamically from `/api/models`. The response contains metadata, quantization ratings, direct download URLs, and brand icons.
-          </p>
-
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>JSON</span>
-              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('{\n  \"id\": \"qwen-2.5-1.5b\",\n  \"name\": \"Qwen 2.5 1.5B Instruct\",\n  \"providerType\": \"GGUF\",\n  \"sizeBytes\": 1120000000\n}')">Copy</button>
+          <!-- ===================================================== -->
+          <!-- SCREEN 3: MODEL STORE & SAF IMPORTER                 -->
+          <!-- ===================================================== -->
+          <div class="screen-showcase-card" id="card-store">
+            <div class="screen-card-header">
+              <div class="screen-badge-row">
+                <span class="screen-tag">Model Management</span>
+                <span class="screen-breadcrumb">Bottom Navigation &gt; Store</span>
+              </div>
+              <h3 class="screen-title" id="guide-store">3. Model Store &amp; GGUF Weight Manager</h3>
+              <p class="screen-description">
+                Browse, download, and activate quantized GGUF weights directly to internal storage. Includes background resumable downloads and an Android Storage Access Framework (SAF) picker for importing existing local models.
+              </p>
             </div>
-            <pre class="code-block" style="border:none; margin:0;"><code class="language-json">[
-  {
-    "id": "qwen-2.5-1.5b-instruct-q4",
-    "name": "Qwen 2.5 1.5B Instruct",
-    "filename": "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
-    "providerType": "GGUF",
-    "sizeBytes": 1120000000,
-    "recommendedRamGb": 4,
-    "downloadUrl": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-    "icon": "qwen"
-  }
-]</code></pre>
+
+            <!-- Apple Split Showcase -->
+            <div class="screen-card-split">
+              <!-- Sticky Phone Column -->
+              <div class="screen-device-col">
+                <div class="doc-phone-frame" onclick="openLightbox('img/live_captures/3_store.png?v=83', 'Screen 3: Model Store & GGUF Importer')">
+                  <img src="img/live_captures/3_store.png?v=83" alt="BIT Model Store Live Capture" loading="lazy" />
+                  <div class="doc-phone-zoom-hint">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Content Column -->
+              <div class="screen-content-col">
+                <h4 class="section-subhead">UI Points &amp; Controls Explained</h4>
+                <div class="ui-points-grid">
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">1</span>
+                      <strong>Category Filter Chips (Top Bar)</strong>
+                    </div>
+                    <p>Filter catalog models by size and task: <em>All Models</em>, <em>Recommended</em>, <em>350M–1B (Ultra-Light)</em>, <em>3B–7B (Reasoning)</em>, <em>Vision (VLM)</em>, and <em>Tool Calling Routers</em>.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">2</span>
+                      <strong>Model Catalog Search Bar</strong>
+                    </div>
+                    <p>Filter available models by keyword, architecture family (Llama, Qwen, Gemma, LFM), author, or specific quantization tags.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">3</span>
+                      <strong>GGUF Model Cards &amp; Specs</strong>
+                    </div>
+                    <p>Each card lists model parameter count, context limit, quantization type (e.g. <code>Q4_K_M</code>, <code>IQ4_XS</code>), and exact file download size.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">4</span>
+                      <strong>Dynamic RAM Safety Badge</strong>
+                    </div>
+                    <p>Compares model size against physical device RAM: <em>Green Check</em> = Safe to run with ample headroom; <em>Amber Warning</em> = Heavy load; <em>Red Alert</em> = Insufficient memory.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">5</span>
+                      <strong>One-Tap Resumable Download Action</strong>
+                    </div>
+                    <p>Streams weights directly from HuggingFace with HTTP Range header support. If connection drops, the download resumes from the exact byte without restarting.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">6</span>
+                      <strong>Persistent Background Service &amp; Notification</strong>
+                    </div>
+                    <p>Runs as an Android foreground service with a notification displaying download speed (MB/s), percentage, and ETA even when BIT is minimized.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">7</span>
+                      <strong>Model Activation Button</strong>
+                    </div>
+                    <p>Once downloaded, tap <strong>Activate</strong> to memory-map the weights into RAM via <code>mmap</code> and assign it as the active generation engine.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">8</span>
+                      <strong>Import External Model (SAF File Picker)</strong>
+                    </div>
+                    <p>Use the Android Storage Access Framework to import existing <code>.gguf</code> files downloaded via external web browsers, PC transfers, or SD cards.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">9</span>
+                      <strong>Delete &amp; Storage Reclamation</strong>
+                    </div>
+                    <p>One-tap trash icon on installed model cards to immediately purge weight files and reclaim precious phone storage.</p>
+                  </div>
+                </div>
+
+                <!-- Tester Pass Criteria -->
+                <div class="tester-pass-box">
+                  <div class="tester-pass-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Closed Testing Pass Criteria
+                  </div>
+                  <div class="tester-pass-desc">
+                    Download a model on your closed testing build. Lock the device screen for 15 seconds during download. Unlock and verify download progress bar advanced without connection interruption.
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <a href="#engine-pipeline-spec" class="docs-next-step">Next step: Llama.kt &amp; JNI pipeline spec →</a>
+          <!-- ===================================================== -->
+          <!-- SCREEN 4: PRIVATE DOCUMENT RAG                       -->
+          <!-- ===================================================== -->
+          <div class="screen-showcase-card" id="card-rag">
+            <div class="screen-card-header">
+              <div class="screen-badge-row">
+                <span class="screen-tag">Offline Knowledge</span>
+                <span class="screen-breadcrumb">Bottom Navigation &gt; Documents &amp; Memory</span>
+              </div>
+              <h3 class="screen-title" id="guide-rag">4. Private Document Search (RAG) &amp; AI Memory Vault</h3>
+              <p class="screen-description">
+                Query and search your local PDF, DOCX, and text documents. BIT indexes files on-device using a hybrid vector cosine + SQLite FTS5 engine, providing grounded answers with verifiable page citations.
+              </p>
+            </div>
+
+            <!-- Apple Split Showcase -->
+            <div class="screen-card-split">
+              <!-- Sticky Phone Column -->
+              <div class="screen-device-col">
+                <div class="doc-phone-frame" onclick="openLightbox('img/live_captures/4_rag.png?v=83', 'Screen 4: Private Document Search & Episodic Memory')">
+                  <img src="img/live_captures/4_rag.png?v=83" alt="BIT Document RAG Live Capture" loading="lazy" />
+                  <div class="doc-phone-zoom-hint">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Content Column -->
+              <div class="screen-content-col">
+                <h4 class="section-subhead">UI Points &amp; Controls Explained</h4>
+                <div class="ui-points-grid">
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">1</span>
+                      <strong>Dual Mode Switcher (Documents vs. Vault)</strong>
+                    </div>
+                    <p>Toggle between <strong>Documents</strong> (file knowledge bases) and <strong>AI Memory Vault</strong> (episodic semantic memories extracted from past conversations).</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">2</span>
+                      <strong>Master Memory Toggle Switch (Header)</strong>
+                    </div>
+                    <p>Enables or disables automatic memory grounding in chats. When disabled, models converse without referencing personal facts stored in the Vault.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">3</span>
+                      <strong>Vault Backup &amp; Export Button</strong>
+                    </div>
+                    <p>One-tap button in the top bar to export an encrypted backup of your indexed document vector database and episodic memory store.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">4</span>
+                      <strong>Document Ingestion (+ Button)</strong>
+                    </div>
+                    <p>Select local files (.pdf, .txt, .md, .docx). Apache PDFBox extracts text entirely on-device with zero server uploads.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">5</span>
+                      <strong>Local Chunking &amp; Vector Embeddings</strong>
+                    </div>
+                    <p>Splits text into 512-token chunks with 64-token sliding window overlap, embedding them into a local SQLite vector table using an on-device MiniLM model.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">6</span>
+                      <strong>Document Knowledge Base List</strong>
+                    </div>
+                    <p>Displays all indexed documents with title, total chunk count, file size, indexing date, and an individual delete action.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">7</span>
+                      <strong>Natural Language RAG Query Bar</strong>
+                    </div>
+                    <p>Ask direct questions across your documents (e.g. <em>"What were the revenue numbers in Q3?"</em>). Uses hybrid vector cosine + BM25 keyword retrieval.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">8</span>
+                      <strong>Grounded Citation Badges</strong>
+                    </div>
+                    <p>Every factual answer includes a source citation chip (e.g. <code>[QuarterlyReport.pdf - Page 4]</code>). Tapping opens the exact passage used for verification.</p>
+                  </div>
+                </div>
+
+                <!-- Tester Pass Criteria -->
+                <div class="tester-pass-box">
+                  <div class="tester-pass-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Closed Testing Pass Criteria
+                  </div>
+                  <div class="tester-pass-desc">
+                    Import a 2-page PDF document on your closed testing build. Query a specific detail from page 2. Verify answer contains an exact quotation and source badge pointing to page 2.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===================================================== -->
+          <!-- SCREEN 5: MODEL CONFIGURATION EDITOR                 -->
+          <!-- ===================================================== -->
+          <div class="screen-showcase-card" id="card-editor">
+            <div class="screen-card-header">
+              <div class="screen-badge-row">
+                <span class="screen-tag">Sampler Tuning</span>
+                <span class="screen-breadcrumb">Model Store &gt; Tap Model &gt; Config Editor</span>
+              </div>
+              <h3 class="screen-title" id="guide-config">5. Model Parameter Configuration &amp; Sampler Tuner</h3>
+              <p class="screen-description">
+                Customize low-level generation parameters per model. Set context buffer length, fine-tune temperature for creativity vs. deterministic coding, and enforce strict GBNF grammar constraints for JSON tool routing.
+              </p>
+            </div>
+
+            <!-- Apple Split Showcase -->
+            <div class="screen-card-split">
+              <!-- Sticky Phone Column -->
+              <div class="screen-device-col">
+                <div class="doc-phone-frame" onclick="openLightbox('img/live_captures/5_editor.png?v=83', 'Screen 5: Per-Model Sampler Controls & GBNF')">
+                  <img src="img/live_captures/5_editor.png?v=83" alt="BIT Model Config Live Capture" loading="lazy" />
+                  <div class="doc-phone-zoom-hint">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Content Column -->
+              <div class="screen-content-col">
+                <h4 class="section-subhead">UI Points &amp; Controls Explained</h4>
+                <div class="ui-points-grid">
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">1</span>
+                      <strong>Model Header &amp; Metadata Banner</strong>
+                    </div>
+                    <p>Displays the active model name, underlying tensor architecture, parameter quantization type, and base context limit.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">2</span>
+                      <strong>Context Length Slider (n_ctx)</strong>
+                    </div>
+                    <p>Controls context buffer allocation from 1,024 to 32,768 tokens. Lower context (2,048) minimizes RAM footprint; higher context (8,192+) enables deep document analysis.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">3</span>
+                      <strong>Temperature Slider (0.0 to 1.5)</strong>
+                    </div>
+                    <p><code>0.0</code> = Pure greedy deterministic output (ideal for code and math); <code>0.7</code> = Natural conversational balance; <code>1.2+</code> = Diverse creative writing.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">4</span>
+                      <strong>Top-P (Nucleus Sampling) Control</strong>
+                    </div>
+                    <p>Restricts candidate tokens to cumulative probability P (e.g. 0.9), filtering out low-probability tails while retaining vocabulary richness.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">5</span>
+                      <strong>Top-K Sampling Control</strong>
+                    </div>
+                    <p>Limits the candidate token pool to top K highest-probability tokens (default: 40), stabilizing generation output.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">6</span>
+                      <strong>Repetition &amp; Frequency Penalty</strong>
+                    </div>
+                    <p>Penalizes already-generated tokens (1.0 to 1.5) to completely eliminate repetitive loops and degenerate phrasing.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">7</span>
+                      <strong>System Persona Prompt Editor</strong>
+                    </div>
+                    <p>Multi-line text editor to supply custom instructions (e.g. <em>"You are a Kotlin expert who writes concise code"</em>) applied across all conversation turns.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">8</span>
+                      <strong>GBNF Grammar Schema Selector</strong>
+                    </div>
+                    <p>Enforces strict context-free grammars at the native token sampling stage for guaranteed valid JSON object outputs and function calling schemas.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">9</span>
+                      <strong>GPU Offload Layers (n_gpu_layers)</strong>
+                    </div>
+                    <p>Adjust how many transformer layers are offloaded to mobile GPU shaders via Vulkan/OpenCL. (0 = CPU only; max = maximum GPU acceleration).</p>
+                  </div>
+                </div>
+
+                <!-- Tester Pass Criteria -->
+                <div class="tester-pass-box">
+                  <div class="tester-pass-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Closed Testing Pass Criteria
+                  </div>
+                  <div class="tester-pass-desc">
+                    Set Temperature to 0.0 on your closed testing build. Ask "What is 256 + 144?". Repeat query 3 times. Verify output is 100% deterministic across all runs with zero variation.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ===================================================== -->
+          <!-- SCREEN 6: HARDWARE DIAGNOSTICS & SETTINGS            -->
+          <!-- ===================================================== -->
+          <div class="screen-showcase-card" id="card-settings">
+            <div class="screen-card-header">
+              <div class="screen-badge-row">
+                <span class="screen-tag">Hardware Diagnostics</span>
+                <span class="screen-breadcrumb">Bottom Navigation &gt; Settings</span>
+              </div>
+              <h3 class="screen-title" id="guide-settings">6. Diagnostics &amp; Crash Reports</h3>
+              <p class="screen-description">
+                Monitor on-device system metrics, allocate CPU performance cores, verify RAM consumption, manage offline speech models, and inspect crash reports.
+              </p>
+            </div>
+
+            <!-- Apple Split Showcase -->
+            <div class="screen-card-split">
+              <!-- Sticky Phone Column -->
+              <div class="screen-device-col">
+                <div class="doc-phone-frame" onclick="openLightbox('img/live_captures/6_settings.png?v=83', 'Screen 6: Hardware Diagnostics & Settings')">
+                  <img src="img/live_captures/6_settings.png?v=83" alt="BIT Settings Live Capture" loading="lazy" />
+                  <div class="doc-phone-zoom-hint">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Content Column -->
+              <div class="screen-content-col">
+                <h4 class="section-subhead">UI Points &amp; Controls Explained</h4>
+                <div class="ui-points-grid">
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">1</span>
+                      <strong>Diagnostics &amp; Crash Reports Header</strong>
+                    </div>
+                    <p>Includes back navigation and a <strong>Share</strong> button (top right) to export a consolidated diagnostic zip bundle for bug triage.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">2</span>
+                      <strong>Hardware Overview Card</strong>
+                    </div>
+                    <p>Displays detected SoC name (e.g. Snapdragon, Dimensity, Tensor), CPU core cluster topology, and SIMD instruction sets (NEON, FP16, KleidiAI).</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">3</span>
+                      <strong>Real-Time RAM &amp; Memory Pressure Gauge</strong>
+                    </div>
+                    <p>Displays Total Device Physical RAM, Available Free Memory, and BIT Memory Footprint, preventing out-of-memory terminations.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">4</span>
+                      <strong>CPU Thread Allocation Slider</strong>
+                    </div>
+                    <p>Adjust thread count (2, 4, 6, 8 threads). 4 threads is recommended for modern octa-core processors, balancing raw generation speed with battery thermals.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">5</span>
+                      <strong>SIMD Hardware Acceleration Toggles</strong>
+                    </div>
+                    <p>Status badges confirming Arm KleidiAI acceleration for matrix-multiplication kernels and OpenCL/Vulkan GPU shader status.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">6</span>
+                      <strong>Offline Speech Synthesis Engine Settings</strong>
+                    </div>
+                    <p>Select neural voices for the Piper TTS engine (US English, British, alternate speakers) and adjust speech pitch and tempo.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">7</span>
+                      <strong>Tool Calling &amp; Router Model Settings</strong>
+                    </div>
+                    <p>Configure tool calling behavior: toggle "Bypass Tool Model" to force the primary model to handle function calls directly without secondary model overhead.</p>
+                  </div>
+
+                  <div class="ui-point-card">
+                    <div class="ui-point-header">
+                      <span class="ui-step-num">8</span>
+                      <strong>Zero-Telemetry Security Verification</strong>
+                    </div>
+                    <p>Live socket monitor confirming 0 outbound network requests, proving 100% offline air-gapped security and zero user data collection.</p>
+                  </div>
+                </div>
+
+                <!-- Tester Pass Criteria -->
+                <div class="tester-pass-box">
+                  <div class="tester-pass-title">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    Closed Testing Pass Criteria
+                  </div>
+                  <div class="tester-pass-desc">
+                    Open Diagnostics on your closed testing build. Verify detected physical RAM matches your phone specifications. Adjust thread count from 4 to 2; verify settings persist upon app relaunch.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
-        <section id="engine-pipeline-spec" class="docs-section">
-          <h2 class="docs-h2">Llama.kt &amp; JNI pipeline spec</h2>
-          <p class="docs-summary">Summary: Architecture specification of Llama.kt in-process JNI bindings connecting Kotlin to C++ llama.cpp.</p>
+        <!-- QA PROTOCOL -->
+        <section id="guide-qa-matrix" class="docs-section">
+          <h2 class="docs-h2">QA Acceptance Protocols (5-Point Test Suite)</h2>
+          <p class="docs-summary">Structured verification recipes for Google Play Closed Testing builds, manual QA engineers, and regression testing.</p>
 
-          <p class="docs-p">
-            Llama.kt executes native C++ inference in-process via JNI (`com.dark.gguf_lib.EmbeddingEngine` and `LibLlamaEngine`). This avoids Android Inter-Process Communication (IPC) overhead.
+          <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 24px;">
+            <div style="background: rgba(18, 19, 24, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 1.05rem; color: #FFFFFF;">TC-1: Airplane Mode Zero-Network Test</h3>
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #81c784; background: rgba(76, 175, 80, 0.15); padding: 3px 8px; border-radius: 6px;">P0 CRITICAL</span>
+              </div>
+              <p class="docs-p" style="margin-bottom: 8px;">1. Put device in Airplane Mode. 2. Launch BIT. 3. Prompt: <em>"Explain sorting algorithms."</em></p>
+              <div style="font-size: 0.85rem; color: #81c784;"><strong>Pass Criteria:</strong> Full generation completes smoothly at expected tok/s with zero network activity.</div>
+            </div>
+
+            <div style="background: rgba(18, 19, 24, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 1.05rem; color: #FFFFFF;">TC-2: Voice Mode Barge-In Test</h3>
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #81c784; background: rgba(76, 175, 80, 0.15); padding: 3px 8px; border-radius: 6px;">P0 CRITICAL</span>
+              </div>
+              <p class="docs-p" style="margin-bottom: 8px;">1. Open Voice Mode. 2. Ask for a 2-minute story. 3. Interrupt mid-sentence by speaking aloud.</p>
+              <div style="font-size: 0.85rem; color: #81c784;"><strong>Pass Criteria:</strong> Piper voice cancels within 200ms of user speech; new speech is transcribed immediately.</div>
+            </div>
+
+            <div style="background: rgba(18, 19, 24, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 1.05rem; color: #FFFFFF;">TC-3: Background Model Download Persistence</h3>
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #79a8ff; background: rgba(121, 168, 255, 0.15); padding: 3px 8px; border-radius: 6px;">P1 HIGH</span>
+              </div>
+              <p class="docs-p" style="margin-bottom: 8px;">1. Start downloading a 1GB model in Store. 2. Press Home button to minimize BIT for 30 seconds.</p>
+              <div style="font-size: 0.85rem; color: #79a8ff;"><strong>Pass Criteria:</strong> Foreground notification displays active progress without process termination.</div>
+            </div>
+
+            <div style="background: rgba(18, 19, 24, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 1.05rem; color: #FFFFFF;">TC-4: Cross-Session Episodic Memory Recall</h3>
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #79a8ff; background: rgba(121, 168, 255, 0.15); padding: 3px 8px; border-radius: 6px;">P1 HIGH</span>
+              </div>
+              <p class="docs-p" style="margin-bottom: 8px;">1. Tell BIT: <em>"My favorite framework is Jetpack Compose."</em> 2. Start a fresh chat. 3. Ask: <em>"What framework do I like?"</em></p>
+              <div style="font-size: 0.85rem; color: #79a8ff;"><strong>Pass Criteria:</strong> BIT retrieves the episodic memory fact accurately in the new session.</div>
+            </div>
+
+            <div style="background: rgba(18, 19, 24, 0.65); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 20px 24px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 1.05rem; color: #FFFFFF;">TC-5: Deterministic Sampling Test</h3>
+                <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #ffb74d; background: rgba(255, 183, 77, 0.15); padding: 3px 8px; border-radius: 6px;">P2 MEDIUM</span>
+              </div>
+              <p class="docs-p" style="margin-bottom: 8px;">1. In Config Editor, set Temperature to 0.0. 2. Submit prompt <em>"What is 256 + 144?"</em> 3. Repeat 3 times.</p>
+              <div style="font-size: 0.85rem; color: #ffb74d;"><strong>Pass Criteria:</strong> All 3 outputs produce character-identical tokens with zero variance.</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================= -->
+        <!-- QUADRANT III: EXPLANATION (Understanding-oriented)                -->
+        <!-- ================================================================= -->
+
+        <section id="explanation-privacy" class="docs-section">
+          <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #ffb74d; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">DIÁTAXIS QUADRANT III — EXPLANATION</div>
+          <h2 class="docs-h2">On-Device vs Cloud AI: Security &amp; Latency</h2>
+          <p class="docs-summary">
+            Architectural analysis of why on-device inference provides structural guarantees that cloud AI cannot match.
           </p>
 
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>PIPELINE DIAGRAM</span>
-            </div>
-            <pre class="code-block" style="border:none; margin:0;">User Prompt ──► ChatViewModel ──► LlmModelWorker ──► JNI (libllama.so)
-                                                         │
-                                                         ▼
-                                                C++ llama_eval()
-                                                         │
-                                                         ▼
-                                             Stream Tokens via Flow</pre>
-          </div>
-
-          <a href="#database-schemas" class="docs-next-step">Next step: Memory Note &amp; Room DB schemas →</a>
-        </section>
-
-        <section id="database-schemas" class="docs-section">
-          <h2 class="docs-h2">Memory Note &amp; Room DB schemas</h2>
-          <p class="docs-summary">Summary: Table structure and frontmatter schema for `MemoryNote` objects stored in Room SQLite (`memory_notes`).</p>
-
           <p class="docs-p">
-            All notes are persisted as Markdown files with YAML frontmatter in `AppPaths.vaultRoot(context)` and mirrored in Room DB (`memory_notes` table).
+            Cloud LLMs require transmitting user prompts, personal documents, and raw microphone audio over public transit networks to remote datacenters. Even with TLS encryption in transit, prompts are decrypted in cloud RAM and subject to provider retention policies, employee inspection, subpoena, or training data harvesting.
           </p>
 
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>KOTLIN</span>
-              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('@Entity(tableName = \"memory_notes\")\ndata class MemoryNote(\n    @PrimaryKey val id: String = UUID.randomUUID().toString(),\n    val title: String,\n    val content: String\n)')">Copy</button>
-            </div>
-            <pre class="code-block" style="border:none; margin:0;"><code class="language-kotlin">@Entity(tableName = "memory_notes")
-data class MemoryNote(
-    @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val title: String,
-    val content: String,
-    val folder: String = "notes",
-    val noteType: String = "note",
-    val filePath: String = "",
-    val isAiMemoryEnabled: Boolean = true,
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
-)</code></pre>
-          </div>
-
-          <a href="#gbnf-tool-definitions" class="docs-next-step">Next step: Built-in GBNF tool definitions →</a>
+          <p class="docs-p">
+            BIT operates on an <strong>air-gapped local execution model</strong>. The Android OS sandbox isolates BIT from other applications. Memory mappings (<code>mmap</code>) are held in private app memory, and the application requires zero network socket permissions during inference. If you discard or reset the application data, your history ceases to exist anywhere on Earth.
+          </p>
         </section>
 
-        <section id="gbnf-tool-definitions" class="docs-section">
-          <h2 class="docs-h2">Built-in GBNF tool definitions</h2>
-          <p class="docs-summary">Summary: Definitions for builtin memory tools (`create_memory_file`, `edit_memory_file`, `delete_memory_file`, `read_memory_file`).</p>
+        <section id="explanation-gguf" class="docs-section">
+          <h2 class="docs-h2">GGUF Quantization Mechanics on Silicon</h2>
+          <p class="docs-summary">How 16-bit floating-point weights are packed into 4-bit integer representations without catastrophic perplexity loss.</p>
 
           <p class="docs-p">
-            `MemoryPlugin` registers standard tools that enable the LLM to manage vault files. Every write goes through `VaultFileStore.writeNote()` -> `MemoryNoteDao.insertNote()` -> `GlobalRagOrchestrator.reloadNoteIntoGraph()`.
+            Standard foundation models are trained in 16-bit half-precision (<code>FP16</code>) or Brain Floating Point (<code>BF16</code>), requiring 2 bytes of RAM per parameter (e.g. 7 billion parameters = 14 GB of memory, far exceeding mobile limits).
           </p>
 
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>KOTLIN</span>
-              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('const val TOOL_CREATE_MEMORY = \"create_memory_file\"\nconst val TOOL_EDIT_MEMORY = \"edit_memory_file\"\nconst val TOOL_DELETE_MEMORY = \"delete_memory_file\"')">Copy</button>
-            </div>
-            <pre class="code-block" style="border:none; margin:0;"><code class="language-kotlin">const val TOOL_LIST_MEMORY = "list_memory_files"
-const val TOOL_READ_MEMORY = "read_memory_file"
-const val TOOL_CREATE_MEMORY = "create_memory_file"
-const val TOOL_EDIT_MEMORY = "edit_memory_file"
-const val TOOL_DELETE_MEMORY = "delete_memory_file"</code></pre>
-          </div>
-
-          <a href="#release-notes" class="docs-next-step">Next step: Version changelog →</a>
+          <p class="docs-p">
+            BIT utilizes <strong>k-quantization GGUF formats</strong> (<code>Q4_K_M</code>, <code>IQ4_XS</code>). High-importance layers (attention matrices, feed-forward gates) retain higher bit precision, while low-impact bias vectors are quantized to 4 or 2 bits. On ARMv8.2-A+ mobile chipsets, these quantized blocks are computed using vectorized NEON dot-product instructions (<code>SDOT</code>/<code>UDOT</code>), delivering 3x–4x throughput improvements with virtually zero perceptual degradation in reasoning.
+          </p>
         </section>
 
-        <!-- ==================== RELEASE NOTES ==================== -->
+        <section id="explanation-rag" class="docs-section">
+          <h2 class="docs-h2">Hybrid RAG &amp; Memory Vault Architecture</h2>
+          <p class="docs-summary">The dual-retrieval pipeline powering offline document grounding and persistent episodic memory.</p>
 
-        <section id="release-notes" class="docs-section">
-          <h2 class="docs-h2">Version changelog</h2>
-          <p class="docs-summary">Summary: Official release notes and architectural changelog for BIT releases.</p>
-
-          <h3 class="docs-h3">v1.9.3 (August 2026)</h3>
-          <ul style="color: var(--text-secondary); font-size: 0.95rem; margin-left: 20px; line-height: 1.7;">
-            <li><strong style="color: #FFFFFF;">Single Write-Path Consolidation</strong> — Unified vault storage, Room DB, and RAG Graph reloads across MemoryPlugin, AiMemoryWriter, and ChatViewModel.</li>
-            <li><strong style="color: #FFFFFF;">EmbeddingEngine Auto-Init</strong> — Added `ensureInitialized(context)` to automatically load downloaded embedding GGUF models on startup without requiring manual setup tab navigation.</li>
-            <li><strong style="color: #FFFFFF;">Node Eviction on Edit &amp; Delete</strong> — Implemented `removeSource(sourceId)` in `NeuronGraph` to purge stale nodes and dangling edges when notes are edited or deleted.</li>
-            <li><strong style="color: #FFFFFF;">Graph Initialization Sync</strong> — Protected `GlobalRagOrchestrator` methods with `CompletableDeferred<NeuronGraph>()` to prevent premature queries before graph population.</li>
+          <p class="docs-p">
+            Pure vector semantic search often misses exact alphanumeric identifiers (part numbers, dates, error codes), while pure BM25 full-text keyword search fails on conceptual queries. BIT employs a <strong>Reciprocal Rank Fusion (RRF)</strong> pipeline combining:
+          </p>
+          <ul style="color: var(--text-secondary); margin: 8px 0 16px 20px; line-height: 1.6; font-size: 0.95rem;">
+            <li><strong>Dense Vector Retrieval:</strong> 384-dimensional on-device MiniLM embeddings calculating cosine distance over local document chunks.</li>
+            <li><strong>Sparse Keyword Retrieval:</strong> SQLite FTS5 BM25 inverted index matching exact keywords and tokens.</li>
+            <li><strong>RRF Merge Layer:</strong> Scores are normalized and merged before feeding top-k passages into the model context window.</li>
           </ul>
-
-          <a href="#fdroid-spec" class="docs-next-step">Next step: F-Droid build &amp; verification →</a>
         </section>
 
-        <section id="fdroid-spec" class="docs-section">
-          <h2 class="docs-h2">F-Droid build &amp; verification</h2>
-          <p class="docs-summary">Summary: F-Droid build recipe spec and reproducible build verification instructions.</p>
+        <!-- ================================================================= -->
+        <!-- QUADRANT IV: REFERENCE (Information-oriented)                     -->
+        <!-- ================================================================= -->
 
-          <p class="docs-p">
-            BIT includes a complete F-Droid build spec at `fdroid/com.bit.yml`. To verify reproducible builds locally:
-          </p>
+        <section id="reference-ram-matrix" class="docs-section">
+          <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #f06292; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">DIÁTAXIS QUADRANT IV — REFERENCE</div>
+          <h2 class="docs-h2">Hardware &amp; RAM Allocation Matrix</h2>
+          <p class="docs-summary">Technical limits, quantization types, and safe memory thresholds per device tier.</p>
 
-          <div class="code-wrapper">
-            <div class="code-header">
-              <span>BASH</span>
-              <button class="code-copy-btn" onclick="navigator.clipboard.writeText('python3 setup_fdroid.py\nfdroid build --verbose com.bit')">Copy</button>
+          <div class="reference-card">
+            <div class="table-container">
+              <table class="docs-table">
+                <thead>
+                  <tr>
+                    <th>Device RAM Tier</th>
+                    <th>Usable AI Budget</th>
+                    <th>Recommended Model Class</th>
+                    <th>Recommended Quant</th>
+                    <th>Safe Context (n_ctx)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>4 GB Physical RAM</strong></td>
+                    <td>~1.2 GB - 1.5 GB</td>
+                    <td><strong>LFM2 350M</strong> / <strong>Gemma 3 1B IT</strong></td>
+                    <td><span class="badge-quant">Q8_0</span> / <span class="badge-quant">Q4_K_M</span></td>
+                    <td><code>2,048 tokens</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>6 GB Physical RAM</strong></td>
+                    <td>~2.5 GB - 3.0 GB</td>
+                    <td><strong>Gemma 3 1B</strong> / <strong>Qwen 2.5 1.5B</strong> / <strong>Llama 3.2 1B</strong></td>
+                    <td><span class="badge-quant">Q4_K_M</span> / <span class="badge-quant">Q5_K_M</span></td>
+                    <td><code>4,096 tokens</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>8 GB Physical RAM</strong></td>
+                    <td>~4.0 GB - 4.5 GB</td>
+                    <td><strong>Llama 3.2 3B</strong> / <strong>Qwen 2.5 3B</strong> / <strong>Phi-3.5 3.8B</strong></td>
+                    <td><span class="badge-quant">Q4_K_M</span></td>
+                    <td><code>4,096 tokens</code></td>
+                  </tr>
+                  <tr>
+                    <td><strong>12 GB+ Physical RAM</strong></td>
+                    <td>~6.5 GB - 8.0 GB</td>
+                    <td><strong>Mistral 7B</strong> / <strong>Qwen 2.5 7B</strong> / <strong>DeepSeek R1 7B</strong></td>
+                    <td><span class="badge-quant">Q4_K_M</span> / <span class="badge-quant">IQ4_XS</span></td>
+                    <td><code>8,192 tokens</code></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-            <pre class="code-block" style="border:none; margin:0;">python3 setup_fdroid.py
-fdroid build --verbose com.bit</pre>
           </div>
+        </section>
 
-          <div class="doc-callout doc-callout-tip">
-            <div class="doc-callout-title">Tip</div>
-            Read the complete <a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/FDROID_SUBMISSION.md" style="color:#38BDF8; text-decoration:underline;" target="_blank" rel="noopener">F-Droid Submission Guide</a> for anti-feature audits and reproducible build metadata details.
+        <section id="reference-schemata" class="docs-section">
+          <h2 class="docs-h2">GBNF Grammar Schemata Specifications</h2>
+          <p class="docs-summary">Formal context-free grammar specifications for constrained token sampling.</p>
+
+          <p class="docs-p">Below is the production GBNF grammar specification used by BIT for strict JSON tool-call routing:</p>
+
+          <div class="code-block-wrapper">
+            <div class="code-block-header">
+              <div class="mac-window-dots">
+                <span class="mac-dot mac-dot-red"></span>
+                <span class="mac-dot mac-dot-yellow"></span>
+                <span class="mac-dot mac-dot-green"></span>
+              </div>
+              <span class="code-block-filename">tool_router.gbnf</span>
+              <span style="font-family: var(--font-mono); font-size: 0.7rem; color: #79a8ff; font-weight: 600;">PRODUCTION GBNF</span>
+            </div>
+            <pre><code>root   ::= object
+value  ::= object | array | string | number | ("true" | "false" | "null")
+object ::= "{" ws ( pair ( "," ws pair )* )? ws "}"
+pair   ::= string ":" ws value
+array  ::= "[" ws ( value ( "," ws value )* )? ws "]"
+string ::= "\"" ( [^"\\] | "\\" ( ["\\/bfnrt] | "u" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] ) )* "\""
+number ::= ("-"? ([0-9] | [1-9] [0-9]*)) ("." [0-9]+)? ([eE] [-+]? [0-9]+)? ws
+ws     ::= [ \t\n]*</code></pre>
           </div>
+        </section>
 
-          <a href="#overview" class="docs-next-step">Back to top: Overview &amp; Quickstart ↑</a>
+        <section id="reference-permissions" class="docs-section">
+          <h2 class="docs-h2">Android Security &amp; Manifest Permissions</h2>
+          <p class="docs-summary">Audit of all declared permissions in AndroidManifest.xml and their functional justification.</p>
+
+          <div class="reference-card">
+            <div class="table-container">
+              <table class="docs-table">
+                <thead>
+                  <tr>
+                    <th>Android Permission</th>
+                    <th>Protection Level</th>
+                    <th>Purpose &amp; Functional Justification</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>RECORD_AUDIO</code></td>
+                    <td><span class="badge-perm-danger">Dangerous (Runtime)</span></td>
+                    <td>Required for hands-free conversational Voice Mode and local 16kHz VAD capture.</td>
+                  </tr>
+                  <tr>
+                    <td><code>FOREGROUND_SERVICE_DATA_SYNC</code></td>
+                    <td><span class="badge-perm-normal">Normal</span></td>
+                    <td>Ensures model weight downloads continue reliably when user minimizes app.</td>
+                  </tr>
+                  <tr>
+                    <td><code>POST_NOTIFICATIONS</code></td>
+                    <td><span class="badge-perm-runtime">Runtime (API 33+)</span></td>
+                    <td>Displays model download progress and voice service active status in notification drawer.</td>
+                  </tr>
+                  <tr>
+                    <td><code>INTERNET</code></td>
+                    <td><span class="badge-perm-normal">Normal</span></td>
+                    <td>Used strictly for user-requested GGUF downloads from HuggingFace. Zero analytics, telemetry, or remote prompts.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </section>
 
       </main>
     </div>
   </div>
 
+  <!-- ── Screenshot Lightbox Modal ── -->
+  <div id="screenshotLightbox" class="lightbox-modal" onclick="closeLightbox()">
+    <div class="lightbox-content" onclick="event.stopPropagation()">
+      <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+      <img id="lightboxImg" src="" alt="Enlarged UI Capture" />
+      <div id="lightboxCap" class="lightbox-caption"></div>
+    </div>
+  </div>
+
   <!-- ── Footer ── -->
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-grid">
+  <footer class="docs-footer">
+    <div class="container footer-grid">
+      <div class="footer-col">
         <div class="footer-brand">
-          <div class="nav-brand">
-            <img src="img/ic_logo.svg" alt="BIT Logo" class="logo-img" />
-            <span>BIT</span>
-          </div>
-          <p>Privacy-first on-device AI stack for Android. Built with Kotlin, Jetpack Compose, and native C++ llama.cpp JNI bindings.</p>
+          <img src="img/ic_logo.svg" alt="BIT Logo" width="22" height="22" />
+          <span>BIT</span>
         </div>
+        <p class="footer-desc">
+          Binary Intelligent Terminal — 100% on-device AI for Android. Private, offline, and secure by design.
+        </p>
+      </div>
 
-        <div>
-          <div class="footer-col-title">Navigation</div>
-          <ul class="footer-links">
-            <li><a href="index.html" class="footer-link">Home</a></li>
-            <li><a href="index.html#benchmarks" class="footer-link">Technical Specs</a></li>
-            <li><a href="index.html#showcase" class="footer-link">Model Store</a></li>
-            <li><a href="docs.html" class="footer-link">Documentation</a></li>
-          </ul>
-        </div>
+      <div class="footer-col">
+        <h4>Documentation</h4>
+        <ul class="footer-links">
+          <li><a href="#tutorial-first-5-minutes" class="footer-link">Tutorials</a></li>
+          <li><a href="#guide-screen-tour" class="footer-link">Visual Tour</a></li>
+          <li><a href="#explanation-privacy" class="footer-link">Explanation</a></li>
+          <li><a href="#reference-ram-matrix" class="footer-link">Reference</a></li>
+        </ul>
+      </div>
 
-        <div>
-          <div class="footer-col-title">Community</div>
-          <ul class="footer-links">
-            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" class="footer-link">GitHub Repo</a></li>
-            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/issues" class="footer-link">Issues</a></li>
-            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/discussions" class="footer-link">Discussions</a></li>
-          </ul>
-        </div>
-
-        <div>
-          <div class="footer-col-title">License</div>
-          <ul class="footer-links">
-            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/LICENSE" class="footer-link">Apache 2.0</a></li>
-            <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/blob/master/NOTICE" class="footer-link">Notice</a></li>
-          </ul>
-        </div>
+      <div class="footer-col">
+        <h4>Open Source</h4>
+        <ul class="footer-links">
+          <li><a href="https://github.com/jaswanthsanjay88/Bit_Android" target="_blank" rel="noopener" class="footer-link">GitHub Repository</a></li>
+          <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/releases" target="_blank" rel="noopener" class="footer-link">Releases</a></li>
+          <li><a href="https://github.com/jaswanthsanjay88/Bit_Android/issues" target="_blank" rel="noopener" class="footer-link">Issue Tracker</a></li>
+        </ul>
       </div>
     </div>
 
-    <div class="giant-wordmark-container">
-      <h1 class="giant-wordmark">BIT</h1>
+    <div class="container footer-bottom">
+      <p>&copy; 2026 BIT Project. Released under the Apache 2.0 License.</p>
     </div>
   </footer>
 
-  <script src="script.js"></script>
+  <!-- ── Interactive JavaScript ── -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Active link tracker for sidebar & quick-nav
+      const sections = document.querySelectorAll('.docs-section, .screen-showcase-card');
+      const navLinks = document.querySelectorAll('.docs-sidebar-link, .screen-quick-nav a');
+
+      window.addEventListener('scroll', () => {
+        let current = '';
+        sections.forEach(section => {
+          const sectionTop = section.offsetTop - 150;
+          if (window.scrollY >= sectionTop) {
+            current = section.getAttribute('id');
+          }
+        });
+
+        navLinks.forEach(link => {
+          if (link.getAttribute('href') === `#${current}`) {
+            link.classList.add('active');
+          } else {
+            link.classList.remove('active');
+          }
+        });
+      }, { passive: true });
+    });
+
+    // Lightbox Controls
+    function openLightbox(src, caption) {
+      const modal = document.getElementById('screenshotLightbox');
+      const img = document.getElementById('lightboxImg');
+      const cap = document.getElementById('lightboxCap');
+      if (!modal || !img) return;
+
+      img.src = src;
+      if (cap) cap.textContent = caption || '';
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById('screenshotLightbox');
+      if (!modal) return;
+      modal.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLightbox();
+    });
+  </script>
+
 </body>
 </html>

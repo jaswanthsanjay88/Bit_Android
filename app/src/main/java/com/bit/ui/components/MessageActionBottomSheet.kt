@@ -28,6 +28,7 @@ fun MessageActionBottomSheet(
     onSaveToMemory: ((String) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    @Suppress("DEPRECATION")
     val clipboardManager = LocalClipboardManager.current
 
     if (show) {

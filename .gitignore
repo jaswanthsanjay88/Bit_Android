@@ -29,7 +29,7 @@ local.properties
 /repo/*.apk
 *.apk
 *.aab
-/google_play_assets/
+
 
 /app/release/
 ISSUES_TRACKER.txt
@@ -76,9 +76,17 @@ test_*.kt
 test.py
 modify*.cjs
 modify*.py
+__pycache__/
+*.pyc
 
 # Zip archives and skill artifacts
 *.zip
 /material-3-skill*/
 bit_website issue/
 bit_test.png
+
+# Node modules & web artifacts
+node_modules/
+**/node_modules/
+/web-ui/
+/bit_website issue/

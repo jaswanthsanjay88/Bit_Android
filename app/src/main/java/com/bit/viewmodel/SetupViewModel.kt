@@ -66,30 +66,30 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
 
     // ==================== Setup Model Definitions ====================
 
-    private val llama1bModel = HuggingFaceModel(
-        id = "unsloth-llama-3_2-1b-instruct-q4_k_m",
-        name = "Llama-3.2 1B Instruct",
-        description = "Highly optimized, state-of-the-art Llama-3.2 1B text model",
-        fileUri = "unsloth/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
-        approximateSize = "640 MB",
+    val lfm350mModel = HuggingFaceModel(
+        id = "lfm2-350m-q8",
+        name = "LFM2 350M",
+        description = "Ultra-fast tiny model from Liquid AI. Instant responses, runs smoothly on any device.",
+        fileUri = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+        approximateSize = "400 MB",
         modelType = ModelType.GGUF,
         isZip = false,
-        tags = listOf("GGUF", "Q4_K_M", "Llama-3.2 (1B)", "Tool Calling"),
+        tags = listOf("GGUF", "Q8_0", "LFM2 (350M)", "Ultra Fast"),
         requiresNPU = false,
-        repositoryUrl = "unsloth/Llama-3.2-1B-Instruct-GGUF"
+        repositoryUrl = "LiquidAI/LFM2-350M-GGUF"
     )
 
-    private val llama3bModel = HuggingFaceModel(
-        id = "unsloth-llama-3_2-3b-instruct-q4_k_m",
-        name = "Llama-3.2 3B Instruct",
-        description = "Powerful, state-of-the-art Llama-3.2 3B text model",
-        fileUri = "unsloth/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-        approximateSize = "2.0 GB",
+    val gemma1bModel = HuggingFaceModel(
+        id = "gemma-3-1b-it-q4km",
+        name = "Gemma 3 1B IT",
+        description = "Google's lightweight Gemma 3 1B Instruct model. Superior reasoning & precision.",
+        fileUri = "https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf",
+        approximateSize = "750 MB",
         modelType = ModelType.GGUF,
         isZip = false,
-        tags = listOf("GGUF", "Q4_K_M", "Llama-3.2 (3B)", "Tool Calling"),
+        tags = listOf("GGUF", "Q4_K_M", "Gemma 3 (1B)", "High Quality"),
         requiresNPU = false,
-        repositoryUrl = "unsloth/Llama-3.2-3B-Instruct-GGUF"
+        repositoryUrl = "unsloth/gemma-3-1b-it-GGUF"
     )
 
 
@@ -111,7 +111,7 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private val _recommendedTextModel = MutableStateFlow<HuggingFaceModel>(llama1bModel)
+    private val _recommendedTextModel = MutableStateFlow<HuggingFaceModel>(lfm350mModel)
     val recommendedTextModel: StateFlow<HuggingFaceModel> = _recommendedTextModel
 
     companion object {
@@ -193,13 +193,13 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
         val recommendedModel = recommendedTextModel.value
 
         when {
-            currentStates.containsKey(llama1bModel.id) -> {
+            currentStates.containsKey(lfm350mModel.id) -> {
                 _selectedOption.value = SetupOption.TEXT
-                _primaryModelId.value = llama1bModel.id
+                _primaryModelId.value = lfm350mModel.id
             }
-            currentStates.containsKey(llama3bModel.id) -> {
+            currentStates.containsKey(gemma1bModel.id) -> {
                 _selectedOption.value = SetupOption.TEXT_RECOMMENDED
-                _primaryModelId.value = llama3bModel.id
+                _primaryModelId.value = gemma1bModel.id
             }
             currentStates.containsKey(imageModelId) -> {
                 _selectedOption.value = SetupOption.IMAGE_GEN
@@ -218,13 +218,12 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
 
         when (option) {
             SetupOption.TEXT -> {
-                _primaryModelId.value = llama1bModel.id
-                downloadModel(llama1bModel)
+                _primaryModelId.value = lfm350mModel.id
+                downloadModel(lfm350mModel)
             }
             SetupOption.TEXT_RECOMMENDED -> {
-                val model = recommendedTextModel.value
-                _primaryModelId.value = model.id
-                downloadModel(model)
+                _primaryModelId.value = gemma1bModel.id
+                downloadModel(gemma1bModel)
             }
 
             SetupOption.IMAGE_GEN -> {
@@ -358,23 +357,21 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
             val topo = profile.cpuTopology
             val primeCores = if (topo.scanSucceeded) topo.primeCoreCount else 0
 
-            val recommended = when {
-                ramGb < 10.0 -> llama1bModel
-                ramGb >= 10.0 -> {
-                    if (primeCores > 0) {
-                        llama3bModel
-                    } else {
-                        llama1bModel
-                    }
-                }
-                else -> llama1bModel
+            // Always recommend lightweight models during initial setup:
+            // Under 4GB RAM -> LFM2 350M (lowest memory, instant startup)
+            // 4GB+ RAM -> Gemma 3 1B IT (high quality lightweight 1B)
+            // Heavy 3B+ models are never recommended in setup; available later in Model Store.
+            val recommended = if (ramGb < 4.0) {
+                lfm350mModel
+            } else {
+                gemma1bModel
             }
 
             _recommendedTextModel.value = recommended
-            Log.d(TAG, "Recommended text model determined: ${recommended.name} (RAM: ${profile.totalRamMB}MB, Prime cores: $primeCores)")
+            Log.d(TAG, "Recommended setup model determined: ${recommended.name} (RAM: ${profile.totalRamMB}MB)")
         } catch (e: Exception) {
             Log.e(TAG, "Error determining recommended model", e)
-            _recommendedTextModel.value = llama1bModel
+            _recommendedTextModel.value = lfm350mModel
         }
     }
 

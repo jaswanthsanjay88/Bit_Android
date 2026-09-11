@@ -28,7 +28,7 @@ import kotlin.math.sqrt
 
 @Singleton
 class AiMemoryWriter @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val vaultFileStore: VaultFileStore,
     private val memoryNoteDao: MemoryNoteDao,
     private val globalRagOrchestrator: GlobalRagOrchestrator,

@@ -1145,8 +1145,8 @@ class ModelDownloadService : Service() {
             startDownload(
                 modelId = modelId,
                 modelName = meta.optString("modelName", modelName),
-                fileUrl = if (meta.has("fileUrl")) meta.getString("fileUrl") else null,
-                projectorUrl = if (meta.has("projectorUrl")) meta.getString("projectorUrl") else null,
+                fileUrl = meta.optString("fileUrl", "").takeIf { it.isNotEmpty() },
+                projectorUrl = meta.optString("projectorUrl", "").takeIf { it.isNotEmpty() },
                 isZip = meta.optBoolean("isZip", false),
                 modelType = meta.optString("modelType", "GGUF"),
                 runOnCpu = meta.optBoolean("runOnCpu", false),

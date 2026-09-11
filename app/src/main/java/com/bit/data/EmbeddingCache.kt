@@ -15,7 +15,7 @@ import javax.inject.Singleton
 
 @Singleton
 class EmbeddingCache @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : SQLiteOpenHelper(context, AppPaths.vaultRoot(context).absolutePath + File.separator + "embeddings_cache.db", null, 1) {
 
     override fun onCreate(db: SQLiteDatabase) {

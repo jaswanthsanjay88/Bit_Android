@@ -114,6 +114,9 @@ add_subdirectory(${LLAMA_DIR} ${CMAKE_CURRENT_BINARY_DIR}/llama)
 if (NOT TARGET cpp-httplib)
     add_subdirectory(${LLAMA_DIR}/vendor/cpp-httplib ${CMAKE_CURRENT_BINARY_DIR}/cpp-httplib)
 endif()
+# Since BUILD_SHARED_LIBS is ON, llama-common is built as a shared library.
+# It doesn't use export macros, so we must set its visibility to default.
+set_target_properties(llama-common PROPERTIES CXX_VISIBILITY_PRESET default C_VISIBILITY_PRESET default)
 
 set(RAG_INGEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rag_ingest)
 set(PDFIUM_DIR     ${RAG_INGEST_DIR}/third_party/pdfium)
