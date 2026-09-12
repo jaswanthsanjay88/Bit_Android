@@ -512,7 +512,9 @@ class LLMService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
-        Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+        // Use FOREGROUND priority so the Linux scheduler allocates high CPU bandwidth
+        // to inference threads and OEM battery killers/freezers do not freeze the process.
+        Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND)
 
         // Batch streaming tokens (8 bytes) to dramatically reduce JNI/AIDL IPC frequency & Binder overhead
         ggufEngine.setTokenBatchSize(8)

@@ -55,7 +55,7 @@ set(LLAMA_BUILD_TOOLS    OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER   OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_COMMON   ON  CACHE BOOL "" FORCE)
 set(LLAMA_OPENSSL        OFF CACHE BOOL "" FORCE)
-set(GGML_OPENMP          OFF CACHE BOOL "" FORCE)
+set(GGML_OPENMP          ON  CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS    ON  CACHE BOOL "" FORCE)
 set(LLAMA_MULTIMODAL     ON  CACHE BOOL "" FORCE)
 set(GGML_CPU             ON  CACHE BOOL "" FORCE)
@@ -120,10 +120,6 @@ set_target_properties(llama-common PROPERTIES CXX_VISIBILITY_PRESET default C_VI
 
 set(RAG_INGEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/rag_ingest)
 set(PDFIUM_DIR     ${RAG_INGEST_DIR}/third_party/pdfium)
-
-add_library(pdfium SHARED IMPORTED)
-set_target_properties(pdfium PROPERTIES
-    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libpdfium.so)
 
 set(MINIZ_SOURCES ${RAG_INGEST_DIR}/third_party/miniz/miniz.c)
 set_source_files_properties(${MINIZ_SOURCES} PROPERTIES LANGUAGE C COMPILE_FLAGS "-D_FILE_OFFSET_BITS=64 -Wno-\\#pragma-messages")
@@ -196,6 +192,6 @@ target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -O3 -DNDEBUG -Wno-cast-qual
 target_link_libraries(${CMAKE_PROJECT_NAME}
     llama
     llama-common
-    pdfium
+    ${CMAKE_DL_LIBS}
     android
     log)

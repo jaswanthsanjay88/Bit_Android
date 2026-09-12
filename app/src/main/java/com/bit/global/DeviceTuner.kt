@@ -71,10 +71,16 @@ object DeviceTuner {
         val ramAfterModelMB = (usableRamMB - modelSizeMB).coerceAtLeast(256)
 
         // ── Context size ──
+        // For mobile devices, cap context size based on model parameter size.
+        // Models <= 3B suffer severe memory bandwidth throttling if context exceeds 4096 on mobile CPU.
+        val isSmallMobileModel = modelSizeMB in 1..2500 || modelName.contains("1.7b", ignoreCase = true) ||
+                modelName.contains("1.5b", ignoreCase = true) || modelName.contains("2b", ignoreCase = true) ||
+                modelName.contains("1b", ignoreCase = true) || modelName.contains("3b", ignoreCase = true) ||
+                modelName.contains("qwen3", ignoreCase = true)
         val ctxCap = when (mode) {
-            PerformanceMode.PERFORMANCE -> 32768
-            PerformanceMode.BALANCED -> 16384
-            PerformanceMode.POWER_SAVING -> 8192
+            PerformanceMode.PERFORMANCE -> if (isSmallMobileModel) 8192 else 32768
+            PerformanceMode.BALANCED -> if (isSmallMobileModel) 4096 else 16384
+            PerformanceMode.POWER_SAVING -> if (isSmallMobileModel) 2048 else 8192
         }
         val kvBudgetKB = ramAfterModelMB * 0.50 * 1024
         val rawCtx = (kvBudgetKB / quant.kvBytesPerToken).toInt()
@@ -97,7 +103,9 @@ object DeviceTuner {
             else -> 9              // Q8_0
         }
 
-        val useMlock = usableRamMB > 6000
+        // Never use mlock on Android: mmap provides instant loading (<100ms) and
+        // avoids forcing the kernel to fault in GBs of pages or freezing memory.
+        val useMlock = false
 
         return GgufLoadingParams(
             threads = threads,
@@ -121,12 +129,17 @@ object DeviceTuner {
         val afterModel = (availMB - modelSizeMB).coerceAtLeast(256)
         val quant = QuantLevel.fromModelName(modelName)
         val kvBudgetKB = afterModel * 0.50 * 1024
-        val raw = (kvBudgetKB / quant.kvBytesPerToken).toInt().coerceIn(512, 32768)
+        val isSmallMobileModel = modelSizeMB in 1..2500 || modelName.contains("1.7b", ignoreCase = true) ||
+                modelName.contains("1.5b", ignoreCase = true) || modelName.contains("2b", ignoreCase = true) ||
+                modelName.contains("1b", ignoreCase = true) || modelName.contains("3b", ignoreCase = true) ||
+                modelName.contains("qwen3", ignoreCase = true)
+        val maxCap = if (isSmallMobileModel) 4096 else 32768
+        val raw = (kvBudgetKB / quant.kvBytesPerToken).toInt().coerceIn(512, maxCap)
         return (raw / 512) * 512
     }
 
     fun recommendMaxTokens(ctxSize: Int): Int {
-        return (ctxSize / 2).coerceIn(256, 4096)
+        return (ctxSize / 2).coerceIn(256, 2048)
     }
 
     // ── Private Helpers ──

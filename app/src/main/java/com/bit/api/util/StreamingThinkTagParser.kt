@@ -3,7 +3,7 @@ package com.bit.api.util
 class StreamingThinkTagParser(
     /**
      * When true, the parser starts in "inside thinking block" state.
-     * This handles models like Qwen3 whose chat template pre-fills
+     * This handles models whose chat template pre-fills
      * `<think>\n` in the prompt so the generated stream starts
      * already inside a thinking block — only `</think>` appears.
      */
@@ -13,9 +13,17 @@ class StreamingThinkTagParser(
     var pendingBuffer = ""
     private var hasExitedThinkBlock = false
 
+    private val tagPairs = listOf(
+        "<think>" to "</think>",
+        "[THINK]" to "[/THINK]",
+        "<reasoning>" to "</reasoning>",
+        "<|channel>thought" to "<|channel>"
+    )
+    private var activeCloseTag: String = "</think>"
+
     suspend fun feed(
         content: String,
-        thinkingEnabled: Boolean,
+        thinkingEnabled: Boolean = true,
         onText: suspend (String) -> Unit,
         onThought: suspend (String) -> Unit
     ) {
@@ -23,41 +31,106 @@ class StreamingThinkTagParser(
 
         while (pendingBuffer.isNotEmpty()) {
             if (!inThinkingBlock) {
-                val startIdx = if (!hasExitedThinkBlock) pendingBuffer.indexOf("<think>") else -1
-                if (startIdx != -1) {
-                    val before = pendingBuffer.substring(0, startIdx)
-                    if (before.isNotEmpty()) onText(before)
-                    inThinkingBlock = true
-                    pendingBuffer = pendingBuffer.substring(startIdx + 7)
-                } else {
-                    val lastBracket = pendingBuffer.lastIndexOf('<')
-                    if (!hasExitedThinkBlock && lastBracket != -1 && "<think>".startsWith(pendingBuffer.substring(lastBracket))) {
-                        val before = pendingBuffer.substring(0, lastBracket)
+                if (!hasExitedThinkBlock) {
+                    var earliestOpenIdx = -1
+                    var matchedOpenTag = ""
+                    var matchedCloseTag = ""
+
+                    for ((open, close) in tagPairs) {
+                        val idx = pendingBuffer.indexOf(open)
+                        if (idx != -1 && (earliestOpenIdx == -1 || idx < earliestOpenIdx)) {
+                            earliestOpenIdx = idx
+                            matchedOpenTag = open
+                            matchedCloseTag = close
+                        }
+                    }
+
+                    if (earliestOpenIdx != -1) {
+                        val before = pendingBuffer.substring(0, earliestOpenIdx)
                         if (before.isNotEmpty()) onText(before)
-                        pendingBuffer = pendingBuffer.substring(lastBracket)
-                        break
-                    } else {
-                        onText(pendingBuffer)
-                        pendingBuffer = ""
+                        inThinkingBlock = true
+                        activeCloseTag = matchedCloseTag
+                        pendingBuffer = pendingBuffer.substring(earliestOpenIdx + matchedOpenTag.length)
+                        continue
+                    }
+
+                    // Check for orphan closing tag
+                    var orphanCloseIdx = -1
+                    var matchedOrphanClose = ""
+                    for ((_, close) in tagPairs) {
+                        val idx = pendingBuffer.indexOf(close)
+                        if (idx != -1 && (orphanCloseIdx == -1 || idx < orphanCloseIdx)) {
+                            orphanCloseIdx = idx
+                            matchedOrphanClose = close
+                        }
+                    }
+
+                    if (orphanCloseIdx != -1) {
+                        val thought = pendingBuffer.substring(0, orphanCloseIdx)
+                        if (thought.isNotEmpty()) onThought(thought)
+                        hasExitedThinkBlock = true
+                        pendingBuffer = pendingBuffer.substring(orphanCloseIdx + matchedOrphanClose.length)
+                        continue
                     }
                 }
+
+                // Check if the end of pendingBuffer might be a prefix of any opening tag (e.g. "<thi")
+                var potentialPrefixStart = -1
+                if (!hasExitedThinkBlock) {
+                    for ((open, _) in tagPairs) {
+                        val firstChar = open.first()
+                        var searchIdx = pendingBuffer.indexOf(firstChar)
+                        while (searchIdx != -1) {
+                            val candidate = pendingBuffer.substring(searchIdx)
+                            if (open.startsWith(candidate)) {
+                                if (potentialPrefixStart == -1 || searchIdx < potentialPrefixStart) {
+                                    potentialPrefixStart = searchIdx
+                                }
+                                break
+                            }
+                            searchIdx = pendingBuffer.indexOf(firstChar, searchIdx + 1)
+                        }
+                    }
+                }
+
+                if (potentialPrefixStart != -1) {
+                    val before = pendingBuffer.substring(0, potentialPrefixStart)
+                    if (before.isNotEmpty()) onText(before)
+                    pendingBuffer = pendingBuffer.substring(potentialPrefixStart)
+                    break
+                } else {
+                    onText(pendingBuffer)
+                    pendingBuffer = ""
+                }
             } else {
-                val endIdx = pendingBuffer.indexOf("</think>")
+                val endIdx = pendingBuffer.indexOf(activeCloseTag)
                 if (endIdx != -1) {
                     val thought = pendingBuffer.substring(0, endIdx)
-                    if (thought.isNotEmpty() && thinkingEnabled) onThought(thought)
+                    if (thought.isNotEmpty()) onThought(thought)
                     inThinkingBlock = false
                     hasExitedThinkBlock = true
-                    pendingBuffer = pendingBuffer.substring(endIdx + 8)
+                    pendingBuffer = pendingBuffer.substring(endIdx + activeCloseTag.length)
                 } else {
-                    val lastBracket = pendingBuffer.lastIndexOf('<')
-                    if (lastBracket != -1 && "</think>".startsWith(pendingBuffer.substring(lastBracket))) {
-                        val before = pendingBuffer.substring(0, lastBracket)
-                        if (before.isNotEmpty() && thinkingEnabled) onThought(before)
-                        pendingBuffer = pendingBuffer.substring(lastBracket)
+                    // Check if the end of pendingBuffer is a prefix of activeCloseTag
+                    val firstChar = activeCloseTag.first()
+                    var searchIdx = pendingBuffer.indexOf(firstChar)
+                    var potentialClosePrefix = -1
+                    while (searchIdx != -1) {
+                        val candidate = pendingBuffer.substring(searchIdx)
+                        if (activeCloseTag.startsWith(candidate)) {
+                            potentialClosePrefix = searchIdx
+                            break
+                        }
+                        searchIdx = pendingBuffer.indexOf(firstChar, searchIdx + 1)
+                    }
+
+                    if (potentialClosePrefix != -1) {
+                        val before = pendingBuffer.substring(0, potentialClosePrefix)
+                        if (before.isNotEmpty()) onThought(before)
+                        pendingBuffer = pendingBuffer.substring(potentialClosePrefix)
                         break
                     } else {
-                        if (thinkingEnabled) onThought(pendingBuffer)
+                        onThought(pendingBuffer)
                         pendingBuffer = ""
                     }
                 }

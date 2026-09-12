@@ -35,7 +35,11 @@ sealed class AppState {
     ) : AppState()
 
     // Error states
-    data class Error(val message: String, val modelName: String? = null) : AppState()
+    data class Error(
+        val message: String,
+        val modelName: String? = null,
+        val technicalLogs: String? = null
+    ) : AppState()
 }
 
 // Helper extension to get display text

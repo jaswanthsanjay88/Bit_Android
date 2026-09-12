@@ -131,8 +131,8 @@ object AppStateManager {
     /**
      * Update when an error occurs
      */
-    fun setError(message: String) {
-        setStateIfChanged(AppState.Error(message, currentModelName))
+    fun setError(message: String, technicalLogs: String? = null) {
+        setStateIfChanged(AppState.Error(message, currentModelName, technicalLogs))
     }
 
     /**

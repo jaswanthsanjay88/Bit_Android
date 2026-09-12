@@ -253,6 +253,7 @@ fun HomeScreen(
                             message = errorState.message,
                             title = "Inference & Engine Notice",
                             modelName = errorState.modelName,
+                            technicalLogs = errorState.technicalLogs,
                             onDismiss = {
                                 dismissedError = errorState.message
                                 com.bit.state.AppStateManager.clearError()

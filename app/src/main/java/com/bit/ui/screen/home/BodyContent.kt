@@ -211,16 +211,20 @@ fun parseThinkingTags(raw: String): ParsedMessage {
     val thinkingStr = thinking.toString().trim()
     val contentStr = content.toString().trim()
 
-    // Handle orphaned closing tag at the very beginning (e.g., if the text starts with </think>)
-    val orphanClose = contentStr.indexOf("</think>", ignoreCase = true)
-    if (orphanClose != -1 && orphanClose < 10 && thinkingStr.isEmpty()) {
-        val actualContent = contentStr.substring(orphanClose + 8).trim()
-        val orphanThink = contentStr.substring(0, orphanClose).trim()
-        return ParsedMessage(
-            thinkingContent = orphanThink.ifEmpty { null },
-            actualContent = actualContent,
-            isThinkingInProgress = false
-        )
+    // Handle orphaned closing tag (e.g., if the model started generating inside a thinking block and ends with </think>)
+    if (thinkingStr.isEmpty()) {
+        for ((_, close) in THINK_TAGS) {
+            val orphanClose = contentStr.indexOf(close, ignoreCase = true)
+            if (orphanClose != -1) {
+                val actualContent = contentStr.substring(orphanClose + close.length).trim()
+                val orphanThink = contentStr.substring(0, orphanClose).trim()
+                return ParsedMessage(
+                    thinkingContent = orphanThink.ifEmpty { null },
+                    actualContent = actualContent,
+                    isThinkingInProgress = false
+                )
+            }
+        }
     }
 
     return ParsedMessage(

@@ -1067,11 +1067,29 @@ class ModelDownloadService : Service() {
                         modelId.contains("mini", ignoreCase = true) ||
                         modelName.contains("mini", ignoreCase = true)
 
-                val inferenceParams = if (isSmall) {
+                val isVerySmall = isSmall
+                val isMediumSmall = modelId.contains("1.5b", ignoreCase = true) ||
+                        modelName.contains("1.5b", ignoreCase = true) ||
+                        modelId.contains("1.7b", ignoreCase = true) ||
+                        modelName.contains("1.7b", ignoreCase = true) ||
+                        modelId.contains("1.8b", ignoreCase = true) ||
+                        modelName.contains("1.8b", ignoreCase = true) ||
+                        modelId.contains("2b", ignoreCase = true) ||
+                        modelName.contains("2b", ignoreCase = true) ||
+                        modelId.contains("3b", ignoreCase = true) ||
+                        modelName.contains("3b", ignoreCase = true) ||
+                        modelId.contains("qwen3", ignoreCase = true) ||
+                        modelName.contains("qwen3", ignoreCase = true)
+
+                val inferenceParams = if (isVerySmall) {
                     com.bit.models.engine_schema.GgufInferenceParams(
                         temperature = 0.4f,
                         maxTokens = 256,
                         repeatPenalty = 1.1f
+                    )
+                } else if (isMediumSmall) {
+                    com.bit.models.engine_schema.GgufInferenceParams(
+                        maxTokens = 2048
                     )
                 } else {
                     com.bit.models.engine_schema.GgufInferenceParams()

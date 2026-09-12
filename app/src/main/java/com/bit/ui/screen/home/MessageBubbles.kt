@@ -183,9 +183,9 @@ internal fun AssistantStreamingBubble(
                 .padding(vertical = Standards.SpacingSm),
             verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
         ) {
-            if (parsedMessage.thinkingContent != null) {
+            if (parsedMessage.thinkingContent != null || parsedMessage.isThinkingInProgress) {
                 ThinkingBlock(
-                    thinkingText = parsedMessage.thinkingContent,
+                    thinkingText = parsedMessage.thinkingContent ?: "",
                     isStreaming = parsedMessage.isThinkingInProgress
                 )
             }

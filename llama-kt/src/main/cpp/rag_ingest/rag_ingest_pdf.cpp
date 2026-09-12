@@ -3,23 +3,78 @@
 #include "third_party/pdfium/include/fpdfview.h"
 #include "third_party/pdfium/include/fpdf_text.h"
 
+#include <dlfcn.h>
 #include <mutex>
 #include <string>
 #include <vector>
 
 namespace {
 
-std::once_flag g_pdfium_init_once;
-bool g_pdfium_init_ok = false;
+typedef void (*pfn_FPDF_InitLibraryWithConfig)(const FPDF_LIBRARY_CONFIG* config);
+typedef FPDF_DOCUMENT (*pfn_FPDF_LoadMemDocument)(const void* data_buf, int size, FPDF_BYTESTRING password);
+typedef unsigned long (*pfn_FPDF_GetLastError)();
+typedef int (*pfn_FPDF_GetPageCount)(FPDF_DOCUMENT document);
+typedef void (*pfn_FPDF_CloseDocument)(FPDF_DOCUMENT document);
+typedef FPDF_PAGE (*pfn_FPDF_LoadPage)(FPDF_DOCUMENT document, int page_index);
+typedef void (*pfn_FPDF_ClosePage)(FPDF_PAGE page);
+typedef FPDF_TEXTPAGE (*pfn_FPDFText_LoadPage)(FPDF_PAGE page);
+typedef void (*pfn_FPDFText_ClosePage)(FPDF_TEXTPAGE text_page);
+typedef int (*pfn_FPDFText_CountChars)(FPDF_TEXTPAGE text_page);
+typedef int (*pfn_FPDFText_GetText)(FPDF_TEXTPAGE text_page, int start_index, int count, unsigned short* result);
+
+struct PdfiumApi {
+    void* handle = nullptr;
+    pfn_FPDF_InitLibraryWithConfig fn_InitLibraryWithConfig = nullptr;
+    pfn_FPDF_LoadMemDocument fn_LoadMemDocument = nullptr;
+    pfn_FPDF_GetLastError fn_GetLastError = nullptr;
+    pfn_FPDF_GetPageCount fn_GetPageCount = nullptr;
+    pfn_FPDF_CloseDocument fn_CloseDocument = nullptr;
+    pfn_FPDF_LoadPage fn_LoadPage = nullptr;
+    pfn_FPDF_ClosePage fn_ClosePage = nullptr;
+    pfn_FPDFText_LoadPage fn_LoadTextPage = nullptr;
+    pfn_FPDFText_ClosePage fn_CloseTextPage = nullptr;
+    pfn_FPDFText_CountChars fn_CountChars = nullptr;
+    pfn_FPDFText_GetText fn_GetText = nullptr;
+};
+
+static PdfiumApi g_pdfium;
+static std::once_flag g_pdfium_init_once;
+static bool g_pdfium_init_ok = false;
 
 void init_pdfium_once() {
     std::call_once(g_pdfium_init_once, []() {
+        void* handle = dlopen("libpdfium.so", RTLD_LOCAL | RTLD_LAZY);
+        if (!handle) {
+            return;
+        }
+        g_pdfium.handle = handle;
+        g_pdfium.fn_InitLibraryWithConfig = (pfn_FPDF_InitLibraryWithConfig)dlsym(handle, "FPDF_InitLibraryWithConfig");
+        g_pdfium.fn_LoadMemDocument       = (pfn_FPDF_LoadMemDocument)dlsym(handle, "FPDF_LoadMemDocument");
+        g_pdfium.fn_GetLastError          = (pfn_FPDF_GetLastError)dlsym(handle, "FPDF_GetLastError");
+        g_pdfium.fn_GetPageCount          = (pfn_FPDF_GetPageCount)dlsym(handle, "FPDF_GetPageCount");
+        g_pdfium.fn_CloseDocument         = (pfn_FPDF_CloseDocument)dlsym(handle, "FPDF_CloseDocument");
+        g_pdfium.fn_LoadPage              = (pfn_FPDF_LoadPage)dlsym(handle, "FPDF_LoadPage");
+        g_pdfium.fn_ClosePage             = (pfn_FPDF_ClosePage)dlsym(handle, "FPDF_ClosePage");
+        g_pdfium.fn_LoadTextPage          = (pfn_FPDFText_LoadPage)dlsym(handle, "FPDFText_LoadPage");
+        g_pdfium.fn_CloseTextPage         = (pfn_FPDFText_ClosePage)dlsym(handle, "FPDFText_ClosePage");
+        g_pdfium.fn_CountChars            = (pfn_FPDFText_CountChars)dlsym(handle, "FPDFText_CountChars");
+        g_pdfium.fn_GetText               = (pfn_FPDFText_GetText)dlsym(handle, "FPDFText_GetText");
+
+        if (!g_pdfium.fn_InitLibraryWithConfig || !g_pdfium.fn_LoadMemDocument ||
+            !g_pdfium.fn_GetLastError || !g_pdfium.fn_GetPageCount ||
+            !g_pdfium.fn_CloseDocument || !g_pdfium.fn_LoadPage ||
+            !g_pdfium.fn_ClosePage || !g_pdfium.fn_LoadTextPage ||
+            !g_pdfium.fn_CloseTextPage || !g_pdfium.fn_CountChars ||
+            !g_pdfium.fn_GetText) {
+            return;
+        }
+
         FPDF_LIBRARY_CONFIG cfg{};
         cfg.version = 2;
         cfg.m_pUserFontPaths = nullptr;
         cfg.m_pIsolate = nullptr;
         cfg.m_v8EmbedderSlot = 0;
-        FPDF_InitLibraryWithConfig(&cfg);
+        g_pdfium.fn_InitLibraryWithConfig(&cfg);
         g_pdfium_init_ok = true;
     });
 }
@@ -81,15 +136,15 @@ int rag_ingest_extract_pdf(const uint8_t* bytes, size_t len, std::string& out) {
     init_pdfium_once();
     if (!g_pdfium_init_ok) return RAG_INGEST_ERR_INTERNAL;
 
-    FPDF_DOCUMENT doc = FPDF_LoadMemDocument(bytes, (int) len, nullptr);
+    FPDF_DOCUMENT doc = g_pdfium.fn_LoadMemDocument(bytes, (int) len, nullptr);
     if (!doc) {
-        unsigned long err = FPDF_GetLastError();
+        unsigned long err = g_pdfium.fn_GetLastError();
         if (err == FPDF_ERR_PASSWORD) return RAG_INGEST_ERR_UNSUPPORTED;
         return RAG_INGEST_ERR_PARSE;
     }
 
-    int n_pages = FPDF_GetPageCount(doc);
-    if (n_pages <= 0) { FPDF_CloseDocument(doc); return RAG_INGEST_ERR_EMPTY; }
+    int n_pages = g_pdfium.fn_GetPageCount(doc);
+    if (n_pages <= 0) { g_pdfium.fn_CloseDocument(doc); return RAG_INGEST_ERR_EMPTY; }
 
     out.clear();
     out.reserve((size_t) n_pages * 1024);
@@ -97,24 +152,24 @@ int rag_ingest_extract_pdf(const uint8_t* bytes, size_t len, std::string& out) {
     std::vector<unsigned short> buf;
 
     for (int p = 0; p < n_pages; ++p) {
-        FPDF_PAGE page = FPDF_LoadPage(doc, p);
+        FPDF_PAGE page = g_pdfium.fn_LoadPage(doc, p);
         if (!page) continue;
-        FPDF_TEXTPAGE tp = FPDFText_LoadPage(page);
-        if (!tp) { FPDF_ClosePage(page); continue; }
+        FPDF_TEXTPAGE tp = g_pdfium.fn_LoadTextPage(page);
+        if (!tp) { g_pdfium.fn_ClosePage(page); continue; }
 
-        int n_chars = FPDFText_CountChars(tp);
+        int n_chars = g_pdfium.fn_CountChars(tp);
         if (n_chars > 0) {
             buf.resize((size_t) n_chars + 1);
-            int got = FPDFText_GetText(tp, 0, n_chars, buf.data());
+            int got = g_pdfium.fn_GetText(tp, 0, n_chars, buf.data());
             if (got > 0) append_utf16le_to_utf8(buf.data(), got, out);
         }
         if (!out.empty() && out.back() != '\n') out.push_back('\n');
 
-        FPDFText_ClosePage(tp);
-        FPDF_ClosePage(page);
+        g_pdfium.fn_CloseTextPage(tp);
+        g_pdfium.fn_ClosePage(page);
     }
 
-    FPDF_CloseDocument(doc);
+    g_pdfium.fn_CloseDocument(doc);
 
     normalize_spaces(out);
     return out.empty() ? RAG_INGEST_ERR_EMPTY : RAG_INGEST_OK;

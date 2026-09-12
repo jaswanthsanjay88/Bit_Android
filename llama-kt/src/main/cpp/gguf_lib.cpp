@@ -595,6 +595,9 @@ static std::vector<common_chat_msg> parse_messages_json(const std::string & mess
                 common_chat_msg cm;
                 cm.role    = msg.value("role", "user");
                 cm.content = msg.value("content", "");
+                if (msg.contains("reasoning_content")) {
+                    cm.reasoning_content = msg.value("reasoning_content", "");
+                }
                 if (cm.role != "system" && cm.role != "user" &&
                     cm.role != "assistant") {
                     cm.role = "assistant";
@@ -629,6 +632,26 @@ struct chat_template_result {
     std::vector<std::string> stops;
 };
 
+// Returns the prefilled opening thinking tag (e.g. "<think>\n") if the prompt ends with it,
+// trimmed of trailing whitespace. Jinja chat templates for reasoning models (e.g. Qwen 3, DeepSeek)
+// prefill "<think>\n" as part of the generation prompt so the model's output begins directly
+// with thinking tokens.
+static std::string get_prompt_thinking_tag(const std::string & prompt) {
+    if (prompt.empty()) return "";
+    size_t end = prompt.find_last_not_of(" \t\r\n");
+    if (end == std::string::npos || end < 6) return "";
+    if (end >= 6 && prompt.compare(end - 6, 7, "<think>") == 0) {
+        return "<think>\n";
+    }
+    if (end >= 6 && prompt.compare(end - 6, 7, "[THINK]") == 0) {
+        return "[THINK]\n";
+    }
+    if (end >= 10 && prompt.compare(end - 10, 11, "<reasoning>") == 0) {
+        return "<reasoning>\n";
+    }
+    return "";
+}
+
 // One-time best-effort init for the model's chat template. Cached state:
 //   * chat_templates set     → use the model's Jinja template
 //   * chat_templates null + tried → bare-prompt fallback (template was bad)
@@ -654,6 +677,46 @@ static void ensure_chat_templates_loaded() {
     }
 }
 
+static chat_template_result fallback_chat_template(const std::vector<common_chat_msg> & messages,
+                                                   bool add_generation_prompt) {
+    chat_template_result out;
+    bool has_im_start = false;
+    if (g_state.model) {
+        const llama_vocab * vocab = llama_model_get_vocab(g_state.model);
+        llama_token test_tok = -1;
+        if (vocab && llama_tokenize(vocab, "<|im_start|>", 12, &test_tok, 1, false, true) == 1 && test_tok >= 0) {
+            has_im_start = true;
+        }
+    }
+
+    if (has_im_start) {
+        std::string prompt;
+        for (auto & msg : messages) {
+            prompt += "<|im_start|>" + msg.role + "\n" + msg.content + "<|im_end|>\n";
+        }
+        if (add_generation_prompt) {
+            prompt += "<|im_start|>assistant\n";
+        }
+        out.prompt = prompt;
+        out.stops  = {"<|im_end|>", "<|im_start|>", "<|endoftext|>", "\n<|im_start|>"};
+        out.stops.insert(out.stops.end(), COMMON_STOP_STRINGS.begin(), COMMON_STOP_STRINGS.end());
+        return out;
+    }
+
+    // Generic bare prompt fallback
+    std::string prompt;
+    for (auto & msg : messages) {
+        if (msg.role == "system")         prompt += msg.content + "\n";
+        else if (msg.role == "user")      prompt += "User: " + msg.content + "\n";
+        else if (msg.role == "assistant") prompt += "Assistant: " + msg.content + "\n";
+    }
+    if (add_generation_prompt) prompt += "Assistant:";
+    out.prompt = prompt;
+    out.stops  = {"\nUser:", "\nuser:", "\n\nUser:"};
+    out.stops.insert(out.stops.end(), COMMON_STOP_STRINGS.begin(), COMMON_STOP_STRINGS.end());
+    return out;
+}
+
 static chat_template_result apply_chat_template(const std::vector<common_chat_msg> & messages,
                                                  bool add_generation_prompt = true) {
     chat_template_result out;
@@ -661,17 +724,7 @@ static chat_template_result apply_chat_template(const std::vector<common_chat_ms
     ensure_chat_templates_loaded();
 
     if (!g_state.chat_templates) {
-        std::string prompt;
-        for (auto & msg : messages) {
-            if (msg.role == "system")         prompt += msg.content + "\n";
-            else if (msg.role == "user")      prompt += "User: " + msg.content + "\n";
-            else if (msg.role == "assistant") prompt += "Assistant: " + msg.content + "\n";
-        }
-        if (add_generation_prompt) prompt += "Assistant:";
-        out.prompt = prompt;
-        out.stops  = {"\nUser:", "\nuser:", "\n\nUser:"};
-        out.stops.insert(out.stops.end(), COMMON_STOP_STRINGS.begin(), COMMON_STOP_STRINGS.end());
-        return out;
+        return fallback_chat_template(messages, add_generation_prompt);
     }
 
     common_chat_templates_inputs inputs;
@@ -680,11 +733,19 @@ static chat_template_result apply_chat_template(const std::vector<common_chat_ms
     inputs.use_jinja             = true;
     inputs.enable_thinking       = g_state.thinking_enabled;
 
-    auto result = common_chat_templates_apply(g_state.chat_templates.get(), inputs);
-    out.prompt = result.prompt;
-    out.stops  = result.additional_stops;
-    out.stops.insert(out.stops.end(), COMMON_STOP_STRINGS.begin(), COMMON_STOP_STRINGS.end());
-    return out;
+    try {
+        auto result = common_chat_templates_apply(g_state.chat_templates.get(), inputs);
+        out.prompt = result.prompt;
+        out.stops  = result.additional_stops;
+        out.stops.insert(out.stops.end(), COMMON_STOP_STRINGS.begin(), COMMON_STOP_STRINGS.end());
+        return out;
+    } catch (const std::exception & e) {
+        LOGE("common_chat_templates_apply Jinja error: %s — falling back to ChatML / bare prompt mode", e.what());
+    } catch (...) {
+        LOGE("common_chat_templates_apply unknown error — falling back to ChatML / bare prompt mode");
+    }
+
+    return fallback_chat_template(messages, add_generation_prompt);
 }
 
 // Two-phase antiprompt: STOP_FULL hits when a complete stop string lands in
@@ -858,13 +919,18 @@ struct token_batcher {
     JNIEnv *    env;
     jobject     callback;
     jmethodID   onToken;
+    size_t      emitted_tokens = 0;
 
     token_batcher(JNIEnv * e, jobject cb, jmethodID m)
         : env(e), callback(cb), onToken(m) { buf.reserve(256); }
 
     bool add(const char * text, size_t len) {
         buf.append(text, len);
-        return buf.size() >= g_token_batch_threshold ? flush() : true;
+        emitted_tokens++;
+        // Low latency for first few tokens: flush immediately so TTFT is instant (<500ms),
+        // then batch up to threshold (capped at 32 bytes) for smooth streaming without JNI lag.
+        size_t effective_threshold = emitted_tokens <= 4 ? 1 : std::min(g_token_batch_threshold, (size_t)32);
+        return buf.size() >= effective_threshold ? flush() : true;
     }
     bool add(const std::string & text) { return add(text.data(), text.size()); }
 
@@ -1213,15 +1279,16 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeLoadModel(
         tn_thread_config cfg = tn_thread_config_for_mode((tn_thread_mode)g_state.thread_mode);
         if (nThreads > 0) {
             cparams.n_threads       = nThreads;
-            cparams.n_threads_batch = nThreads;
+            cparams.n_threads_batch = std::max((int)nThreads, (int)cfg.n_threads_batch);
         } else {
             cparams.n_threads       = cfg.n_threads_generation;
             cparams.n_threads_batch = cfg.n_threads_batch;
         }
-        cparams.n_batch = nBatch > 0 ? nBatch : cfg.n_batch;
+        cparams.n_batch  = nBatch > 0 ? nBatch : cfg.n_batch;
+        cparams.n_ubatch = cparams.n_batch;
     }
 
-    if (flashAttn) cparams.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+    cparams.flash_attn_type = flashAttn ? LLAMA_FLASH_ATTN_TYPE_AUTO : LLAMA_FLASH_ATTN_TYPE_DISABLED;
 
     // Auto-promote KV cache type for sub-1B models. The default "q8_0" is a
     // reasonable choice for 3B+ where saving ~50% of KV memory is worth the
@@ -1578,6 +1645,14 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeGenerateStream(
 
     token_batcher batcher(env, callback, g_onToken);
 
+    std::string prefilled_think = get_prompt_thinking_tag(tmpl_result.prompt);
+    if (!prefilled_think.empty()) {
+        batcher.add(prefilled_think.data(), prefilled_think.size());
+        batcher.flush();
+        generated_text.append(prefilled_think);
+        sent_count = prefilled_think.size();
+    }
+
     while (n_generated < maxTokens && !g_state.cancel_flag.load()) {
         if (!g_state.sampler) break;
 
@@ -1872,6 +1947,14 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeGenerateStreamMultiTurn(
     size_t sent_count = 0;
 
     token_batcher batcher(env, callback, g_onToken);
+
+    std::string prefilled_think = get_prompt_thinking_tag(tmpl_result.prompt);
+    if (!prefilled_think.empty()) {
+        batcher.add(prefilled_think.data(), prefilled_think.size());
+        batcher.flush();
+        generated_text.append(prefilled_think);
+        sent_count = prefilled_think.size();
+    }
 
     while (n_generated < maxTokens && !g_state.cancel_flag.load()) {
         if (!g_state.sampler) break;
@@ -2510,9 +2593,18 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeReleaseEmbeddingModel(JNIEnv *, jobj
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_dark_gguf_1lib_GGUFNativeLib_nativeSupportsThinking(JNIEnv *, jobject) {
+    ensure_chat_templates_loaded();
     if (!g_state.chat_templates) return JNI_FALSE;
-    return common_chat_templates_support_enable_thinking(g_state.chat_templates.get())
-           ? JNI_TRUE : JNI_FALSE;
+    if (common_chat_templates_support_enable_thinking(g_state.chat_templates.get())) {
+        return JNI_TRUE;
+    }
+    std::string src = common_chat_templates_source(g_state.chat_templates.get());
+    if (src.find("enable_thinking") != std::string::npos ||
+        src.find("<think>") != std::string::npos ||
+        src.find("</think>") != std::string::npos) {
+        return JNI_TRUE;
+    }
+    return JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -4260,6 +4352,14 @@ Java_com_dark_gguf_1lib_GGUFNativeLib_nativeVlmGenerateStream(
     antiprompt.set_stops(tmpl_result.stops);
 
     token_batcher batcher(env, callback, g_onToken);
+
+    std::string prefilled_think = get_prompt_thinking_tag(tmpl_result.prompt);
+    if (!prefilled_think.empty()) {
+        batcher.add(prefilled_think.data(), prefilled_think.size());
+        batcher.flush();
+        generated_text.append(prefilled_think);
+        sent_count = prefilled_think.size();
+    }
 
     while (n_generated < maxTokens && !g_state.cancel_flag.load()) {
         if (!g_state.sampler) break;

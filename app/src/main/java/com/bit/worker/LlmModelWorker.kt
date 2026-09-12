@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -99,8 +100,7 @@ object LlmModelWorker {
             Log.w(TAG, "Inference process disconnected unexpectedly (crashed or killed)")
             
             _isGgufModelLoaded.value = false
-            com.bit.state.AppStateManager.setError("AI engine process crashed. Recovering session...")
-            triggerAutoRecovery()
+            handleInferenceCrash("Inference process disconnected unexpectedly (crashed or killed).")
         }
 
         override fun onBindingDied(name: ComponentName?) {
@@ -109,8 +109,7 @@ object LlmModelWorker {
             Log.e(TAG, "Service binding died")
             
             _isGgufModelLoaded.value = false
-            com.bit.state.AppStateManager.setError("AI engine process crashed. Recovering session...")
-            triggerAutoRecovery()
+            handleInferenceCrash("Inference service binding died (process terminated).")
         }
 
         override fun onNullBinding(name: ComponentName?) {
@@ -188,15 +187,38 @@ object LlmModelWorker {
         }
     }
 
+    private fun handleInferenceCrash(reason: String) {
+        val context = boundContext
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            val report = com.bit.util.CrashLogCollector.captureCrashReport(
+                context = context,
+                model = lastLoadedModel,
+                config = lastLoadedConfig,
+                customMessage = reason
+            )
+            withContext(Dispatchers.Main) {
+                com.bit.state.AppStateManager.setError(
+                    message = "AI inference process crashed unexpectedly. Diagnostic report is ready to copy.",
+                    technicalLogs = report
+                )
+            }
+        }
+        triggerAutoRecovery()
+    }
+
     private fun restoreSessionAfterCrash() {
         val model = lastLoadedModel
         val config = lastLoadedConfig
         if (model != null && config != null) {
-            Log.i(TAG, "Attempting to auto-restore crashed model session: ${model.modelName}")
+            Log.i(TAG, "Attempting to auto-restore crashed model session in background: ${model.modelName}")
             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                 val context = boundContext ?: return@launch
                 try {
-                    com.bit.state.AppStateManager.setLoadingModel(model.modelName)
+                    // Do not overwrite user-facing error state with loading spinner
+                    val currentAppState = com.bit.state.AppStateManager.appState.value
+                    if (currentAppState !is com.bit.models.state.AppState.Error) {
+                        com.bit.state.AppStateManager.setLoadingModel(model.modelName)
+                    }
                     val success = loadGgufModel(model, config)
                     if (success) {
                         // Restore performance optimizations on restart
@@ -211,14 +233,16 @@ object LlmModelWorker {
                             Log.w(TAG, "Failed to re-apply optimizations on recovery: ${e.message}")
                         }
 
-                        com.bit.state.AppStateManager.setModelLoaded(model.modelName)
+                        // Only transition appState if user is not currently viewing an active error popup
+                        if (com.bit.state.AppStateManager.appState.value !is com.bit.models.state.AppState.Error) {
+                            com.bit.state.AppStateManager.setModelLoaded(model.modelName)
+                        }
                         Log.i(TAG, "Auto-recovery successful for model: ${model.modelName}")
                     } else {
-                        com.bit.state.AppStateManager.setError("Failed to auto-restore model after crash")
+                        Log.w(TAG, "Background auto-restore of model failed")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Auto-recovery failed", e)
-                    com.bit.state.AppStateManager.setError("Auto-recovery failed: ${e.message}")
                 }
             }
         }
@@ -816,7 +840,13 @@ object LlmModelWorker {
             close()
         }
 
-        awaitClose { }
+        awaitClose {
+            try {
+                svc.stopGenerationGguf()
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to stop generation in awaitClose: ${e.message}")
+            }
+        }
     }.buffer(Channel.UNLIMITED)
         .flowOn(Dispatchers.IO)
 

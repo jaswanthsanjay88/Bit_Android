@@ -577,7 +577,7 @@ class ChatViewModel @Inject constructor(
     val promptEditState: StateFlow<PromptEditState?> = _promptEditState.asStateFlow()
 
     // Thinking mode toggle — when enabled, adds /think to system prompt for supported models
-    private val _thinkingModeEnabled = MutableStateFlow(false)
+    private val _thinkingModeEnabled = MutableStateFlow(true)
     val thinkingModeEnabled: StateFlow<Boolean> = _thinkingModeEnabled.asStateFlow()
     private val _modelSupportsThinking = MutableStateFlow(false)
     val modelSupportsThinking: StateFlow<Boolean> = _modelSupportsThinking.asStateFlow()
@@ -585,6 +585,7 @@ class ChatViewModel @Inject constructor(
     fun toggleThinkingMode() {
         val next = !_thinkingModeEnabled.value
         _thinkingModeEnabled.value = next
+        LlmModelWorker.setThinkingEnabledGguf(next)
         viewModelScope.launch {
             try {
                 appSettings.updateThinkingModeEnabled(next)
@@ -595,8 +596,12 @@ class ChatViewModel @Inject constructor(
     }
 
     fun setThinkingMode(enabled: Boolean) {
-        if (_thinkingModeEnabled.value == enabled) return
+        if (_thinkingModeEnabled.value == enabled) {
+            LlmModelWorker.setThinkingEnabledGguf(enabled)
+            return
+        }
         _thinkingModeEnabled.value = enabled
+        LlmModelWorker.setThinkingEnabledGguf(enabled)
         viewModelScope.launch {
             try {
                 appSettings.updateThinkingModeEnabled(enabled)
@@ -792,6 +797,7 @@ class ChatViewModel @Inject constructor(
             try {
                 appSettings.thinkingModeEnabled.collect { saved ->
                     _thinkingModeEnabled.value = saved
+                    LlmModelWorker.setThinkingEnabledGguf(saved)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to load thinkingModeEnabled: ${e.message}")
@@ -811,7 +817,9 @@ class ChatViewModel @Inject constructor(
                 } else if (isGgufLoaded) {
                     val supports = LlmModelWorker.supportsThinkingGguf()
                     _modelSupportsThinking.value = supports
-                    // Do not auto-disable thinking mode; allow user to force enable it
+                    if (supports) {
+                        setThinkingMode(true)
+                    }
                 } else {
                     _modelSupportsThinking.value = false
                     // Preserve user toggle preference across unloads / app launches
@@ -981,7 +989,7 @@ class ChatViewModel @Inject constructor(
                 val activeProviderType = ActiveModelSession.currentModelType.value
                 val hasTools = PluginManager.hasEnabledTools()
                         && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
-                LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value && !hasTools)
+                LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value)
 
                 // ── TTFT optimization: fire API connection pre-warm immediately ──
                 // While we're building the request, TCP+TLS handshake happens in parallel
@@ -1024,8 +1032,6 @@ class ChatViewModel @Inject constructor(
                             chatManager.updateChatTitle(id, instantTitle)
                             AppStateManager.chatRefreshed()
                         }
-                        // Refine title asynchronously with LLM
-                        generateChatTitleAsync(id, prompt, "")
                     }.onFailure { e ->
                         reportError("Failed to create chat: ${e.message}")
                     }
@@ -1329,7 +1335,12 @@ class ChatViewModel @Inject constructor(
                                     resultBuilder.append(text)
                                     val now = System.currentTimeMillis()
                                     if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                                        val output = if (thinkingBuilder.isNotEmpty()) "<think>${thinkingBuilder}</think>${resultBuilder}" else resultBuilder.toString()
+                                        val hasThink = resultBuilder.contains("<think>") || resultBuilder.contains("</think>")
+                                        val output = if (thinkingBuilder.isNotEmpty() && !hasThink) {
+                                            "<think>${thinkingBuilder}</think>\n\n${resultBuilder}"
+                                        } else {
+                                            resultBuilder.toString()
+                                        }
                                         _streamingAssistantMessage.value = output
                                         lastEmitTime = now
                                     }
@@ -1338,7 +1349,14 @@ class ChatViewModel @Inject constructor(
                                     thinkingBuilder.append(thought) 
                                     val now = System.currentTimeMillis()
                                     if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                                        val output = if (thinkingBuilder.isNotEmpty()) "<think>${thinkingBuilder}</think>${resultBuilder}" else resultBuilder.toString()
+                                        val hasThink = resultBuilder.contains("<think>") || resultBuilder.contains("</think>")
+                                        val output = if (resultBuilder.isEmpty()) {
+                                            "<think>${thinkingBuilder}"
+                                        } else if (thinkingBuilder.isNotEmpty() && !hasThink) {
+                                            "<think>${thinkingBuilder}</think>\n\n${resultBuilder}"
+                                        } else {
+                                            resultBuilder.toString()
+                                        }
                                         _streamingAssistantMessage.value = output
                                         lastEmitTime = now
                                     }
@@ -1350,7 +1368,12 @@ class ChatViewModel @Inject constructor(
                                 onText = { resultBuilder.append(it) },
                                 onThought = { thinkingBuilder.append(it) }
                             )
-                            val finalResponse = if (thinkingBuilder.isNotEmpty()) "<think>${thinkingBuilder}</think>${resultBuilder}" else resultBuilder.toString()
+                            val hasThink = resultBuilder.contains("<think>") || resultBuilder.contains("</think>")
+                            val finalResponse = if (thinkingBuilder.isNotEmpty() && !hasThink) {
+                                "<think>${thinkingBuilder}</think>\n\n${resultBuilder}"
+                            } else {
+                                resultBuilder.toString()
+                            }
                             _streamingAssistantMessage.value = finalResponse
                         }
                         is GenerationEvent.Metrics -> { currentMetrics = event.metrics }
@@ -1460,7 +1483,7 @@ class ChatViewModel @Inject constructor(
                 val activeProviderType = ActiveModelSession.currentModelType.value
                 val hasTools = PluginManager.hasEnabledTools()
                         && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
-                LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value && !hasTools)
+                LlmModelWorker.setThinkingEnabledGguf(_thinkingModeEnabled.value)
                 val ragContext = _currentRagContext.value
 
                 executeUnifiedGeneration(prompt, ragContext, maxTokens, isNewChat = false, isRegeneration = true)
@@ -1567,7 +1590,6 @@ class ChatViewModel @Inject constructor(
         _agentPhase.value = AgentPhase.Executing
 
         val activeProviderType = ActiveModelSession.currentModelType.value
-        val isQwen3 = activeModelId.contains("qwen3", ignoreCase = true)
         val isTooTinyForTools = activeModelId.contains("350m", ignoreCase = true) ||
                 activeModelId.contains("125m", ignoreCase = true) ||
                 activeModelId.contains("160m", ignoreCase = true) ||
@@ -1576,11 +1598,13 @@ class ChatViewModel @Inject constructor(
                 activeModelId.contains("0.8b", ignoreCase = true) ||
                 activeModelId.contains("1b", ignoreCase = true) ||
                 activeModelId.contains("1.5b", ignoreCase = true) ||
+                activeModelId.contains("1.7b", ignoreCase = true) ||
                 activeModelId.contains("1.8b", ignoreCase = true) ||
+                activeModelId.contains("2b", ignoreCase = true) ||
                 activeModelId.contains("tiny", ignoreCase = true) ||
                 activeModelId.contains("mini", ignoreCase = true)
         val hasTools = PluginManager.hasEnabledTools()
-                && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API || isQwen3)
+                && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
                 && !isTooTinyForTools
 
         val steps = mutableListOf<ToolChainStepData>()
@@ -2043,7 +2067,7 @@ class ChatViewModel @Inject constructor(
                     if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
                         val hasThinkInText = textBuilder.contains("<think>") || textBuilder.contains("</think>")
                         val output = if (thinkBuilder.isNotEmpty() && !hasThinkInText) {
-                            "<think>${thinkBuilder}</think>${textBuilder}"
+                            "<think>${thinkBuilder}</think>\n\n${textBuilder}"
                         } else {
                             textBuilder.toString()
                         }
@@ -2060,8 +2084,10 @@ class ChatViewModel @Inject constructor(
                     val now = System.currentTimeMillis()
                     if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
                         val hasThinkInText = textBuilder.contains("<think>") || textBuilder.contains("</think>")
-                        val output = if (thinkBuilder.isNotEmpty() && !hasThinkInText) {
-                            "<think>${thinkBuilder}</think>${textBuilder}"
+                        val output = if (textBuilder.isEmpty()) {
+                            "<think>${thinkBuilder}"
+                        } else if (thinkBuilder.isNotEmpty() && !hasThinkInText) {
+                            "<think>${thinkBuilder}</think>\n\n${textBuilder}"
                         } else {
                             textBuilder.toString()
                         }
@@ -2093,7 +2119,7 @@ class ChatViewModel @Inject constructor(
 
         val hasThinkInText = textBuilder.contains("<think>") || textBuilder.contains("</think>")
         val text = if (thinkBuilder.isNotEmpty() && !hasThinkInText) {
-            "<think>${thinkBuilder}</think>${textBuilder.toString().trim()}"
+            "<think>${thinkBuilder}</think>\n\n${textBuilder.toString().trim()}"
         } else {
             textBuilder.toString().trim()
         }
@@ -2167,7 +2193,11 @@ class ChatViewModel @Inject constructor(
                             val now = System.currentTimeMillis()
                             if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
                                 val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
-                                val output = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                                val output = if (thinkBuilder.isNotEmpty() && !hasThink) {
+                                    "<think>${thinkBuilder}</think>\n\n${textBuilder}"
+                                } else {
+                                    textBuilder.toString()
+                                }
                                 _streamingAssistantMessage.value = output
                                 lastEmitTime = now
                             }
@@ -2177,7 +2207,13 @@ class ChatViewModel @Inject constructor(
                             val now = System.currentTimeMillis()
                             if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
                                 val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
-                                val output = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                                val output = if (textBuilder.isEmpty()) {
+                                    "<think>${thinkBuilder}"
+                                } else if (thinkBuilder.isNotEmpty() && !hasThink) {
+                                    "<think>${thinkBuilder}</think>\n\n${textBuilder}"
+                                } else {
+                                    textBuilder.toString()
+                                }
                                 _streamingAssistantMessage.value = output
                                 lastEmitTime = now
                             }
@@ -2199,7 +2235,11 @@ class ChatViewModel @Inject constructor(
                         onThought = { thinkBuilder.append(it) }
                     )
                     val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
-                    val output = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>${textBuilder}" else textBuilder.toString()
+                    val output = if (thinkBuilder.isNotEmpty() && !hasThink) {
+                        "<think>${thinkBuilder}</think>\n\n${textBuilder}"
+                    } else {
+                        textBuilder.toString()
+                    }
                     _streamingAssistantMessage.value = output
                 }
                 else -> {}
@@ -2207,7 +2247,7 @@ class ChatViewModel @Inject constructor(
         }
 
         val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
-        val text = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>${textBuilder.toString().trim()}" else textBuilder.toString().trim()
+        val text = if (thinkBuilder.isNotEmpty() && !hasThink) "<think>${thinkBuilder}</think>\n\n${textBuilder.toString().trim()}" else textBuilder.toString().trim()
         val finalToolCalls = mutableListOf<Pair<String, String>>()
         finalToolCalls.addAll(toolCalls)
 
@@ -2627,11 +2667,32 @@ class ChatViewModel @Inject constructor(
                                 resultBuilder.append(text)
                                 val now = System.currentTimeMillis()
                                 if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
-                                    _streamingAssistantMessage.value = resultBuilder.toString()
+                                    val hasThink = resultBuilder.contains("<think>") || resultBuilder.contains("</think>")
+                                    val output = if (thinkResultBuilder.isNotEmpty() && !hasThink) {
+                                        "<think>${thinkResultBuilder}</think>\n\n${resultBuilder}"
+                                    } else {
+                                        resultBuilder.toString()
+                                    }
+                                    _streamingAssistantMessage.value = output
                                     lastEmitTime = now
                                 }
                             },
-                            onThought = { thought -> thinkResultBuilder.append(thought) }
+                            onThought = { thought -> 
+                                thinkResultBuilder.append(thought)
+                                val now = System.currentTimeMillis()
+                                if (now - lastEmitTime >= STREAMING_THROTTLE_MS) {
+                                    val hasThink = resultBuilder.contains("<think>") || resultBuilder.contains("</think>")
+                                    val output = if (resultBuilder.isEmpty()) {
+                                        "<think>${thinkResultBuilder}"
+                                    } else if (thinkResultBuilder.isNotEmpty() && !hasThink) {
+                                        "<think>${thinkResultBuilder}</think>\n\n${resultBuilder}"
+                                    } else {
+                                        resultBuilder.toString()
+                                    }
+                                    _streamingAssistantMessage.value = output
+                                    lastEmitTime = now
+                                }
+                            }
                         )
                     }
 
@@ -2661,7 +2722,13 @@ class ChatViewModel @Inject constructor(
                         onText = { resultBuilder.append(it) },
                         onThought = { thinkResultBuilder.append(it) }
                     )
-                    _streamingAssistantMessage.value = resultBuilder.toString()
+                    val hasThink = resultBuilder.contains("<think>") || resultBuilder.contains("</think>")
+                    val output = if (thinkResultBuilder.isNotEmpty() && !hasThink) {
+                        "<think>${thinkResultBuilder}</think>\n\n${resultBuilder}"
+                    } else {
+                        resultBuilder.toString()
+                    }
+                    _streamingAssistantMessage.value = output
                     // Update context usage after generation completes
                     _contextUsagePercent.value = LlmModelWorker.getContextUsageGguf()
                 }
@@ -2681,7 +2748,12 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        var result = resultBuilder.toString().trim()
+        val hasThinkInResult = resultBuilder.contains("<think>") || resultBuilder.contains("</think>")
+        var result = if (thinkResultBuilder.isNotEmpty() && !hasThinkInResult) {
+            "<think>${thinkResultBuilder}</think>\n\n${resultBuilder.toString().trim()}"
+        } else {
+            resultBuilder.toString().trim()
+        }
 
         // Trim repetitive tail if detected during streaming
         if (repetitionTrimIndex in 1 until result.length) {
@@ -2820,9 +2892,26 @@ class ChatViewModel @Inject constructor(
                         thinkingEnabled = thinkingActive,
                         onText = { text ->
                             textBuilder.append(text)
-                            _streamingAssistantMessage.value = textBuilder.toString()
+                            val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+                            val output = if (thinkTextBuilder.isNotEmpty() && !hasThink) {
+                                "<think>${thinkTextBuilder}</think>\n\n${textBuilder}"
+                            } else {
+                                textBuilder.toString()
+                            }
+                            _streamingAssistantMessage.value = output
                         },
-                        onThought = { thought -> thinkTextBuilder.append(thought) }
+                        onThought = { thought -> 
+                            thinkTextBuilder.append(thought)
+                            val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+                            val output = if (textBuilder.isEmpty()) {
+                                "<think>${thinkTextBuilder}"
+                            } else if (thinkTextBuilder.isNotEmpty() && !hasThink) {
+                                "<think>${thinkTextBuilder}</think>\n\n${textBuilder}"
+                            } else {
+                                textBuilder.toString()
+                            }
+                            _streamingAssistantMessage.value = output
+                        }
                     )
                 }
                 is GenerationEvent.ToolCall -> {
@@ -2834,7 +2923,13 @@ class ChatViewModel @Inject constructor(
                         onText = { textBuilder.append(it) },
                         onThought = { thinkTextBuilder.append(it) }
                     )
-                    _streamingAssistantMessage.value = textBuilder.toString()
+                    val hasThink = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+                    val output = if (thinkTextBuilder.isNotEmpty() && !hasThink) {
+                        "<think>${thinkTextBuilder}</think>\n\n${textBuilder}"
+                    } else {
+                        textBuilder.toString()
+                    }
+                    _streamingAssistantMessage.value = output
                 }
                 is GenerationEvent.Metrics -> { currentMetrics = event.metrics }
                 is GenerationEvent.Progress -> { /* progress tracked elsewhere */ }
@@ -2849,7 +2944,12 @@ class ChatViewModel @Inject constructor(
         }
 
         // Fallback: parse text if no ToolCall events were received
-        val text = textBuilder.toString()
+        val hasThinkInText = textBuilder.contains("<think>") || textBuilder.contains("</think>")
+        val text = if (thinkTextBuilder.isNotEmpty() && !hasThinkInText) {
+            "<think>${thinkTextBuilder}</think>\n\n${textBuilder.toString().trim()}"
+        } else {
+            textBuilder.toString().trim()
+        }
         if (toolCalls.isEmpty() && text.isNotBlank()) {
             Log.d(TAG, "No ToolCall events, trying text parsing fallback")
             parseToolCallsFromText(text)?.let { parsed ->
@@ -2952,11 +3052,33 @@ class ChatViewModel @Inject constructor(
             compiledPrompt = compiledPrompt.replace(key, value)
         }
 
-        val skillsPrompt = if (hasTools && PluginManager.hasEnabledTools()) {
-            skillManager.getSkillCatalogPrompt()
-        } else {
-            skillManager.getActiveSkillsPrompt()
+        val isSmall = modelId.contains("350m", ignoreCase = true) ||
+                modelId.contains("125m", ignoreCase = true) ||
+                modelId.contains("160m", ignoreCase = true) ||
+                modelId.contains("0.5b", ignoreCase = true) ||
+                modelId.contains("0.6b", ignoreCase = true) ||
+                modelId.contains("0.8b", ignoreCase = true) ||
+                modelId.contains("1b", ignoreCase = true) ||
+                modelId.contains("1.5b", ignoreCase = true) ||
+                modelId.contains("1.7b", ignoreCase = true) ||
+                modelId.contains("1.8b", ignoreCase = true) ||
+                modelId.contains("2b", ignoreCase = true) ||
+                modelId.contains("tiny", ignoreCase = true) ||
+                modelId.contains("mini", ignoreCase = true)
+
+        if (isSmall && !hasTools) {
+            compiledPrompt = compiledPrompt
+                .replace(Regex("(?s)<storage_and_tools_distinction>.*?</storage_and_tools_distinction>"), "")
+                .replace(Regex("(?s)<memory_vault_rules>.*?</memory_vault_rules>"), "")
+                .trim()
         }
+
+        val isLocalGguf = ActiveModelSession.currentModelType.value == ProviderType.GGUF
+
+        val skillsPrompt = if (!isLocalGguf && hasTools && PluginManager.hasEnabledTools()) {
+            skillManager.getSkillCatalogPrompt()
+        } else ""
+
         if (skillsPrompt.isNotBlank()) {
             compiledPrompt = if (compiledPrompt.isNotBlank()) {
                 "$compiledPrompt\n\n$skillsPrompt"
@@ -2965,7 +3087,10 @@ class ChatViewModel @Inject constructor(
             }
         }
 
-        val mcpPrompt = mcpManager.getMcpCatalogPrompt()
+        val mcpPrompt = if (!isLocalGguf && hasTools && PluginManager.hasEnabledTools()) {
+            mcpManager.getMcpCatalogPrompt()
+        } else ""
+
         if (mcpPrompt.isNotBlank()) {
             compiledPrompt = if (compiledPrompt.isNotBlank()) {
                 "$compiledPrompt\n\n$mcpPrompt"
@@ -2993,7 +3118,7 @@ class ChatViewModel @Inject constructor(
                 val isQwen3 = modelId.contains("qwen3", ignoreCase = true)
                 if (isQwen3) {
                     append("<tools>\n")
-                    append(toolsJsonArray.toString(2))
+                    append(toolsJsonArray.toString())
                     append("\n</tools>\n\n")
                     append("TOOL DISPATCH & RESPONSE RULES:\n")
                     append("1. If user requests MCP or asks about repositories/git/branches/commits, prioritize MCP tools (e.g. GitHub/Git tools) before searching the web.\n")
@@ -3785,6 +3910,11 @@ class ChatViewModel @Inject constructor(
     private fun generateChatTitleAsync(chatId: String, userPrompt: String, assistantResponse: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val providerType = ActiveModelSession.currentModelType.value ?: return@launch
+            // On-device GGUF generation is strictly single-stream. Background title generation
+            // contends for the native context and calls stopGenerationGguf(), which aborts active chat generation.
+            if (providerType == ProviderType.GGUF) {
+                return@launch
+            }
             val summaryText = "User: $userPrompt\nAssistant: ${assistantResponse.take(500)}"
             val userMsg = "Generate a short title (5 words maximum) for this conversation:\n\n$summaryText\n\nRespond with ONLY the title text, no quotes, no punctuation, no explanation."
             val systemMsg = "You are a title generator. Output only a short title in the same language as the conversation."

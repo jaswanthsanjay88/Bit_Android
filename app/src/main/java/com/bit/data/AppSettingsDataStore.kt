@@ -142,7 +142,7 @@ class AppSettingsDataStore(private val context: Context) {
     }
 
     val thinkingModeEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
-        prefs[THINKING_MODE_ENABLED] ?: false
+        prefs[THINKING_MODE_ENABLED] ?: true
     }
 
     suspend fun updateThinkingModeEnabled(enabled: Boolean) {

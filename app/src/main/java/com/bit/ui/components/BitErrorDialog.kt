@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,6 +57,7 @@ fun BitErrorDialog(
     message: String,
     title: String = "Execution Notice",
     modelName: String? = null,
+    technicalLogs: String? = null,
     onDismiss: () -> Unit,
     onNavigateToModelStore: (() -> Unit)? = null,
     onNavigateToSettings: (() -> Unit)? = null,
@@ -63,7 +65,8 @@ fun BitErrorDialog(
 ) {
     val haptics = LocalBitHaptics.current
     val clipboardManager = LocalClipboardManager.current
-    var isDetailsExpanded by remember { mutableStateOf(false) }
+    val hasTechLogs = !technicalLogs.isNullOrBlank()
+    var isDetailsExpanded by remember { mutableStateOf(hasTechLogs) }
     var isCopied by remember { mutableStateOf(false) }
 
     val isModelMissingError = remember(message) {
@@ -177,46 +180,47 @@ fun BitErrorDialog(
                         lineHeight = 20.sp
                     )
 
-                    // Optional Technical Details Toggle if lengthy
-                    if (message.length > 90 || message.contains("\n") || message.contains("Exception")) {
+                    val fullReport = technicalLogs ?: message
+
+                    // Optional Technical Details Toggle if lengthy or technicalLogs provided
+                    if (hasTechLogs || message.length > 90 || message.contains("\n") || message.contains("Exception")) {
                         TextButton(
                             onClick = { isDetailsExpanded = !isDetailsExpanded },
-                            modifier = Modifier.padding(top = 4.dp)
+                            modifier = Modifier.padding(top = 2.dp)
                         ) {
                             Text(
-                                text = if (isDetailsExpanded) "Hide Details" else "View Technical Trace",
+                                text = if (isDetailsExpanded) "Hide Diagnostic Logs" else if (hasTechLogs) "View Crash Logs & Diagnostics" else "View Technical Trace",
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
 
                         AnimatedVisibility(visible = isDetailsExpanded) {
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 color = MaterialTheme.colorScheme.surfaceContainerLowest,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .border(
                                         1.dp,
                                         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                        RoundedCornerShape(8.dp)
+                                        RoundedCornerShape(10.dp)
                                     )
-                                    .padding(8.dp)
+                                    .padding(10.dp)
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(
-                                        text = message,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 11.sp
-                                        ),
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        Text(
+                                            text = if (hasTechLogs) "Crash Report & Logs" else "Technical Trace",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
                                         TextButton(onClick = {
-                                            clipboardManager.setText(AnnotatedString(message))
+                                            clipboardManager.setText(AnnotatedString(fullReport))
                                             isCopied = true
                                             haptics.action()
                                         }) {
@@ -226,8 +230,26 @@ fun BitErrorDialog(
                                                 modifier = Modifier.size(14.dp)
                                             )
                                             Spacer(Modifier.width(4.dp))
-                                            Text(if (isCopied) "Copied" else "Copy", style = MaterialTheme.typography.labelSmall)
+                                            Text(if (isCopied) "Copied!" else "Copy", style = MaterialTheme.typography.labelSmall)
                                         }
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 180.dp)
+                                            .verticalScroll(rememberScrollState())
+                                            .horizontalScroll(rememberScrollState())
+                                    ) {
+                                        Text(
+                                            text = fullReport,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                lineHeight = 16.sp
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
                                     }
                                 }
                             }
@@ -241,6 +263,28 @@ fun BitErrorDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val fullReport = technicalLogs ?: message
+
+                    // Prominent Copy Report Action Button
+                    if (hasTechLogs || message.length > 90 || message.contains("\n") || message.contains("Exception")) {
+                        OutlinedButton(
+                            onClick = {
+                                clipboardManager.setText(AnnotatedString(fullReport))
+                                isCopied = true
+                                haptics.action()
+                            },
+                            modifier = Modifier.padding(end = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isCopied) TnIcons.Check else TnIcons.Copy,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (isCopied) "Copied!" else "Copy Report", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+
                     // Secondary context action
                     if (isModelMissingError && onNavigateToModelStore != null) {
                         OutlinedButton(
