@@ -30,6 +30,11 @@ class UpdateDownloader(private val context: Context) {
      * the completion broadcast via [registerInstallOnComplete].
      */
     fun startDownload(update: UpdateInfo): Long {
+        if (!UpdateChecker.isGitHubUpdateSupported(context)) {
+            Log.w("UpdateDownloader", "Blocked download: GitHub updates are disabled on this installation.")
+            return -1L
+        }
+
         // Delete any existing update file to avoid partial/corrupt overwrite issues
         try {
             val file = File(
@@ -129,6 +134,11 @@ class UpdateDownloader(private val context: Context) {
      * Launches the system package installer for the downloaded APK using the verified content URI.
      */
     fun installDownloadedApk(downloadId: Long? = null) {
+        if (!UpdateChecker.isGitHubUpdateSupported(context)) {
+            Log.w("UpdateDownloader", "Blocked installation: APK sideloading is disabled on this installation.")
+            return
+        }
+
         var uri: Uri? = null
 
         if (downloadId != null && downloadId != -1L) {

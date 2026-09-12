@@ -4,6 +4,10 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 
+import android.os.Build
+import android.util.Log
+import com.bit.BuildConfig
+
 data class UpdateInfo(
     val version: String,          // e.g. "v1.4.2"
     val currentVersion: String,   // e.g. "1.4.1"
@@ -17,6 +21,7 @@ data class UpdateInfo(
 sealed class UpdateCheckResult {
     data class UpdateAvailable(val info: UpdateInfo) : UpdateCheckResult()
     object UpToDate : UpdateCheckResult()
+    object DisabledForStoreInstall : UpdateCheckResult()
     data class Error(val message: String) : UpdateCheckResult()
 }
 
@@ -26,9 +31,74 @@ class UpdateChecker(
 ) {
 
     companion object {
+        private const val TAG = "UpdateChecker"
         private const val PREFS_NAME = "bit_update_prefs"
         private const val KEY_SKIPPED_VERSION = "skipped_version"
         private const val KEY_LAST_INSTALLED_VERSION = "last_installed_version"
+
+        val PLAY_STORE_INSTALLERS = setOf(
+            "com.android.vending",
+            "com.google.android.feedback"
+        )
+
+        /**
+         * Returns true only if GitHub in-app updates are permitted on this installation.
+         * Returns false if:
+         * 1. Disabled at build time (e.g. AAB bundle or explicit -Pplaystore build target)
+         * 2. Installed via Google Play Store (enforcing Google Play Device & Network Abuse policy)
+         * 3. Running inside Firebase Test Lab (Google Play automated pre-launch scanner)
+         */
+        fun isGitHubUpdateSupported(context: Context): Boolean {
+            if (!BuildConfig.ENABLE_GITHUB_UPDATES) {
+                return false
+            }
+            if (isInstalledFromGooglePlay(context)) {
+                return false
+            }
+            if (isFirebaseTestLab(context)) {
+                return false
+            }
+            return true
+        }
+
+        /**
+         * Checks whether this app installation originated from the Google Play Store.
+         * Uses InstallSourceInfo on Android 11+ (API 30+) and getInstallerPackageName on older versions.
+         */
+        fun isInstalledFromGooglePlay(context: Context): Boolean {
+            return try {
+                val pm = context.packageManager
+                val packageName = context.packageName
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val sourceInfo = pm.getInstallSourceInfo(packageName)
+                    val isPlay = listOfNotNull(
+                        sourceInfo.installingPackageName,
+                        sourceInfo.initiatingPackageName,
+                        sourceInfo.originatingPackageName
+                    ).any { it in PLAY_STORE_INSTALLERS }
+                    if (isPlay) return true
+                }
+                @Suppress("DEPRECATION")
+                val installer = pm.getInstallerPackageName(packageName)
+                installer in PLAY_STORE_INSTALLERS
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        /**
+         * Detects if the app is being run inside Google Play's Firebase Test Lab.
+         */
+        fun isFirebaseTestLab(context: Context): Boolean {
+            return try {
+                android.provider.Settings.System.getString(
+                    context.contentResolver,
+                    "firebase.test.lab"
+                ) == "true"
+            } catch (e: Exception) {
+                false
+            }
+        }
     }
 
     private val prefs: SharedPreferences
@@ -39,12 +109,20 @@ class UpdateChecker(
      * currently-installed versionName. Never throws — always returns a
      * result you can branch on. Safe to call on every app start.
      *
+     * Returns [UpdateCheckResult.DisabledForStoreInstall] if the app was installed
+     * from Google Play Store or if GitHub updates are disabled for this build.
+     *
      * If the user previously tapped "Later" for a given version, we
      * suppress the prompt for that version until a newer release lands.
      * If the installed version changed since the last check (i.e. user
      * actually updated), we clear the skipped-version marker.
      */
     suspend fun checkForUpdate(): UpdateCheckResult {
+        if (!isGitHubUpdateSupported(context)) {
+            Log.i(TAG, "GitHub update check skipped: not a GitHub-released installation")
+            return UpdateCheckResult.DisabledForStoreInstall
+        }
+
         return try {
             val currentVersion = getCurrentVersionName()
                 ?: return UpdateCheckResult.Error("Could not read current app version")

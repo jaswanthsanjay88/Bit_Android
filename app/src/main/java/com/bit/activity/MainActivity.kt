@@ -155,20 +155,30 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Non-blocking GitHub update check on every app start
-                val updateChecker = remember { com.bit.update.UpdateChecker(context) }
-                var pendingUpdate by remember { mutableStateOf<com.bit.update.UpdateInfo?>(null) }
+                // Non-blocking GitHub update check on every app start (only active on GitHub releases)
+                if (com.bit.update.UpdateChecker.isGitHubUpdateSupported(context)) {
+                    val updateChecker = remember { com.bit.update.UpdateChecker(context) }
+                    var pendingUpdate by remember { mutableStateOf<com.bit.update.UpdateInfo?>(null) }
 
-                LaunchedEffect(Unit) {
-                    withContext(Dispatchers.IO) {
-                        when (val result = updateChecker.checkForUpdate()) {
-                            is com.bit.update.UpdateCheckResult.UpdateAvailable -> {
-                                withContext(Dispatchers.Main) {
-                                    pendingUpdate = result.info
+                    LaunchedEffect(Unit) {
+                        withContext(Dispatchers.IO) {
+                            when (val result = updateChecker.checkForUpdate()) {
+                                is com.bit.update.UpdateCheckResult.UpdateAvailable -> {
+                                    withContext(Dispatchers.Main) {
+                                        pendingUpdate = result.info
+                                    }
                                 }
+                                else -> {}
                             }
-                            else -> {}
                         }
+                    }
+
+                    pendingUpdate?.let { info ->
+                        com.bit.update.UpdateBottomSheet(
+                            update = info,
+                            updateChecker = updateChecker,
+                            onDismiss = { pendingUpdate = null }
+                        )
                     }
                 }
 
@@ -183,14 +193,6 @@ class MainActivity : ComponentActivity() {
 
                 if (betaStatus is com.bit.util.BetaStatus.Expired) {
                     com.bit.ui.components.BetaExpiredDialog(status = betaStatus)
-                }
-
-                pendingUpdate?.let { info ->
-                    com.bit.update.UpdateBottomSheet(
-                        update = info,
-                        updateChecker = updateChecker,
-                        onDismiss = { pendingUpdate = null }
-                    )
                 }
             }
         }

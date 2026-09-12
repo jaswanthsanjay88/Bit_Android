@@ -16,6 +16,14 @@ android {
     compileSdk = 37
     ndkVersion = "28.2.13676358"
 
+    val isBuildingBundle = gradle.startParameter.taskNames.any { it.contains("bundle", ignoreCase = true) }
+    val isPlayStoreTarget = project.hasProperty("playstore") ||
+        project.hasProperty("play") ||
+        System.getenv("TARGET_STORE")?.equals("playstore", ignoreCase = true) == true ||
+        System.getenv("PLAY_STORE_BUILD")?.equals("true", ignoreCase = true) == true ||
+        project.findProperty("distribution") == "playstore" ||
+        isBuildingBundle
+
     defaultConfig {
         applicationId = "com.bit.agent"
         minSdk = 29
@@ -28,9 +36,8 @@ android {
         buildConfigField("String", "ALIAS", getProperty("ALIAS"))
         buildConfigField("Long", "BUILD_TIMESTAMP", "${System.currentTimeMillis()}L")
         buildConfigField("int", "BETA_EXPIRY_DAYS", "0")
+        buildConfigField("boolean", "ENABLE_GITHUB_UPDATES", (!isPlayStoreTarget).toString())
     }
-
-    val isBuildingBundle = gradle.startParameter.taskNames.any { it.contains("bundle", ignoreCase = true) }
     splits {
         abi {
             isEnable = !isBuildingBundle
