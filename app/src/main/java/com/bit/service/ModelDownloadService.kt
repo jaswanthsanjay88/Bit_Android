@@ -49,6 +49,7 @@ class ModelDownloadService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val downloadJobs = ConcurrentHashMap<String, Job>()
+    private val activeCalls = ConcurrentHashMap<String, okhttp3.Call>()
     private val notificationIdCounter = java.util.concurrent.atomic.AtomicInteger(NOTIFICATION_ID)
 
     private val notificationManager by lazy {
@@ -223,6 +224,15 @@ class ModelDownloadService : Service() {
             var tempFile: File? = null
             var extractTempDir: File? = null
             try {
+                // Prevent downloading if already installed on disk
+                val repository = com.bit.di.AppContainer.getModelRepository()
+                val existingModel = repository.getModelById(modelId)
+                if (existingModel != null && File(existingModel.modelPath).exists()) {
+                    Log.w(TAG, "Model $modelId is already installed on disk, skipping download")
+                    updateDownloadState(modelId, null)
+                    return@launch
+                }
+
                 updateDownloadState(modelId, DownloadState.Downloading(modelId, 0f, 0, 0))
 
                 val tempDir = AppPaths.tempDownloads(applicationContext, modelId)
@@ -498,13 +508,12 @@ class ModelDownloadService : Service() {
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 extractTempDir?.deleteRecursively()
+                tempFile?.delete()
 
-                updateDownloadState(modelId, DownloadState.Cancelled(modelId))
+                updateDownloadState(modelId, null)
                 updateNotification(modelName, 0f, notificationId, isCancelled = true)
 
                 withContext(Dispatchers.Main) {
-                    kotlinx.coroutines.delay(2000)
-                    updateDownloadState(modelId, null)
                     downloadJobs.remove(modelId)
 
                     if (downloadJobs.isEmpty()) {
@@ -561,6 +570,7 @@ class ModelDownloadService : Service() {
             }
         }.build()
         val call = client.newCall(request)
+        activeCalls[modelId] = call
 
         try {
             call.execute().use { response ->
@@ -626,9 +636,11 @@ class ModelDownloadService : Service() {
                                     speedSamples.average().toLong()
                                 } else 0L
 
-                                val eta = if (avgSpeed > 0 && totalBytes > 0) {
-                                    (totalBytes - downloadedBytes) / avgSpeed
-                                } else -1L
+                                // Calculate ETA
+                                val remainingBytes = totalBytes - downloadedBytes
+                                val eta = if (avgSpeed > 0 && remainingBytes > 0) {
+                                    remainingBytes / avgSpeed
+                                } else 0L
 
                                 lastUpdateTime = currentTime
                                 val progress = if (totalBytes > 0) {
@@ -651,6 +663,8 @@ class ModelDownloadService : Service() {
         } catch (e: Exception) {
             call.cancel()
             throw e
+        } finally {
+            activeCalls.remove(modelId)
         }
     }
 
@@ -1145,8 +1159,14 @@ class ModelDownloadService : Service() {
 
     private fun cancelDownload(modelId: String) {
         pausedModelIds.remove(modelId)
-        downloadJobs[modelId]?.cancel()
+        activeCalls.remove(modelId)?.cancel()
+        downloadJobs.remove(modelId)?.cancel()
         clearPauseMetadata(modelId)
+        updateDownloadState(modelId, null)
+        if (downloadJobs.isEmpty()) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     private fun pauseDownload(modelId: String) {

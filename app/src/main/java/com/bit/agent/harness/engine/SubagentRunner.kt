@@ -13,12 +13,14 @@ import com.bit.api.StreamEvent
 import com.bit.api.ToolCallData
 import com.bit.plugins.PluginManager
 import com.bit.worker.ActiveModelSession
+import com.bit.worker.LlmModelWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
@@ -64,16 +66,20 @@ class SubagentRunner(
         val startTime = System.currentTimeMillis()
         try {
             val remoteCfg = resolveRemoteConfig()
-                ?: return@withContext SubagentResult(
+            if (remoteCfg == null) {
+                if (LlmModelWorker.isGgufModelLoaded.value) {
+                    return@withContext executeLocalSubagent(task, startTime)
+                }
+                return@withContext SubagentResult(
                     taskId = task.id,
                     role = task.role,
                     isSuccess = false,
-                    summary = "No API model configured; subagents require a remote endpoint.",
-                    output = "Configure an API provider (endpoint + auth) to deploy subagents. " +
-                        "Local GGUF models do not support isolated subagent loops yet.",
+                    summary = "No model active for subagent execution.",
+                    output = "Load a model or configure an API provider to deploy subagents.",
                     artifacts = emptyList(),
                     stepsCompleted = 0
                 )
+            }
 
             val provider = LlmProviderResolver.resolveProvider(remoteCfg.endpoint, remoteCfg.model)
             val apiKey = LlmProviderResolver.cleanApiKey(remoteCfg.authHeader)
@@ -117,15 +123,21 @@ class SubagentRunner(
                 )
 
                 val textBuilder = StringBuilder()
+                val thoughtBuilder = StringBuilder()
                 val pendingCalls = mutableListOf<Triple<String, String, String?>>() // name, args, id
 
                 provider.generateResponse(chatMessages.toList(), config).collect { event ->
                     when (event) {
                         is StreamEvent.TextChunk -> textBuilder.append(event.text)
+                        is StreamEvent.ThoughtChunk -> thoughtBuilder.append(event.thought)
                         is StreamEvent.ToolCallRequest ->
                             pendingCalls.add(Triple(event.name, event.arguments, event.id))
                         is StreamEvent.ToolCallsRequest -> event.calls.forEach { call ->
                             pendingCalls.add(Triple(call.name, call.arguments, call.id))
+                        }
+                        is StreamEvent.Error -> {
+                            logger.w(TAG, "Subagent stream error: ${event.message}")
+                            SubagentSessionBus.log(task.id, stepsCompleted, "Error: ${event.message}")
                         }
                         else -> Unit
                     }
@@ -136,7 +148,8 @@ class SubagentRunner(
                     // real report. Small models often emit mid-work reasoning as plain text in
                     // one round and intend tool calls in the next — ending the loop on that
                     // chatter produces fragment outputs like "Let's try alternate source.".
-                    val candidate = stripThinking(textBuilder.toString())
+                    val rawCandidate = if (textBuilder.isNotBlank()) textBuilder.toString() else thoughtBuilder.toString()
+                    val candidate = stripThinking(rawCandidate)
                     SubagentSessionBus.log(task.id, stepsCompleted, "Reasoned (${candidate.length} chars, no tools)")
                     if (candidate.length >= MIN_FINAL_ANSWER_CHARS) {
                         finalText = candidate
@@ -372,6 +385,46 @@ class SubagentRunner(
             appendLine("{\"claims\":[{\"claim\":\"<the claim>\",\"status\":\"VERIFIED|CONTRADICTED|UNCERTAIN\",\"sources\":[\"<url or name>\"],\"notes\":\"<evidence summary>\"}]}")
             appendLine("```")
         }.trimEnd()
+    }
+
+    private suspend fun executeLocalSubagent(task: SubagentTask, startTime: Long): SubagentResult {
+        SubagentSessionBus.start(task.id, task.role, task.goal, 1)
+        val systemPrompt = buildSystemPrompt(task)
+        val messages = JSONArray().apply {
+            put(JSONObject().apply {
+                put("role", "system")
+                put("content", systemPrompt)
+            })
+            put(JSONObject().apply {
+                put("role", "user")
+                put("content", task.goal)
+            })
+        }
+        val builder = StringBuilder()
+        var errorMsg: String? = null
+        try {
+            LlmModelWorker.ggufGenerateMultiTurnStreaming(messages.toString(), maxTokens = 2048).collect { event ->
+                when (event) {
+                    is com.bit.engine.GenerationEvent.Token -> builder.append(event.text)
+                    is com.bit.engine.GenerationEvent.Error -> errorMsg = event.message
+                    else -> Unit
+                }
+            }
+        } catch (e: Exception) {
+            errorMsg = e.message
+        }
+        val text = stripThinking(builder.toString())
+        val success = text.isNotBlank() && errorMsg == null
+        SubagentSessionBus.finish(task.id, if (success) "COMPLETED" else "FAILED", text.ifBlank { errorMsg ?: "No output produced" })
+        return SubagentResult(
+            taskId = task.id,
+            role = task.role,
+            isSuccess = success,
+            summary = if (success) "Completed task via local model" else "Local execution failed: ${errorMsg ?: "empty output"}",
+            output = text.ifBlank { errorMsg ?: "No output produced" },
+            artifacts = emptyList(),
+            stepsCompleted = 1
+        )
     }
 }
 

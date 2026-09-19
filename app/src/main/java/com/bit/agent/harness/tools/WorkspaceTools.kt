@@ -97,7 +97,7 @@ class WorkspaceWriteFileTool(private val context: Context) : AgentTool {
         return try {
             val args = JSONObject(argumentsJson)
             val path = args.optString("path", "").trim()
-            val content = args.optString("content", "")
+            val content = args.optString("content", "").ifBlank { args.optString("text", "") }
             val overwrite = args.optBoolean("overwrite", true)
 
             val file = resolveFile(context, path)

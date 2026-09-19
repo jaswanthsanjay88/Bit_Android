@@ -28,9 +28,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -185,7 +188,16 @@ internal fun CuratedModelList(
         ) {
             // Recommended model card
             item {
-                RecommendedModelCard(systemRamGb = ramGb, models = models, onDownload = onDownload)
+                RecommendedModelCard(
+                    systemRamGb = ramGb,
+                    models = models,
+                    installedModelIds = installedModelIds,
+                    downloadStates = downloadStates,
+                    onDownload = onDownload,
+                    onCancelDownload = onCancelDownload,
+                    onPauseDownload = onPauseDownload,
+                    onResumeDownload = onResumeDownload
+                )
             }
 
             items(
@@ -334,18 +346,35 @@ internal fun StoreRepoCard(
 internal fun RecommendedModelCard(
     systemRamGb: Double,
     models: List<HuggingFaceModel>,
-    onDownload: (HuggingFaceModel) -> Unit
+    installedModelIds: Set<String> = emptySet(),
+    downloadStates: Map<String, ModelDownloadService.DownloadState> = emptyMap(),
+    onDownload: (HuggingFaceModel) -> Unit,
+    onCancelDownload: ((String) -> Unit)? = null,
+    onPauseDownload: ((String) -> Unit)? = null,
+    onResumeDownload: ((String, String) -> Unit)? = null
 ) {
-    // Find the best matching model from the curated list based on RAM
-    val recommended = remember(models, systemRamGb) {
+    // Find the best matching model from the curated list based on RAM,
+    // prioritizing models the user has NOT yet installed so they are not recommended
+    // something they already have.
+    val recommended = remember(models, systemRamGb, installedModelIds) {
         val ggufModels = models.filter { it.modelType == com.bit.models.data.ModelType.GGUF }
-        ggufModels
+        val uninstalled = ggufModels.filter { it.id !in installedModelIds }
+        val pool = if (uninstalled.isNotEmpty()) uninstalled else ggufModels
+        pool
             .filter { it.minRamGb > 0 && it.minRamGb <= systemRamGb }
             .maxByOrNull { it.sizeBytes }
-            ?: ggufModels.minByOrNull { it.sizeBytes }
+            ?: pool.minByOrNull { it.sizeBytes }
     }
 
     if (recommended == null) return
+
+    val isInstalled = installedModelIds.contains(recommended.id)
+    val dlState = downloadStates[recommended.id]
+    val isDownloading = dlState is ModelDownloadService.DownloadState.Downloading
+    val isPaused = dlState is ModelDownloadService.DownloadState.Paused
+    val isExtracting = dlState is ModelDownloadService.DownloadState.Extracting ||
+            dlState is ModelDownloadService.DownloadState.Processing ||
+            dlState is ModelDownloadService.DownloadState.Verifying
 
     val ramStr = when {
         systemRamGb < 4.0 -> "Fits under 4GB RAM"
@@ -357,65 +386,206 @@ internal fun RecommendedModelCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = { onDownload(recommended) })
+            .then(
+                if (!isInstalled && !isDownloading && !isExtracting) {
+                    Modifier.clickable(onClick = { onDownload(recommended) })
+                } else Modifier
+            )
             .padding(horizontal = Standards.SpacingXs, vertical = Standards.SpacingSm),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isInstalled) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
+        ),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isInstalled) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.outlineVariant
+        ),
         shape = RoundedCornerShape(20.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(Standards.SpacingMd),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.size(36.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = TnIcons.Bolt,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
+                Surface(
+                    shape = CircleShape,
+                    color = if (isInstalled) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isInstalled) TnIcons.CircleCheck else TnIcons.Bolt,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isInstalled) "RECOMMENDED FOR YOUR DEVICE • INSTALLED"
+                               else "RECOMMENDED FOR YOUR DEVICE",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.1.sp
                     )
+                    Spacer(modifier = Modifier.height(Standards.SpacingXs))
+                    Text(
+                        text = recommended.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CaptionText(
+                            text = if (isInstalled) "Installed · ${recommended.approximateSize}"
+                                   else recommended.approximateSize,
+                            color = if (isInstalled) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        CaptionText(text = "·", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                        CaptionText(text = ramStr, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+                    }
+                }
+
+                when {
+                    isInstalled -> {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.CircleCheck,
+                                    contentDescription = "Installed",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Ready",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    isDownloading -> {
+                        TextButton(
+                            onClick = { onCancelDownload?.invoke(recommended.id) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                "Cancel",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    isPaused -> {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(
+                                onClick = { onResumeDownload?.invoke(recommended.id, recommended.name) },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("Resume", style = MaterialTheme.typography.labelSmall)
+                            }
+                            TextButton(
+                                onClick = { onCancelDownload?.invoke(recommended.id) },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("Cancel", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+
+                    isExtracting -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    else -> {
+                        Icon(
+                            imageVector = TnIcons.Download,
+                            contentDescription = "Download ${recommended.name}",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "RECOMMENDED FOR YOUR DEVICE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.1.sp
-                )
-                Spacer(modifier = Modifier.height(Standards.SpacingXs))
-                Text(
-                    text = recommended.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    CaptionText(text = recommended.approximateSize, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    CaptionText(text = "·", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
-                    CaptionText(text = ramStr, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
+            // Download progress bar if currently downloading
+            if (isDownloading) {
+                val downloadingState = dlState as? ModelDownloadService.DownloadState.Downloading
+                val progress = downloadingState?.progress ?: 0f
+                val pct = (progress * 100).toInt()
+                val speedText = if (downloadingState != null && downloadingState.speedBytesPerSec > 0) {
+                    " · %.1f MB/s".format(downloadingState.speedBytesPerSec / 1_000_000.0)
+                } else ""
+                val etaText = if (downloadingState != null && downloadingState.etaSeconds > 0) {
+                    val mins = downloadingState.etaSeconds / 60
+                    val secs = downloadingState.etaSeconds % 60
+                    if (mins > 0) " · ${mins}m ${secs}s left" else " · ${secs}s left"
+                } else ""
+
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Downloading... $pct%$speedText",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (etaText.isNotEmpty()) {
+                            Text(
+                                text = etaText.trimStart(' ', '·'),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
-            Icon(
-                imageVector = TnIcons.Download,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }

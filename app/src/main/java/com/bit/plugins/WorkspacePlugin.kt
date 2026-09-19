@@ -149,7 +149,7 @@ class WorkspacePlugin(
                 TOOL_WORKSPACE_WRITE_FILE -> {
                     val rawPath = args.optString("path", "").trim()
                     require(rawPath.isNotBlank()) { "path is required" }
-                    val text = args.optString("text", "")
+                    val text = args.optString("text", "").ifBlank { args.optString("content", "") }
                     val overwrite = args.optBoolean("overwrite", true)
                     val path = rawPath.removePrefix("/workspace/").removePrefix("/workspace").trimStart('/')
 

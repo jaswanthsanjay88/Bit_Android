@@ -60,6 +60,7 @@ set(BUILD_SHARED_LIBS    ON  CACHE BOOL "" FORCE)
 set(LLAMA_MULTIMODAL     ON  CACHE BOOL "" FORCE)
 set(GGML_CPU             ON  CACHE BOOL "" FORCE)
 set(GGML_LTO             OFF CACHE BOOL "" FORCE)
+set(GGML_CPU_REPACK      OFF CACHE BOOL "" FORCE)
 
 # GPU backend — Vulkan only.
 # Headers and libvulkan.so are bundled in the NDK sysroot, so it builds

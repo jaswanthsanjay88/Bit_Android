@@ -24,6 +24,7 @@ android {
                           "-DGGML_BACKEND_DL=OFF",
                           "-DGGML_CPU_ALL_VARIANTS=OFF",
                           "-DGGML_LLAMAFILE=OFF",
+                          "-DGGML_CPU_REPACK=OFF",
                           "-Wno-deprecated",
                           "-Wno-dev")
                 abiFilters.addAll(listOf("arm64-v8a", "x86_64"))

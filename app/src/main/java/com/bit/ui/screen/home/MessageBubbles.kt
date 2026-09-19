@@ -33,7 +33,7 @@ import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.Glass
 import com.bit.ui.theme.Motion
 import kotlinx.coroutines.delay
-import java.util.Base64
+import android.util.Base64
 import com.bit.global.Standards
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.PaddingValues
@@ -210,40 +210,82 @@ internal fun AssistantStreamingBubble(
 
 // ── ImageMessageBubble ──
 
+/**
+ * Detect if a decoded bitmap is solid black (or nearly solid black, < 15 brightness per channel).
+ * This occurs when remote Stable Diffusion safety checkers zero-out an image on flagged prompts,
+ * or when VAE NaN outputs cause blank frames.
+ */
+private fun isBitmapAllBlack(bitmap: android.graphics.Bitmap): Boolean {
+    val width = bitmap.width
+    val height = bitmap.height
+    if (width <= 0 || height <= 0) return false
+
+    val stepX = (width / 32).coerceAtLeast(1)
+    val stepY = (height / 32).coerceAtLeast(1)
+
+    for (x in 0 until width step stepX) {
+        for (y in 0 until height step stepY) {
+            val pixel = bitmap.getPixel(x, y)
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+            if (r > 15 || g > 15 || b > 15) {
+                return false
+            }
+        }
+    }
+    return true
+}
+
 @Composable
-internal fun ImageMessageBubble(message: Messages, imageBlurEnabled: Boolean = true) {
+internal fun ImageMessageBubble(message: Messages, imageBlurEnabled: Boolean = false) {
     var isImageRevealed by remember(imageBlurEnabled) { mutableStateOf(!imageBlurEnabled) }
+    var showFullscreenDialog by remember { mutableStateOf(false) }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
         modifier = Modifier.padding(Standards.SpacingMd)
     ) {
         message.content.imagePrompt?.let { prompt ->
+            val cleanDisplayPrompt = prompt.replace(Regex("^(?i)(generate\\s+image|create\\s+image|/image|/draw|/paint)[:\\s]*"), "").trim()
             Text(
-                text = "Prompt: $prompt",
+                text = "Prompt: $cleanDisplayPrompt",
                 style = MaterialTheme.typography.bodySmall,
                 color = Glass.TextSecondary,
                 modifier = Modifier.padding(horizontal = Standards.SpacingXs)
             )
         }
 
-        message.content.imageData?.let { base64Image ->
-            val bitmap = remember(base64Image) {
+        message.content.imageData?.let { rawBase64 ->
+            val bitmap = remember(rawBase64) {
                 try {
-                    val imageBytes = Base64.getDecoder().decode(base64Image)
+                    val cleanB64 = if (rawBase64.contains(",")) {
+                        rawBase64.substringAfter(",")
+                    } else {
+                        rawBase64
+                    }.replace("\\s".toRegex(), "")
+                    val imageBytes = Base64.decode(cleanB64, Base64.DEFAULT)
                     BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
                 } catch (e: Exception) {
                     null
                 }
             }
 
-            bitmap?.let {
+            if (bitmap != null) {
+                val isAllBlack = remember(bitmap) { isBitmapAllBlack(bitmap) }
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .clip(RoundedCornerShape(Standards.RadiusLg))
-                        .clickable { isImageRevealed = !isImageRevealed },
+                        .clickable {
+                            if (!isImageRevealed) {
+                                isImageRevealed = true
+                            } else {
+                                showFullscreenDialog = true
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Surface(
@@ -254,44 +296,159 @@ internal fun ImageMessageBubble(message: Messages, imageBlurEnabled: Boolean = t
                         color = Glass.Surface
                     ) {
                         Image(
-                            bitmap = it.asImageBitmap(),
+                            bitmap = bitmap.asImageBitmap(),
                             contentDescription = message.content.content,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .then(
-                                    if (!isImageRevealed) Modifier.blur(radius = 70.dp)
+                                    if (!isImageRevealed) Modifier.blur(radius = 60.dp)
                                     else Modifier
                                 ),
                             contentScale = ContentScale.Crop
                         )
                     }
 
-                    // Overlay when blurred
+                    // Soft frosted glass veil when image is blurred (never pitch black!)
                     if (!isImageRevealed) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Glass.Scrim),
+                                .background(Color.Black.copy(alpha = 0.45f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                            Surface(
+                                shape = CircleShape,
+                                color = Glass.SurfaceElevated.copy(alpha = 0.85f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Glass.BorderActive)
                             ) {
-                                Icon(
-                                    imageVector = TnIcons.Sparkles,
-                                    contentDescription = "Reveal image",
-                                    modifier = Modifier.size(32.dp),
-                                    tint = Glass.AccentTertiary
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = TnIcons.Eye,
+                                        contentDescription = "Reveal image",
+                                        modifier = Modifier.size(18.dp),
+                                        tint = Glass.TextPrimary
+                                    )
+                                    Text(
+                                        text = "Tap to reveal",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = Glass.TextPrimary,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If remote API/diffusers returned an all-black image due to safety filter or VAE NaN
+                if (isAllBlack) {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = Standards.SpacingXs),
+                        shape = RoundedCornerShape(Standards.RadiusMd),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(Standards.SpacingMd),
+                            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = TnIcons.AlertTriangle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp).padding(top = 2.dp)
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "Blank / Black Image Detected",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "Tap to reveal",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = Glass.TextPrimary,
-                                    fontWeight = FontWeight.Medium
+                                    text = "The image model returned a completely black image. This occurs when the safety filter flags sensitive keywords in the prompt (e.g. minors, beach, swimwear) or due to model precision limits. Try rephrasing your prompt.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Glass.TextSecondary
                                 )
                             }
                         }
+                    }
+                }
+
+                // Fullscreen Lightbox Dialog
+                if (showFullscreenDialog) {
+                    androidx.compose.ui.window.Dialog(
+                        onDismissRequest = { showFullscreenDialog = false },
+                        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.92f))
+                                .clickable { showFullscreenDialog = false },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = message.content.content,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(Standards.SpacingMd)
+                                    .clip(RoundedCornerShape(Standards.RadiusLg)),
+                                contentScale = ContentScale.Fit
+                            )
+
+                            // Close button
+                            IconButton(
+                                onClick = { showFullscreenDialog = false },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(24.dp)
+                                    .background(Glass.SurfaceElevated.copy(alpha = 0.7f), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.X,
+                                    contentDescription = "Close",
+                                    tint = Glass.TextPrimary
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Bitmap decode error fallback
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f),
+                    shape = RoundedCornerShape(Standards.RadiusLg),
+                    color = Glass.Surface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Glass.BorderSubtle)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(Standards.SpacingMd),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = TnIcons.AlertTriangle,
+                            contentDescription = "Image decode failed",
+                            tint = Glass.TextMuted,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(Modifier.height(Standards.SpacingSm))
+                        Text(
+                            text = "Unable to load image preview",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Glass.TextSecondary
+                        )
                     }
                 }
             }

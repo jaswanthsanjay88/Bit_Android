@@ -36,7 +36,7 @@ class LlmGoalPlanner(
 
     companion object {
         private const val TAG = "LlmGoalPlanner"
-        private const val MAX_PLAN_TOKENS = 1024
+        private const val MAX_PLAN_TOKENS = 4096
     }
 
     override suspend fun generatePlanJson(goal: String): String? {
@@ -78,14 +78,19 @@ class LlmGoalPlanner(
                 val messages = listOf(
                     ChatMessage(text = planningPrompt, participant = Participant.USER)
                 )
-                val builder = StringBuilder()
+                val textBuilder = StringBuilder()
+                val thoughtBuilder = StringBuilder()
                 cfg.provider.generateResponse(messages, cfg.config).collect { event ->
-                    if (event is StreamEvent.TextChunk) builder.append(event.text)
+                    when (event) {
+                        is StreamEvent.TextChunk -> textBuilder.append(event.text)
+                        is StreamEvent.ThoughtChunk -> thoughtBuilder.append(event.thought)
+                        is StreamEvent.Error -> logger.w(TAG, "Planning stream error: ${event.message}")
+                        else -> Unit
+                    }
                 }
-                val text = builder.toString().trim()
-                if (text.isNotBlank()) {
-                    cleanSlmPlanJson(text) ?: text
-                } else null
+                val raw = if (textBuilder.isNotBlank()) textBuilder.toString() else thoughtBuilder.toString()
+                val clean = cleanSlmPlanJson(raw)
+                clean ?: raw.takeIf { it.isNotBlank() }
             } catch (e: Exception) {
                 logger.w(TAG, "Remote LLM planning failed: ${e.message}")
                 null
@@ -96,7 +101,11 @@ class LlmGoalPlanner(
     }
 
     private fun cleanSlmPlanJson(raw: String): String? {
-        var text = raw.trim()
+        var text = raw
+            .replace(Regex("<think>[\\s\\S]*?</think>", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("</?think>", RegexOption.IGNORE_CASE), "")
+            .trim()
+
         if (text.contains("```")) {
             text = text.replace(Regex("""^```(?:json)?\s*""", RegexOption.MULTILINE), "")
                 .replace(Regex("""\s*```$""", RegexOption.MULTILINE), "")
@@ -105,11 +114,18 @@ class LlmGoalPlanner(
         // Remove trailing commas before closing braces/brackets
         text = text.replace(Regex(""",\s*([\]}])"""), "$1")
 
-        if (text.contains("[") && text.contains("]")) {
-            return "[" + text.substringAfter("[").substringBeforeLast("]") + "]"
+        // Find array bounds
+        val arrayStart = text.indexOf('[')
+        val arrayEnd = text.lastIndexOf(']')
+        if (arrayStart != -1 && arrayEnd > arrayStart) {
+            return text.substring(arrayStart, arrayEnd + 1)
         }
-        if (text.contains("{") && text.contains("}")) {
-            val candidate = "{" + text.substringAfter("{").substringBeforeLast("}") + "}"
+
+        // Object with "steps" or "plan"
+        val objStart = text.indexOf('{')
+        val objEnd = text.lastIndexOf('}')
+        if (objStart != -1 && objEnd > objStart) {
+            val candidate = text.substring(objStart, objEnd + 1)
             return try {
                 val obj = JSONObject(candidate)
                 when {
@@ -122,6 +138,19 @@ class LlmGoalPlanner(
                 candidate
             }
         }
+
+        // If JSON array was truncated (missing closing ']'), salvage completed step objects
+        if (arrayStart != -1) {
+            val lastCloseBrace = text.lastIndexOf('}')
+            if (lastCloseBrace > arrayStart) {
+                val candidate = text.substring(arrayStart, lastCloseBrace + 1) + "\n]"
+                try {
+                    org.json.JSONArray(candidate)
+                    return candidate
+                } catch (_: Exception) {}
+            }
+        }
+
         return text.takeIf { it.isNotBlank() }
     }
 
@@ -194,37 +223,34 @@ class LlmGoalPlanner(
             toolNames.joinToString(", ")
         }
         return buildString {
-            appendLine("You are an autonomous agent planner. Decompose the user goal into actionable tool steps.")
-            appendLine("Generate the FULL, COMPLETE content (code, script, or text) inside the tool arguments.")
-            appendLine("Respond with ONLY a JSON array, no conversational prose, no markdown fences. Each element must follow:")
+            appendLine("You are an autonomous agent planner. Decompose the user goal into a DAG of actionable steps using the allowed tools.")
+            appendLine("Allowed tools: [$toolList]")
+            appendLine()
+            appendLine("Respond with ONLY a valid JSON array of step objects, no conversational prose, no markdown fences.")
             appendLine("""[
   {
     "id": "step_1",
-    "description": "Brief description of the step",
+    "description": "Short description of the step",
     "toolName": "<tool name from allowed tools>",
     "arguments": {
-      "path": "filename.py",
-      "text": "full python code here",
-      "command": "python3 filename.py",
-      "query": "search keywords",
-      "title": "note title",
-      "content": "note content"
+      "path": "filename.html",
+      "content": "concise initial content or template",
+      "query": "search query keywords",
+      "command": "sh command to run",
+      "role": "Web Engineer",
+      "goal": "autonomous subagent mission instructions"
     },
     "expectedOutcome": "Expected outcome of the step"
   }
 ]""")
             appendLine()
-            appendLine("Allowed tools: [$toolList]")
-            appendLine()
-            appendLine("PLANNING RULES:")
-            appendLine("- Multi-part goals (e.g. \"research X, then have a reviewer verify\") MUST become separate sequential steps — never merge phases into one step.")
-            appendLine("- If the goal asks for verification, review, fact-checking, or auditing of findings, add a final step using toolName \"invoke_subagent\" with arguments: {\"role\": \"Verification Reviewer\", \"goal\": \"<what to verify and how>\", \"max_steps\": 8}.")
-            appendLine("- invoke_subagent automatically receives all prior step outputs appended to its goal — phrase its goal as work instructions (e.g. \"Cross-check the supplied findings against sources; flag unsupported claims\").")
-            appendLine("- INDEPENDENT parallel sub-tasks (e.g. verify unrelated claim groups, research separate subtopics) may be batched in ONE invoke_subagent step via a \"tasks\" array: {\"tasks\":[{\"role\":\"...\",\"goal\":\"...\",\"max_steps\":8}]}. Max 3 tasks; they run concurrently. Never batch dependent tasks.")
-            appendLine("- After a web_search step whose findings will be verified, add a Research Reader invoke_subagent step that uses web_fetch on the 2-3 top URLs and outputs FINDINGS + a numbered CLAIMS list. Reviewers verify those claims — never raw search snippets.")
-            appendLine("- Reviewer subagents must END their report with: (a) a corrections list marking every fixable issue CORRECTION REQUIRED or ADDITION REQUIRED with the corrected statement, and (b) a final verdict: PASS, PASS_WITH_CONDITIONS, or FAIL. The harness auto-injects revision + convergence steps when corrections are demanded.")
-            appendLine("- Search queries must be short keyword phrases extracted from the goal — NEVER copy the full instruction sentence into a query, and do NOT invent years, dates or limits the user did not specify.")
-            appendLine("- Keep plans under 10 steps. Prefer fewer, well-scoped steps.")
+            appendLine("PLANNING GUIDELINES:")
+            appendLine("- For research, facts, discoveries, or current information, start with 'web_search'.")
+            appendLine("- For coding, building web pages, writing software, or creative workspace tasks, delegate to 'invoke_subagent' with a descriptive 'role' and comprehensive 'goal', OR write directly with 'workspace_write_file'.")
+            appendLine("- Subagents launched via 'invoke_subagent' operate autonomously in the workspace with access to all tools (read/write/edit/shell) and automatically receive prior research findings.")
+            appendLine("- If the user requests fact-checking, verification, or review, add an 'invoke_subagent' step with role 'Verification Reviewer'.")
+            appendLine("- When writing files directly, specify 'path' and 'content' cleanly without unnecessary escape bloat.")
+            appendLine("- Keep plans concise and effective (typically 1 to 4 steps).")
             appendLine()
             appendLine("""Example verification step:
   {"id": "step_2", "description": "Verify findings with an independent reviewer", "toolName": "invoke_subagent", "arguments": {"role": "Verification Reviewer", "goal": "Cross-check the research findings about <topic> using web_search and web_fetch; flag unsupported claims.", "max_steps": 8}, "expectedOutcome": "Findings verified"}""")

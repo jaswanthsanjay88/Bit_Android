@@ -629,9 +629,10 @@ class ChatViewModel @Inject constructor(
 
     val isVlmLoaded: StateFlow<Boolean> = combine(
         LlmModelWorker.isVlmLoaded,
-        ActiveModelSession.currentModelType
-    ) { localVlm, providerType ->
-        localVlm || providerType == ProviderType.VLM || providerType == ProviderType.API
+        ActiveModelSession.currentModelType,
+        ActiveModelSession.isImageModel
+    ) { localVlm, providerType, isImage ->
+        localVlm || providerType == ProviderType.VLM || (providerType == ProviderType.API && !isImage)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // TTS state
@@ -826,6 +827,22 @@ class ChatViewModel @Inject constructor(
                 }
             }
         }
+
+        // Synchronize generation type with loaded model capabilities
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(
+                isTextModelLoaded,
+                isImageModelLoaded
+            ) { textLoaded, imgLoaded ->
+                Pair(textLoaded, imgLoaded)
+            }.collect { (textLoaded, imgLoaded) ->
+                if (!imgLoaded) {
+                    _currentGenerationType.value = ModelType.TEXT_GENERATION
+                } else if (imgLoaded && !textLoaded) {
+                    _currentGenerationType.value = ModelType.IMAGE_GENERATION
+                }
+            }
+        }
     }
 
     // ==================== RAG Controls ====================
@@ -961,6 +978,7 @@ class ChatViewModel @Inject constructor(
         }
 
         _isGenerating.value = true
+        _currentGenerationType.value = ModelType.TEXT_GENERATION
         _streamingUserMessage.value = prompt
         _streamingAssistantMessage.value = ""
         userMessageAdded.set(false)
@@ -1111,6 +1129,7 @@ class ChatViewModel @Inject constructor(
                         nodeId = "attached-$docName"
                     )
                     _currentRagResults.value = listOf(docDisplay) + _currentRagResults.value
+                    clearAttachedDocument()
                 }
 
                 executeUnifiedGeneration(prompt, ragContext, maxTokens, isNewChat)
@@ -1271,21 +1290,47 @@ class ChatViewModel @Inject constructor(
                     return@launch
                 }
 
-                val isNewChat = isNewConversation
-                if (activeProviderType == ProviderType.API) {
-                    simpleRemoteFlowWithImages(prompt, base64Image, isNewChat)
-                    return@launch
+                val maxTokens = getCurrentModelMaxTokens()
+                val isSmall = maxTokens <= 2048
+
+                var docAndRagContext: String? = _currentRagContext.value
+
+                if (_attachedDocContent.value != null) {
+                    val docText = _attachedDocContent.value!!
+                    val docName = _attachedFileName.value ?: "Attached Document"
+                    val docContent = if (isSmall && docText.length > 1500) docText.take(1500) + "..." else if (docText.length > 25000) docText.take(25000) + "..." else docText
+                    val docChunk = "<attached_document name=\"$docName\">\n$docContent\n</attached_document>"
+                    docAndRagContext = if (docAndRagContext != null) "$docChunk\n\n$docAndRagContext" else docChunk
+                    val docDisplay = com.bit.viewmodel.RagQueryDisplayResult(
+                        ragName = docName,
+                        content = if (docText.length > 300) docText.take(300) + "..." else docText,
+                        score = 1.0f,
+                        nodeId = "attached-$docName"
+                    )
+                    _currentRagResults.value = listOf(docDisplay) + _currentRagResults.value
+                    clearAttachedDocument()
                 }
 
-                val maxTokens = getCurrentModelMaxTokens()
+                val effectivePrompt = if (prompt.isBlank()) "Describe this image in detail." else prompt
+                val augmentedPrompt = if (docAndRagContext != null) {
+                    "Context:\n$docAndRagContext\n\n$effectivePrompt"
+                } else {
+                    effectivePrompt
+                }
+
+                val isNewChat = isNewConversation
+                if (activeProviderType == ProviderType.API) {
+                    simpleRemoteFlowWithImages(augmentedPrompt, base64Image, isNewChat)
+                    return@launch
+                }
 
                 // Insert image marker into prompt for VLM
                 val marker = LlmModelWorker.getVlmDefaultMarker().ifBlank { "<__image__>" }
                 val imageCount = resizedImageData.size.coerceAtLeast(1)
-                val vlmPrompt = if (prompt.contains(marker) || prompt.contains("<__image__>") || prompt.contains("<__media__>")) {
-                    prompt
+                val vlmPrompt = if (augmentedPrompt.contains(marker) || augmentedPrompt.contains("<__image__>") || augmentedPrompt.contains("<__media__>")) {
+                    augmentedPrompt
                 } else {
-                    (1..imageCount).joinToString("") { "$marker\n" } + prompt
+                    (1..imageCount).joinToString("") { "$marker\n" } + augmentedPrompt
                 }
 
                 val messagesJsonList = mutableListOf<JSONObject>()
@@ -1402,11 +1447,15 @@ class ChatViewModel @Inject constructor(
                         userMessageAdded.set(true)
                     }
                     if (finalResponse.isNotBlank()) {
+                        val ragResultItems = _currentRagResults.value.takeIf { it.isNotEmpty() }?.map { result ->
+                            RagResultItem(ragName = result.ragName, content = result.content, score = result.score, nodeId = result.nodeId)
+                        }
                         val assistantMessage = Messages(
                             role = Role.Assistant,
                             content = MessageContent(contentType = ContentType.Text, content = finalResponse),
                             modelId = currentModelId,
                             decodingMetrics = currentMetrics,
+                            ragResults = ragResultItems
                         )
                         _messages.add(assistantMessage)
                         chatManager.addMessage(chatId, assistantMessage)
@@ -1555,19 +1604,14 @@ class ChatViewModel @Inject constructor(
             "{${com.bit.data.PredefinedVariables.ACTIVE_MEMORY}}" to activeMemoryText
         )
 
-        val activeModelId = currentModelId ?: ""
-        val isSmall = activeModelId.contains("350m", ignoreCase = true) ||
-                activeModelId.contains("125m", ignoreCase = true) ||
-                activeModelId.contains("160m", ignoreCase = true) ||
-                activeModelId.contains("tiny", ignoreCase = true) ||
-                activeModelId.contains("mini", ignoreCase = true) ||
-                activeModelId.contains("1b", ignoreCase = true) ||
-                activeModelId.contains("2b", ignoreCase = true) ||
-                activeModelId.contains("3b", ignoreCase = true) ||
-                activeModelId.contains("1.5b", ignoreCase = true) ||
-                activeModelId.contains("1.7b", ignoreCase = true) ||
-                activeModelId.contains("1.8b", ignoreCase = true) ||
-                activeModelId.contains("qwen3", ignoreCase = true)
+        val activeProviderType = ActiveModelSession.currentModelType.value
+        val activeModelId = ActiveModelSession.currentModelId.value.ifBlank { LlmModelWorker.currentGgufModelId.value ?: "" }
+        val isSmall = if (activeProviderType == ProviderType.API) {
+            false
+        } else {
+            val id = activeModelId.lowercase()
+            Regex("""\b(350m|125m|160m|tiny|1b|2b|3b|1\.5b|1\.7b|1\.8b)\b""").containsMatchIn(id)
+        }
 
         var finalPrepend = if (isSmall) "" else globalPrepend
         var finalPostpend = if (isSmall) "" else globalPostpend
@@ -1589,20 +1633,12 @@ class ChatViewModel @Inject constructor(
         _toolChainSteps.value = emptyList()
         _agentPhase.value = AgentPhase.Executing
 
-        val activeProviderType = ActiveModelSession.currentModelType.value
-        val isTooTinyForTools = activeModelId.contains("350m", ignoreCase = true) ||
-                activeModelId.contains("125m", ignoreCase = true) ||
-                activeModelId.contains("160m", ignoreCase = true) ||
-                activeModelId.contains("0.5b", ignoreCase = true) ||
-                activeModelId.contains("0.6b", ignoreCase = true) ||
-                activeModelId.contains("0.8b", ignoreCase = true) ||
-                activeModelId.contains("1b", ignoreCase = true) ||
-                activeModelId.contains("1.5b", ignoreCase = true) ||
-                activeModelId.contains("1.7b", ignoreCase = true) ||
-                activeModelId.contains("1.8b", ignoreCase = true) ||
-                activeModelId.contains("2b", ignoreCase = true) ||
-                activeModelId.contains("tiny", ignoreCase = true) ||
-                activeModelId.contains("mini", ignoreCase = true)
+        val isTooTinyForTools = if (activeProviderType == ProviderType.API) {
+            false
+        } else {
+            val id = activeModelId.lowercase()
+            Regex("""\b(350m|125m|160m|0\.5b|0\.6b|0\.8b)\b""").containsMatchIn(id)
+        }
         val hasTools = PluginManager.hasEnabledTools()
                 && (PluginManager.isToolCallingModelLoaded.value || activeProviderType == ProviderType.API)
                 && !isTooTinyForTools
@@ -2482,10 +2518,14 @@ class ChatViewModel @Inject constructor(
         }
 
         if (finalResponse.isNotBlank()) {
+            val ragResultItems = _currentRagResults.value.takeIf { it.isNotEmpty() }?.map { result ->
+                RagResultItem(ragName = result.ragName, content = result.content, score = result.score, nodeId = result.nodeId)
+            }
             val assistantMessage = Messages(
                 role = Role.Assistant,
                 content = MessageContent(contentType = ContentType.Text, content = finalResponse),
-                modelId = currentModelId
+                modelId = currentModelId,
+                ragResults = ragResultItems
             )
             _messages.add(assistantMessage)
             chatManager.addMessage(chatId, assistantMessage)
@@ -3461,7 +3501,9 @@ class ChatViewModel @Inject constructor(
         seed: Long = -1L,
         width: Int? = null,
         height: Int? = null,
-        scheduler: String? = null
+        scheduler: String? = null,
+        inputImage: String? = null,
+        denoiseStrength: Float = 0.6f
     ) {
         val isRemoteImage = ActiveModelSession.currentModelType.value == ProviderType.API && ActiveModelSession.isImageModel.value
         if (!LlmModelWorker.isDiffusionModelLoaded.value && !isRemoteImage) {
@@ -3473,8 +3515,24 @@ class ChatViewModel @Inject constructor(
         _isGenerating.value = true
         _currentGenerationType.value = ModelType.IMAGE_GENERATION
 
+        val inputImageBase64 = inputImage?.let { path ->
+            try {
+                val file = File(path)
+                if (file.exists()) {
+                    val bytes = file.readBytes()
+                    android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                } else null
+            } catch (_: Exception) { null }
+        }
+        val cleanPrompt = prompt.replace(Regex("^(?i)(generate\\s+image|create\\s+image|/image|/draw|/paint)[:\\s]*"), "").trim()
+        val promptText = if (inputImageBase64 != null) {
+            if (cleanPrompt.isNotBlank()) cleanPrompt else "Edit image"
+        } else {
+            "Generate image: $cleanPrompt"
+        }
+
         if (isRemoteImage) {
-            _streamingUserMessage.value = prompt
+            _streamingUserMessage.value = cleanPrompt
             imageGenerationStartTime = System.currentTimeMillis()
             userMessageAdded.set(false)
 
@@ -3483,7 +3541,11 @@ class ChatViewModel @Inject constructor(
                 currentUserMessage = Messages(
                     msgId = "",
                     role = Role.User,
-                    content = MessageContent(contentType = ContentType.Text, content = "Generate image: $prompt"),
+                    content = if (inputImageBase64 != null) {
+                        MessageContent(contentType = ContentType.TextWithImage, content = promptText, imageData = inputImageBase64)
+                    } else {
+                        MessageContent(contentType = ContentType.Text, content = promptText)
+                    },
                     modelId = activeModelId
                 )
                 if (!userMessageAdded.get()) {
@@ -3491,7 +3553,7 @@ class ChatViewModel @Inject constructor(
                     userMessageAdded.set(true)
                 }
                 AppStateManager.setHasMessages(true)
-                generateRemoteImage(prompt = prompt, width = width ?: 1024, height = height ?: 1024, chatId = null, userMessage = currentUserMessage)
+                generateRemoteImage(prompt = cleanPrompt, width = width ?: 1024, height = height ?: 1024, chatId = null, userMessage = currentUserMessage)
             } else {
                 val chatId = _currentChatId.value
                 if (chatId == null) {
@@ -3502,7 +3564,11 @@ class ChatViewModel @Inject constructor(
                 currentUserMessage = Messages(
                     msgId = "",
                     role = Role.User,
-                    content = MessageContent(contentType = ContentType.Text, content = "Generate image: $prompt"),
+                    content = if (inputImageBase64 != null) {
+                        MessageContent(contentType = ContentType.TextWithImage, content = promptText, imageData = inputImageBase64)
+                    } else {
+                        MessageContent(contentType = ContentType.Text, content = promptText)
+                    },
                     modelId = activeModelId
                 )
                 if (!userMessageAdded.get()) {
@@ -3511,13 +3577,13 @@ class ChatViewModel @Inject constructor(
                 }
                 AppStateManager.setHasMessages(true)
                 viewModelScope.launch {
-                    chatManager.addUserMessage(chatId, "Generate image: $prompt").onSuccess { userMessage ->
+                    chatManager.addUserMessage(chatId, promptText).onSuccess { userMessage ->
                         currentUserMessage = userMessage
-                        val idx = _messages.indexOfLast { it.role == Role.User && it.msgId == "" && it.content.content == "Generate image: $prompt" }
+                        val idx = _messages.indexOfLast { it.role == Role.User && it.msgId == "" && it.content.content == promptText }
                         if (idx != -1) {
                             _messages[idx] = userMessage
                         }
-                        generateRemoteImage(prompt = prompt, width = width ?: 1024, height = height ?: 1024, chatId = chatId, userMessage = userMessage)
+                        generateRemoteImage(prompt = cleanPrompt, width = width ?: 1024, height = height ?: 1024, chatId = chatId, userMessage = userMessage)
                     }.onFailure { e ->
                         reportError("Failed to save message: ${e.message}")
                         resetStreamingState()
@@ -3555,7 +3621,7 @@ class ChatViewModel @Inject constructor(
                 val finalHeight = height ?: diffusionConfig.height
                 val finalScheduler = scheduler ?: inferenceParams.scheduler
 
-                _streamingUserMessage.value = prompt
+                _streamingUserMessage.value = cleanPrompt
                 imageGenerationStartTime = System.currentTimeMillis()
                 userMessageAdded.set(false)
 
@@ -3563,15 +3629,24 @@ class ChatViewModel @Inject constructor(
                     currentUserMessage = Messages(
                         msgId = "",
                         role = Role.User,
-                        content = MessageContent(contentType = ContentType.Text, content = "Generate image: $prompt"),
+                        content = if (inputImageBase64 != null) {
+                            MessageContent(contentType = ContentType.TextWithImage, content = promptText, imageData = inputImageBase64)
+                        } else {
+                            MessageContent(contentType = ContentType.Text, content = promptText)
+                        },
                         modelId = LlmModelWorker.currentDiffusionModelId.value,
-                            )
+                    )
                     if (!userMessageAdded.get()) {
                         _messages.add(currentUserMessage!!)
                         userMessageAdded.set(true)
                     }
                     AppStateManager.setHasMessages(true)
-                    generateImageForNewChat(prompt, finalNegativePrompt, finalSteps, finalCfgScale, seed, finalWidth, finalHeight, finalScheduler, inferenceParams.showDiffusionProcess, inferenceParams.showDiffusionStride)
+                    generateImageForNewChat(
+                        cleanPrompt, finalNegativePrompt, finalSteps, finalCfgScale, seed,
+                        finalWidth, finalHeight, finalScheduler,
+                        inferenceParams.showDiffusionProcess, inferenceParams.showDiffusionStride,
+                        inputImage = inputImage, denoiseStrength = denoiseStrength
+                    )
                 } else {
                     val chatId = _currentChatId.value
                     if (chatId == null) {
@@ -3583,7 +3658,11 @@ class ChatViewModel @Inject constructor(
                     currentUserMessage = Messages(
                         msgId = "",
                         role = Role.User,
-                        content = MessageContent(contentType = ContentType.Text, content = "Generate image: $prompt"),
+                        content = if (inputImageBase64 != null) {
+                            MessageContent(contentType = ContentType.TextWithImage, content = promptText, imageData = inputImageBase64)
+                        } else {
+                            MessageContent(contentType = ContentType.Text, content = promptText)
+                        },
                         modelId = LlmModelWorker.currentDiffusionModelId.value,
                     )
                     if (!userMessageAdded.get()) {
@@ -3592,14 +3671,19 @@ class ChatViewModel @Inject constructor(
                     }
                     AppStateManager.setHasMessages(true)
 
-                    chatManager.addUserMessage(chatId, "Generate image: $prompt").onSuccess { userMessage ->
+                    chatManager.addUserMessage(chatId, promptText).onSuccess { userMessage ->
                         currentUserMessage = userMessage
                         // Update the optimistic message with the real DB message
-                        val idx = _messages.indexOfLast { it.role == Role.User && it.msgId == "" && it.content.content == "Generate image: $prompt" }
+                        val idx = _messages.indexOfLast { it.role == Role.User && it.msgId == "" && it.content.content == promptText }
                         if (idx != -1) {
                             _messages[idx] = userMessage
                         }
-                        generateImage(chatId, userMessage, prompt, finalNegativePrompt, finalSteps, finalCfgScale, seed, finalWidth, finalHeight, finalScheduler, inferenceParams.showDiffusionProcess, inferenceParams.showDiffusionStride)
+                        generateImage(
+                            chatId, userMessage, cleanPrompt, finalNegativePrompt, finalSteps, finalCfgScale, seed,
+                            finalWidth, finalHeight, finalScheduler,
+                            inferenceParams.showDiffusionProcess, inferenceParams.showDiffusionStride,
+                            inputImage = inputImage, denoiseStrength = denoiseStrength
+                        )
                     }.onFailure { e ->
                         reportError("Failed to save message: ${e.message}")
                         resetStreamingState()
@@ -3629,11 +3713,20 @@ class ChatViewModel @Inject constructor(
 
             try {
                 val activeModelId = ActiveModelSession.currentModelId.value
+                val modelDb = try { com.bit.di.AppContainer.getModelRepository().getModelById(activeModelId) } catch (_: Exception) { null }
                 val config = getModelConfig(activeModelId)
                 val loadingJson = org.json.JSONObject(config?.modelLoadingParams ?: "{}")
-                val endpointUrl = loadingJson.optString("endpoint", "")
+                val endpointUrl = loadingJson.optString("endpoint", "").ifBlank { modelDb?.modelPath ?: "" }
                 val apiKey = loadingJson.optString("authHeader", "")
-                val modelName = loadingJson.optString("model", activeModelId)
+
+                // Model name resolution: strip "(Provider)" suffix if from modelDb
+                val dbModelName = modelDb?.modelName?.substringBefore(" (")?.trim().orEmpty()
+                val jsonModelName = loadingJson.optString("model", "").trim()
+                val modelName = when {
+                    dbModelName.isNotBlank() -> dbModelName
+                    jsonModelName.isNotBlank() -> jsonModelName
+                    else -> activeModelId
+                }
 
                 _imageGenerationProgress.value = 0.4f
                 _imageGenerationStep.value = "Generating image with $modelName..."
@@ -3712,7 +3805,8 @@ class ChatViewModel @Inject constructor(
     private fun generateImageForNewChat(
         prompt: String, negativePrompt: String, steps: Int, cfgScale: Float,
         seed: Long, width: Int, height: Int, scheduler: String,
-        showDiffusionProcess: Boolean = true, showDiffusionStride: Int = 1
+        showDiffusionProcess: Boolean = true, showDiffusionStride: Int = 1,
+        inputImage: String? = null, denoiseStrength: Float = 0.6f
     ) {
         generationJob = viewModelScope.launch {
             _error.value = null
@@ -3723,7 +3817,11 @@ class ChatViewModel @Inject constructor(
             AppStateManager.setGeneratingImage()
 
             try {
-                LlmModelWorker.generateDiffusionImage(prompt, negativePrompt, steps, cfgScale, seed, width, height, scheduler, showDiffusionProcess = showDiffusionProcess, showDiffusionStride = showDiffusionStride).collect { event ->
+                LlmModelWorker.generateDiffusionImage(
+                    prompt, negativePrompt, steps, cfgScale, seed, width, height, scheduler,
+                    inputImage = inputImage, denoiseStrength = denoiseStrength,
+                    showDiffusionProcess = showDiffusionProcess, showDiffusionStride = showDiffusionStride
+                ).collect { event ->
                     when (event) {
                         is LlmModelWorker.DiffusionGenerationEvent.Progress -> {
                             _imageGenerationProgress.value = event.progress
@@ -3756,7 +3854,8 @@ class ChatViewModel @Inject constructor(
     private fun generateImage(
         chatId: String, userMessage: Messages, prompt: String, negativePrompt: String,
         steps: Int, cfgScale: Float, seed: Long, width: Int, height: Int, scheduler: String,
-        showDiffusionProcess: Boolean = true, showDiffusionStride: Int = 1
+        showDiffusionProcess: Boolean = true, showDiffusionStride: Int = 1,
+        inputImage: String? = null, denoiseStrength: Float = 0.6f
     ) {
         generationJob = viewModelScope.launch {
             _error.value = null
@@ -3766,7 +3865,11 @@ class ChatViewModel @Inject constructor(
             AppStateManager.setGeneratingImage()
 
             try {
-                LlmModelWorker.generateDiffusionImage(prompt, negativePrompt, steps, cfgScale, seed, width, height, scheduler, showDiffusionProcess = showDiffusionProcess, showDiffusionStride = showDiffusionStride).collect { event ->
+                LlmModelWorker.generateDiffusionImage(
+                    prompt, negativePrompt, steps, cfgScale, seed, width, height, scheduler,
+                    inputImage = inputImage, denoiseStrength = denoiseStrength,
+                    showDiffusionProcess = showDiffusionProcess, showDiffusionStride = showDiffusionStride
+                ).collect { event ->
                     when (event) {
                         is LlmModelWorker.DiffusionGenerationEvent.Progress -> {
                             _imageGenerationProgress.value = event.progress
@@ -4032,6 +4135,11 @@ class ChatViewModel @Inject constructor(
 
     private fun resetStreamingState() {
         _isGenerating.value = false
+        if (isImageModelLoaded.value && !isTextModelLoaded.value) {
+            _currentGenerationType.value = ModelType.IMAGE_GENERATION
+        } else {
+            _currentGenerationType.value = ModelType.TEXT_GENERATION
+        }
         _streamingUserMessage.value = null
         _streamingAssistantMessage.value = ""
         _streamingImage.value = null

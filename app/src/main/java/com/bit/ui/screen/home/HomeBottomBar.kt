@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -273,6 +274,34 @@ internal fun BottomBar(
         onRefreshStats = { memoryViewModel.refreshStats() }
     )
 
+    // Model attachment capabilities
+    val hasAnyModel = isTextModelLoaded || isImageModelLoaded || isVlmLoaded
+
+    val canAttachImages = when {
+        !hasAnyModel -> false
+        isVlmLoaded || isImageModelLoaded -> true
+        else -> false
+    }
+
+    val imagesDisabledReason = when {
+        !hasAnyModel -> "Please load a model first"
+        !canAttachImages -> "Vision model or projector required for image input"
+        else -> null
+    }
+
+    val canAttachDocuments = when {
+        !hasAnyModel -> false
+        isImageModelLoaded && !isTextModelLoaded && !isVlmLoaded -> false
+        isTextModelLoaded || isVlmLoaded -> true
+        else -> false
+    }
+
+    val documentsDisabledReason = when {
+        !hasAnyModel -> "Please load a model first"
+        !canAttachDocuments -> "Document files not supported for image models"
+        else -> null
+    }
+
     // Add Attachment Sheet
     AddAttachmentBottomSheet(
         show = showAttachmentSheet,
@@ -289,6 +318,10 @@ internal fun BottomBar(
             fileLauncher.launch(documentMimeTypes)
             showAttachmentSheet = false
         },
+        canAttachImages = canAttachImages,
+        imagesDisabledReason = imagesDisabledReason,
+        canAttachDocuments = canAttachDocuments,
+        documentsDisabledReason = documentsDisabledReason,
         toolCallingEnabled = toolCallingEnabled,
         isWebSearchEnabled = isWebSearchEnabled,
         onWebSearchToggle = { pluginViewModel.toggleWebSearch(it) },
@@ -637,7 +670,7 @@ internal fun BottomBar(
                                         if (value.isEmpty()) {
                                             val placeholder = when {
                                                 isImageModelLoaded && !isTextModelLoaded -> "Describe the image to generate..."
-                                                chatState.generationType == ModelType.IMAGE_GENERATION -> "Describe the image to generate..."
+                                                isImageModelLoaded && chatState.generationType == ModelType.IMAGE_GENERATION -> "Describe the image to generate..."
                                                 else -> "Ask me anything"
                                             }
                                             Text(
@@ -685,8 +718,28 @@ internal fun BottomBar(
                                     onClick = {
                                         val now = System.currentTimeMillis()
                                         if (now - lastSendTime < 1000L) return@FilledTonalIconButton
+
+                                        if (attachedImages.isNotEmpty() && !canAttachImages) {
+                                            haptics.action()
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                imagesDisabledReason ?: "Current model does not support image input",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                            return@FilledTonalIconButton
+                                        }
+
+                                        if (attachedFiles.isNotEmpty() && !canAttachDocuments) {
+                                            haptics.action()
+                                            android.widget.Toast.makeText(
+                                                context,
+                                                documentsDisabledReason ?: "Current model does not support document input",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                            return@FilledTonalIconButton
+                                        }
+
                                         lastSendTime = now
-                                        
                                         haptics.action()
                                         val trimmedValue = value.trim()
                                         val isImageTrigger = trimmedValue.startsWith("/image", ignoreCase = true) ||
@@ -699,16 +752,36 @@ internal fun BottomBar(
 
                                         if (shouldGenerateImage) {
                                             val cleanPrompt = when {
-                                                trimmedValue.startsWith("/image", ignoreCase = true) -> trimmedValue.removePrefix("/image").trim()
-                                                trimmedValue.startsWith("/draw", ignoreCase = true) -> trimmedValue.removePrefix("/draw").trim()
-                                                trimmedValue.startsWith("/paint", ignoreCase = true) -> trimmedValue.removePrefix("/paint").trim()
-                                                trimmedValue.startsWith("generate image", ignoreCase = true) -> trimmedValue.removePrefix("generate image").trim()
-                                                trimmedValue.startsWith("create image", ignoreCase = true) -> trimmedValue.removePrefix("create image").trim()
+                                                trimmedValue.startsWith("/image", ignoreCase = true) -> trimmedValue.substring(6).trim()
+                                                trimmedValue.startsWith("/draw", ignoreCase = true) -> trimmedValue.substring(5).trim()
+                                                trimmedValue.startsWith("/paint", ignoreCase = true) -> trimmedValue.substring(6).trim()
+                                                trimmedValue.startsWith("generate image", ignoreCase = true) -> trimmedValue.substring(14).trim()
+                                                trimmedValue.startsWith("create image", ignoreCase = true) -> trimmedValue.substring(12).trim()
                                                 else -> trimmedValue
                                             }.removePrefix(":").removePrefix(" ").trim()
 
-                                            chatViewModel.sendImageRequest(cleanPrompt)
+                                            var inputImagePath: String? = null
+                                            if (attachedImages.isNotEmpty()) {
+                                                try {
+                                                    val uri = attachedImages.first()
+                                                    val tempFile = java.io.File(context.cacheDir, "sd_input_${System.currentTimeMillis()}.png")
+                                                    context.contentResolver.openInputStream(uri)?.use { input ->
+                                                        tempFile.outputStream().use { output ->
+                                                            input.copyTo(output)
+                                                        }
+                                                    }
+                                                    if (tempFile.exists() && tempFile.length() > 0) {
+                                                        inputImagePath = tempFile.absolutePath
+                                                    }
+                                                } catch (e: Exception) {
+                                                    android.util.Log.e("HomeBottomBar", "Failed to cache attached image for SD: ${e.message}")
+                                                }
+                                            }
+
+                                            chatViewModel.sendImageRequest(cleanPrompt, inputImage = inputImagePath)
                                             value = ""
+                                            attachedImages = emptyList()
+                                            attachedFiles = emptyList()
                                         } else {
                                             val finalPrompt = trimmedValue
                                             val imageBytesList = attachedImages.mapNotNull { uri ->
@@ -721,16 +794,31 @@ internal fun BottomBar(
                                                 }
                                             }
 
+                                            val hasActiveKnowledge = unifiedSources.any { it.isEnabled }
+                                            val hasRags = (loadedRags.isNotEmpty() || hasActiveKnowledge) && isRagEnabledForChat
+                                            val hasAttachedDoc = attachedFiles.isNotEmpty() || chatViewModel.attachedFileName.value != null
+
                                             if (imageBytesList.isNotEmpty()) {
-                                                chatViewModel.clearRagContext()
-                                                chatViewModel.sendChatWithImages(finalPrompt, imageBytesList)
                                                 value = ""
                                                 attachedImages = emptyList()
                                                 attachedFiles = emptyList()
+
+                                                if (hasRags) {
+                                                    scope.launch {
+                                                        val ragContext = ragViewModel.queryAndStoreResults(finalPrompt)
+                                                        chatViewModel.setRagContext(
+                                                            ragContext.ifBlank { null },
+                                                            ragViewModel.lastRagResults.value
+                                                        )
+                                                        chatViewModel.sendChatWithImages(finalPrompt, imageBytesList)
+                                                    }
+                                                } else {
+                                                    if (!hasAttachedDoc) {
+                                                        chatViewModel.clearRagContext()
+                                                    }
+                                                    chatViewModel.sendChatWithImages(finalPrompt, imageBytesList)
+                                                }
                                             } else {
-                                                val hasActiveKnowledge = unifiedSources.any { it.isEnabled }
-                                                val hasRags = (loadedRags.isNotEmpty() || hasActiveKnowledge) && isRagEnabledForChat
-                                                val hasAttachedDoc = attachedFiles.isNotEmpty() || chatViewModel.attachedFileName.value != null
                                                 if (hasRags) {
                                                     value = ""
                                                     attachedImages = emptyList()
@@ -924,6 +1012,10 @@ fun AddAttachmentBottomSheet(
     onModelClick: () -> Unit,
     onGalleryClick: () -> Unit,
     onFilesClick: () -> Unit,
+    canAttachImages: Boolean = true,
+    imagesDisabledReason: String? = null,
+    canAttachDocuments: Boolean = true,
+    documentsDisabledReason: String? = null,
     toolCallingEnabled: Boolean,
     isWebSearchEnabled: Boolean,
     onWebSearchToggle: (Boolean) -> Unit,
@@ -954,8 +1046,20 @@ fun AddAttachmentBottomSheet(
 
                 // Zone 1: instant-action grid
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    GridActionButton(icon = TnIcons.Photo, label = "Photos", onClick = onGalleryClick)
-                    GridActionButton(icon = TnIcons.Folder, label = "Files", onClick = onFilesClick)
+                    GridActionButton(
+                        icon = TnIcons.Photo,
+                        label = "Photos",
+                        onClick = onGalleryClick,
+                        enabled = canAttachImages,
+                        disabledReason = imagesDisabledReason
+                    )
+                    GridActionButton(
+                        icon = TnIcons.Folder,
+                        label = "Files",
+                        onClick = onFilesClick,
+                        enabled = canAttachDocuments,
+                        disabledReason = documentsDisabledReason
+                    )
                     GridActionButton(icon = TnIcons.BrainCircuit, label = "Models", onClick = onModelClick)
                 }
 
@@ -979,10 +1083,32 @@ fun AddAttachmentBottomSheet(
 }
 
 @Composable
-private fun GridActionButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun GridActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    disabledReason: String? = null
+) {
+    val context = LocalContext.current
+    val haptics = com.bit.ui.theme.LocalBitHaptics.current
+    val alpha = if (enabled) 1f else 0.38f
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.alpha(alpha)
+    ) {
         androidx.compose.material3.Surface(
-            onClick = onClick,
+            onClick = {
+                if (enabled) {
+                    onClick()
+                } else {
+                    haptics.action()
+                    disabledReason?.let {
+                        android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
             shape = androidx.compose.foundation.shape.CircleShape,
             color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHighest,
             modifier = Modifier.size(48.dp)

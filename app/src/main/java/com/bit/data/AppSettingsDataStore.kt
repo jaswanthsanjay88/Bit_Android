@@ -130,7 +130,7 @@ class AppSettingsDataStore(private val context: Context) {
     }
 
     val imageBlurEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
-        prefs[IMAGE_BLUR_ENABLED] ?: true
+        prefs[IMAGE_BLUR_ENABLED] ?: false
     }
 
     val loadTTSOnStart: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->

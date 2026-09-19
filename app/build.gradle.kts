@@ -28,8 +28,8 @@ android {
         applicationId = "com.bit.agent"
         minSdk = 29
         targetSdk = 36
-        versionCode = 87
-        versionName = "2.1.3"
+        versionCode = 88
+        versionName = "2.1.4"
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }

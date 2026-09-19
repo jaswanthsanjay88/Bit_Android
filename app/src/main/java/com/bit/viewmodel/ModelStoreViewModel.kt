@@ -478,6 +478,18 @@ class ModelStoreViewModel @Inject constructor(
             return
         }
 
+        // Prevent re-downloading if already installed
+        if (installedModels.value.any { it.id == model.id }) {
+            _error.value = "${model.name} is already installed."
+            return
+        }
+
+        // Prevent duplicate download if already actively downloading
+        if (ModelDownloadService.downloadStates.value.containsKey(model.id)) {
+            _error.value = "${model.name} is already downloading."
+            return
+        }
+
         // Warn user if model is likely too large for their device
         val approxSizeMB = parseApproxSizeMB(model.approximateSize)
         if (approxSizeMB > 0) {

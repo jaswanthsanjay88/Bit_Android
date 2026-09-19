@@ -100,6 +100,14 @@ val SETTINGS_SEARCH_INDEX = listOf(
         keywords = listOf("workspace", "linux", "proot", "terminal", "rootfs", "ubuntu", "alpine", "shell", "bash", "pty")
     ),
     SettingsSearchEntry(
+        title = "Model Benchmark & Evaluation",
+        description = "Evaluate local GGUF models on TTFT latency, tokens/sec, and BFCL tool calling accuracy",
+        categoryId = "benchmark",
+        categoryName = "Device & Storage",
+        icon = TnIcons.Gauge,
+        keywords = listOf("benchmark", "eval", "bfcl", "speed", "ttft", "tokens", "latency", "accuracy", "tools", "gguf")
+    ),
+    SettingsSearchEntry(
         title = "Installed Models",
         description = "Configure LLMs, context lengths, and model parameters",
         categoryId = "services",
@@ -614,6 +622,7 @@ fun SettingsScreen(
                             selectedCategory == "intelligence" -> "Intelligence & Tools"
                             selectedCategory == "voice" -> "Voice Settings"
                             selectedCategory == "storage" -> "Storage & Diagnostics"
+                            selectedCategory == "benchmark" -> "Model Benchmark & Eval"
                             selectedCategory == "about" -> "About BIT"
                             else -> "Settings"
                         },
@@ -809,6 +818,13 @@ fun SettingsScreen(
                     }
                     "mcp" -> {
                         McpServersScreen(mcpManager = viewModel.mcpManager)
+                    }
+                    "benchmark" -> {
+                        BenchmarkScreen(
+                            installedModels = installedModels,
+                            onBack = { selectedCategory = null },
+                            onNavigateToModelStore = onNavigateToModelStore
+                        )
                     }
                     "workspaces" -> {
                         val wsSubScreen = when {
@@ -1121,6 +1137,15 @@ fun SettingsScreen(
                                     icon = Icons.Default.Storage,
                                     onClick = {
                                         selectedCategory = "storage"
+                                    }
+                                )
+                                androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), thickness = 1.dp)
+                                SettingsItem(
+                                    title = "Model Benchmark & Eval",
+                                    description = "Benchmark local GGUF models on TTFT latency, tokens/sec, and BFCL tool calling",
+                                    icon = TnIcons.Gauge,
+                                    onClick = {
+                                        selectedCategory = "benchmark"
                                     }
                                 )
                             }

@@ -520,7 +520,11 @@ class AgentHarnessEngine @Inject constructor(
     fun parsePlanJson(goal: String, jsonString: String): TaskPlan {
         val steps = mutableListOf<TaskStep>()
         try {
-            var text = jsonString.trim()
+            var text = jsonString
+                .replace(Regex("<think>[\\s\\S]*?</think>", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("</?think>", RegexOption.IGNORE_CASE), "")
+                .trim()
+
             if (text.contains("```")) {
                 text = text.replace(Regex("""^```(?:json)?\s*""", RegexOption.MULTILINE), "")
                     .replace(Regex("""\s*```$""", RegexOption.MULTILINE), "")
@@ -529,18 +533,27 @@ class AgentHarnessEngine @Inject constructor(
             // Strip trailing commas before closing braces/brackets that break org.json
             text = text.replace(Regex(""",\s*([\]}])"""), "$1")
 
+            val arrayStart = text.indexOf('[')
+            val arrayEnd = text.lastIndexOf(']')
             val array = when {
-                text.contains("[") && text.contains("]") -> {
-                    val candidate = "[" + text.substringAfter("[").substringBeforeLast("]") + "]"
+                arrayStart != -1 && arrayEnd > arrayStart -> {
                     try {
-                        JSONArray(candidate)
+                        JSONArray(text.substring(arrayStart, arrayEnd + 1))
                     } catch (_: Exception) {
-                        JSONArray(text)
+                        // Truncated array recovery: close last valid object
+                        val lastBrace = text.lastIndexOf('}')
+                        if (lastBrace > arrayStart) {
+                            try {
+                                JSONArray(text.substring(arrayStart, lastBrace + 1) + "\n]")
+                            } catch (_: Exception) {
+                                JSONArray()
+                            }
+                        } else JSONArray()
                     }
                 }
                 text.contains("{") && text.contains("}") -> {
                     val candidate = "{" + text.substringAfter("{").substringBeforeLast("}") + "}"
-                    val obj = JSONObject(candidate)
+                    val obj = try { JSONObject(candidate) } catch (_: Exception) { JSONObject() }
                     when {
                         obj.has("steps") -> obj.optJSONArray("steps") ?: JSONArray()
                         obj.has("plan") -> obj.optJSONArray("plan") ?: JSONArray()
@@ -555,7 +568,7 @@ class AgentHarnessEngine @Inject constructor(
                 val item = array.getJSONObject(i)
                 val id = item.optString("id", "step_${i + 1}")
                 val desc = item.optString("description", "Step ${i + 1}")
-                val tool = item.optString("toolName", item.optString("tool", "workspace_shell"))
+                val tool = item.optString("toolName", item.optString("tool", "invoke_subagent"))
                 val args = if (item.has("toolArguments")) {
                     val a = item.get("toolArguments")
                     if (a is JSONObject) a.toString() else a.toString()
@@ -609,264 +622,100 @@ class AgentHarnessEngine @Inject constructor(
     }
 
     fun decomposeGoal(goal: String, maxSteps: Int): TaskPlan {
-        val lower = goal.lowercase()
+        val lower = goal.lowercase().trim()
         val steps = mutableListOf<TaskStep>()
 
-        val filenameRegex = Regex("""([a-zA-Z0-9_\-./]+\.(?:md|py|txt|json|kt|sh|js|html|cpp|rs|go))""", RegexOption.IGNORE_CASE)
-        val extractedFilename = filenameRegex.find(goal)?.groupValues?.get(1)?.trim()
-            ?: (if (lower.contains("kotlin")) "kotlin.md" else "search_summary.md")
+        // 1. Pure memory requests (remember / vault)
+        val isPureMemory = (lower.startsWith("remember") || lower.startsWith("save to memory") || lower.startsWith("vault remember")) &&
+                !lower.contains("workspace") && !lower.contains("file")
 
-        // Clean, focused search query: first actionable clause only — never the raw
-        // multi-instruction goal text (which pollutes search engines).
-        val searchQuery = extractSearchQuery(goal)
+        if (isPureMemory) {
+            steps.add(
+                TaskStep(
+                    id = "step_1_vault",
+                    description = "Access memory vault",
+                    toolName = "create_memory",
+                    toolArguments = JSONObject(mapOf("title" to "Agent Note", "content" to goal)).toString(),
+                    expectedOutcome = "Memory note processed"
+                )
+            )
+            return TaskPlan(goal = goal, steps = steps)
+        }
 
-        // Multi-part goals like "research X then have a reviewer verify" must not lose
-        // the verification phase when the LLM planner is unavailable.
-        val wantsVerification = Regex(
-            """\b(reviewer?|verif\w*|fact.?\s?check\w*|double.?\s?check\w*|cross.?\s?check\w*|audit|validate)\b""",
-            RegexOption.IGNORE_CASE
-        ).containsMatchIn(goal)
+        // 2. Pure search requests without workspace or file creation
+        val isPureSearch = (lower.startsWith("search ") || lower.startsWith("find ") || lower.startsWith("lookup ") || lower.startsWith("look up ")) &&
+                !lower.contains("file") && !lower.contains("write") && !lower.contains("create") && !lower.contains("workspace") && !lower.contains("make")
 
-        // Plural-reviewer goals ("two independent reviewers: one checks X, one checks Y")
-        // fan out as a single parallel invoke_subagent step with a tasks[] array.
-        val multiReviewer = Regex(
-            """\b(two|2|both|multiple|several)\b[^.;]{0,40}\b(reviewers?|verifiers?|agents?)\b""",
-            RegexOption.IGNORE_CASE
-        ).containsMatchIn(goal) ||
-                Regex(
-                    """one\b[^.;]{0,60}\b(checks?|verifies|validates|reviews?)\b[^.;]{0,120}\b(other|second|one)\b""",
-                    RegexOption.IGNORE_CASE
-                ).containsMatchIn(goal)
+        if (isPureSearch) {
+            val searchQuery = extractSearchQuery(goal)
+            steps.add(
+                TaskStep(
+                    id = "step_1_search",
+                    description = "Search web for information",
+                    toolName = "web_search",
+                    toolArguments = JSONObject(mapOf("query" to searchQuery, "max_results" to 5)).toString(),
+                    expectedOutcome = "Search results returned"
+                )
+            )
+            return TaskPlan(goal = goal, steps = steps)
+        }
 
-        val focusRegex = Regex(
-            """one\b[^.;]{0,20}\b(?:checks?|verifies|validates|reviews?)\b\s+(.+?)\s*[;,]?\s+""" +
-                    """(?:and\s+)?(?:the\s+)?(?:other|second|one)\b[^.;]{0,20}\b(?:checks?|verifies|validates|reviews?)\b\s+(.+?)\s*(?:[.;:!?]|$)""",
-            RegexOption.IGNORE_CASE
-        )
-        val focusMatch = runCatching { focusRegex.find(goal) }.getOrNull()
-        val focusValues = focusMatch?.groupValues ?: emptyList()
-        val focusA = focusValues.getOrNull(1)?.trim().takeUnless { it.isNullOrBlank() }
-            ?: "technical accuracy of the claims"
-        val focusB = focusValues.getOrNull(2)?.trim().takeUnless { it.isNullOrBlank() }
-            ?: "commercial and business claims"
-
-        // Research Reader: fetches full page content (web_fetch) from the raw search
-        // listings and distills them into detailed findings + a numbered claims list.
-        // Reviewers then verify concrete claims instead of starving on URL snippets.
-        val readerStep = {
-            TaskStep(
-                id = "step_read",
-                description = "Read top sources and extract explicit claims",
-                toolName = "invoke_subagent",
-                toolArguments = JSONObject(
-                    mapOf(
-                        "role" to "Research Reader",
-                        "goal" to "Raw web search results are supplied below. Use web_fetch to open the 2-3 " +
-                                "most relevant URLs and read their FULL content — do not judge from snippets. " +
-                                "Then output exactly two sections:\n" +
-                                "FINDINGS — a detailed plain-language digest of the key developments.\n" +
-                                "CLAIMS — a numbered list of every explicit factual claim found, " +
-                                "one claim per line, statements only (no commentary).",
-                        "max_steps" to 50
-                    )
-                ).toString(),
-                expectedOutcome = "Detailed findings + numbered claims extracted from sources"
+        // 3. General Autonomous Agent Execution:
+        // Instead of hardcoding regexes for languages or echoing commands,
+        // deploy an autonomous agent loop with access to the full tool suite.
+        val needsWebResearch = Regex("""\b(search|discoveries|latest|recent|news|trends|lookup|research|find out)\b""", RegexOption.IGNORE_CASE).containsMatchIn(goal)
+        if (needsWebResearch) {
+            val searchQuery = extractSearchQuery(goal)
+            steps.add(
+                TaskStep(
+                    id = "step_1_search",
+                    description = "Search web for background information",
+                    toolName = "web_search",
+                    toolArguments = JSONObject(mapOf("query" to searchQuery, "max_results" to 5)).toString(),
+                    expectedOutcome = "Background research gathered"
+                )
             )
         }
 
-        val verificationStep = {
-            if (multiReviewer) {
-                val reviewerInstructions = "Independently verify each numbered claim from the CLAIMS section " +
-                        "supplied below (focus: %s). Prefer web_fetch to read full sources rather than relying " +
-                        "on search snippets. Report VERIFIED / CONTRADICTED / UNCERTAIN per claim with evidence " +
-                        "and sources. End with: (a) a corrections list where every fixable issue is marked " +
-                        "CORRECTION REQUIRED or ADDITION REQUIRED together with the corrected statement, and " +
-                        "(b) a final verdict: PASS, PASS_WITH_CONDITIONS, or FAIL."
-                TaskStep(
-                    id = "step_review_parallel",
-                    description = "Deploy parallel verification reviewers ($focusA / $focusB)",
-                    toolName = "invoke_subagent",
-                    toolArguments = JSONObject(
-                        mapOf(
-                            "tasks" to JSONArray(
-                                listOf(
-                                    JSONObject(
-                                        mapOf(
-                                            "role" to "Technical Claims Reviewer",
-                                            "goal" to String.format(reviewerInstructions, focusA),
-                                            "max_steps" to 50
-                                        )
-                                    ),
-                                    JSONObject(
-                                        mapOf(
-                                            "role" to "Commercial Claims Reviewer",
-                                            "goal" to String.format(reviewerInstructions, focusB),
-                                            "max_steps" to 50
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    ).toString(),
-                    expectedOutcome = "Independent verification from 2 parallel reviewers"
-                )
-            } else {
-                TaskStep(
-                    id = "step_review",
-                    description = "Deploy a verification reviewer to check the findings",
-                    toolName = "invoke_subagent",
-                    toolArguments = JSONObject(
-                        mapOf(
-                            "role" to "Verification Reviewer",
-                            "goal" to "Independently verify each numbered claim in the CLAIMS section supplied " +
-                                    "below for this task: '$searchQuery'. Prefer web_fetch to read full sources " +
-                                    "rather than relying on search snippets. " +
-                                    "Report what is confirmed, what is contradicted, and what remains uncertain. " +
-                                    "End with: (a) a corrections list where every fixable issue is marked " +
-                                    "CORRECTION REQUIRED or ADDITION REQUIRED together with the corrected statement, " +
-                                    "and (b) a final verdict: PASS, PASS_WITH_CONDITIONS, or FAIL.",
-                            "max_steps" to 50
-                        )
-                    ).toString(),
-                    expectedOutcome = "Findings verified with flagged discrepancies"
-                )
-            }
-        }
+        val filenameRegex = Regex("""([a-zA-Z0-9_\-./]+\.(?:md|py|txt|json|kt|sh|js|html|htm|css|ts|cpp|rs|go))""", RegexOption.IGNORE_CASE)
+        val extractedFilename = filenameRegex.find(goal)?.groupValues?.get(1)?.trim()
 
-        // Code-writing intents ("make X from scratch in workspace", "and another will make Y")
-        // delegate to Code Engineer subagents — parallel when the goal requests a second file —
-        // each self-verifying via workspace_shell (python3 <file>).
-        val codeAction = Regex(
-            """\b(make|create|write|build|implement|generate|code)\b""",
-            RegexOption.IGNORE_CASE
-        ).containsMatchIn(goal)
-        val codeTarget = Regex(
-            """\b(python|\.py|script|transformer|model|program|function|class|module|neural|network)\b""",
-            RegexOption.IGNORE_CASE
-        ).containsMatchIn(goal)
-        val codeSurface = lower.contains("workspace") || lower.contains(".py") ||
-                lower.contains("python") || lower.contains("script")
+        steps.add(
+            TaskStep(
+                id = if (needsWebResearch) "step_2_execute" else "step_1_execute",
+                description = "Autonomous Specialist: ${goal.take(70)}",
+                toolName = "invoke_subagent",
+                toolArguments = JSONObject(
+                    mapOf(
+                        "role" to "Autonomous Specialist",
+                        "goal" to goal,
+                        "max_steps" to 50
+                    )
+                ).toString(),
+                expectedOutcome = "Task executed and deliverables produced"
+            )
+        )
 
-        val secondFileMatch = if (codeAction && codeTarget && codeSurface) {
-            Regex("""\band\s+(another|a\s+second|second)\b""", RegexOption.IGNORE_CASE).find(goal)
-        } else null
-
-        if (codeAction && codeTarget && codeSurface) {
-            val engineerInstructions = "You are a Code Engineer working in the on-device Linux workspace. %s " +
-                    "Write the complete, working Python file using workspace_write_file " +
-                    "(choose a clear filename ending in .py — full implementation, no placeholders). " +
-                    "Then VERIFY it: run 'python3 <yourfile>.py' via workspace_shell and fix every error " +
-                    "until it executes cleanly. Report the final filename and verification output."
-            if (secondFileMatch != null) {
-                val firstGoal = goal.substring(0, secondFileMatch.range.first).trim().trimEnd(',', ';', '.')
-                val secondGoal = goal.substring(secondFileMatch.range.first).trim()
+        // If a specific output file was requested, add a verification step to confirm file presence
+        if (!extractedFilename.isNullOrBlank()) {
+            if (extractedFilename.endsWith(".py", ignoreCase = true)) {
                 steps.add(
                     TaskStep(
-                        id = "step_code_a",
-                        description = "Code Engineer A: ${firstGoal.take(70)}",
-                        toolName = "invoke_subagent",
-                        toolArguments = JSONObject(
-                            mapOf(
-                                "role" to "Code Engineer A",
-                                "goal" to String.format(engineerInstructions, "Task: $firstGoal."),
-                                "max_steps" to 50
-                            )
-                        ).toString(),
-                        expectedOutcome = "Working Python file written and execution-verified"
-                    )
-                )
-                steps.add(
-                    TaskStep(
-                        id = "step_code_b",
-                        description = "Code Engineer B: ${secondGoal.take(70)}",
-                        toolName = "invoke_subagent",
-                        toolArguments = JSONObject(
-                            mapOf(
-                                "role" to "Code Engineer B",
-                                "goal" to String.format(engineerInstructions, "Second deliverable — $secondGoal"),
-                                "max_steps" to 50
-                            )
-                        ).toString(),
-                        expectedOutcome = "Second Python file written and execution-verified"
-                    )
-                )
-            } else {
-                steps.add(
-                    TaskStep(
-                        id = "step_code",
-                        description = "Code Engineer: ${goal.take(70)}",
-                        toolName = "invoke_subagent",
-                        toolArguments = JSONObject(
-                            mapOf(
-                                "role" to "Code Engineer",
-                                "goal" to String.format(engineerInstructions, "Task: $goal"),
-                                "max_steps" to 50
-                            )
-                        ).toString(),
-                        expectedOutcome = "Working Python file written and execution-verified"
-                    )
-                )
-            }
-        } else when {
-            (lower.contains("search") || lower.contains("find") || lower.contains("look up")) &&
-            (lower.contains("save") || lower.contains("write") || lower.contains("file") || lower.contains("summary")) -> {
-                steps.add(
-                    TaskStep(
-                        id = "step_1_search",
-                        description = "Search web for information",
-                        toolName = "web_search",
-                        toolArguments = JSONObject(mapOf("query" to searchQuery, "max_results" to 5)).toString(),
-                        expectedOutcome = "Search results returned"
-                    )
-                )
-                if (wantsVerification) {
-                    steps.add(readerStep())
-                    steps.add(verificationStep())
-                }
-                steps.add(
-                    TaskStep(
-                        id = "step_2_save",
-                        description = "Save findings to workspace file",
-                        toolName = "workspace_write_file",
-                        toolArguments = JSONObject(mapOf("path" to extractedFilename, "content" to "Summary for: $goal", "overwrite" to true)).toString(),
-                        expectedOutcome = "File written successfully"
-                    )
-                )
-            }
-            lower.contains("search") || lower.contains("find") || lower.contains("lookup") || lower.contains("web") -> {
-                steps.add(
-                    TaskStep(
-                        id = "step_1_search",
-                        description = "Search web for information",
-                        toolName = "web_search",
-                        toolArguments = JSONObject(mapOf("query" to searchQuery, "max_results" to 5)).toString(),
-                        expectedOutcome = "Search results returned"
-                    )
-                )
-                if (wantsVerification) {
-                    steps.add(readerStep())
-                    steps.add(verificationStep())
-                }
-            }
-            lower.contains("memory") || lower.contains("vault") || lower.contains("remember") -> {
-                steps.add(
-                    TaskStep(
-                        id = "step_1_vault",
-                        description = "Access memory vault",
-                        toolName = "create_memory",
-                        toolArguments = JSONObject(mapOf("title" to "Agent Note", "content" to goal)).toString(),
-                        expectedOutcome = "Memory note processed"
-                    )
-                )
-            }
-            else -> {
-                steps.add(
-                    TaskStep(
-                        id = "step_1_execute",
-                        description = "Execute task",
+                        id = "step_verify",
+                        description = "Verify Python script: $extractedFilename",
                         toolName = "workspace_shell",
-                        toolArguments = JSONObject(mapOf("command" to "echo '$goal'")).toString(),
-                        expectedOutcome = "Command executed"
+                        toolArguments = JSONObject(mapOf("command" to "python3 $extractedFilename")).toString(),
+                        expectedOutcome = "Script executed cleanly"
+                    )
+                )
+            } else {
+                steps.add(
+                    TaskStep(
+                        id = "step_verify",
+                        description = "Verify file created: $extractedFilename",
+                        toolName = "workspace_read_file",
+                        toolArguments = JSONObject(mapOf("path" to extractedFilename)).toString(),
+                        expectedOutcome = "File presence and content verified"
                     )
                 )
             }

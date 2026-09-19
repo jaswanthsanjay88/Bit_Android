@@ -1,0 +1,7 @@
+• Model Capability Gating: Attachment buttons dynamically adapt to model capabilities (Vision/VLM, SD Image models, and normal text models) with clear contextual prompts.
+• Multimodal + Document Flow: Seamlessly attach images and documents together with VLM and vision models; document context and RAG are preserved and synthesized alongside visual inputs.
+• Stable Diffusion Image Flow: Input image support for local diffusion models (img2img and image editing).
+• Fix GGUF Memory Overhead: Eliminated duplicate weight repacking buffer on Android, resolving Out-Of-Memory (OOM) crashes when loading large 7B/9B models.
+• Model Benchmark & Eval: Benchmark local GGUF models on-device with tool-calling tests and real-time TTFT & TPS metrics.
+• Dynamic Agent Harness: Replaced rigid hardcoded templates with dynamic autonomous subagent loops, expanded planning token capacity, and unlocked full tool calling for API models.
+• 100% Private & Offline: Zero telemetry on-device AI.

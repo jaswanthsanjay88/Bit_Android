@@ -263,7 +263,7 @@ fun BodyContent(
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val imageBlurEnabled by remember { com.bit.data.AppSettingsDataStore(context).imageBlurEnabled }
-        .collectAsStateWithLifecycle(initialValue = true)
+        .collectAsStateWithLifecycle(initialValue = false)
 
     val listState = rememberLazyListState()
     val haptics = com.bit.ui.theme.LocalBitHaptics.current

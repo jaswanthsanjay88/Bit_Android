@@ -99,22 +99,31 @@ export default {
             timestamp: new Date().toISOString()
           };
 
+          let kvSaved = false;
+          let kvError = null;
           if (kv) {
-            const stored = await kv.get('latest_ratings');
-            let currentList = stored ? JSON.parse(stored) : [];
-            currentList.unshift(newEntry);
-            currentList = currentList.slice(0, 50);
-            await kv.put('latest_ratings', JSON.stringify(currentList));
-            console.log(`Saved review to KV using binding '${boundKeyName}'`);
+            try {
+              const stored = await kv.get('latest_ratings');
+              let currentList = stored ? JSON.parse(stored) : [];
+              currentList.unshift(newEntry);
+              currentList = currentList.slice(0, 50);
+              await kv.put('latest_ratings', JSON.stringify(currentList));
+              kvSaved = true;
+              console.log(`Saved review to KV using binding '${boundKeyName}'`);
+            } catch (kvErr) {
+              kvError = kvErr.message;
+              console.warn(`KV storage warning: ${kvErr.message}`);
+            }
           } else {
             console.warn(`No valid KV Namespace binding found in env! Available env keys: [${Object.keys(env).join(', ')}]`);
           }
 
           return new Response(JSON.stringify({
             success: true,
-            message: kv ? 'Review saved to KV!' : 'Review received, but KV binding missing in Cloudflare Dashboard!',
+            message: kvSaved ? 'Review saved to website!' : 'Review received!',
             review: newEntry,
-            kvSaved: Boolean(kv),
+            kvSaved,
+            kvError,
             boundKeyName: boundKeyName || 'None',
             availableEnvKeys: Object.keys(env)
           }), {

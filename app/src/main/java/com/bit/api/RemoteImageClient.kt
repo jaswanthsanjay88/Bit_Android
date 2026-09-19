@@ -151,11 +151,18 @@ object RemoteImageClient {
                 if (!url.isNullOrBlank()) {
                     val imgReq = Request.Builder().url(url).build()
                     val imgRes = HttpClient.client.newCall(imgReq).execute()
+                    if (!imgRes.isSuccessful) {
+                        val errBody = imgRes.body?.string() ?: ""
+                        val errMsg = parseErrorMessage(errBody, imgRes.code)
+                        Log.e(TAG, "Failed to download image URL ($url): HTTP ${imgRes.code} - $errMsg")
+                        return@withContext Result.failure(Exception("Failed to download generated image: HTTP ${imgRes.code}"))
+                    }
                     val imgBytes = imgRes.body?.bytes()
                     if (imgBytes != null && imgBytes.isNotEmpty()) {
                         val base64 = Base64.encodeToString(imgBytes, Base64.NO_WRAP)
                         return@withContext Result.success(base64)
                     }
+                    return@withContext Result.failure(Exception("Downloaded image data was empty"))
                 }
                 return@withContext Result.failure(Exception("No image data found in provider response"))
             }

@@ -598,10 +598,12 @@ private fun ProviderDetailView(
                             put("isImageModel", isImageModel)
                         }.toString()
 
+                        val existingConfig = db.getConfigByModelId(modelId)
                         val config = ModelConfig(
+                            id = existingConfig?.id ?: java.util.UUID.randomUUID().toString(),
                             modelId = modelId,
                             modelLoadingParams = loadingJson,
-                            modelInferenceParams = "{}"
+                            modelInferenceParams = existingConfig?.modelInferenceParams ?: "{}"
                         )
                         db.insertConfig(config)
 

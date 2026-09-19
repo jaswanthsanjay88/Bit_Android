@@ -47,6 +47,24 @@ object TnIcons {
     // ── Status / Feedback ──
     val Heart by lazy { tabler("M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572") }
     val Star by lazy { tabler("M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z") }
+    val StarFilled by lazy {
+        ImageVector.Builder(
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).apply {
+            val path = "M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z"
+            addPath(
+                pathData = PathParser().parsePathString(path).toNodes(),
+                fill = SolidColor(Color.Black),
+                stroke = SolidColor(Color.Black),
+                strokeLineWidth = 1.5f,
+                strokeLineCap = StrokeCap.Round,
+                strokeLineJoin = StrokeJoin.Round
+            )
+        }.build()
+    }
     val AlertCircle by lazy { tabler("M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M12 8l0 4", "M12 16l.01 0") }
     val InfoCircle by lazy { tabler("M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M12 9l.01 0", "M11 12l1 0l0 4l1 0") }
     val CircleCheck by lazy { tabler("M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0", "M9 12l2 2l4 -4") }

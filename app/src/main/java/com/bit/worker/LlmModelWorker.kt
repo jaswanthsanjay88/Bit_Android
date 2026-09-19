@@ -64,6 +64,7 @@ object LlmModelWorker {
     // Session recovery tracking
     @Volatile private var lastLoadedModel: Model? = null
     @Volatile private var lastLoadedConfig: ModelConfig? = null
+    val lastLoadedGgufModel: Model? get() = lastLoadedModel
 
     // GGUF state
     private val _isGgufModelLoaded = MutableStateFlow(false)

@@ -402,8 +402,6 @@ class GeminiProvider : LlmProvider {
 
                                         part.thoughtSignature?.let { sig ->
                                             currentThoughtSignature = sig
-                                            isPartOfThought = true
-                                            inThoughtBlock = true
                                         }
 
                                         part.text?.let {

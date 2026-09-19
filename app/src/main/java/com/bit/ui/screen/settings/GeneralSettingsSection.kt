@@ -674,6 +674,23 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
         
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AboutLinkRow(
+                title = "Rate on Google Play",
+                description = "Support BIT with a 5-star review on Play Store",
+                icon = TnIcons.Star,
+                onClick = {
+                    haptics.selection()
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${context.packageName}")).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                        }
+                        context.startActivity(intent)
+                    } catch (_: Exception) {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
+                    }
+                }
+            )
+
+            AboutLinkRow(
                 title = "Official Website",
                 description = "bit.jaswanthsanjay.me",
                 icon = TnIcons.Sparkles,
@@ -755,7 +772,7 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
 
         var userName by remember { mutableStateOf("") }
         var userRole by remember { mutableStateOf("") }
-        var rating by remember { mutableStateOf(5) }
+        var rating by remember { mutableStateOf(0) }
         var reviewComment by remember { mutableStateOf("") }
 
         var isSubmitting by remember { mutableStateOf(false) }
@@ -805,7 +822,25 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                         ActionTextButton(
                             onClickListener = {
                                 haptics.selection()
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${context.packageName}")).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
+                                }
+                            },
+                            text = "Rate on Google Play Store",
+                            icon = TnIcons.Star,
+                            shape = RoundedCornerShape(Standards.CardSmallCornerRadius)
+                        )
+                        Spacer(modifier = Modifier.height(Standards.SpacingXs))
+                        ActionTextButton(
+                            onClickListener = {
+                                haptics.selection()
                                 isSuccess = false
+                                rating = 0
                                 reviewComment = ""
                             },
                             text = "Submit Another Review",
@@ -914,11 +949,12 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                                 4 -> "★★★★☆ Great App"
                                 3 -> "★★★☆☆ Good"
                                 2 -> "★★☆☆☆ Okay"
-                                else -> "★☆☆☆☆ Needs Improvement"
+                                1 -> "★☆☆☆☆ Needs Improvement"
+                                else -> "Tap stars to rate"
                             },
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = if (rating > 0) MaterialTheme.colorScheme.primary else Glass.TextSecondary
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(
@@ -926,6 +962,7 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             for (i in 1..5) {
+                                val isSelected = i <= rating
                                 IconButton(
                                     onClick = {
                                         haptics.selection()
@@ -934,9 +971,9 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                                     modifier = Modifier.size(44.dp)
                                 ) {
                                     Icon(
-                                        imageVector = TnIcons.Star,
+                                        imageVector = if (isSelected) TnIcons.StarFilled else TnIcons.Star,
                                         contentDescription = "Star $i",
-                                        tint = if (i <= rating) MaterialTheme.colorScheme.primary else Glass.TextSecondary.copy(alpha = 0.3f),
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else Glass.TextSecondary.copy(alpha = 0.35f),
                                         modifier = Modifier.size(32.dp)
                                     )
                                 }
@@ -976,6 +1013,10 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                     // Submit Button
                     ActionTextButton(
                         onClickListener = {
+                            if (rating <= 0) {
+                                errorMessage = "Please select a star rating"
+                                return@ActionTextButton
+                            }
                             if (userName.isBlank()) {
                                 errorMessage = "Please enter your name"
                                 return@ActionTextButton
@@ -1023,9 +1064,22 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                                             isSuccess = true
                                         }
                                     } else {
+                                        val errText = try {
+                                            val errStream = conn.errorStream ?: conn.inputStream
+                                            val raw = errStream?.bufferedReader()?.use { it.readText() }
+                                            if (!raw.isNullOrBlank()) {
+                                                val json = JSONObject(raw)
+                                                json.optString("error", json.optString("message", raw))
+                                            } else null
+                                        } catch (_: Exception) { null }
+
                                         withContext(Dispatchers.Main) {
                                             isSubmitting = false
-                                            errorMessage = "Server error ($responseCode). Please try again."
+                                            errorMessage = if (!errText.isNullOrBlank()) {
+                                                errText
+                                            } else {
+                                                "Server error ($responseCode). Please try again."
+                                            }
                                         }
                                     }
                                 } catch (e: Exception) {
@@ -1038,6 +1092,25 @@ internal fun LazyListScope.aboutSection(appVersion: String, onTriggerCredits: ()
                         },
                         text = if (isSubmitting) "Publishing to Website..." else "Submit Review to Website",
                         icon = if (!isSubmitting) TnIcons.Sparkles else null,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(Standards.CardSmallCornerRadius)
+                    )
+
+                    Spacer(modifier = Modifier.height(Standards.SpacingXs))
+                    ActionTextButton(
+                        onClickListener = {
+                            haptics.selection()
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${context.packageName}")).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY or Intent.FLAG_ACTIVITY_NEW_DOCUMENT or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")))
+                            }
+                        },
+                        text = "Rate on Google Play Store",
+                        icon = TnIcons.Star,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(Standards.CardSmallCornerRadius)
                     )
