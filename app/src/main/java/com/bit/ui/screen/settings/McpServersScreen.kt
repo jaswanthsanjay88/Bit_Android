@@ -163,7 +163,7 @@ fun McpServersScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = TnIcons.McpServer,
+                            imageVector = TnIcons.Mcp,
                             contentDescription = "MCP Logo",
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(22.dp)

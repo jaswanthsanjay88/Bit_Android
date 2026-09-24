@@ -20,11 +20,14 @@ class ModelPickerActivity : ComponentActivity() {
             NeuroVerseTheme {
                 Surface(Modifier.fillMaxSize()) {
                     ModelPickerScreen(
-                        onModelPicked = { uri, providerType ->
+                        onModelPicked = { uri, providerType, projectorUri ->
                             startActivity(
                                 Intent(this, ModelLoadingActivity::class.java).apply {
                                     putExtra(EXTRA_RESULT_URI, uri.toString())
                                     putExtra(EXTRA_PICKER_MODE, providerType.name)
+                                    if (projectorUri != null) {
+                                        putExtra(EXTRA_PROJECTOR_URI, projectorUri.toString())
+                                    }
                                     flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                                 }
                             )
@@ -41,5 +44,6 @@ class ModelPickerActivity : ComponentActivity() {
         const val EXTRA_RESULT_URI = "model_uri"
         const val EXTRA_RESULT_FILE_PATH = "model_file_path"  // Legacy compat
         const val EXTRA_PICKER_MODE = "picker_mode"
+        const val EXTRA_PROJECTOR_URI = "projector_uri"
     }
 }

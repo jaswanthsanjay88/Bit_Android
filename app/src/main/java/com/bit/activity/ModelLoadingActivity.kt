@@ -119,6 +119,8 @@ class ModelLoadingActivity : ComponentActivity() {
             ?.let { Uri.parse(it) }
         val pickerFilePath = intent.getStringExtra(ModelPickerActivity.EXTRA_RESULT_FILE_PATH)
         val pickerMode = intent.getStringExtra(ModelPickerActivity.EXTRA_PICKER_MODE)
+        val pickerProjectorUri = intent.getStringExtra(ModelPickerActivity.EXTRA_PROJECTOR_URI)
+            ?.let { Uri.parse(it) }
 
         setContent {
             NeuroVerseTheme {
@@ -126,9 +128,11 @@ class ModelLoadingActivity : ComponentActivity() {
                     modelParser = modelParser,
                     initialUri = pickerUri,
                     initialFilePath = pickerFilePath,
+                    initialProjectorUri = pickerProjectorUri,
                     initialProviderType = when (pickerMode) {
                         ProviderType.DIFFUSION.name -> ProviderType.DIFFUSION
-                        else -> null
+                        ProviderType.VLM.name -> ProviderType.VLM
+                        else -> if (pickerProjectorUri != null) ProviderType.VLM else null
                     },
                     onEngineLoaded = { loadedEngine = it },
                     onClose = { finish() }
@@ -154,6 +158,7 @@ fun ModelLoadingScreen(
     modelParser: ModelDataParser,
     initialUri: Uri? = null,
     initialFilePath: String? = null,
+    initialProjectorUri: Uri? = null,
     initialProviderType: ProviderType? = null,
     onEngineLoaded: (Any) -> Unit,
     onClose: () -> Unit
@@ -164,6 +169,7 @@ fun ModelLoadingScreen(
     var currentModel by remember { mutableStateOf<Model?>(null) }
     var selectedUri by remember { mutableStateOf(initialUri) }
     var selectedFilePath by remember { mutableStateOf(initialFilePath) }
+    var selectedProjectorUri by remember { mutableStateOf(initialProjectorUri) }
     var selectedProviderType by remember { mutableStateOf(initialProviderType) }
     val scope = rememberCoroutineScope()
     val repository = AppContainer.getModelRepository()
@@ -215,12 +221,17 @@ fun ModelLoadingScreen(
                 // Fast partial hash for deduplication (first 4 MB + metadata)
                 val modelHash = modelParser.checksumSHA256FromUri(context, uri)
 
+                val effectiveProviderType = when {
+                    selectedProviderType == ProviderType.VLM || selectedProjectorUri != null -> ProviderType.VLM
+                    selectedProviderType != null -> selectedProviderType!!
+                    else -> ProviderType.GGUF
+                }
                 val model = Model(
                     id = modelHash,
                     modelPath = uri.toString(),  // Store the content:// URI string
                     modelName = modelName,
                     pathType = PathType.CONTENT_URI,
-                    providerType = ProviderType.GGUF,
+                    providerType = effectiveProviderType,
                     fileSize = fileSize
                 )
                 currentModel = model
@@ -306,10 +317,26 @@ fun ModelLoadingScreen(
                         }
 
                         ProviderType.VLM -> {
+                            val projPathOrUri = selectedProjectorUri?.toString() ?: "mmproj-Qwen2-VL-2B-Instruct-f16.gguf"
+                            val appSettings = AppSettingsDataStore(context)
+                            val tuningEnabled = appSettings.hardwareTuningEnabled.firstOrNull() ?: true
+                            val loadingParams = if (tuningEnabled) {
+                                val perfMode = appSettings.performanceMode.firstOrNull() ?: com.bit.global.PerformanceMode.BALANCED
+                                val modelSizeMB = ((model.fileSize ?: 0L) / (1024 * 1024)).toInt()
+                                val profile = HardwareScanner.scan(context)
+                                DeviceTuner.tune(profile, modelSizeMB, model.modelName, perfMode)
+                            } else {
+                                com.bit.models.engine_schema.GgufLoadingParams()
+                            }
+                            val schema = GgufEngineSchema(loadingParams = loadingParams)
+                            val loadingJson = org.json.JSONObject(schema.toLoadingJson())
+                                .put("type", "vlm")
+                                .put("projector", projPathOrUri)
+                                .toString()
                             ModelConfig(
                                 modelId = model.id,
-                                modelLoadingParams = """{"type":"vlm","projector":"mmproj-Qwen2-VL-2B-Instruct-f16.gguf"}""",
-                                modelInferenceParams = """{"max_tokens":512}"""
+                                modelLoadingParams = loadingJson,
+                                modelInferenceParams = schema.toInferenceJson()
                             )
                         }
 

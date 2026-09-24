@@ -1311,7 +1311,16 @@ class ChatViewModel @Inject constructor(
                     clearAttachedDocument()
                 }
 
-                val effectivePrompt = if (prompt.isBlank()) "Describe this image in detail." else prompt
+                var effectivePrompt = if (prompt.isBlank()) "Describe this image in detail." else prompt
+                val trimmedImgPrompt = prompt.trim()
+                if (trimmedImgPrompt.startsWith("/")) {
+                    val firstWord = trimmedImgPrompt.substringBefore(" ").removePrefix("/").lowercase()
+                    val skillManager = com.bit.skills.SkillManager.getInstance(appContext)
+                    val matchedSkill = skillManager.getSkillBySlug(firstWord) ?: skillManager.findSkill(firstWord)
+                    if (matchedSkill != null && matchedSkill.enabled) {
+                        effectivePrompt = "## Active Skill Context: ${matchedSkill.name}\n${matchedSkill.instructions}\n\n$effectivePrompt"
+                    }
+                }
                 val augmentedPrompt = if (docAndRagContext != null) {
                     "Context:\n$docAndRagContext\n\n$effectivePrompt"
                 } else {
@@ -1621,6 +1630,16 @@ class ChatViewModel @Inject constructor(
         }
 
         var finalPrompt = prompt
+        val trimmed = prompt.trim()
+        if (trimmed.startsWith("/")) {
+            val firstWord = trimmed.substringBefore(" ").removePrefix("/").lowercase()
+            val skillManager = com.bit.skills.SkillManager.getInstance(appContext)
+            val matchedSkill = skillManager.getSkillBySlug(firstWord) ?: skillManager.findSkill(firstWord)
+            if (matchedSkill != null && matchedSkill.enabled) {
+                val skillInstruction = "## Active Skill Context: ${matchedSkill.name}\n${matchedSkill.instructions}\n"
+                finalPrompt = "$skillInstruction\n$finalPrompt"
+            }
+        }
         if (finalPrepend.isNotBlank()) finalPrompt = "$finalPrepend\n$finalPrompt"
         if (finalPostpend.isNotBlank()) finalPrompt = "$finalPrompt\n$finalPostpend"
         

@@ -161,10 +161,16 @@ class LLMModelViewModel @Inject constructor(
                     return@launch
                 }
 
-                val isVlm = model.providerType == ProviderType.VLM || try {
-                    val pathFile = File(model.modelPath)
-                    VlmPaths.colocatedMmproj(pathFile) != null ||
-                    (pathFile.isDirectory && pathFile.listFiles()?.any { VlmPaths.isMmprojFileName(it.name) } == true)
+                val projectorInConfig = try {
+                    org.json.JSONObject(config.modelLoadingParams ?: "{}").optString("projector").takeIf { it.isNotBlank() }
+                } catch (_: Exception) { null }
+
+                val isVlm = model.providerType == ProviderType.VLM || projectorInConfig != null || try {
+                    if (model.pathType != PathType.CONTENT_URI && !model.modelPath.startsWith("content://")) {
+                        val pathFile = File(model.modelPath)
+                        VlmPaths.colocatedMmproj(pathFile) != null ||
+                        (pathFile.isDirectory && pathFile.listFiles()?.any { VlmPaths.isMmprojFileName(it.name) } == true)
+                    } else false
                 } catch (e: Exception) { false }
 
                 if (isVlm) {
@@ -230,32 +236,62 @@ class LLMModelViewModel @Inject constructor(
     }
 
     private suspend fun loadVlmModel(model: Model, config: ModelConfig) {
-        // VLM models can store directory path or direct file path
-        val pathFile = File(model.modelPath)
-        val ggufFile = if (pathFile.isDirectory) {
-            VlmPaths.findGgufModelFile(pathFile) ?: run {
-                AppStateManager.setError("No GGUF model file found in VLM model directory")
-                return
-            }
+        val isContentUri = model.pathType == PathType.CONTENT_URI || model.modelPath.startsWith("content://")
+        val resolvedModel = if (isContentUri) {
+            model
         } else {
-            pathFile
+            val pathFile = File(model.modelPath)
+            val ggufFile = if (pathFile.isDirectory) {
+                VlmPaths.findGgufModelFile(pathFile) ?: run {
+                    AppStateManager.setError("No GGUF model file found in VLM model directory")
+                    return
+                }
+            } else {
+                pathFile
+            }
+            model.copy(modelPath = ggufFile.absolutePath)
         }
 
-        val resolvedModel = model.copy(modelPath = ggufFile.absolutePath)
-        val projFile = VlmPaths.colocatedMmproj(ggufFile)
+        val projectorInConfig = try {
+            org.json.JSONObject(config.modelLoadingParams ?: "{}").optString("projector").takeIf { it.isNotBlank() }
+        } catch (_: Exception) { null }
 
         // Load base model first
         loadGgufModel(resolvedModel, config)
         if (_currentModelID.value == resolvedModel.id) {
-            // Load projector if found
-            if (projFile != null && projFile.exists() && projFile.length() > 1024L) {
-                val projLoaded = LlmModelWorker.loadVlmProjector(projFile.absolutePath)
-                if (projLoaded) {
-                    Log.i("LLMModelVM", "VLM projector loaded successfully: ${projFile.name}")
+            var projLoaded = false
+            // 1. Try explicit projector from config (URI or Path)
+            if (projectorInConfig != null) {
+                if (projectorInConfig.startsWith("content://")) {
+                    try {
+                        val pUri = Uri.parse(projectorInConfig)
+                        val pfd = getApplication<Application>().contentResolver.openFileDescriptor(pUri, "r")
+                        if (pfd != null) {
+                            projLoaded = LlmModelWorker.loadVlmProjectorFromFd(pfd.detachFd())
+                            Log.i("LLMModelVM", "VLM projector loaded from content URI FD: $projLoaded")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("LLMModelVM", "Failed to load VLM projector from URI: ${e.message}")
+                    }
                 } else {
-                    Log.w("LLMModelVM", "VLM projector failed to load: ${projFile.name}")
+                    val pFile = File(projectorInConfig)
+                    if (pFile.exists() && pFile.length() > 1024L) {
+                        projLoaded = LlmModelWorker.loadVlmProjector(pFile.absolutePath)
+                        Log.i("LLMModelVM", "VLM projector loaded from path: $projLoaded")
+                    }
                 }
             }
+
+            // 2. Fallback to colocated mmproj file if not yet loaded and on filesystem
+            if (!projLoaded && !isContentUri) {
+                val ggufFile = File(resolvedModel.modelPath)
+                val projFile = VlmPaths.colocatedMmproj(ggufFile)
+                if (projFile != null && projFile.exists() && projFile.length() > 1024L) {
+                    projLoaded = LlmModelWorker.loadVlmProjector(projFile.absolutePath)
+                    Log.i("LLMModelVM", "VLM colocated projector loaded: $projLoaded (${projFile.name})")
+                }
+            }
+
             _currentModelType.value = ProviderType.VLM
             ActiveModelSession.set(model.id, ProviderType.VLM)
         }

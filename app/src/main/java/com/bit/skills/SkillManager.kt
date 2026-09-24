@@ -41,6 +41,13 @@ class SkillManager @Inject constructor(
             }
         }
 
+        fun getSkillSlug(skill: Skill): String {
+            return skill.name.lowercase()
+                .replace(Regex("""[^a-z0-9]+"""), "-")
+                .trim('-')
+                .ifBlank { skill.id.take(8) }
+        }
+
         val DEFAULT_BUILTIN_SKILLS = listOf(
             Skill(
                 id = "skill-web-search",
@@ -233,5 +240,25 @@ class SkillManager @Inject constructor(
                 appendLine()
             }
         }
+    }
+
+    fun getSkillSlug(skill: Skill): String = Companion.getSkillSlug(skill)
+
+    fun findSkill(query: String): Skill? {
+        val q = query.trim().lowercase()
+        if (q.isBlank()) return null
+        val cleanSlug = q.removePrefix("/")
+        return _skills.value.find { skill ->
+            val slug = getSkillSlug(skill)
+            skill.id.equals(q, ignoreCase = true) ||
+            skill.name.equals(q, ignoreCase = true) ||
+            slug.equals(cleanSlug, ignoreCase = true) ||
+            skill.name.lowercase().contains(cleanSlug)
+        }
+    }
+
+    fun getSkillBySlug(slug: String): Skill? {
+        val clean = slug.trim().removePrefix("/").lowercase()
+        return _skills.value.find { getSkillSlug(it) == clean }
     }
 }

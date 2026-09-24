@@ -1052,7 +1052,7 @@ fun SettingsScreen(
                                 SettingsItem(
                                     title = "MCP Servers",
                                     description = "Model Context Protocol remote tools & SSE servers",
-                                    icon = TnIcons.McpServer,
+                                    icon = TnIcons.Mcp,
                                     onClick = {
                                         selectedCategory = "mcp"
                                     }

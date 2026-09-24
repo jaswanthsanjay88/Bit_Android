@@ -15,6 +15,8 @@ import java.io.File
  * dynamically for any skill in the workspace or agent registry.
  */
 class UseSkillTool(
+    private val context: android.content.Context? = null,
+    private val skillManager: com.bit.skills.SkillManager? = null,
     private val logger: HarnessLogger = NoOpHarnessLogger
 ) : AgentTool {
 
@@ -26,12 +28,12 @@ class UseSkillTool(
         type = "function",
         function = ToolFunction(
             name = NAME,
-            description = "Load specialized domain instructions, guidelines, and patterns for a specific skill (e.g. android-clean-architecture, api-design, docker-patterns, git-workflow, kotlin-patterns, python-patterns, security-review, tdd-workflow).",
+            description = "Load specialized domain instructions, guidelines, and patterns for a specific skill (e.g. web-search, memory-vault, file-ops, python-patterns, tdd-workflow, security-review, android-clean-architecture).",
             parameters = ToolParameters(
                 properties = mapOf(
                     "name" to ToolProperty(
                         type = "string",
-                        description = "The skill name to load instructions from (e.g. python-patterns, tdd-workflow, security-review, android-clean-architecture)"
+                        description = "The skill name or command slug to load instructions from (e.g. web-search, file-ops, python-patterns, tdd-workflow)"
                     )
                 ),
                 required = listOf("name")
@@ -51,19 +53,32 @@ class UseSkillTool(
                 )
             }
 
-            // Search possible skill directories
-            val searchPaths = listOf(
-                File("E:/BIT/.agent/skills/$skillName/SKILL.md"),
-                File("E:/BIT/.agents/skills/$skillName/SKILL.md"),
-                File(".agent/skills/$skillName/SKILL.md"),
-                File(".agents/skills/$skillName/SKILL.md")
-            )
+            val manager = skillManager ?: context?.let { com.bit.skills.SkillManager.getInstance(it) }
+            val matchedSkill = manager?.findSkill(skillName)
 
-            val skillFile = searchPaths.firstOrNull { it.exists() && it.isFile }
-            val content = if (skillFile != null) {
-                compactSkillInstructions(skillFile.readText())
-            } else {
-                "Skill '$skillName' loaded with standard specialized best practices."
+            val content = when {
+                matchedSkill != null && matchedSkill.instructions.isNotBlank() -> {
+                    compactSkillInstructions(matchedSkill.instructions)
+                }
+                matchedSkill != null -> {
+                    "Skill '${matchedSkill.name}': ${matchedSkill.description}"
+                }
+                else -> {
+                    // Fallback to on-device file storage or debug repo paths
+                    val deviceSkillsDir = context?.filesDir?.resolve("skills")
+                    val fileCandidates = listOfNotNull(
+                        deviceSkillsDir?.resolve("$skillName/SKILL.md"),
+                        deviceSkillsDir?.resolve("$skillName.md"),
+                        File("E:/BIT/.agent/skills/$skillName/SKILL.md"),
+                        File(".agent/skills/$skillName/SKILL.md")
+                    )
+                    val skillFile = fileCandidates.firstOrNull { it.exists() && it.isFile }
+                    if (skillFile != null) {
+                        compactSkillInstructions(skillFile.readText())
+                    } else {
+                        "Skill '$skillName' active with standard specialized patterns and directives."
+                    }
+                }
             }
 
             ToolObservation.success(

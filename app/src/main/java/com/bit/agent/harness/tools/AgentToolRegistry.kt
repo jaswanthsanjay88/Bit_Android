@@ -43,7 +43,7 @@ class AgentToolRegistry @Inject constructor(
         val tools = buildList {
             // 1. Native Harness & Device Tools
             add(VaultQueryTool(ragOrchestrator, logger))
-            add(UseSkillTool(logger))
+            add(UseSkillTool(context = context, logger = logger))
             add(AskUserTool(logger))
             add(TimeInfoTool())
             add(ClipboardTool(context))

@@ -42,6 +42,9 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
     private val _ggufConfig = MutableStateFlow(GgufEngineSchema())
     val ggufConfig: StateFlow<GgufEngineSchema> = _ggufConfig.asStateFlow()
 
+    private val _projectorPath = MutableStateFlow<String?>(null)
+    val projectorPath: StateFlow<String?> = _projectorPath.asStateFlow()
+
     private val _diffusionConfig = MutableStateFlow(DiffusionConfig())
     val diffusionConfig: StateFlow<DiffusionConfig> = _diffusionConfig.asStateFlow()
 
@@ -70,7 +73,7 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
                 val config = repository.getConfigByModelId(model.id)
 
                 when (model.providerType) {
-                    ProviderType.GGUF -> {
+                    ProviderType.GGUF, ProviderType.VLM -> {
                         _ggufConfig.value = if (config != null) {
                             GgufEngineSchema.fromJson(
                                 config.modelLoadingParams, config.modelInferenceParams
@@ -78,6 +81,12 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
                         } else {
                             GgufEngineSchema()
                         }
+                        val proj = if (config != null && !config.modelLoadingParams.isNullOrBlank()) {
+                            try {
+                                JSONObject(config.modelLoadingParams).optString("projector").takeIf { it.isNotBlank() }
+                            } catch (_: Exception) { null }
+                        } else null
+                        _projectorPath.value = proj
                     }
 
                     ProviderType.DIFFUSION -> {
@@ -100,10 +109,6 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
 
                     ProviderType.STT -> {
                         // STT config is managed by speech pipeline and service defaults.
-                    }
-
-                    ProviderType.VLM -> {
-                        // VLM config is currently managed at install/download time.
                     }
 
                     ProviderType.API -> {
@@ -142,11 +147,36 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
                 val existingConfig = repository.getConfigByModelId(model.id)
 
                 val config = when (model.providerType) {
-                    ProviderType.GGUF -> {
+                    ProviderType.GGUF, ProviderType.VLM -> {
+                        val currentProj = _projectorPath.value
+                        val baseLoadingJson = try {
+                            JSONObject(_ggufConfig.value.toLoadingJson())
+                        } catch (_: Exception) {
+                            JSONObject()
+                        }
+
+                        val updatedProviderType = if (!currentProj.isNullOrBlank()) {
+                            baseLoadingJson.put("type", "vlm")
+                            baseLoadingJson.put("projector", currentProj)
+                            ProviderType.VLM
+                        } else {
+                            baseLoadingJson.remove("projector")
+                            if (baseLoadingJson.optString("type") == "vlm") {
+                                baseLoadingJson.remove("type")
+                            }
+                            ProviderType.GGUF
+                        }
+
+                        if (model.providerType != updatedProviderType) {
+                            val updatedModel = model.copy(providerType = updatedProviderType)
+                            repository.updateModel(updatedModel)
+                            _selectedModel.value = updatedModel
+                        }
+
                         ModelConfig(
                             id = existingConfig?.id ?: "",
                             modelId = model.id,
-                            modelLoadingParams = _ggufConfig.value.toLoadingJson(),
+                            modelLoadingParams = baseLoadingJson.toString(),
                             modelInferenceParams = _ggufConfig.value.toInferenceJson()
                         )
                     }
@@ -175,15 +205,6 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
                             modelId = model.id,
                             modelLoadingParams = existingConfig?.modelLoadingParams ?: """{"engine":"sherpa-onnx","type":"whisper"}""",
                             modelInferenceParams = existingConfig?.modelInferenceParams ?: "{}"
-                        )
-                    }
-
-                    ProviderType.VLM -> {
-                        ModelConfig(
-                            id = existingConfig?.id ?: "",
-                            modelId = model.id,
-                            modelLoadingParams = existingConfig?.modelLoadingParams ?: """{"type":"vlm","projector":"mmproj-Qwen2-VL-2B-Instruct-f16.gguf"}""",
-                            modelInferenceParams = existingConfig?.modelInferenceParams ?: """{"max_tokens":512}"""
                         )
                     }
 
@@ -418,6 +439,14 @@ class ModelConfigEditorViewModel @Inject constructor() : ViewModel() {
         _diffusionInferenceParams.update {
             it.copy(showDiffusionStride = value)
         }
+    }
+
+    fun attachProjector(pathOrUri: String) {
+        _projectorPath.value = pathOrUri
+    }
+
+    fun detachProjector() {
+        _projectorPath.value = null
     }
 
     fun updateApiEndpoint(endpoint: String) {

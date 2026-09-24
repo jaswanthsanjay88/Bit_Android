@@ -33,8 +33,14 @@ import com.bit.ui.components.ActionTextButton
 import com.bit.ui.components.ActionSwitch
 import com.bit.viewmodel.ModelConfigEditorViewModel
 import com.bit.ui.icons.TnIcons
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.bit.tts.TTSDataStore
 import com.bit.tts.TTSSettings
+import com.bit.util.VlmPaths
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -357,11 +363,10 @@ internal fun ConfigEditorPanel(
         ) {
             item {
                 when (model.providerType) {
-                    ProviderType.GGUF -> GgufConfigEditor(viewModel)
+                    ProviderType.GGUF, ProviderType.VLM -> GgufConfigEditor(viewModel, model)
                     ProviderType.DIFFUSION -> DiffusionConfigEditor(viewModel)
                     ProviderType.STT -> SttConfigEditor(model)
                     ProviderType.TTS -> TtsConfigEditor(model)
-                    ProviderType.VLM -> VlmConfigEditor(model)
                     ProviderType.API -> ApiConfigEditor(viewModel, model)
                 }
             }
@@ -396,7 +401,7 @@ internal fun ConfigEditorPanel(
 }
 
 @Composable
-internal fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
+internal fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel, model: Model) {
     val ggufConfig by viewModel.ggufConfig.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -417,6 +422,185 @@ internal fun GgufConfigEditor(viewModel: ModelConfigEditorViewModel) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {
+        ConfigSection("Vision Projector (mmproj)") {
+            val projectorPath by viewModel.projectorPath.collectAsStateWithLifecycle()
+
+            val projectorPickerLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.OpenDocument()
+            ) { uri ->
+                if (uri != null) {
+                    try {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {}
+                    viewModel.attachProjector(uri.toString())
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(Standards.RadiusLg),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(Standards.SpacingMd),
+                    verticalArrangement = Arrangement.spacedBy(Standards.SpacingSm)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(Standards.SpacingSm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = if (!projectorPath.isNullOrBlank()) TnIcons.Eye else TnIcons.Photo,
+                                contentDescription = null,
+                                tint = if (!projectorPath.isNullOrBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = if (!projectorPath.isNullOrBlank()) "Vision Projector Attached (VLM)" else "Text-Only Model",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (!projectorPath.isNullOrBlank()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (!projectorPath.isNullOrBlank())
+                                        "Multimodal vision is enabled for image understanding in chat."
+                                    else
+                                        "Attach an mmproj file to give this local model vision capabilities.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    if (!projectorPath.isNullOrBlank()) {
+                        val displayPath = projectorPath!!
+                        val displayName = remember(displayPath) {
+                            if (displayPath.startsWith("content://")) {
+                                try {
+                                    val uri = Uri.parse(displayPath)
+                                    val (name, _) = queryFileInfo(context, uri)
+                                    name
+                                } catch (_: Exception) {
+                                    displayPath.substringAfterLast("%2F").substringAfterLast("/")
+                                }
+                            } else {
+                                java.io.File(displayPath).name
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(Standards.RadiusMd),
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = displayPath,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    IconButton(
+                                        onClick = { projectorPickerLauncher.launch(arrayOf("*/*")) },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = TnIcons.Edit,
+                                            contentDescription = "Replace projector",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.detachProjector() },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = TnIcons.Trash,
+                                            contentDescription = "Detach projector",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        val colocatedProj = remember(model.modelPath) {
+                            if (!model.modelPath.startsWith("content://")) {
+                                try {
+                                    val f = java.io.File(model.modelPath)
+                                    VlmPaths.colocatedMmproj(f)
+                                } catch (_: Exception) { null }
+                            } else null
+                        }
+
+                        if (colocatedProj != null) {
+                            OutlinedButton(
+                                onClick = { viewModel.attachProjector(colocatedProj.absolutePath) },
+                                shape = RoundedCornerShape(Standards.RadiusMd),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.CircleCheck,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    "Attach Colocated: ${colocatedProj.name}",
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        OutlinedButton(
+                            onClick = { projectorPickerLauncher.launch(arrayOf("*/*")) },
+                            shape = RoundedCornerShape(Standards.RadiusMd),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = TnIcons.Plus,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Attach mmproj Projector (.gguf)")
+                        }
+                    }
+                }
+            }
+        }
+
         ConfigSection("Loading Parameters") {
             AnimatedVisibility(
                 visible = loadingLocked,
@@ -860,44 +1044,6 @@ internal fun TtsConfigEditor(model: Model) {
 }
 
 @Composable
-internal fun VlmConfigEditor(model: Model) {
-    // Resolve actual model info from the directory or file path
-    val modelDir = remember(model.modelPath) {
-        val path = java.io.File(model.modelPath)
-        if (path.isDirectory) path else path.parentFile
-    }
-    val modelFileName = remember(modelDir) {
-        modelDir?.listFiles()?.find { f ->
-            val name = f.name.lowercase()
-            name.endsWith(".gguf") && !name.contains("mmproj") && !name.contains("projector")
-        }?.name ?: "Unknown"
-    }
-    val projectorFileName = remember(modelDir) {
-        modelDir?.listFiles()?.find { f ->
-            val name = f.name.lowercase()
-            (name.contains("mmproj") || name.contains("projector")) && name.endsWith(".gguf")
-        }?.name ?: "Not found"
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(Standards.SpacingLg)) {
-        ConfigSection("Vision-Language Model Details") {
-            ReadOnlyField(label = "Model ID", value = model.id)
-            ReadOnlyField(label = "Model Path", value = model.modelPath)
-            ReadOnlyField(label = "Model File", value = modelFileName)
-            ReadOnlyField(label = "Projector Weights", value = projectorFileName)
-        }
-
-        ConfigSection("VLM Parameters") {
-            Text(
-                text = "Model parameters are pre-configured during installation for snapshot compatibility.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
 internal fun ApiConfigEditor(viewModel: ModelConfigEditorViewModel, model: Model) {
     val apiConfig by viewModel.apiConfig.collectAsStateWithLifecycle()
 
@@ -1231,4 +1377,20 @@ private fun SuccessMessage() {
             )
         }
     }
+}
+
+private fun queryFileInfo(context: Context, uri: Uri): Pair<String, Long> {
+    var name = "mmproj"
+    var size = 0L
+    try {
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            val sizeIdx = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+            if (cursor.moveToFirst()) {
+                if (nameIdx != -1) name = cursor.getString(nameIdx) ?: name
+                if (sizeIdx != -1) size = cursor.getLong(sizeIdx)
+            }
+        }
+    } catch (_: Exception) {}
+    return Pair(name, size)
 }

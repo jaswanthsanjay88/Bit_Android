@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -129,6 +131,25 @@ internal fun BottomBar(
     val context = LocalContext.current
     var showSttDownloadDialog by remember { mutableStateOf(false) }
     var value by remember { mutableStateOf("") }
+    var isInputExpanded by remember { mutableStateOf(false) }
+
+    val allSkills by remember { com.bit.skills.SkillManager.getInstance(context).skills }.collectAsStateWithLifecycle(emptyList())
+    val showSlashSuggestions = remember(value) { value.startsWith("/") && !value.contains("\n") }
+    val slashQuery = remember(value) {
+        if (value.startsWith("/")) value.substringAfter("/").substringBefore(" ").trim() else ""
+    }
+    val filteredSkills = remember(allSkills, slashQuery) {
+        val active = allSkills.filter { it.enabled }
+        if (slashQuery.isBlank()) {
+            active.take(8)
+        } else {
+            active.filter { skill ->
+                com.bit.skills.SkillManager.getSkillSlug(skill).contains(slashQuery, ignoreCase = true) ||
+                skill.name.contains(slashQuery, ignoreCase = true) ||
+                skill.description.contains(slashQuery, ignoreCase = true)
+            }.take(8)
+        }
+    }
     val isSttRecording by chatViewModel.isSttRecording.collectAsStateWithLifecycle()
     val isSttTranscribing by chatViewModel.isSttTranscribing.collectAsStateWithLifecycle()
     val sttAmplitude by chatViewModel.sttAmplitude.collectAsStateWithLifecycle()
@@ -448,24 +469,278 @@ internal fun BottomBar(
                     }
                 }
 
-                // ── M3 Capsule Input Pill ──
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shape = BitShapeScale.extraLarge
-                        )
-                        .padding(horizontal = Spacing.sm, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // ── Send Handler & Capabilities ──
+                val canSend = value.isNotBlank() || attachedImages.isNotEmpty() || attachedFiles.isNotEmpty()
+                val handleSendMessage: () -> Unit = {
+                    val now = System.currentTimeMillis()
+                    if (now - lastSendTime >= 1000L) {
+                        if (attachedImages.isNotEmpty() && !canAttachImages) {
+                            haptics.action()
+                            android.widget.Toast.makeText(
+                                context,
+                                imagesDisabledReason ?: "Current model does not support image input",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        } else if (attachedFiles.isNotEmpty() && !canAttachDocuments) {
+                            haptics.action()
+                            android.widget.Toast.makeText(
+                                context,
+                                documentsDisabledReason ?: "Current model does not support document input",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            lastSendTime = now
+                            haptics.action()
+                            val trimmedValue = value.trim()
+                            val isImageTrigger = trimmedValue.startsWith("/image", ignoreCase = true) ||
+                                    trimmedValue.startsWith("/draw", ignoreCase = true) ||
+                                    trimmedValue.startsWith("/paint", ignoreCase = true) ||
+                                    trimmedValue.startsWith("generate image", ignoreCase = true) ||
+                                    trimmedValue.startsWith("create image", ignoreCase = true)
+
+                            val shouldGenerateImage = isImageModelLoaded && (isImageTrigger || !isTextModelLoaded || chatState.generationType == ModelType.IMAGE_GENERATION)
+
+                            if (shouldGenerateImage) {
+                                val cleanPrompt = when {
+                                    trimmedValue.startsWith("/image", ignoreCase = true) -> trimmedValue.substring(6).trim()
+                                    trimmedValue.startsWith("/draw", ignoreCase = true) -> trimmedValue.substring(5).trim()
+                                    trimmedValue.startsWith("/paint", ignoreCase = true) -> trimmedValue.substring(6).trim()
+                                    trimmedValue.startsWith("generate image", ignoreCase = true) -> trimmedValue.substring(14).trim()
+                                    trimmedValue.startsWith("create image", ignoreCase = true) -> trimmedValue.substring(12).trim()
+                                    else -> trimmedValue
+                                }.removePrefix(":").removePrefix(" ").trim()
+
+                                var inputImagePath: String? = null
+                                if (attachedImages.isNotEmpty()) {
+                                    try {
+                                        val uri = attachedImages.first()
+                                        val tempFile = java.io.File(context.cacheDir, "sd_input_${System.currentTimeMillis()}.png")
+                                        context.contentResolver.openInputStream(uri)?.use { input ->
+                                            tempFile.outputStream().use { output ->
+                                                input.copyTo(output)
+                                            }
+                                        }
+                                        if (tempFile.exists() && tempFile.length() > 0) {
+                                            inputImagePath = tempFile.absolutePath
+                                        }
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("HomeBottomBar", "Failed to cache attached image for SD: ${e.message}")
+                                    }
+                                }
+
+                                chatViewModel.sendImageRequest(cleanPrompt, inputImage = inputImagePath)
+                                value = ""
+                                attachedImages = emptyList()
+                                attachedFiles = emptyList()
+                                isInputExpanded = false
+                            } else {
+                                val finalPrompt = trimmedValue
+                                val imageBytesList = attachedImages.mapNotNull { uri ->
+                                    try {
+                                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                                            stream.readBytes()
+                                        }
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
+
+                                val hasActiveKnowledge = unifiedSources.any { it.isEnabled }
+                                val hasRags = (loadedRags.isNotEmpty() || hasActiveKnowledge) && isRagEnabledForChat
+                                val hasAttachedDoc = attachedFiles.isNotEmpty() || chatViewModel.attachedFileName.value != null
+
+                                if (imageBytesList.isNotEmpty()) {
+                                    value = ""
+                                    attachedImages = emptyList()
+                                    attachedFiles = emptyList()
+                                    isInputExpanded = false
+
+                                    if (hasRags) {
+                                        scope.launch {
+                                            val ragContext = ragViewModel.queryAndStoreResults(finalPrompt)
+                                            chatViewModel.setRagContext(
+                                                ragContext.ifBlank { null },
+                                                ragViewModel.lastRagResults.value
+                                            )
+                                            chatViewModel.sendChatWithImages(finalPrompt, imageBytesList)
+                                        }
+                                    } else {
+                                        if (!hasAttachedDoc) {
+                                            chatViewModel.clearRagContext()
+                                        }
+                                        chatViewModel.sendChatWithImages(finalPrompt, imageBytesList)
+                                    }
+                                } else {
+                                    if (hasRags) {
+                                        value = ""
+                                        attachedImages = emptyList()
+                                        attachedFiles = emptyList()
+                                        isInputExpanded = false
+                                        scope.launch {
+                                            val ragContext = ragViewModel.queryAndStoreResults(finalPrompt)
+                                            chatViewModel.setRagContext(
+                                                ragContext.ifBlank { null },
+                                                ragViewModel.lastRagResults.value
+                                            )
+                                            chatViewModel.sendTextMessage(finalPrompt)
+                                        }
+                                    } else {
+                                        if (!hasAttachedDoc) {
+                                            chatViewModel.clearRagContext()
+                                        }
+                                        chatViewModel.sendTextMessage(finalPrompt)
+                                        value = ""
+                                        attachedImages = emptyList()
+                                        attachedFiles = emptyList()
+                                        isInputExpanded = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── Slash Skills Suggestions Popup ──
+                AnimatedVisibility(
+                    visible = showSlashSuggestions && filteredSkills.isNotEmpty(),
+                    enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 2 },
+                    exit = fadeOut(tween(120)) + slideOutVertically(tween(120)) { it / 2 }
                 ) {
-                    if (isSttRecording || isSttTranscribing) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(16.dp))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.7f))
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.Terminal,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Agent Skills & Commands",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Text(
+                                text = "${filteredSkills.size} available",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 200.dp)
+                        ) {
+                            items(filteredSkills, key = { it.id }) { skill ->
+                                val slug = com.bit.skills.SkillManager.getSkillSlug(skill)
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            val args = if (value.contains(" ")) value.substringAfter(" ") else ""
+                                            value = if (args.isNotBlank()) "/$slug $args" else "/$slug "
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(8.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        val iconVector = when (skill.icon) {
+                                            "mcp" -> TnIcons.Mcp
+                                            "search" -> TnIcons.Search
+                                            "storage" -> TnIcons.Database
+                                            "terminal" -> TnIcons.Terminal
+                                            else -> TnIcons.Sparkles
+                                        }
+                                        Icon(
+                                            imageVector = iconVector,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Text(
+                                                text = skill.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "/$slug",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                        if (skill.description.isNotBlank()) {
+                                            Text(
+                                                text = skill.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── M3 Composer (Expanded vs Collapsed Pill) ──
+                if (isSttRecording || isSttTranscribing) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = BitShapeScale.extraLarge
+                            )
+                            .padding(horizontal = Spacing.sm, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // 1. Cancel button
                             ActionButton(
                                 onClickListener = { chatViewModel.cancelSttRecording() },
                                 icon = TnIcons.X,
@@ -477,7 +752,6 @@ internal fun BottomBar(
                                 )
                             )
 
-                            // 2. Equalizer / Status
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -510,7 +784,6 @@ internal fun BottomBar(
                                 }
                             }
 
-                            // 3. Stop/Check button
                             ActionButton(
                                 onClickListener = {
                                     chatViewModel.stopSttRecording { transcribedText ->
@@ -527,8 +800,173 @@ internal fun BottomBar(
                                 enabled = !isSttTranscribing
                             )
                         }
-                    } else {
-                        // Plus (+) button inside the pill
+                    }
+                } else if (isInputExpanded) {
+                    // Expanded full composer mode
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.Prompt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Expanded Composer",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "• ${value.length} chars (${value.lines().size} lines)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                if (value.isNotEmpty()) {
+                                    FilledTonalIconButton(
+                                        onClick = { value = "" },
+                                        modifier = Modifier.size(28.dp),
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    ) {
+                                        Icon(
+                                            imageVector = TnIcons.Eraser,
+                                            contentDescription = "Clear",
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                                FilledTonalIconButton(
+                                    onClick = { isInputExpanded = false },
+                                    modifier = Modifier.size(28.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = TnIcons.Minimize,
+                                        contentDescription = "Collapse",
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        AttachmentRow(
+                            context = context,
+                            attachedImages = attachedImages,
+                            attachedFiles = attachedFiles,
+                            isRagProcessing = isRagProcessing,
+                            onRemoveImage = { attachedImages = attachedImages - it },
+                            onRemoveFile = {
+                                attachedFiles = attachedFiles - it
+                                chatViewModel.clearAttachedDocument()
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 120.dp, max = 220.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            BasicTextField(
+                                value = value,
+                                onValueChange = { value = it },
+                                enabled = !chatState.isGenerating,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary),
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.TopStart) {
+                                        if (value.isEmpty()) {
+                                            Text(
+                                                text = "Ask me anything or enter / for skills...",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                style = MaterialTheme.typography.bodyLarge
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = { showAttachmentSheet = true },
+                                modifier = Modifier.size(36.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.Plus,
+                                    contentDescription = "Add attachment",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            FilledTonalIconButton(
+                                onClick = handleSendMessage,
+                                enabled = canSend && !chatState.isGenerating,
+                                modifier = Modifier.size(36.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.ArrowUp,
+                                    contentDescription = "Send message",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Collapsed M3 Capsule Input Pill
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = BitShapeScale.extraLarge
+                            )
+                            .padding(horizontal = Spacing.sm, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         FilledTonalIconButton(
                             onClick = { showAttachmentSheet = true },
                             modifier = Modifier.size(36.dp),
@@ -546,116 +984,24 @@ internal fun BottomBar(
 
                         Spacer(modifier = Modifier.width(4.dp))
 
-                        // Column for attachments and TextField
                         Column(
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(vertical = 2.dp)
                         ) {
-                            if (attachedImages.isNotEmpty() || attachedFiles.isNotEmpty()) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState())
-                                        .padding(horizontal = 4.dp, vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    attachedImages.forEach { uri ->
-                                        Box(
-                                            modifier = Modifier
-                                                .size(56.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                                        ) {
-                                            val resolver = context.contentResolver
-                                            val bitmap = remember(uri) {
-                                                try {
-                                                    resolver.openInputStream(uri)?.use { stream ->
-                                                        android.graphics.BitmapFactory.decodeStream(stream)
-                                                    }
-                                                } catch (e: Exception) {
-                                                    null
-                                                }
-                                            }
-                                            if (bitmap != null) {
-                                                Image(
-                                                    bitmap = bitmap.asImageBitmap(),
-                                                    contentDescription = "Attachment",
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier.fillMaxSize()
-                                                )
-                                            }
-                                            Icon(
-                                                imageVector = TnIcons.X,
-                                                contentDescription = "Remove",
-                                                modifier = Modifier
-                                                    .size(16.dp)
-                                                    .align(Alignment.TopEnd)
-                                                    .clickable { attachedImages = attachedImages - uri }
-                                                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f), CircleShape)
-                                                    .padding(2.dp),
-                                                tint = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        }
-                                    }
-                                    attachedFiles.forEach { uri ->
-                                        val fileName = remember(uri) {
-                                            val cursor = context.contentResolver.query(uri, null, null, null, null)
-                                            cursor?.use {
-                                                val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                                                if (nameIndex != -1 && it.moveToFirst()) it.getString(nameIndex) else "File"
-                                            } ?: "File"
-                                        }
-                                        Row(
-                                            modifier = Modifier
-                                                .height(32.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                                                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
-                                                .padding(horizontal = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = TnIcons.FileText,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp),
-                                                tint = MaterialTheme.colorScheme.primary
-                                            )
-                                            Text(
-                                                text = fileName,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.widthIn(max = 100.dp)
-                                            )
-                                            if (isRagProcessing) {
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier.size(14.dp),
-                                                    strokeWidth = 2.dp,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
-                                            } else {
-                                                Icon(
-                                                    imageVector = TnIcons.X,
-                                                    contentDescription = "Remove",
-                                                    modifier = Modifier
-                                                        .size(14.dp)
-                                                        .clickable { 
-                                                            attachedFiles = attachedFiles - uri
-                                                            chatViewModel.clearAttachedDocument()
-                                                        },
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
+                            AttachmentRow(
+                                context = context,
+                                attachedImages = attachedImages,
+                                attachedFiles = attachedFiles,
+                                isRagProcessing = isRagProcessing,
+                                onRemoveImage = { attachedImages = attachedImages - it },
+                                onRemoveFile = {
+                                    attachedFiles = attachedFiles - it
+                                    chatViewModel.clearAttachedDocument()
                                 }
-                            }
+                            )
 
-                            androidx.compose.foundation.text.BasicTextField(
+                            BasicTextField(
                                 value = value,
                                 onValueChange = { value = it },
                                 enabled = !chatState.isGenerating,
@@ -687,9 +1033,24 @@ internal fun BottomBar(
 
                         Spacer(modifier = Modifier.width(4.dp))
 
-                        // Trailing Buttons: Send or Mic + Live Mode (Animated swap)
-                        val canSend = value.isNotBlank() || attachedImages.isNotEmpty() || attachedFiles.isNotEmpty()
-                        
+                        if (value.lines().size > 1 || value.length > 50) {
+                            FilledTonalIconButton(
+                                onClick = { isInputExpanded = true },
+                                modifier = Modifier.size(32.dp),
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = TnIcons.Maximize,
+                                    contentDescription = "Expand composer",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+
                         AnimatedContent(
                             targetState = Pair(canSend, chatState.isGenerating),
                             transitionSpec = {
@@ -715,134 +1076,7 @@ internal fun BottomBar(
                                 }
                             } else if (hasInput) {
                                 FilledTonalIconButton(
-                                    onClick = {
-                                        val now = System.currentTimeMillis()
-                                        if (now - lastSendTime < 1000L) return@FilledTonalIconButton
-
-                                        if (attachedImages.isNotEmpty() && !canAttachImages) {
-                                            haptics.action()
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                imagesDisabledReason ?: "Current model does not support image input",
-                                                android.widget.Toast.LENGTH_SHORT
-                                            ).show()
-                                            return@FilledTonalIconButton
-                                        }
-
-                                        if (attachedFiles.isNotEmpty() && !canAttachDocuments) {
-                                            haptics.action()
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                documentsDisabledReason ?: "Current model does not support document input",
-                                                android.widget.Toast.LENGTH_SHORT
-                                            ).show()
-                                            return@FilledTonalIconButton
-                                        }
-
-                                        lastSendTime = now
-                                        haptics.action()
-                                        val trimmedValue = value.trim()
-                                        val isImageTrigger = trimmedValue.startsWith("/image", ignoreCase = true) ||
-                                                trimmedValue.startsWith("/draw", ignoreCase = true) ||
-                                                trimmedValue.startsWith("/paint", ignoreCase = true) ||
-                                                trimmedValue.startsWith("generate image", ignoreCase = true) ||
-                                                trimmedValue.startsWith("create image", ignoreCase = true)
-
-                                        val shouldGenerateImage = isImageModelLoaded && (isImageTrigger || !isTextModelLoaded || chatState.generationType == ModelType.IMAGE_GENERATION)
-
-                                        if (shouldGenerateImage) {
-                                            val cleanPrompt = when {
-                                                trimmedValue.startsWith("/image", ignoreCase = true) -> trimmedValue.substring(6).trim()
-                                                trimmedValue.startsWith("/draw", ignoreCase = true) -> trimmedValue.substring(5).trim()
-                                                trimmedValue.startsWith("/paint", ignoreCase = true) -> trimmedValue.substring(6).trim()
-                                                trimmedValue.startsWith("generate image", ignoreCase = true) -> trimmedValue.substring(14).trim()
-                                                trimmedValue.startsWith("create image", ignoreCase = true) -> trimmedValue.substring(12).trim()
-                                                else -> trimmedValue
-                                            }.removePrefix(":").removePrefix(" ").trim()
-
-                                            var inputImagePath: String? = null
-                                            if (attachedImages.isNotEmpty()) {
-                                                try {
-                                                    val uri = attachedImages.first()
-                                                    val tempFile = java.io.File(context.cacheDir, "sd_input_${System.currentTimeMillis()}.png")
-                                                    context.contentResolver.openInputStream(uri)?.use { input ->
-                                                        tempFile.outputStream().use { output ->
-                                                            input.copyTo(output)
-                                                        }
-                                                    }
-                                                    if (tempFile.exists() && tempFile.length() > 0) {
-                                                        inputImagePath = tempFile.absolutePath
-                                                    }
-                                                } catch (e: Exception) {
-                                                    android.util.Log.e("HomeBottomBar", "Failed to cache attached image for SD: ${e.message}")
-                                                }
-                                            }
-
-                                            chatViewModel.sendImageRequest(cleanPrompt, inputImage = inputImagePath)
-                                            value = ""
-                                            attachedImages = emptyList()
-                                            attachedFiles = emptyList()
-                                        } else {
-                                            val finalPrompt = trimmedValue
-                                            val imageBytesList = attachedImages.mapNotNull { uri ->
-                                                try {
-                                                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                                                        stream.readBytes()
-                                                    }
-                                                } catch (e: Exception) {
-                                                    null
-                                                }
-                                            }
-
-                                            val hasActiveKnowledge = unifiedSources.any { it.isEnabled }
-                                            val hasRags = (loadedRags.isNotEmpty() || hasActiveKnowledge) && isRagEnabledForChat
-                                            val hasAttachedDoc = attachedFiles.isNotEmpty() || chatViewModel.attachedFileName.value != null
-
-                                            if (imageBytesList.isNotEmpty()) {
-                                                value = ""
-                                                attachedImages = emptyList()
-                                                attachedFiles = emptyList()
-
-                                                if (hasRags) {
-                                                    scope.launch {
-                                                        val ragContext = ragViewModel.queryAndStoreResults(finalPrompt)
-                                                        chatViewModel.setRagContext(
-                                                            ragContext.ifBlank { null },
-                                                            ragViewModel.lastRagResults.value
-                                                        )
-                                                        chatViewModel.sendChatWithImages(finalPrompt, imageBytesList)
-                                                    }
-                                                } else {
-                                                    if (!hasAttachedDoc) {
-                                                        chatViewModel.clearRagContext()
-                                                    }
-                                                    chatViewModel.sendChatWithImages(finalPrompt, imageBytesList)
-                                                }
-                                            } else {
-                                                if (hasRags) {
-                                                    value = ""
-                                                    attachedImages = emptyList()
-                                                    attachedFiles = emptyList()
-                                                    scope.launch {
-                                                        val ragContext = ragViewModel.queryAndStoreResults(finalPrompt)
-                                                        chatViewModel.setRagContext(
-                                                            ragContext.ifBlank { null },
-                                                            ragViewModel.lastRagResults.value
-                                                        )
-                                                        chatViewModel.sendTextMessage(finalPrompt)
-                                                    }
-                                                } else {
-                                                    if (!hasAttachedDoc) {
-                                                        chatViewModel.clearRagContext()
-                                                    }
-                                                    chatViewModel.sendTextMessage(finalPrompt)
-                                                    value = ""
-                                                    attachedImages = emptyList()
-                                                    attachedFiles = emptyList()
-                                                }
-                                            }
-                                        }
-                                    },
+                                    onClick = handleSendMessage,
                                     modifier = Modifier.size(36.dp),
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
@@ -1154,3 +1388,114 @@ private fun ToggleRow(
         )
     )
 }
+
+@Composable
+private fun AttachmentRow(
+    context: android.content.Context,
+    attachedImages: List<Uri>,
+    attachedFiles: List<Uri>,
+    isRagProcessing: Boolean,
+    onRemoveImage: (Uri) -> Unit,
+    onRemoveFile: (Uri) -> Unit
+) {
+    if (attachedImages.isNotEmpty() || attachedFiles.isNotEmpty()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            attachedImages.forEach { uri ->
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                ) {
+                    val resolver = context.contentResolver
+                    val bitmap = remember(uri) {
+                        try {
+                            resolver.openInputStream(uri)?.use { stream ->
+                                android.graphics.BitmapFactory.decodeStream(stream)
+                            }
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = "Attachment",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Icon(
+                        imageVector = TnIcons.X,
+                        contentDescription = "Remove",
+                        modifier = Modifier
+                            .size(16.dp)
+                            .align(Alignment.TopEnd)
+                            .clickable { onRemoveImage(uri) }
+                            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f), CircleShape)
+                            .padding(2.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            attachedFiles.forEach { uri ->
+                val fileName = remember(uri) {
+                    val cursor = context.contentResolver.query(uri, null, null, null, null)
+                    cursor?.use {
+                        val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1 && it.moveToFirst()) it.getString(nameIndex) else "File"
+                    } ?: "File"
+                }
+                Row(
+                    modifier = Modifier
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = TnIcons.FileText,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = fileName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.widthIn(max = 100.dp)
+                    )
+                    if (isRagProcessing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Icon(
+                            imageVector = TnIcons.X,
+                            contentDescription = "Remove",
+                            modifier = Modifier
+                                .size(14.dp)
+                                .clickable { onRemoveFile(uri) },
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+

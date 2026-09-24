@@ -7,10 +7,9 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +20,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -30,7 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +46,7 @@ import com.bit.models.Skill
 import com.bit.skills.SkillManager
 import com.bit.ui.components.ItemPosition
 import com.bit.ui.components.PhysicsSwipeToDelete
+import com.bit.ui.icons.TnIcons
 import com.bit.ui.theme.LocalBitHaptics
 import com.bit.util.SkillExportImport
 import kotlinx.coroutines.launch
@@ -62,15 +63,17 @@ fun LazyListScope.skillsSection(
 
 @Composable
 fun SkillsContent(
-    skillManager: SkillManager
+    skillManager: SkillManager,
+    onUseSkillInChat: ((String) -> Unit)? = null
 ) {
-    SkillsScreen(skillManager = skillManager)
+    SkillsScreen(skillManager = skillManager, onUseSkillInChat = onUseSkillInChat)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkillsScreen(
-    skillManager: SkillManager
+    skillManager: SkillManager,
+    onUseSkillInChat: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -80,6 +83,7 @@ fun SkillsScreen(
     var localOrder by remember(skills) { mutableStateOf(skills) }
 
     val coroutineScope = rememberCoroutineScope()
+    var selectedSkillForDetail by remember { mutableStateOf<Skill?>(null) }
     var selectedSkillForEdit by remember { mutableStateOf<Skill?>(null) }
     var showCreateSheet by remember { mutableStateOf(false) }
     var showImportUrlDialog by remember { mutableStateOf(false) }
@@ -93,7 +97,8 @@ fun SkillsScreen(
             val matchesSearch = searchQuery.isBlank() ||
                     skill.name.contains(searchQuery, ignoreCase = true) ||
                     skill.description.contains(searchQuery, ignoreCase = true) ||
-                    skill.instructions.contains(searchQuery, ignoreCase = true)
+                    skill.instructions.contains(searchQuery, ignoreCase = true) ||
+                    skillManager.getSkillSlug(skill).contains(searchQuery, ignoreCase = true)
 
             val matchesFilter = when (selectedFilterIndex) {
                 1 -> skill.enabled
@@ -161,7 +166,7 @@ fun SkillsScreen(
         )
     }
 
-    // First-time tool notice dialog
+    // First-time notice dialog
     val prefs = remember { context.getSharedPreferences("bit_ui_prefs", Context.MODE_PRIVATE) }
     var showFirstTimeSkillsDialog by remember {
         mutableStateOf(!prefs.getBoolean("has_seen_skills_notice", false))
@@ -174,33 +179,24 @@ fun SkillsScreen(
                 prefs.edit().putBoolean("has_seen_skills_notice", true).apply()
             },
             icon = {
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(52.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Rounded.Build,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                }
+                Icon(
+                    Icons.Rounded.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
             },
             title = {
                 Text(
                     "Agent Skills Framework",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
                 )
             },
             text = {
                 Text(
-                    "Agent Skills inject progressive behavioral instructions, prompt guidelines, and domain specializations (following Claude SKILL.md standard) directly into the model context.",
+                    "Agent Skills inject specialized behavioral instructions, domain patterns, and capabilities (Anthropic SKILL.md standard) directly into the agent context.",
                     style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = 20.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             },
@@ -210,13 +206,11 @@ fun SkillsScreen(
                         bitHaptics.pop()
                         showFirstTimeSkillsDialog = false
                         prefs.edit().putBoolean("has_seen_skills_notice", true).apply()
-                    },
-                    shape = RoundedCornerShape(12.dp)
+                    }
                 ) {
                     Text("Got It")
                 }
-            },
-            shape = RoundedCornerShape(24.dp)
+            }
         )
     }
 
@@ -225,369 +219,371 @@ fun SkillsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
-        contentPadding = PaddingValues(horizontal = Standards.SpacingMd, vertical = Standards.SpacingSm),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // ── 1. MATERIAL 3 EXPRESSIVE HERO HEADER ──
-        item(key = "hero_banner") {
+        // ── 1. HEADER / TOOLBAR CARD (MATCHES MCP & SETTINGS SCREEN) ──
+        item(key = "header_toolbar") {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                shape = RoundedCornerShape(Standards.RadiusLg),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
             ) {
-                Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.size(48.dp)
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Build,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Rounded.AutoAwesome,
+                                contentDescription = "Skills",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
-
-                        Column(modifier = Modifier.weight(1f)) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
                             Text(
                                 text = "Agent Skills",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Modular instruction skills and prompt capabilities (Claude SKILL.md)",
+                                text = "${skills.count { it.enabled }} active • ${skills.size} total",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
 
-                    // Stat Pills Row
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
-                        val activeCount = skills.count { it.enabled }
-                        val customCount = skills.count { !it.isBuiltIn }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                Text(
-                                    text = "TOTAL",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "${skills.size}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                Text(
-                                    text = "ACTIVE",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Text(
-                                    text = "$activeCount",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                Text(
-                                    text = "CUSTOM",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                                Text(
-                                    text = "$customCount",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                        }
-                    }
-
-                    // Action Buttons Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
+                        IconButton(
                             onClick = {
                                 bitHaptics.pop()
                                 importLauncher.launch(arrayOf("*/*", "text/markdown", "application/json"))
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                            }
                         ) {
-                            Icon(Icons.Rounded.FileUpload, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("File", style = MaterialTheme.typography.labelMedium)
+                            Icon(
+                                imageVector = Icons.Rounded.FileUpload,
+                                contentDescription = "Import file",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-
-                        OutlinedButton(
+                        IconButton(
                             onClick = {
                                 bitHaptics.pop()
                                 showImportUrlDialog = true
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1.2f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                            }
                         ) {
-                            Icon(Icons.Rounded.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("URL / Git", style = MaterialTheme.typography.labelMedium)
+                            Icon(
+                                imageVector = Icons.Rounded.CloudDownload,
+                                contentDescription = "Import URL",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-
-                        Button(
+                        FilledTonalButton(
                             onClick = {
                                 bitHaptics.pop()
                                 showCreateSheet = true
                             },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1.2f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp)
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(Standards.RadiusMd),
+                            modifier = Modifier.height(36.dp)
                         ) {
                             Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("New Skill", style = MaterialTheme.typography.labelMedium)
+                            Text("New", style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
             }
         }
 
-        // ── 2. FILTER CHIPS & SEARCH ──
-        item(key = "filters_section") {
+        // ── 2. SEARCH BAR & FILTER CHIPS ──
+        item(key = "search_and_filters") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Search field if list is large
-                if (localOrder.size > 3) {
-                    OutlinedTextField(
+                // Search bar matching SettingsScreen
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = TnIcons.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    BasicTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        placeholder = { Text("Search skills...") },
-                        leadingIcon = {
-                            Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(20.dp))
-                        },
-                        trailingIcon = {
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { searchQuery = "" }) {
-                                    Icon(Icons.Rounded.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
-                                }
-                            }
-                        },
                         singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        )
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.weight(1f),
+                        decorationBox = { innerTextField ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (searchQuery.isEmpty()) {
+                                    Text(
+                                        text = "Search skills or /commands...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
                     )
+
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(
+                            onClick = { searchQuery = "" },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = TnIcons.X,
+                                contentDescription = "Clear",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                 }
 
-                // Material 3 Filter Chips Row
+                // Filter Chips
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    filters.forEachIndexed { idx, label ->
+                    filters.forEachIndexed { index, filter ->
+                        val isSelected = selectedFilterIndex == index
                         FilterChip(
-                            selected = selectedFilterIndex == idx,
+                            selected = isSelected,
                             onClick = {
                                 bitHaptics.selection()
-                                selectedFilterIndex = idx
+                                selectedFilterIndex = index
                             },
-                            label = { Text(label) },
-                            shape = RoundedCornerShape(10.dp),
-                            leadingIcon = if (selectedFilterIndex == idx) {
-                                {
-                                    Icon(
-                                        Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                            } else null
+                            label = {
+                                Text(
+                                    filter,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            },
+                            shape = RoundedCornerShape(Standards.RadiusMd),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            )
                         )
                     }
                 }
             }
         }
 
-        // ── 3. SKILL CARDS LIST ──
+        // ── 3. SKILL CARDS ──
         if (filteredSkills.isEmpty()) {
             item(key = "empty_state") {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 40.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Column(
-                        modifier = Modifier
-                            .padding(32.dp)
-                            .fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            modifier = Modifier.size(56.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Rounded.Build,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-                        }
+                        Icon(
+                            imageVector = TnIcons.Sparkles,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.outlineVariant,
+                            modifier = Modifier.size(48.dp)
+                        )
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "No matching skills found" else "No skills configured",
+                            text = if (searchQuery.isNotEmpty()) "No matching skills" else "No skills configured",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "Try a different search term or clear the filter." else "Tap \"New Skill\" or \"Import\" to add a custom SKILL.md capability.",
+                            text = if (searchQuery.isNotEmpty()) "Try a different search term" else "Tap '+ New' to create an agent skill",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        if (searchQuery.isNotEmpty()) {
+                            TextButton(onClick = { searchQuery = "" }) {
+                                Text("Clear Search")
+                            }
+                        }
                     }
                 }
             }
         } else {
-            items(filteredSkills, key = { it.id }) { skill ->
-                val index = localOrder.indexOf(skill)
-                val position = when {
-                    localOrder.size == 1 -> ItemPosition.ONLY
-                    index == 0 -> ItemPosition.FIRST
-                    index == localOrder.lastIndex -> ItemPosition.LAST
-                    else -> ItemPosition.MIDDLE
-                }
+            items(
+                items = filteredSkills,
+                key = { it.id }
+            ) { skill ->
+                ReorderableItem(reorderableState, key = skill.id) { isDragging ->
+                    val slug = skillManager.getSkillSlug(skill)
 
-                ReorderableItem(state = reorderableState, key = skill.id) { isDragging ->
-                    val elevation by animateDpAsState(if (isDragging) 8.dp else 0.dp, label = "elevation")
-                    val scale by animateFloatAsState(if (isDragging) 1.02f else 1f, label = "scale")
-                    val alpha by animateFloatAsState(if (isDragging) 0.92f else 1f, label = "alpha")
-
-                    PhysicsSwipeToDelete(
-                        onDelete = {
-                            bitHaptics.thud()
-                            skillManager.removeSkill(skill.id)
-                            Toast.makeText(context, "Deleted \"${skill.name}\"", Toast.LENGTH_SHORT).show()
-                        },
-                        position = position,
-                        modifier = Modifier
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                shadowElevation = elevation.toPx()
-                                this.alpha = alpha
+                    if (!skill.isBuiltIn) {
+                        PhysicsSwipeToDelete(
+                            onDelete = {
+                                bitHaptics.thud()
+                                skillManager.removeSkill(skill.id)
+                                Toast.makeText(context, "Deleted \"${skill.name}\"", Toast.LENGTH_SHORT).show()
                             }
-                    ) { shape ->
+                        ) { shape ->
+                            SkillCard(
+                                skill = skill,
+                                slug = slug,
+                                isDragging = isDragging,
+                                shape = shape,
+                                dragHandle = {
+                                    IconButton(
+                                        onClick = {},
+                                        modifier = Modifier.draggableHandle()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.DragHandle,
+                                            contentDescription = "Reorder",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                },
+                                onToggle = { enabled ->
+                                    skillManager.toggleSkill(skill.id, enabled)
+                                },
+                                onClick = {
+                                    bitHaptics.pop()
+                                    selectedSkillForDetail = skill
+                                }
+                            )
+                        }
+                    } else {
                         SkillCard(
                             skill = skill,
-                            shape = shape,
+                            slug = slug,
+                            isDragging = isDragging,
                             dragHandle = {
-                                Icon(
-                                    Icons.Rounded.DragIndicator,
-                                    contentDescription = "Reorder ${skill.name}",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .padding(8.dp)
-                                        .longPressDraggableHandle(
-                                            onDragStarted = {
-                                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            },
-                                            onDragStopped = {
-                                                skillManager.setOrderedSkills(localOrder)
-                                            }
-                                        )
-                                )
+                                IconButton(
+                                    onClick = {},
+                                    modifier = Modifier.draggableHandle()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.DragHandle,
+                                        contentDescription = "Reorder",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             },
-                            onToggle = { isEnabled ->
-                                bitHaptics.selection()
-                                skillManager.toggleSkill(skill.id, isEnabled)
+                            onToggle = { enabled ->
+                                skillManager.toggleSkill(skill.id, enabled)
                             },
                             onClick = {
                                 bitHaptics.pop()
-                                selectedSkillForEdit = skill
-                            },
-                            onExportMd = {
-                                val md = SkillExportImport.exportToSkillMd(skill)
-                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                cm.setPrimaryClip(ClipData.newPlainText("SKILL.md", md))
-                                Toast.makeText(context, "Copied SKILL.md to clipboard", Toast.LENGTH_SHORT).show()
+                                selectedSkillForDetail = skill
                             }
                         )
                     }
                 }
             }
         }
+
+        item(key = "bottom_spacer") {
+            Spacer(modifier = Modifier.height(24.dp))
+        }
     }
 
-    // ── EDIT / CREATE MODAL SHEET ──
-    val activeSkill = selectedSkillForEdit
-    if (activeSkill != null) {
-        SkillEditorSheet(
-            skill = activeSkill,
-            isNew = false,
-            onDismiss = { selectedSkillForEdit = null },
-            onSave = { updated ->
-                skillManager.updateSkill(updated)
-                selectedSkillForEdit = null
-                Toast.makeText(context, "Saved \"${updated.name}\"", Toast.LENGTH_SHORT).show()
-            }
+    // Detail Sheet
+    selectedSkillForDetail?.let { skill ->
+        SkillDetailSheet(
+            skill = skill,
+            slug = skillManager.getSkillSlug(skill),
+            onDismiss = { selectedSkillForDetail = null },
+            onToggle = { enabled ->
+                skillManager.toggleSkill(skill.id, enabled)
+                selectedSkillForDetail = skill.copy(enabled = enabled)
+            },
+            onEdit = {
+                selectedSkillForDetail = null
+                selectedSkillForEdit = skill
+            },
+            onDelete = {
+                skillManager.removeSkill(skill.id)
+                selectedSkillForDetail = null
+                Toast.makeText(context, "Deleted \"${skill.name}\"", Toast.LENGTH_SHORT).show()
+            },
+            onExportMd = {
+                val text = SkillExportImport.exportToSkillMd(skill)
+                val sendIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TEXT, text)
+                    type = "text/plain"
+                }
+                context.startActivity(android.content.Intent.createChooser(sendIntent, "Share ${skill.name} (SKILL.md)"))
+            },
+            onExportJson = {
+                val json = SkillExportImport.exportToJson(skill)
+                val sendIntent = android.content.Intent().apply {
+                    action = android.content.Intent.ACTION_SEND
+                    putExtra(android.content.Intent.EXTRA_TEXT, json)
+                    type = "application/json"
+                }
+                context.startActivity(android.content.Intent.createChooser(sendIntent, "Share ${skill.name} (JSON)"))
+            },
+            onUseInChat = onUseSkillInChat
         )
     }
 
+    // Create / Edit Sheet
     if (showCreateSheet) {
         SkillEditorSheet(
             skill = Skill(name = "", description = "", instructions = "", icon = "code"),
@@ -596,128 +592,429 @@ fun SkillsScreen(
             onSave = { newSkill ->
                 skillManager.addSkill(newSkill)
                 showCreateSheet = false
-                Toast.makeText(context, "Created \"${newSkill.name}\"", Toast.LENGTH_SHORT).show()
+                bitHaptics.success()
+                Toast.makeText(context, "Skill created", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    selectedSkillForEdit?.let { skill ->
+        SkillEditorSheet(
+            skill = skill,
+            isNew = false,
+            onDismiss = { selectedSkillForEdit = null },
+            onSave = { updated ->
+                skillManager.updateSkill(updated)
+                selectedSkillForEdit = null
+                bitHaptics.success()
+                Toast.makeText(context, "Skill updated", Toast.LENGTH_SHORT).show()
             }
         )
     }
 }
 
+// ─────────────────────────────────────────────────────────────
+// MINIMAL MATERIAL 3 SKILL CARD
+// ─────────────────────────────────────────────────────────────
 @Composable
 fun SkillCard(
     skill: Skill,
-    shape: androidx.compose.ui.graphics.Shape,
+    slug: String,
+    isDragging: Boolean = false,
+    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(Standards.RadiusMd),
     dragHandle: @Composable () -> Unit = {},
     onToggle: (Boolean) -> Unit,
-    onClick: () -> Unit,
-    onExportMd: () -> Unit
+    onClick: () -> Unit
 ) {
+    val bitHaptics = LocalBitHaptics.current
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+        colors = CardDefaults.cardColors(
+            containerColor = if (skill.enabled) MaterialTheme.colorScheme.surfaceContainer
+            else MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (skill.enabled) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)
+        )
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Drag handle — isolated 44dp touch area
+            // Drag handle
             dragHandle()
 
-            // Skill Icon with tonal container
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (skill.enabled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.size(44.dp)
+            // Icon container
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(Standards.RadiusSm))
+                    .background(
+                        if (skill.enabled) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = getSkillIcon(skill.icon),
-                        contentDescription = null,
-                        tint = if (skill.enabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                Icon(
+                    imageVector = getSkillIcon(skill.icon),
+                    contentDescription = null,
+                    tint = if (skill.enabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
             }
 
-            // Text Info — Clickable region for editing
+            // Text Info — Clickable region for details
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .clip(RoundedCornerShape(8.dp))
                     .clickable(onClick = onClick)
                     .padding(vertical = 2.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = skill.name,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
+
+                    // Command Slug Badge (e.g. /web-search)
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                    ) {
+                        Text(
+                            text = "/$slug",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+
                     if (skill.isBuiltIn) {
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                            modifier = Modifier.wrapContentWidth()
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Text(
                                 text = "BUILT-IN",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                maxLines = 1,
-                                softWrap = false,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                             )
                         }
                     }
                 }
 
                 if (skill.description.isNotBlank()) {
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(3.dp))
                     Text(
                         text = skill.description,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        lineHeight = 16.sp
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            // Actions (Export & Toggle)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(onClick = onExportMd, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        Icons.Rounded.ContentCopy,
-                        contentDescription = "Copy SKILL.md",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                Switch(
-                    checked = skill.enabled,
-                    onCheckedChange = onToggle
+            // Material 3 Switch
+            Switch(
+                checked = skill.enabled,
+                onCheckedChange = {
+                    bitHaptics.selection()
+                    onToggle(it)
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primaryContainer,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
                 )
-            }
+            )
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────
+// DETAIL MODAL BOTTOM SHEET
+// ─────────────────────────────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SkillDetailSheet(
+    skill: Skill,
+    slug: String,
+    onDismiss: () -> Unit,
+    onToggle: (Boolean) -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onExportMd: () -> Unit,
+    onExportJson: () -> Unit,
+    onUseInChat: ((String) -> Unit)? = null
+) {
+    val context = LocalContext.current
+    val bitHaptics = LocalBitHaptics.current
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(topStart = Standards.RadiusLg, topEnd = Standards.RadiusLg),
+        tonalElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .padding(horizontal = 20.dp, vertical = 6.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Header Row: Icon + Name + Switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(Standards.RadiusSm))
+                        .background(
+                            if (skill.enabled) MaterialTheme.colorScheme.primaryContainer
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = getSkillIcon(skill.icon),
+                        contentDescription = null,
+                        tint = if (skill.enabled) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = skill.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                        ) {
+                            Text(
+                                text = "/$slug",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Text(
+                                text = if (skill.isBuiltIn) "BUILT-IN" else "CUSTOM",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                Switch(
+                    checked = skill.enabled,
+                    onCheckedChange = {
+                        bitHaptics.selection()
+                        onToggle(it)
+                    }
+                )
+            }
+
+            // Description
+            if (skill.description.isNotBlank()) {
+                Text(
+                    text = skill.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Instructions section
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "INSTRUCTIONS",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 1.sp
+                    )
+
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Skill Instructions", skill.instructions))
+                            bitHaptics.pop()
+                            Toast.makeText(context, "Instructions copied", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ContentCopy,
+                            contentDescription = "Copy instructions",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(Standards.RadiusMd),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = skill.instructions.ifBlank { "No behavioral instructions defined." },
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
+
+            // Action Buttons
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (onUseInChat != null) {
+                    Button(
+                        onClick = {
+                            bitHaptics.pop()
+                            onDismiss()
+                            onUseInChat("/$slug ")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(Standards.RadiusMd)
+                    ) {
+                        Icon(Icons.Rounded.Chat, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Use in Chat")
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            bitHaptics.pop()
+                            onExportMd()
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(Standards.RadiusMd)
+                    ) {
+                        Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Share .md")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            bitHaptics.pop()
+                            onExportJson()
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(Standards.RadiusMd)
+                    ) {
+                        Icon(Icons.Rounded.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Share JSON")
+                    }
+                }
+
+                if (!skill.isBuiltIn) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalButton(
+                            onClick = {
+                                bitHaptics.pop()
+                                onEdit()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(Standards.RadiusMd)
+                        ) {
+                            Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Edit")
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                bitHaptics.thud()
+                                onDelete()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(Standards.RadiusMd),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Delete")
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// SKILL EDITOR BOTTOM SHEET (CREATE & EDIT)
+// ─────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SkillEditorSheet(
@@ -729,16 +1026,17 @@ fun SkillEditorSheet(
     var name by remember { mutableStateOf(skill.name) }
     var description by remember { mutableStateOf(skill.description) }
     var instructions by remember { mutableStateOf(skill.instructions) }
-    var icon by remember { mutableStateOf(skill.icon ?: "sparkles") }
+    var icon by remember { mutableStateOf(skill.icon ?: "terminal") }
     var enabled by remember { mutableStateOf(skill.enabled) }
 
     val iconOptions = listOf(
-        "sparkles" to Icons.Rounded.AutoAwesome,
-        "search" to Icons.Rounded.Search,
-        "storage" to Icons.Rounded.Storage,
         "terminal" to Icons.Rounded.Terminal,
         "code" to Icons.Rounded.Code,
+        "mcp" to TnIcons.Mcp,
+        "search" to Icons.Rounded.Search,
+        "storage" to Icons.Rounded.Storage,
         "security" to Icons.Rounded.Security,
+        "auto" to Icons.Rounded.AutoAwesome,
         "translate" to Icons.Rounded.Translate,
         "brush" to Icons.Rounded.Brush,
         "psychology" to Icons.Rounded.Psychology
@@ -747,153 +1045,162 @@ fun SkillEditorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        shape = RoundedCornerShape(topStart = Standards.RadiusLg, topEnd = Standards.RadiusLg),
         tonalElevation = 2.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f)
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-                .verticalScroll(rememberScrollState())
-                .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .fillMaxHeight(0.9f)
+                .padding(horizontal = 20.dp, vertical = 6.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = if (isNew) "Create Agent Skill" else "Edit Agent Skill",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = if (enabled) "Enabled" else "Disabled",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Switch(checked = enabled, onCheckedChange = { enabled = it })
-                }
-            }
+            Text(
+                text = if (isNew) "Create Agent Skill" else "Edit Skill",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
             // Name
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
                 label = { Text("Skill Name") },
-                placeholder = { Text("e.g. Code Reviewer, Deep Researcher") },
+                placeholder = { Text("e.g. Code Reviewer") },
                 singleLine = true,
-                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
+                shape = RoundedCornerShape(Standards.RadiusMd)
             )
 
-            // Description / Trigger
+            // Description
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Description & Trigger Criteria") },
-                placeholder = { Text("When and why the AI should apply this skill...") },
-                maxLines = 3,
-                shape = RoundedCornerShape(14.dp),
+                label = { Text("Description") },
+                placeholder = { Text("What does this skill help with?") },
+                singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
+                shape = RoundedCornerShape(Standards.RadiusMd)
             )
 
-            // Icon Chips
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Icon Picker
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "Skill Icon",
-                    style = MaterialTheme.typography.labelMedium,
+                    text = "ICON",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(iconOptions) { (key, imageVector) ->
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(iconOptions) { (key, vector) ->
                         val isSelected = icon == key
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                        Box(
                             modifier = Modifier
-                                .size(44.dp)
-                                .clickable { icon = key }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = imageVector,
-                                    contentDescription = key,
-                                    tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(22.dp)
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(Standards.RadiusSm))
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.surfaceContainerHigh
                                 )
-                            }
+                                .border(
+                                    1.dp,
+                                    if (isSelected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                                    RoundedCornerShape(Standards.RadiusSm)
+                                )
+                                .clickable { icon = key },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = vector,
+                                contentDescription = key,
+                                tint = if (isSelected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
             }
 
-            // Markdown Instructions Body
+            // Instructions
             OutlinedTextField(
                 value = instructions,
                 onValueChange = { instructions = it },
-                label = { Text("Instructions Body (Claude SKILL.md markdown)") },
-                placeholder = { Text("Enter the system prompt instructions, rules, and behavioral guidelines...") },
+                label = { Text("Behavioral Instructions (Markdown)") },
+                placeholder = { Text("Instructions injected into system prompt when this skill is invoked...") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 160.dp, max = 320.dp),
-                textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
+                    .height(200.dp),
+                shape = RoundedCornerShape(Standards.RadiusMd)
             )
 
-            // Save button
-            Button(
-                onClick = {
-                    if (name.isNotBlank()) {
-                        onSave(
-                            skill.copy(
-                                name = name.trim(),
-                                description = description.trim(),
-                                instructions = instructions.trim(),
-                                icon = icon,
-                                enabled = enabled
-                            )
-                        )
-                    }
-                },
-                enabled = name.isNotBlank(),
-                shape = RoundedCornerShape(14.dp),
+            // Enable switch
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 14.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(if (isNew) "Create Skill" else "Save Changes", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    text = "Enable Skill Immediately",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Switch(
+                    checked = enabled,
+                    onCheckedChange = { enabled = it }
+                )
             }
 
-            Spacer(Modifier.height(24.dp))
+            // Save / Cancel Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(Standards.RadiusMd)
+                ) {
+                    Text("Cancel")
+                }
+
+                Button(
+                    onClick = {
+                        if (name.isNotBlank()) {
+                            onSave(
+                                skill.copy(
+                                    name = name.trim(),
+                                    description = description.trim(),
+                                    instructions = instructions.trim(),
+                                    icon = icon,
+                                    enabled = enabled,
+                                    isBuiltIn = false
+                                )
+                            )
+                        }
+                    },
+                    enabled = name.isNotBlank(),
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(Standards.RadiusMd)
+                ) {
+                    Text(if (isNew) "Create" else "Save")
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
 
-fun getSkillIcon(iconKey: String?): ImageVector {
-    return when (iconKey?.lowercase()) {
+private fun getSkillIcon(icon: String?): ImageVector {
+    return when (icon?.lowercase()) {
+        "mcp" -> TnIcons.Mcp
         "search" -> Icons.Rounded.Search
         "storage" -> Icons.Rounded.Storage
         "terminal" -> Icons.Rounded.Terminal
@@ -902,7 +1209,8 @@ fun getSkillIcon(iconKey: String?): ImageVector {
         "translate" -> Icons.Rounded.Translate
         "brush" -> Icons.Rounded.Brush
         "psychology" -> Icons.Rounded.Psychology
-        else -> Icons.Rounded.Build
+        "auto" -> Icons.Rounded.AutoAwesome
+        else -> Icons.Rounded.Terminal
     }
 }
 
@@ -917,56 +1225,60 @@ private fun ImportSkillUrlDialog(
     AlertDialog(
         onDismissRequest = { if (!loading) onDismiss() },
         icon = {
-            Icon(Icons.Rounded.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Icon(
+                Icons.Rounded.CloudDownload,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(28.dp)
+            )
         },
         title = {
-            Text("Import Skill from URL / Git", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                "Import From URL / Git",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "Paste a GitHub repository / directory URL (e.g. `https://github.com/anthropics/skills/...`), raw `SKILL.md` link, or JSON export.",
+                    "Paste a raw URL to a SKILL.md file or skill JSON definition:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text("Skill URL") },
-                    placeholder = { Text("https://github.com/...", fontFamily = FontFamily.Monospace) },
+                    placeholder = { Text("https://raw.githubusercontent.com/.../SKILL.md") },
                     singleLine = true,
-                    enabled = !loading,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(Standards.RadiusMd)
                 )
                 if (loading) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        Text("Downloading and parsing SKILL.md...", style = MaterialTheme.typography.bodySmall)
-                    }
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    loading = true
-                    onConfirm(url)
+                    if (url.isNotBlank()) {
+                        loading = true
+                        onConfirm(url.trim())
+                    }
                 },
-                enabled = url.isNotBlank() && !loading,
-                shape = RoundedCornerShape(12.dp)
+                enabled = url.isNotBlank() && !loading
             ) {
                 Text("Import")
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !loading) {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !loading
+            ) {
                 Text("Cancel")
             }
-        },
-        shape = RoundedCornerShape(20.dp)
+        }
     )
 }
